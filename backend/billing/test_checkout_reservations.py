@@ -443,3 +443,22 @@ class CheckoutReconciliationAdminTests(TestCase):
         payment = ShiftPayment.objects.get()
         self.assertTrue(payment.reconciliation_required)
         self.assertFalse(ShiftSlotAssignment.objects.exists())
+
+    def test_delayed_provider_creation_after_recovery_is_expired_at_the_provider(self):
+        from billing.checkout_reservations import CheckoutConflict, expire_unreconciled_checkout, open_checkout
+        self.checkout.side_effect = TimeoutError('provider may have accepted')
+        self.assertEqual(self.charge().status_code, 503)
+        attempt = self.attempt()
+
+        def resumes_after_recovery(**kwargs):
+            # The request passed its age check, then stalled while an operator recovered the attempt.
+            FulfillmentCheckout.objects.update(created_at=timezone.now() - timedelta(hours=49))
+            expire_unreconciled_checkout(attempt)
+            return fixtures._StripeObject(id='cs_orphan', url='https://checkout.example.test/orphan')
+        self.checkout.side_effect = resumes_after_recovery
+        with patch('billing.stripe_support.stripe.checkout.Session.expire') as expire:
+            with self.assertRaises(CheckoutConflict):
+                open_checkout(attempt)
+        expire.assert_called_once_with('cs_orphan')
+        attempt.refresh_from_db()
+        self.assertEqual((attempt.state, attempt.stripe_session_id), (FulfillmentCheckout.State.EXPIRED, None))

@@ -134,6 +134,12 @@ def open_checkout(attempt):
             raise ValueError("Checkout response is missing its identity or URL")
         with transaction.atomic():
             current = FulfillmentCheckout.objects.select_for_update().get(pk=attempt.pk)
+            orphaned = current.state == FulfillmentCheckout.State.EXPIRED and current.stripe_session_id != session_id
+        if orphaned:
+            # A delayed request resumed after operator recovery: its new session must never be payable.
+            _expire_orphaned_session(attempt.pk, session_id)
+        with transaction.atomic():
+            current = FulfillmentCheckout.objects.select_for_update().get(pk=attempt.pk)
             if current.state in (FulfillmentCheckout.State.COMPLETE, FulfillmentCheckout.State.EXPIRED):
                 raise CheckoutConflict("Checkout state changed. Refresh the shift before continuing.")
             if current.stripe_session_id and current.stripe_session_id != session_id:
@@ -153,6 +159,14 @@ def open_checkout(attempt):
             state=FulfillmentCheckout.State.UNKNOWN,
         )
         raise CheckoutUncertain("Checkout acceptance is uncertain. Retry this unchanged request; do not create another payment.")
+
+
+def _expire_orphaned_session(attempt_id, session_id):
+    try:
+        stripe.checkout.Session.expire(session_id)
+    except Exception:
+        log.exception("Could not expire orphaned provider session %s for recovered attempt %s; reconcile it now",
+                      session_id, attempt_id)
 
 
 def expire_checkout(attempt):
