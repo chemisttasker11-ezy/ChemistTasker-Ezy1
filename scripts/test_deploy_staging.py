@@ -15,35 +15,62 @@ FAKE_TOOL = r'''#!/usr/bin/env python3
 import json, os, pathlib, sys
 args=sys.argv[1:]
 root=pathlib.Path(os.environ['FAKE_ROOT'])
+tool=pathlib.Path(sys.argv[0]).name
 with (root/'calls.jsonl').open('a') as log:
-    log.write(json.dumps([pathlib.Path(sys.argv[0]).name,*args])+'\n')
-if pathlib.Path(sys.argv[0]).name!='docker':
+    log.write(json.dumps([tool,*args])+'\n')
+if tool=='git':
+    if args[:2]==['rev-parse','HEAD']:
+        print('2'*40 if os.environ.get('WRONG_SHA') else '1'*40)
+    elif args[:2]==['status','--porcelain'] and os.environ.get('DIRTY_TREE'):
+        print(' M unreviewed.py')
     sys.exit(0)
+if tool!='docker': sys.exit(0)
 if args[0]=='compose':
-    operation=next(x for x in args if x in ['config','build','ps','up','restart','stop','exec'])
-    if operation=='build' and os.environ.get('FAIL_BUILD'):
-        sys.exit(10)
-    if operation=='ps':
-        if not os.environ.get('NEW_GATEWAY'):
-            print('gateway-id')
-    if operation=='restart':
-        (root/'restarted').touch()
+    operation=next(x for x in args if x in ['config','build','ps','up','restart','stop','exec','run'])
+    if operation=='config' and '--format' in args:
+        services={'gateway':{'image':'nginx:1.27.5-alpine'}}
+        if '--profile' in args and args[args.index('--profile')+1]=='release':
+            services['migration']={'environment':{'RUN_MIGRATIONS':'0' if os.environ.get('DISABLE_MIGRATIONS') else '1'}}
+        print(json.dumps({'services':services}))
+    if operation=='build' and os.environ.get('FAIL_BUILD'): sys.exit(10)
+    if operation=='run' and os.environ.get('FAIL_MIGRATION'): sys.exit(15)
+    if operation=='up' and 'web' in args:
+        (root/'web-started').touch()
+        if os.environ.get('FAIL_WEB'): sys.exit(13)
+    if operation=='ps' and '-q' in args:
+        if not (args[-1]=='gateway' and os.environ.get('NEW_GATEWAY')):
+            print(args[-1]+'-id')
+    if operation=='restart': (root/'restarted').touch()
+elif args[0]=='kill':
+    assert '--signal=TERM' in args, 'A release must never send an unqualified kill'
+    (root/('stopped-'+args[-1])).touch()
 elif args[0]=='ps':
-    print('chemisttasker_postgres_staging')
+    if not os.environ.get('MISSING_DB'): print('chemisttasker_postgres_staging')
 elif args[0]=='inspect':
-    if 'Health.Status' in args[2]:
+    if args[-1]=='chemisttasker_staging_migrate':
+        if os.environ.get('MIGRATION_RUNNING'): print('true')
+        else: sys.exit(1)
+    elif 'State.ExitCode' in args[2]:
+        print('137' if os.environ.get('FORCED_STOP') else '0')
+    elif 'State.OOMKilled' in args[2]: print('false')
+    elif 'State.Running' in args[2]:
+        stopped=(root/('stopped-'+args[-1])).exists()
+        print('false' if os.environ.get('STOPPED_WRITERS') or (stopped and not os.environ.get('STUCK_WRITER')) else 'true')
+    elif 'Health.Status' in args[2]:
         print('unhealthy' if os.environ.get('UNHEALTHY_GATEWAY') else 'healthy')
     else:
-        changed=os.environ.get('CHANGED_ADDRESS') and (root/'restarted').exists()
+        changed=(os.environ.get('CHANGED_ADDRESS') and (root/'restarted').exists()) or (os.environ.get('PRODUCTION_DRIFT') and args[-1]=='chemisttasker_backend_prod' and (root/'web-started').exists())
         print(json.dumps({'network':{'IPAddress':'172.20.0.9' if changed else '172.20.0.2'}}))
 elif args[0]=='exec' and 'pg_dump' in args:
-    if os.environ.get('FAIL_BACKUP'):
-        sys.exit(11)
+    if os.environ.get('FAIL_BACKUP'): sys.exit(11)
     print('fake-custom-format-archive')
 elif args[0]=='exec' and 'pg_restore' in args:
     sys.stdin.read()
-    if os.environ.get('FAIL_RESTORE_CHECK'):
-        sys.exit(12)
+    if '--list' in args:
+        count=root/'archive-checks'
+        number=int(count.read_text())+1 if count.exists() else 1
+        count.write_text(str(number))
+        if os.environ.get('FAIL_RESTORE_CHECK') or (os.environ.get('FAIL_ROLLBACK_CHECK') and number==2): sys.exit(12)
 '''
 
 
@@ -54,12 +81,13 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root/'scripts').mkdir()
         shutil.copyfile(Path(__file__).with_name('deploy-staging.sh'), self.root/'scripts/deploy-staging.sh')
+        (self.root/'scripts/smoke-staging.sh').write_text('#!/bin/sh\n[ -z \"${FAIL_SMOKE:-}\" ] || exit 14\ncurl --fail https://example.test/health/\n')
         (self.root/'env').mkdir()
         for name in ['secrets','runtime','integrations','web']:
             (self.root/f'env/staging.{name}.env').write_text('FAKE_SETTING=test\n')
         (self.root/'env/staging.test-users.json').write_text('{}')
         (self.root/'bin').mkdir()
-        for name in ['docker','curl','sleep']:
+        for name in ['docker','curl','sleep','git']:
             p=self.root/'bin'/name
             p.write_text(FAKE_TOOL)
             p.chmod(0o755)
@@ -67,7 +95,8 @@ class StagingReleaseSafetyTests(unittest.TestCase):
     def release(self, *args, **extra):
         env={**os.environ, 'FAKE_ROOT':str(self.root),
              'PATH':str(self.root/'bin')+os.pathsep+os.environ['PATH'],
-             'STAGING_BACKUP_DIR':str(self.root/'backups'), **extra}
+             'STAGING_BACKUP_DIR':str(self.root/'backups'), 'STAGING_OPS_DIR':str(self.root/'ops'),
+             'STAGING_EXPECTED_SHA':'1'*40, 'STAGING_STOP_TIMEOUT':'2', **extra}
         result=subprocess.run(['bash',str(self.root/'scripts/deploy-staging.sh'),*args],
                               env=env,capture_output=True,text=True,timeout=30)
         path=self.root/'calls.jsonl'
@@ -85,8 +114,9 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         self.assertIn('--no-recreate',infra)
         self.assertTrue(all('gateway' not in x for x in ups))
         self.assertEqual(len(self.operations('restart')),1)
-        self.assertTrue(any('celery_worker' in x and 'celery_beat' in x for x in ups))
-        self.assertFalse(self.operations('stop'))
+        self.assertTrue(any('celery_worker' in x for x in ups))
+        self.assertTrue(any('celery_beat' in x for x in ups))
+        self.assertEqual([x[-1] for x in self.calls if x[:2]==['docker','kill']], ['celery_beat-id','celery_worker-id','web-id'])
         self.assertTrue(all('--no-deps' in x for x in ups if 'postgres' not in x))
         backup=next((self.root/'backups').glob('*.dump'))
         self.assertEqual(backup.stat().st_mode & 0o777,0o600)
@@ -102,16 +132,26 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         self.assertFalse(self.operations('stop'))
         self.assertFalse(self.operations('exec'))
 
+    def test_frontend_only_with_stopped_web_refuses_before_build_or_gateway_restart(self):
+        result=self.release('--frontend-only',STOPPED_WRITERS='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('backend recovery',result.stderr)
+        self.assertFalse(self.operations('build'))
+        self.assertFalse(self.operations('up'))
+        self.assertFalse(self.operations('restart'))
+
     def test_explicit_worker_opt_out(self):
         result=self.release('--without-workers')
         self.assertEqual(result.returncode,0,result.stderr)
-        self.assertEqual(self.operations('stop'),[['celery_worker','celery_beat']])
+        self.assertEqual([x[-1] for x in self.calls if x[:2]==['docker','kill']], ['celery_beat-id','celery_worker-id','web-id'])
+        self.assertFalse(any('celery_worker' in x or 'celery_beat' in x for x in self.operations('up')))
 
     def test_build_failure_does_not_replace_running_services(self):
         self.assertNotEqual(self.release(FAIL_BUILD='1').returncode,0)
         self.assertFalse(self.operations('up'))
         self.assertFalse(self.operations('restart'))
         self.assertFalse(any('pg_dump' in x for x in self.calls))
+        self.assertFalse(any(x[:2]==['docker','kill'] for x in self.calls))
 
     def test_failed_backup_blocks_service_changes(self):
         self.assertNotEqual(self.release(FAIL_BACKUP='1').returncode,0)
@@ -149,6 +189,175 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         self.assertNotEqual(self.release('--invalid').returncode,0)
         self.assertFalse(self.operations('build'))
         self.assertFalse(self.operations('up'))
+
+
+    def test_disabled_or_active_prior_migration_refuses_before_build(self):
+        for flag in ('DISABLE_MIGRATIONS','MIGRATION_RUNNING'):
+            with self.subTest(flag=flag):
+                self.assertNotEqual(self.release(**{flag:'1'}).returncode, 0)
+                self.assertFalse(self.operations('build'))
+                self.assertFalse(any(x[:2]==['docker','kill'] for x in self.calls))
+
+    def refresh(self, **extra):
+        source=Path(__file__).with_name('refresh-staging-db.sh').read_text()
+        backups=self.root/'backups'
+        backups.mkdir()
+        source=source.replace('/opt/backups/chemisttasker',str(backups))
+        script=self.root/'scripts/refresh-staging-db.sh'
+        script.write_text(source)
+        (self.root/'scripts/reconcile-staging-migration-history.sh').write_text('#!/bin/sh\nexit 0\n')
+        archive=backups/'synthetic.dump'
+        archive.write_bytes(b'fixture')
+        env={**os.environ,'FAKE_ROOT':str(self.root),'STAGING_OPS_DIR':str(self.root/'ops'),
+             'PATH':str(self.root/'bin')+os.pathsep+os.environ['PATH'],'STAGING_STOP_TIMEOUT':'2',**extra}
+        result=subprocess.run(['bash',str(script),'--confirm-production-data',str(archive)],
+                              env=env,capture_output=True,text=True,timeout=30)
+        calls=[json.loads(x) for x in (self.root/'calls.jsonl').read_text().splitlines()]
+        return result,calls
+
+    def test_refresh_bad_input_archive_refuses_before_writer_pause_or_dump(self):
+        result,calls=self.refresh(FAIL_RESTORE_CHECK='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse(any('pg_dump' in x or 'DROP SCHEMA' in ' '.join(x) or x[:2]==['docker','kill'] for x in calls))
+
+    def test_refresh_bad_rollback_archive_never_destroys_schema(self):
+        result,calls=self.refresh(FAIL_ROLLBACK_CHECK='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertTrue(any('pg_dump' in x for x in calls))
+        self.assertFalse(any('DROP SCHEMA' in ' '.join(x) or 'cp' in x for x in calls))
+
+    def test_refresh_stuck_writer_refuses_without_force_kill_or_dump(self):
+        result,calls=self.refresh(STUCK_WRITER='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse(any('pg_dump' in x or 'DROP SCHEMA' in ' '.join(x) for x in calls))
+        self.assertTrue(any(x[:2]==['docker','kill'] for x in calls))
+        self.assertTrue(all('--signal=TERM' in x for x in calls if x[:2]==['docker','kill']))
+
+    def test_refresh_collects_static_from_built_image_before_starting_web_without_migrations(self):
+        result,calls=self.refresh()
+        self.assertEqual(result.returncode,0,result.stderr)
+        calls=[json.loads(x) for x in (self.root/'calls.jsonl').read_text().splitlines()]
+        build=next(i for i,x in enumerate(calls) if x[:2]==['docker','compose'] and 'build' in x)
+        prepare=next(i for i,x in enumerate(calls) if x[:2]==['docker','compose'] and 'run' in x)
+        start=next(i for i,x in enumerate(calls) if x[:2]==['docker','compose'] and 'up' in x and 'web' in x)
+        infrastructure=next(i for i,x in enumerate(calls) if x[:2]==['docker','compose'] and 'up' in x and 'redis' in x)
+        self.assertIn('--no-recreate',calls[infrastructure])
+        self.assertLess(infrastructure,prepare)
+        dump=next(i for i,x in enumerate(calls) if 'pg_dump' in x)
+        self.assertTrue(all(i<dump for i,x in enumerate(calls) if x[:2]==['docker','kill']))
+        self.assertFalse(any('stop' in x and ('web' in x or 'celery_worker' in x) for x in calls))
+        self.assertLess(build,prepare)
+        self.assertLess(prepare,start)
+        self.assertIn('RUN_MIGRATIONS=0',calls[prepare])
+        self.assertEqual(calls[prepare][-1],'migration')
+
+    def test_migration_failure_never_starts_web_or_kills_migration(self):
+        self.assertNotEqual(self.release(FAIL_MIGRATION='1').returncode, 0)
+        migration=next(i for i,x in enumerate(self.calls) if x[:2]==['docker','compose'] and 'run' in x)
+        self.assertFalse(any('web' in x for x in self.operations('up')))
+        self.assertFalse(any(x[:2]==['docker','kill'] for x in self.calls[migration+1:]))
+        self.assertFalse((self.root/'ops/deployed.commit').exists())
+
+    def test_stopped_crashed_writers_do_not_block_recovery(self):
+        result=self.release(STOPPED_WRITERS='1', FORCED_STOP='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any(x[:2]==['docker','kill'] for x in self.calls))
+
+    def test_slow_writer_is_not_force_killed_and_blocks_backup(self):
+        result=self.release(STUCK_WRITER='1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any('pg_dump' in x for x in self.calls))
+        self.assertTrue(all('--signal=TERM' in x for x in self.calls if x[:2]==['docker','kill']))
+
+    def test_independent_production_drift_warns_without_failing_staging(self):
+        result=self.release(PRODUCTION_DRIFT='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('WARNING', result.stderr)
+        record=json.loads(next((self.root/'ops').glob('release-*/release.json')).read_text())
+        self.assertNotEqual(record['production_before'], record['production_after'])
+
+    def test_checkout_config_preflight_is_isolated_from_running_gateway(self):
+        result=self.release()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        preflight=next(x for x in self.calls if x[:2]==['docker','run'])
+        self.assertIn('none', preflight)
+        self.assertIn('--mount', preflight)
+        self.assertFalse(any(x[:2]==['docker','exec'] and 'nginx' in x for x in self.calls))
+
+    def test_source_mismatch_and_dirty_tree_stop_before_build(self):
+        for flag in ('WRONG_SHA', 'DIRTY_TREE'):
+            with self.subTest(flag=flag):
+                self.assertNotEqual(self.release(**{flag:'1'}).returncode, 0)
+                self.assertFalse(self.operations('build'))
+
+    def test_missing_db_or_forced_writer_stop_blocks_migration(self):
+        for flag in ('MISSING_DB', 'FORCED_STOP'):
+            with self.subTest(flag=flag):
+                self.assertNotEqual(self.release(**{flag:'1'}).returncode, 0)
+                self.assertFalse(self.operations('up'))
+                self.assertFalse(any('pg_dump' in x for x in self.calls))
+
+    def test_writers_stop_before_final_backup(self):
+        self.assertEqual(self.release().returncode, 0)
+        stops = [i for i,x in enumerate(self.calls) if x[:2]==['docker','kill']]
+        dump = next(i for i,x in enumerate(self.calls) if 'pg_dump' in x)
+        self.assertTrue(stops)
+        self.assertLess(max(stops), dump)
+
+    def test_failed_web_or_smoke_preserves_prior_release_record(self):
+        ops = self.root/'ops'
+        ops.mkdir()
+        (ops/'deployed.commit').write_text('previous\n')
+        for flag in ('FAIL_WEB', 'FAIL_SMOKE'):
+            with self.subTest(flag=flag):
+                self.assertNotEqual(self.release(**{flag:'1'}).returncode, 0)
+                self.assertEqual((ops/'deployed.commit').read_text(), 'previous\n')
+                self.assertFalse(any('celery_worker' in x or 'celery_beat' in x for x in self.operations('up')))
+
+    def test_success_records_expected_commit_after_smoke(self):
+        self.assertEqual(self.release().returncode, 0)
+        self.assertEqual((self.root/'ops/deployed.commit').read_text().strip(), '1'*40)
+        records=list((self.root/'ops').glob('release-*/release.json'))
+        self.assertEqual(len(records), 1)
+        record=json.loads(records[0].read_text())
+        self.assertEqual(record['status'], 'passed')
+        self.assertEqual(len(record['current_images']), 5)
+        self.assertEqual(len(record['previous_images']), 5)
+        self.assertEqual(record['sha'], '1'*40)
+
+    def test_db_refresh_obeys_the_same_release_lock(self):
+        import fcntl, uuid
+        ops=self.root/'ops'
+        ops.mkdir()
+        script=self.root/'scripts/refresh-staging-db.sh'
+        shutil.copyfile(Path(__file__).with_name('refresh-staging-db.sh'),script)
+        backups=self.root/'backups'
+        backups.mkdir(parents=True,exist_ok=True)
+        backup=backups/('readiness-synthetic-'+uuid.uuid4().hex+'.dump')
+        backup.write_bytes(b'disposable fixture; never restored')
+        script.write_text(script.read_text().replace('/opt/backups/chemisttasker',str(backups)))
+        try:
+            env={**os.environ,'STAGING_OPS_DIR':str(ops),'FAKE_ROOT':str(self.root),
+                 'PATH':str(self.root/'bin')+os.pathsep+os.environ['PATH']}
+            with (ops/'deploy.lock').open('w') as lock:
+                fcntl.flock(lock,fcntl.LOCK_EX | fcntl.LOCK_NB)
+                result=subprocess.run(['bash',str(script),'--confirm-production-data',str(backup)],
+                    env=env,capture_output=True,text=True,timeout=15)
+            self.assertNotEqual(result.returncode,0)
+            self.assertIn('lock',result.stderr.lower())
+            self.assertFalse((self.root/'calls.jsonl').exists())
+        finally:
+            assert backup.resolve().parent==backups.resolve()
+            backup.unlink(missing_ok=True)
+
+    def test_concurrent_release_refuses_before_docker_calls(self):
+        import fcntl
+        ops=self.root/'ops'
+        ops.mkdir()
+        with (ops/'deploy.lock').open('w') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertNotEqual(self.release().returncode, 0)
+        self.assertFalse(any(x[0]=='docker' for x in self.calls))
 
 
 if __name__=='__main__':

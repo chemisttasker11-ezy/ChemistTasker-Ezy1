@@ -117,8 +117,9 @@ services:
     restart: unless-stopped
     environment:
       <<: *backend-environment
-      COLLECT_STATIC: "1"
-      RUN_MIGRATIONS: "${STAGING_RUN_MIGRATIONS:-1}"
+      COLLECT_STATIC: "0"
+      RUN_MIGRATIONS: "0"
+      # The release-profile migration service owns schema/static preparation.
     command: ["daphne", "-b", "0.0.0.0", "-p", "8000", "core.asgi:application"]
     depends_on:
       postgres:
@@ -137,6 +138,23 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+
+  migration:
+    profiles: ["release"]
+    image: chemisttasker_backend_staging:latest
+    restart: "no"
+    logging: *default-logging
+    environment:
+      <<: *backend-environment
+      COLLECT_STATIC: "1"
+      RUN_MIGRATIONS: "${STAGING_RUN_MIGRATIONS:-1}"
+    command: ["true"]
+    volumes:
+      - staging_static_data:/app/staticfiles
+      - staging_media_data:/app/media
+      - staging_verification_data:/app/verification_outputs
+    networks:
+      - staging_network
 
   celery_worker:
     profiles: ["workers"]

@@ -68,10 +68,11 @@ STAGING_ALLOWED_HOSTS=staging.chemisttasker.com.au
 
 ## Deployment
 
-From `/opt/apps/chemisttasker-staging`, run:
+From `/opt/apps/chemisttasker-staging`, set `REVIEWED_SHA` to the full SHA
+approved in the release review, independently verify `git rev-parse HEAD` matches, then run:
 
 ```bash
-bash scripts/deploy-staging.sh
+bash scripts/deploy-staging.sh --expected-sha "$REVIEWED_SHA"
 ```
 
 The script validates Compose, builds images before replacing services, dumps
@@ -88,17 +89,17 @@ bash scripts/smoke-staging.sh https://staging.chemisttasker.com.au
 Celery worker and beat start by default. To deploy without them:
 
 ```bash
-bash scripts/deploy-staging.sh --without-workers
+bash scripts/deploy-staging.sh --expected-sha "$REVIEWED_SHA" --without-workers
 ```
 
 When a reviewed release changes only the frontend images or staging Nginx
 configuration, use:
 
 ```bash
-bash scripts/deploy-staging.sh --frontend-only
+bash scripts/deploy-staging.sh --expected-sha "$REVIEWED_SHA" --frontend-only
 ```
 
-This builds Vite and Next, backs up the database, replaces only those frontend
+This builds Vite and Next without a database backup, replaces only those frontend
 containers and restarts the existing gateway. Backend, worker, beat, PostgreSQL
 and Redis containers are preserved, and synthetic accounts are not reseeded.
 It must not be used to release backend code or migrations.
@@ -197,3 +198,48 @@ permanent `staging` branch because this repository is the staging repository.
 
 Prefer synthetic or sanitised data. If the reviewed production-data refresh
 procedure is used, apply the access restrictions and migration controls above.
+
+
+## Serialized backend releases and failure recovery
+
+Run the exact reviewed clean commit with `--expected-sha FULL_SHA` or set
+`STAGING_EXPECTED_SHA`. All deployment and DB-refresh entrypoints share
+`STAGING_OPS_DIR/deploy.lock` (default /opt/apps/chemisttasker-staging-ops).
+The private release record captures phase, backup, old/new image identities,
+staging data-service identities, environment digests and observed production drift.
+
+Build before interruption. Beat, worker and web receive TERM and a bounded grace
+period (STAGING_STOP_TIMEOUT, default 120 seconds). Already-stopped containers are
+not rejected for historical exit codes. An active writer that does not drain is
+left running and the release aborts: no forced kill or automatic provider replay.
+External/admin/management writers must also be paused by the operator.
+
+After writers stop, take and validate the final matching-version PostgreSQL backup.
+The explicit `migration` release-profile service runs check_content_migrations,
+migrate and collectstatic as a one-shot job with restart disabled. It has no web
+health deadline. Ordinary web, worker and beat never migrate. A still-running
+`chemisttasker_staging_migrate` blocks the next release. Do not cancel migrations
+or assume a failed SSH connection means a provider/migration process stopped.
+
+Effective migration configuration must be enabled before backend deployment.
+STAGING_RUN_MIGRATIONS=0 left by a DB refresh refuses a normal backend release;
+resolve that refreshed state explicitly, then enable the reviewed migration path.
+No environment file is rewritten by deployment. Frontend-only mode does not stop
+writers, migrate, seed users or touch/dump the database.
+
+NGINX preflight mounts the checked-out config into a capped, network-isolated
+throwaway instance of the configured gateway image, using dummy upstream aliases.
+It works with stopped services and tests the new file rather than an old bound
+inode. Expect a maintenance window; once the updated gateway config is loaded its
+own connection failures return JSON 503. Application error responses pass through.
+
+Staging preservation checks run before workers resume. Independent production
+identity drift is recorded as a warning, not a failed staging migration. A failed
+post-migration release requests graceful TERM for new web/workers/beat it started,
+never force-kills migrations/tasks and never automatically restores a live DB.
+The failed phase remains private and deployed.commit stays at the last successful
+release. Inspect active processes and reconcile ambiguous external effects before
+retrying. Select a rehearsed compatible-image rollback or explicit data recovery
+decision; never start an incompatible old binary or discard post-backup writes.
+Retain old images by usable ID/tag until acceptance. No live rollout is established
+by the local fake-Docker safety tests.
