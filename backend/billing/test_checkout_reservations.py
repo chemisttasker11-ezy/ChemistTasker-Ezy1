@@ -151,6 +151,17 @@ class CheckoutReservationTests(TestCase):
         with self.assertRaises(ShiftActionRefused):
             protect_shift_deletion(self.shift)
 
+    def test_roster_and_direct_delete_refuse_a_live_checkout_after_offer_withdrawal(self):
+        from shifts.models import Shift
+        self.charge()
+        Shift.objects.filter(pk=self.shift.pk).update(payment_status='PAID')
+        self.offer.delete()
+        for url in (f'/api/v1/roster-shifts/{self.shift.pk}/', f'/api/v1/shifts/{self.shift.pk}/'):
+            with self.subTest(url):
+                self.assertEqual(client_for(self.owner).delete(url).status_code, 409)
+                self.assertTrue(Shift.objects.filter(pk=self.shift.pk).exists())
+                self.assertTrue(FulfillmentReservation.objects.filter(active=True).exists())
+
     def test_signed_payment_binds_and_books_once(self):
         self.charge()
         self.pay()

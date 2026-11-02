@@ -241,6 +241,16 @@ test('approval requires reason and corrected time, then refreshes the queue', as
   assert.ok(!ui.text.includes('Casey Worker'));
 });
 
+for (const trusted of ['2026-04-05T02:30:00+10:00', '2026-04-05T02:30:00+11:00']) {
+  test(`unchanged approval time in the repeated DST hour keeps the instant ${trusted}`, async () => {
+    const ui = await review({ rows: [{ ...evidence, pharmacy_timezone: 'Australia/Sydney', trusted_time_estimate: trusted }] });
+    await ui.open('approve');
+    await ui.edit(/reason|justification/i, 'Checked shift record.');
+    await ui.submit('approve');
+    assert.equal(new Date(ui.decisions[0].corrected_timestamp).toISOString(), new Date(trusted).toISOString());
+  });
+}
+
 test('rejection requires a reason and never submits a corrected timestamp', async () => {
   const ui = await review();
   await ui.open('reject');

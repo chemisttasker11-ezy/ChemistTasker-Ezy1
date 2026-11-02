@@ -12,6 +12,11 @@ def protect_shift_deletion(shift):
             'This shift has assigned workers and cannot be deleted.',
             status.HTTP_409_CONFLICT,
         )
+    protect_shift_payment_deletion(shift)
+
+
+def protect_shift_payment_deletion(shift):
+    """Payment-owned part of the guard; roster deletion of plain draft staff uses only this part."""
     if (shift.payment_status == 'PENDING'
             or shift.fulfillment_checkouts.exclude(state='expired').exists()
             or shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists()

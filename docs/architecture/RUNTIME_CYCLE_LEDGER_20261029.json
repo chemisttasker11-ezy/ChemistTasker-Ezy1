@@ -1658,6 +1658,12 @@
           "kind": "module"
         },
         {
+          "path": "workforce/roster/views.py",
+          "line": 32,
+          "import": "shifts.deletion",
+          "kind": "module"
+        },
+        {
           "path": "workforce/roster/week_templates.py",
           "line": 5,
           "import": "shifts.models",

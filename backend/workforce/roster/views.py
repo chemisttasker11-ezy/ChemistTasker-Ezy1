@@ -29,6 +29,7 @@ from users.models import User
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.escalation import PUBLIC_LEVEL, apply_escalation, resolve_current_index
 from shifts.history import _protect_assignment_history
+from shifts.deletion import protect_shift_payment_deletion
 
 
 def _slot_locked_by_published_roster(slot):
@@ -236,6 +237,7 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
                     or shift.offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT).exists()):
                 return Response({'detail': 'This shift has a booked or payment-pending worker and cannot be deleted.'},
                                 status=status.HTTP_409_CONFLICT)
+            protect_shift_payment_deletion(shift)  # A live checkout outlives its offer.
             # Worked, accepted or invoiced cover must not cascade away with the shift.
             _protect_removed_assignments(shift.slot_assignments.all())
             self.perform_destroy(shift)

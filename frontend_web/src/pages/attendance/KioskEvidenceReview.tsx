@@ -18,6 +18,7 @@ import type { PendingKioskReview } from "@chemisttasker/shared-core";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
+import { correctionTimestamp } from "./correctionTimestamp";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -26,9 +27,11 @@ export interface KioskEvidenceReviewProps {
   pharmacyId: number | string;
 }
 
-export function formatCorrectedTimestamp(localDateTime: string, timeZone: string): string {
+export function formatCorrectedTimestamp(localDateTime: string, timeZone: string, original?: string | null): string {
   if (!localDateTime) return "";
   try {
+    // A local minute alone cannot tell the two repeated DST hours apart; keep the original instant.
+    if (original) return correctionTimestamp(localDateTime, original, timeZone);
     return dayjs.tz(localDateTime, timeZone).format();
   } catch {
     return localDateTime;
@@ -88,7 +91,9 @@ export default function KioskEvidenceReview({ pharmacyId }: KioskEvidenceReviewP
     if (!approvingItem || !approveReason.trim() || !approveTime.trim() || submitting) return;
     setSubmitting(true);
     try {
-      const timestamp = formatCorrectedTimestamp(approveTime.trim(), approvingItem.pharmacy_timezone);
+      const timestamp = formatCorrectedTimestamp(
+        approveTime.trim(), approvingItem.pharmacy_timezone, approvingItem.trusted_time_estimate,
+      );
       await attendance.decideKioskReview({
         event_id: approvingItem.event_id,
         decision: "APPROVED",
