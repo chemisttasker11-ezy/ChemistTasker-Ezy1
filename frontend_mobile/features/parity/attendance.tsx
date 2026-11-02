@@ -170,7 +170,7 @@ function CoverTerms() {
   const offers=useMemo(()=>selected?([{engagementTermsPreview:camelize(selected.engagement_terms_preview)}] as unknown as ShiftOffer[]):null,[selected]);
   const shown=covers.filter((cover)=>{
     const terms=cover.engagement_terms_preview;
-    return cover.status==='APPROVED'&&(cover.engagement_terms_accepted_at||terms.payment_profile_incomplete||(terms.acceptance_required&&terms.settlement_channel==='INVOICE'));
+    return cover.status==='APPROVED'&&(cover.engagement_terms_accepted_at||terms.payment_profile_incomplete||terms.pricing_missing||(terms.acceptance_required&&terms.settlement_channel==='INVOICE'));
   });
   const openPaymentProfile=paymentPath?()=>router.push(paymentPath as any):undefined;
   const accept=async(payload:{engagementTermsAccepted?:boolean;independentContractorStatusConfirmed?:boolean})=>{
@@ -202,6 +202,7 @@ function CoverTerms() {
           <InfoNote title="Payment details incomplete" tone="warning">{terms.notice||'Your payment details are incomplete.'}</InfoNote>
           {openPaymentProfile?<Button mode="outlined" onPress={openPaymentProfile}>Complete payment profile</Button>:null}
         </>:null}
+        {!accepted&&terms.pricing_missing?<InfoNote title="Pay rate not set" tone="info">{terms.notice||'Ask the pharmacy to set its pay rates before you can accept these terms.'}</InfoNote>:null}
         {!accepted&&!terms.blocked?<ActionButtons><Button mode="contained" onPress={()=>{setAcceptError('');setSelectedId(cover.assignment_id);}}>Accept terms</Button></ActionButtons>:null}
       </View>;
     })}

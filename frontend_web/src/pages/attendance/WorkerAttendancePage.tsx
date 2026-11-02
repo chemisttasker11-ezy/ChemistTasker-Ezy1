@@ -371,7 +371,8 @@ export default function WorkerAttendancePage() {
   );
   const shownCovers = covers.filter((cover) =>
     cover.status === "APPROVED"
-    && (cover.engagement_terms_accepted_at || cover.engagement_terms_preview.payment_profile_incomplete || canAcceptCover(cover)));
+    && (cover.engagement_terms_accepted_at || cover.engagement_terms_preview.payment_profile_incomplete
+      || cover.engagement_terms_preview.pricing_missing || canAcceptCover(cover)));
   const statusPill = isClockedIn
     ? isOnBreak
       ? <Pill tone="amber" label="On break" />
@@ -596,6 +597,11 @@ export default function WorkerAttendancePage() {
                       action={openPaymentProfile ? <Button color="inherit" size="small" onClick={openPaymentProfile}>Complete payment profile</Button> : undefined}
                     >
                       {terms.notice || "Your payment details are incomplete."}
+                    </Alert>
+                  )}
+                  {!cover.engagement_terms_accepted_at && terms.pricing_missing && (
+                    <Alert severity="info" sx={{ mt: 1.5 }}>
+                      {terms.notice || "Ask the pharmacy to set its pay rates before you can accept these terms."}
                     </Alert>
                   )}
                 </Box>

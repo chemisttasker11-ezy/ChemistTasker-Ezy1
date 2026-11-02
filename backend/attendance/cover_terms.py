@@ -73,6 +73,7 @@ def _invoice_terms(provisional, assignment, user):
             "settlement_channel": SETTLEMENT_TIMESHEET_ONLY,
             "notice": "This pharmacy has no usable pay rate for this cover yet; the pharmacy must set its rates before you can accept invoice terms.",
             "payment_profile_incomplete": False,
+            "pricing_missing": True,  # Distinct from an ABN repair: only the pharmacy can fix it.
         }
     return {
         **terms,

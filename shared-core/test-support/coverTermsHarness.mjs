@@ -241,6 +241,16 @@ export function coverTermsTests(platform) {
       assert.equal(nodes(ui.tree, 'Button').filter(node => /^Accept (?:engagement )?terms$/i.test(text(node).trim())).length, 0);
     });
   }
+  test(`${platform} R7 approved cover with no pharmacy rate is shown with an ask-the-pharmacy notice`, async () => {
+    const notice = 'This pharmacy has no usable pay rate for this cover yet; the pharmacy must set its rates before you can accept invoice terms.';
+    const ui = await mount(platform, { rows: [{ ...cover, engagement_terms_preview: {
+      settlement_channel: 'TIMESHEET_ONLY', blocked: true, payment_profile_incomplete: false, pricing_missing: true,
+      accepted_at: null, notice, occurrences: terms.occurrences,
+    } }] });
+    assert.ok(text(ui.tree).includes(notice), 'The worker must see that the pharmacy must set its rates');
+    assert.doesNotMatch(text(ui.tree), /payment details incomplete|complete payment profile/i);
+    assert.equal(nodes(ui.tree, 'Button').filter(node => /^Accept (?:engagement )?terms$/i.test(text(node).trim())).length, 0);
+  });
   if (platform === 'web') {
     for (const [pathname, role, expected] of [
       ['/dashboard/attendance', 'PHARMACIST', '/dashboard/pharmacist/onboarding?step=payment'],

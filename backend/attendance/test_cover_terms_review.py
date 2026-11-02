@@ -153,6 +153,12 @@ class RealCoverRoutingReviewTests(RealCoverRoutingFixture, TestCase):
         self.assertEqual((assignment.unit_rate, assignment.rate_reason, assignment.settlement_channel,
                           assignment.engagement_terms_snapshot), original)
         self.assert_unaccepted(assignment)
+        # R7: the worker sees why (the pharmacy must set rates), not an ABN repair.
+        row = next(row for row in client_for(self.worker).get("/api/v1/attendance/worker/cover-terms/").json()
+                   if row["assignment_id"] == assignment.pk)
+        terms = row["engagement_terms_preview"]
+        self.assertEqual((terms["blocked"], terms.get("pricing_missing"), terms.get("payment_profile_incomplete")),
+                         (True, True, False), terms)
         terms = self.discover()[0]["engagement_terms_preview"]
         self.assertTrue(terms["blocked"])
         self.assertRegex(terms["notice"].lower(), r"rate|pric")

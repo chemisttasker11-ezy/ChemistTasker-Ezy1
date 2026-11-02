@@ -230,6 +230,8 @@ export interface WorkerCoverTermsPreview {
   accepted_at: string | null;
   blocked?: boolean;
   payment_profile_incomplete?: boolean;
+  /** The pharmacy has no usable pay rate yet; only the pharmacy can fix it. */
+  pricing_missing?: boolean;
   notice?: string | null;
   occurrences: WorkerCoverTermsOccurrence[];
 }
