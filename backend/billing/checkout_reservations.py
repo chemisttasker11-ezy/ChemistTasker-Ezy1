@@ -166,7 +166,8 @@ def _expire_orphaned_session(attempt_id, session_id):
     try:
         stripe.checkout.Session.expire(session_id)
     except Exception:
-        # Keep the orphan on the attempt so expire_checkout can retry it; a payment on it is ledgered, never booked.
+        # Keep the orphan on the attempt so expire_checkout can retry it. A payment on it books only the work the
+        # attempt reclaims below; work a replacement already holds is ledgered for refund, never booked twice.
         log.exception("Could not expire orphaned provider session %s for recovered attempt %s; reconcile it now",
                       session_id, attempt_id)
         _reclaim_orphaned_attempt(attempt_id, session_id)

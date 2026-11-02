@@ -32,10 +32,9 @@ class CheckoutReservationTests(TestCase):
                     args=[self.shift.pk, self.attempt().pk]), {}, format='json')
 
     def pay(self, *, metadata=None, intent='pi_reserved', session_id='cs_test', currency='aud', amount=3000):
-        attempt = self.attempt()
         session = fixtures._StripeObject(id=session_id, mode='payment', payment_status='paid',
             amount_total=amount, currency=currency, payment_intent=intent,
-            metadata=metadata if metadata is not None else attempt.parameters['metadata'])
+            metadata=metadata if metadata is not None else self.attempt().parameters['metadata'])
         event = fixtures._StripeObject(id=f'evt_{intent}', type='checkout.session.completed',
                                       data=fixtures._StripeObject(object=session))
         with (patch('billing.stripe_support.stripe.Webhook.construct_event', return_value=event),
@@ -463,21 +462,52 @@ class CheckoutReconciliationAdminTests(TestCase):
         attempt.refresh_from_db()
         self.assertEqual((attempt.state, attempt.stripe_session_id), (FulfillmentCheckout.State.EXPIRED, None))
 
-    def test_orphan_that_cannot_be_expired_is_kept_on_the_attempt_for_reconciliation(self):
+    def unexpirable_orphan(self, during_recovery=lambda: None):
         from billing.checkout_reservations import CheckoutUncertain, expire_unreconciled_checkout, open_checkout
         self.checkout.side_effect = TimeoutError('provider may have accepted')
         self.assertEqual(self.charge().status_code, 503)
         attempt = self.attempt()
 
         def resumes_after_recovery(**kwargs):
-            FulfillmentCheckout.objects.update(created_at=timezone.now() - timedelta(hours=49))
+            FulfillmentCheckout.objects.filter(pk=attempt.pk).update(created_at=timezone.now() - timedelta(hours=49))
             expire_unreconciled_checkout(attempt)
+            during_recovery()
             return fixtures._StripeObject(id='cs_orphan', url='https://checkout.example.test/orphan')
         self.checkout.side_effect = resumes_after_recovery
         with patch('billing.stripe_support.stripe.checkout.Session.expire', side_effect=TimeoutError('provider down')):
             with self.assertRaises(CheckoutUncertain):
                 open_checkout(attempt)
+        self.checkout.side_effect = None
         attempt.refresh_from_db()
+        return attempt
+
+    def test_paid_unexpirable_orphan_books_the_work_it_reclaimed_once(self):
+        attempt = self.unexpirable_orphan()
+        metadata = attempt.parameters['metadata']
+        CheckoutReservationTests.pay(self, session_id='cs_orphan', intent='pi_orphan', metadata=metadata)
+        CheckoutReservationTests.pay(self, session_id='cs_orphan', intent='pi_orphan', metadata=metadata)  # replay
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.state, FulfillmentCheckout.State.COMPLETE)
+        self.assertEqual(ShiftSlotAssignment.objects.get().user_id, self.offer.user_id)
+        self.assertFalse(ShiftPayment.objects.get().reconciliation_required)
+
+    def test_paid_unexpirable_orphan_never_books_work_a_replacement_reserved_first(self):
+        replacement = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+                                                status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+
+        def replacement_reserves():
+            self.checkout.side_effect = None
+            self.checkout.return_value = fixtures._StripeObject(id='cs_new', url='https://checkout.example.test/new')
+            self.assertEqual(self.charge(replacement).status_code, 200)
+        attempt = self.unexpirable_orphan(replacement_reserves)
+        self.assertFalse(attempt.reservations.filter(active=True).exists())
+        CheckoutReservationTests.pay(self, session_id='cs_orphan', intent='pi_orphan',
+                                     metadata=attempt.parameters['metadata'])
+        self.assertTrue(ShiftPayment.objects.get().reconciliation_required)
+        self.assertFalse(ShiftSlotAssignment.objects.exists())
+
+    def test_orphan_that_cannot_be_expired_is_kept_on_the_attempt_for_reconciliation(self):
+        attempt = self.unexpirable_orphan()
         # Kept for the normal provider-confirmed expiry; never shown as a payable checkout URL.
         self.assertEqual((attempt.state, attempt.stripe_session_id, attempt.checkout_url),
                          (FulfillmentCheckout.State.UNKNOWN, 'cs_orphan', ''))

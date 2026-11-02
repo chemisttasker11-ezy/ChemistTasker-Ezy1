@@ -45,7 +45,7 @@
         },
         {
           "path": "attendance/cover_terms.py",
-          "line": 15,
+          "line": 17,
           "import": "shifts.models",
           "kind": "module"
         },
@@ -69,19 +69,19 @@
         },
         {
           "path": "attendance/cover_terms.py",
-          "line": 33,
+          "line": 35,
           "import": "shifts.pricing",
           "kind": "delayed"
         },
         {
           "path": "attendance/cover_terms.py",
-          "line": 42,
+          "line": 44,
           "import": "shifts.engagement",
           "kind": "delayed"
         },
         {
           "path": "attendance/cover_terms.py",
-          "line": 150,
+          "line": 163,
           "import": "shifts.engagement",
           "kind": "delayed"
         }
