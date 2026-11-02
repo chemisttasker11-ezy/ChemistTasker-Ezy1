@@ -22,6 +22,8 @@ export const attendance = {
         const body: Record<string, unknown> = { qr_token: qrToken };
         if (opts.confirm_opposite !== undefined) body.confirm_opposite = opts.confirm_opposite;
         if (opts.request_id !== undefined) body.request_id = opts.request_id;
+        if (opts.expected_action !== undefined) body.expected_action = opts.expected_action;
+        if (opts.observed_session_id !== undefined) body.observed_session_id = opts.observed_session_id;
         return operationalRequest<AttendanceClockResult>(API_ENDPOINTS.attendance.workerClockIn, { method: 'POST', body });
     },
     getWorkerCoverTerms: () => operationalRequest<WorkerCoverTerms[]>(API_ENDPOINTS.attendance.workerCoverTerms),
@@ -41,6 +43,8 @@ export const attendance = {
         const body: Record<string, unknown> = { qr_token: qrToken };
         if (opts.confirm_opposite !== undefined) body.confirm_opposite = opts.confirm_opposite;
         if (opts.request_id !== undefined) body.request_id = opts.request_id;
+        if (opts.expected_action !== undefined) body.expected_action = opts.expected_action;
+        if (opts.observed_session_id !== undefined) body.observed_session_id = opts.observed_session_id;
         return operationalRequest<AttendanceClockResult>(API_ENDPOINTS.attendance.workerClockOut, { method: 'POST', body });
     },
     getPinPharmacies: () => operationalRequest<{

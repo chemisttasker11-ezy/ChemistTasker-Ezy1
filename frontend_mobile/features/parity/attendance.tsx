@@ -4,7 +4,7 @@ import { Button, Chip, Icon, Text } from 'react-native-paper';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { attendance, canManageKioskDevices, workforce } from '@chemisttasker/shared-core';
-import type { ShiftOffer, WorkerCoverTerms } from '@chemisttasker/shared-core';
+import type { AttendanceClockOptions, ShiftOffer, WorkerCoverTerms } from '@chemisttasker/shared-core';
 import ShiftEngagementTermsDialog from '../../roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useAuth } from '@/context/AuthContext';
@@ -223,12 +223,12 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
   const [scanLocked,setScanLocked]=useState(false);
   const [permission,requestPermission]=useCameraPermissions();
   const active=Boolean(status?.has_active_session);
-  const run=async(kind:'in'|'out'|'break-start'|'break-end',scannedToken?:string,confirmOpposite?:boolean)=>{
+  const run=async(kind:'in'|'out'|'break-start'|'break-end',scannedToken?:string,confirmation?:AttendanceClockOptions)=>{
     const token=(scannedToken??qrToken).trim();
     setBusy(true);setLocalError('');
     try{
-      if(kind==='in') await attendance.clockIn(token, confirmOpposite ? { confirm_opposite: true } : undefined);
-      if(kind==='out') await attendance.clockOut(token, confirmOpposite ? { confirm_opposite: true } : undefined);
+      if(kind==='in') await attendance.clockIn(token, confirmation);
+      if(kind==='out') await attendance.clockOut(token, confirmation);
       if(kind==='break-start') await attendance.breakStart();
       if(kind==='break-end') await attendance.breakEnd();
       setQrToken('');
@@ -248,7 +248,7 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
             {
               text: 'Confirm',
               onPress: () => {
-                void run(kind, token, true);
+                void run(kind, token, { confirm_opposite: true, expected_action: errData.pending_action, observed_session_id: errData.observed_session_id });
               },
             },
           ]

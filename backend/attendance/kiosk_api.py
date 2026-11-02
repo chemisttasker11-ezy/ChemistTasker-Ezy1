@@ -44,7 +44,8 @@ from memberships.models import Membership
 from organizations.models import Pharmacy
 from organizations.timezone import get_pharmacy_timezone
 from attendance.models import AttendanceEvent, AttendanceSession, KioskDevice, WorkerPIN
-from attendance.api_support import _confirm_opposite, _get_kiosk_device_from_request, _unexpected_error_response
+from attendance.api_support import (_confirm_opposite, _confirmation_session_id,
+    _get_kiosk_device_from_request, _unexpected_error_response)
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -685,6 +686,7 @@ class KioskWorkerSetupPinView(APIView):
                             raw_pin=new_pin,
                             user_identifier=identifier,
                             confirm_opposite=confirm_opposite,
+                            expected_closed_session_id=_confirmation_session_id(request, "CLOCK_IN"),
                         )
                 except DjangoValidationError as e:
                     msg = e.messages[0] if hasattr(e, "messages") and e.messages else str(e)
@@ -702,6 +704,8 @@ class KioskWorkerSetupPinView(APIView):
                 "message": "PIN created successfully! You are now clocked in.",
             }, status=status.HTTP_201_CREATED)
 
+        except StaleConfirmation:
+            return Response(STALE_CONFIRMATION_RESPONSE, status=status.HTTP_409_CONFLICT)
         except ConfirmOppositeActionRequired as e:
             return Response(e.to_dict(), status=status.HTTP_409_CONFLICT)
         except (DjangoPermissionDenied, PermissionDenied) as e:

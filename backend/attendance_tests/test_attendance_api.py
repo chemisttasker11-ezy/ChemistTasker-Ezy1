@@ -369,7 +369,7 @@ class AttendanceAPITests(unittest.TestCase):
         clock_out_resp = worker_client.post("/attendance/worker/clock-out/", {"qr_token": qr_token})
         self.assertEqual(clock_out_resp.status_code, status.HTTP_409_CONFLICT, clock_out_resp.data)
         self.assertEqual(clock_out_resp.data["code"], "CONFIRM_OPPOSITE_ACTION")
-        clock_out_resp = worker_client.post("/attendance/worker/clock-out/", {"qr_token": qr_token, "confirm_opposite": True}, format="json")
+        clock_out_resp = worker_client.post("/attendance/worker/clock-out/", {"qr_token": qr_token, "confirm_opposite": True, "expected_action": clock_out_resp.data["pending_action"], "observed_session_id": clock_out_resp.data["observed_session_id"]}, format="json")
         self.assertEqual(clock_out_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(clock_out_resp.data["status"], "CLOCKED_OUT")
 
@@ -392,8 +392,11 @@ class AttendanceAPITests(unittest.TestCase):
         worker_client = APIClient()
         worker_client.force_authenticate(user=self.worker_user)
         worker_client.post("/attendance/worker/clock-in/", {"qr_token": qr_resp.data["qr_token"]})
+        prompt = worker_client.post("/attendance/worker/clock-out/", {"qr_token": qr_resp.data["qr_token"]}, format="json")
+        self.assertEqual(prompt.status_code, status.HTTP_409_CONFLICT, prompt.data)
         clock_out_resp = worker_client.post("/attendance/worker/clock-out/", {
             "qr_token": qr_resp.data["qr_token"], "confirm_opposite": True,
+            "expected_action": prompt.data["pending_action"], "observed_session_id": prompt.data["observed_session_id"],
         }, format="json")
         self.assertEqual(clock_out_resp.status_code, status.HTTP_200_OK, clock_out_resp.data)
         self.assertEqual(clock_out_resp.data["status"], "CLOCKED_OUT")

@@ -59,7 +59,7 @@ async function worker({ active = true, reject = true } = {}) {
       // Return the shared-core transport shape, with no Axios response/data aliases.
       if (reject && calls.length === 1) {
         throw { status: 409, payload: {
-          code: 'CONFIRM_OPPOSITE_ACTION', last_action: active ? 'CLOCK_IN' : 'CLOCK_OUT',
+          code: 'CONFIRM_OPPOSITE_ACTION', observed_session_id: 41, last_action: active ? 'CLOCK_IN' : 'CLOCK_OUT',
           pending_action: active ? 'CLOCK_OUT' : 'CLOCK_IN', last_action_at: '2026-10-28T00:00:00Z',
           message: active ? 'You just clocked in. Clock out now?' : 'You just clocked out. Clock in now?',
         } };
@@ -146,6 +146,8 @@ for (const active of [true, false]) {
     assert.equal(ui.calls[1].url, ui.calls[0].url);
     assert.equal(ui.calls[1].body.qr_token, ui.calls[0].body.qr_token);
     assert.equal(ui.calls[1].body.confirm_opposite, true);
+    assert.equal(ui.calls[1].body.observed_session_id, 41);
+    assert.equal(ui.calls[1].body.expected_action, kind === 'out' ? 'CLOCK_OUT' : 'CLOCK_IN');
     assert.equal(ui.reloads, 2);
   });
 

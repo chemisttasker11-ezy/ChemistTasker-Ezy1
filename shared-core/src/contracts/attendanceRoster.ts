@@ -24,11 +24,14 @@ export interface AttendanceClockResult {
 
 export interface AttendanceClockOptions {
   confirm_opposite?: boolean;
+  expected_action?: "CLOCK_IN" | "CLOCK_OUT";
+  observed_session_id?: number;
   request_id?: string;
 }
 
 export interface AttendanceConfirmRequiredResponse {
   code: 'CONFIRM_OPPOSITE_ACTION';
+  observed_session_id: number;
   last_action: 'CLOCK_IN' | 'CLOCK_OUT';
   last_action_at: string;
   pending_action: 'CLOCK_IN' | 'CLOCK_OUT';

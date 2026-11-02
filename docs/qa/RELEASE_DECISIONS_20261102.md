@@ -7,7 +7,7 @@ stays restricted until it is settled. **Before enabling** names the feature that
 | # | Decision | Current behaviour | Before enabling |
 |---|---|---|---|
 | 1 | D1: must companion/super invoices be approved before payment? | No approval guard. R1 is intentional: an owner may record payment made through other channels. | Companion invoice payment |
-| 2 | Should confirmations on kiosk PIN setup and worker QR be tied to the session the worker saw? | They send only `confirm_opposite`. The kiosk PIN-clock path already binds `observed_session_id`. Fix shape: echo it and recheck in `clock_in`/`clock_out`. | Worker QR and PIN-setup clocking |
+| 2 | Should confirmations on kiosk PIN setup and worker QR be tied to the session the worker saw? | Settled: worker QR and PIN setup echo `expected_action` and `observed_session_id`; the transitions recheck the session under their existing locks. Missing or stale confirmation context is refused with 409. | Worker QR and PIN-setup clocking |
 | 3 | Should a stale cover-terms dialog reload after 409 `TERMS_CHANGED`? | The server refuses with no write. The client shows an error and keeps the old preview. | — (UX only) |
 | 4 | Should a paid orphan session after operator recovery book its work, or be refund-only? | It books only the work its attempt reclaimed. Work a replacement holds is ledgered for refund. Both outcomes are tested in `billing/test_checkout_reservations.py`. | Real card payments |
 | 5 | Should paid work be released only by an explicit cancellation record? | It is released when assignment rows are gone (slotless offers: while their offer is still accepted). This needs a trace of every cancellation/delete path. | Real card payments |
@@ -25,3 +25,7 @@ New live shift fulfillment and penalty collection are now closed by default thro
   - Back up the database first, then apply migrations: attendance 0007, billing 0005.
   - Record the deployed SHA and rollback artefact.
   - Run test-mode provider acceptance for checkout recovery, replay and refunds.
+
+## Session-bound attendance rollout
+
+Ship the mobile build that echoes `expected_action` and `observed_session_id` first, and require adoption/minimum-version acceptance before promoting this backend artifact to production. Deployment itself enforces session-bound confirmation; there is no separate enable switch. Deploy the web and kiosk bundles with that backend release; refresh any already-open kiosk page. A legacy mobile build sends only `confirm_opposite` and safely receives 409 until it updates (or the 60-second double-clock window expires). Do not weaken the server check to support old confirmation intent. Staging acceptance must exercise both the updated clients and this legacy refusal path.

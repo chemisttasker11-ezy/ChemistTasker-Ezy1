@@ -72,7 +72,7 @@ async function kiosk({ desktop = false, lastAction = 'CLOCK_IN', reject = true, 
       if (url.endsWith('/worker-pin/setup/')) {
         setupCalls.push(structuredClone({ url, body, config }));
         if (setupPending && body.confirm_opposite !== true) throw { response: { status: 409, data: {
-          code: 'CONFIRM_OPPOSITE_ACTION', last_action: 'CLOCK_OUT', pending_action: 'CLOCK_IN',
+          code: 'CONFIRM_OPPOSITE_ACTION', observed_session_id: 41, last_action: 'CLOCK_OUT', pending_action: 'CLOCK_IN',
           last_action_at: new ControlledDate(now - 30000).toISOString(),
           message: 'You just clocked out. Clock in now?',
         } } };
@@ -361,6 +361,8 @@ test('kiosk setup 409 retains OTP and new PIN and confirms against setup, never 
   assert.equal(ui.setupCalls.length, 2);
   assert.equal(ui.setupCalls[1].url, ui.setupCalls[0].url);
   assert.equal(ui.setupCalls[1].body.confirm_opposite, true);
+  assert.equal(ui.setupCalls[1].body.expected_action, "CLOCK_IN");
+  assert.equal(ui.setupCalls[1].body.observed_session_id, 41);
   for (const key of ['identifier', 'verification_code', 'new_pin']) {
     assert.equal(ui.setupCalls[1].body[key], ui.setupCalls[0].body[key]);
   }
