@@ -300,6 +300,25 @@ test('desktop kiosk recent action is scoped to the worker identifier', async () 
   assert.doesNotMatch(ui.text, /You just clocked/);
 });
 
+test('desktop kiosk break capture keeps the last clock action for the 60 s prompt', async () => {
+  const ui = await kiosk({ desktop: true });
+  await ui.enter(); await ui.submit(); ui.advance(10);
+  await ui.choose('Start Break'); await ui.enter(); await ui.submit(); ui.advance(10);
+  await ui.choose('End Break'); await ui.enter(); await ui.submit(); ui.advance(10);
+  assert.deepEqual(ui.captures.map((row) => row.action), ['CLOCK_IN', 'BREAK_START', 'BREAK_END']);
+  await ui.choose('Clock Out'); await ui.enter(); await ui.submit();
+  assert.equal(ui.captures.length, 3, 'Breaks must not erase the recent clock-in');
+  assert.match(text(ui.dialog()), /You just clocked in\. Clock out now\?/);
+});
+
+test('desktop kiosk matches the recent action across identifier case and spacing', async () => {
+  const ui = await kiosk({ desktop: true });
+  await ui.enter(); await ui.submit(); ui.advance(30);
+  await ui.choose('Clock Out'); await ui.enter('  CASEY@Example.TEST '); await ui.submit();
+  assert.equal(ui.captures.length, 1, 'The same worker typed differently must still be asked first');
+  assert.match(text(ui.dialog()), /You just clocked in\. Clock out now\?/);
+});
+
 test('desktop kiosk repeated same action keeps its action and does not ask to reverse it', async () => {
   const ui = await kiosk({ desktop: true });
   await ui.enter(); await ui.submit(); ui.advance(30);

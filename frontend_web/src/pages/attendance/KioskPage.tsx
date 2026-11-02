@@ -113,6 +113,8 @@ export default function KioskPage() {
   >("CLOCK_IN");
   // shortcut: lost on kiosk restart, upgrade by asking the native store
   const desktopRecentActions = useRef<Map<string, { action: string; timestamp: number }>>(new Map());
+  // Same canonical form as the native credential store (identifier.trim().to_lowercase()).
+  const recentActionKey = (ident: string) => ident.trim().toLowerCase();
   const [doubleClockDialog, setDoubleClockDialog] = useState<{
     message: string;
     isDesktop: boolean;
@@ -675,10 +677,13 @@ export default function KioskPage() {
       action,
       requestId,
     );
-    desktopRecentActions.current.set(ident, {
-      action: action,
-      timestamp: Date.now(),
-    });
+    // Only clock actions feed the 60 s prompt: a break must not erase the last clock action.
+    if (action === "CLOCK_IN" || action === "CLOCK_OUT") {
+      desktopRecentActions.current.set(recentActionKey(ident), {
+        action: action,
+        timestamp: Date.now(),
+      });
+    }
     setActionSuccess({
       action: local.action,
       workerName: local.worker_name,
@@ -718,7 +723,7 @@ export default function KioskPage() {
     try {
       if (desktopRuntime) {
         const ident = identifier.trim();
-        const prev = desktopRecentActions.current.get(ident);
+        const prev = desktopRecentActions.current.get(recentActionKey(ident));
         const isOpposite =
           (prev?.action === "CLOCK_IN" && requestedPinAction === "CLOCK_OUT") ||
           (prev?.action === "CLOCK_OUT" && requestedPinAction === "CLOCK_IN");
