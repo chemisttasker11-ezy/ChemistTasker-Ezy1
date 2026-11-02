@@ -41,10 +41,11 @@ class AssignmentFreezeFixture(PayrollFreezeFixture):
         self.assertEqual(response.status_code, 200, response.data)
         return FulfillmentCheckout.objects.get()
 
-    def paid_webhook(self):
-        attempt = FulfillmentCheckout.objects.get()
+    def paid_webhook(self, metadata=None):
+        if metadata is None:
+            metadata = FulfillmentCheckout.objects.get().parameters['metadata']
         session = billing_fixtures._StripeObject(id='cs_freeze', mode='payment', payment_status='paid',
-            amount_total=3000, currency='aud', payment_intent='pi_frozen_period', metadata=attempt.parameters['metadata'])
+            amount_total=3000, currency='aud', payment_intent='pi_frozen_period', metadata=metadata)
         event = billing_fixtures._StripeObject(id='evt_frozen_period', type='checkout.session.completed',
                                              data=billing_fixtures._StripeObject(object=session))
         with (patch('billing.stripe_support.stripe.Webhook.construct_event', return_value=event),
@@ -68,6 +69,23 @@ class AssignmentFreezeContracts(AssignmentFreezeFixture, TestCase):
         self.assertEqual(self.late_offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
         manifest.refresh_from_db()
         self.assertEqual((manifest.snapshot, manifest.manifest_hash), original)
+
+    def test_unbound_legacy_paid_session_in_a_locked_period_expires_for_refund(self):
+        # R10 (D3): a pre-rollout session has no checkout attempt, so it can never replay after a correction.
+        attempt = self.checkout()
+        self.freeze()
+        metadata = {key: value for key, value in attempt.parameters['metadata'].items()
+                    if key not in ('fulfillment_checkout_id', 'fulfillment_selection_hash')}
+        attempt.reservations.all().delete()
+        attempt.delete()  # Sessions created before checkout attempts existed have none.
+        response = self.paid_webhook(metadata)
+        self.assertEqual(response.status_code, 200, response.content)
+        payment = ShiftPayment.objects.get()
+        self.assertEqual((payment.status, payment.reconciliation_required, payment.reconciliation_reason),
+                         ('paid', True, 'paid_work_unavailable'))
+        self.late_offer.refresh_from_db()
+        self.assertEqual(self.late_offer.status, ShiftOffer.Status.EXPIRED)
+        self.assertFalse(ShiftSlotAssignment.objects.filter(source_offer=self.late_offer).exists())
 
     def test_assignment_creation_cannot_backfill_a_locked_period(self):
         manifest = self.freeze()

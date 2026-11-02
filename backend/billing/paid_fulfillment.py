@@ -35,7 +35,7 @@ def finalize_paid_selection(shift, payment, attempt, metadata, *, created, final
         payment.save(update_fields=['reconciliation_required'])
     elif unbookable or not count:
         payment.reconciliation_required = True
-        payment.reconciliation_reason = ('locked_payroll_period' if any(
+        payment.reconciliation_reason = ('locked_payroll_period' if attempt is not None and any(
             getattr(offer, '_fulfillment_refusal_code', '') == 'locked_payroll_period'
             for offer in unbookable) else 'paid_work_unavailable')
         payment.save(update_fields=['reconciliation_required', 'reconciliation_reason'])

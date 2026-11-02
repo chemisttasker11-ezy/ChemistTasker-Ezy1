@@ -79,7 +79,10 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
                 raise
             if isinstance(exc.detail, dict):
                 offer._fulfillment_refusal_code = str(exc.detail.get("code", ""))
-            if getattr(offer, "_fulfillment_refusal_code", "") not in {"checkout_reserved", "locked_payroll_period", "checkout_selection_changed"}:
+            # Only a bound checkout attempt can replay after a payroll correction; unbound legacy payment cannot.
+            kept = {"checkout_reserved", "checkout_selection_changed"} | (
+                {"locked_payroll_period"} if checkout_id is not None else set())
+            if getattr(offer, "_fulfillment_refusal_code", "") not in kept:
                 offer.status = ShiftOffer.Status.EXPIRED
                 offer.save(update_fields=['status', 'updated_at'])
             unbookable.append(offer)
