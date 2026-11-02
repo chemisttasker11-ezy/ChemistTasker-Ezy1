@@ -41,7 +41,7 @@ def publish_roster_period(roster_period, published_by, force_warnings=False, *, 
     - Runs validation; blocks publication if errors exist.
     - Updates status to PUBLISHED, sets published_at and published_by.
     - Logs publication audit revision.
-    - Marks all assigned slots is_rostered = True.
+    - Leaves assignments' is_rostered unchanged: roster assignments are created rostered.
     """
     if not is_authorized_attendance_manager(published_by, roster_period.pharmacy):
         raise ValidationError("User is not authorized to publish roster for this pharmacy.")
