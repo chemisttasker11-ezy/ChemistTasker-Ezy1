@@ -27,8 +27,17 @@ function verifyInstalled() {
   assert.equal(lock.packages['node_modules/decode-uri-component'].version, '0.5.1');
   assert.equal(lock.packages['node_modules/image-size'].version, '2.0.4');
   // New GHSA-q3jh-wrc6-jgq8 security release: reject stale redirect clients.
-  assert.equal(mobileRequire('follow-redirects/package.json').version, '1.16.1');
-  assert.equal(lock.packages['node_modules/follow-redirects'].version, '1.16.1');
+  assert.equal(mobileRequire('follow-redirects/package.json').version, '1.16.2');
+  assert.equal(lock.packages['node_modules/follow-redirects'].version, '1.16.2');
+  // Security-only transitive upgrades, scoped to Expo's build-time tooling.
+  assert.equal(mobileRequire('node-forge/package.json').version, '1.4.1');
+  assert.equal(lock.packages['node_modules/node-forge'].version, '1.4.1');
+  assert.equal(lock.packages['node_modules/glob'].version, '14.0.2');
+  assert.equal(lock.packages['node_modules/path-scurry'].version, '3.0.0');
+  assert.equal(lock.packages['node_modules/@expo/cli/node_modules/minimatch'].version, '11.0.1');
+  assert.equal(lock.packages['node_modules/@expo/fingerprint/node_modules/minimatch'].version, '11.0.1');
+  assert.equal(lock.packages['node_modules/glob/node_modules/minimatch'].version, '11.0.1');
+  assert.equal(lock.packages['node_modules/@isaacs/nonrecursive-glob-match'].version, '1.0.1');
   assert.equal(lock.packages['node_modules/fast-uri'].version, '3.1.9');
   assert.equal(mobileRequire('fast-uri/package.json').version, '3.1.9');
   assert.equal(lock.packages['node_modules/undici'].version, '6.29.1');

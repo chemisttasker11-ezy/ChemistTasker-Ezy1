@@ -355,3 +355,22 @@ test('qs comma serialization handles hostile toString data and retains Places qu
   assert.equal(encoded, 'input=Gold%20Coast%20%26%20Tweed&key=fixture-key&components=country%3Aau&language=en');
   assert.deepEqual(qs.parse(encoded), query);
 });
+
+test('upgraded security dependencies preserve supported APIs and reject invalid OIDs', () => {
+  const forge = require('node-forge');
+  assert.equal(require('node-forge/package.json').version, '1.4.1');
+  assert.throws(() => forge.asn1.oidToDer('0.42.840.113549.1.1.1'), /invalid oid|out of range/i);
+  const { globSync, globStream } = require('glob');
+  assert.equal(typeof globSync, 'function');
+  assert.equal(typeof globStream, 'function');
+  const { createRequire } = require('node:module');
+  const cliRequire = createRequire(path.join(root, 'node_modules/@expo/cli/package.json'));
+  const fingerprintRequire = createRequire(path.join(root, 'node_modules/@expo/fingerprint/package.json'));
+  for (const dependent of [cliRequire, fingerprintRequire]) {
+    const matcher = dependent('minimatch');
+    assert.equal(typeof matcher.minimatch, 'function');
+    assert.equal(matcher.minimatch('app/screens/index.tsx', 'app/**/*.tsx'), true);
+    assert.equal(matcher.minimatch('app/screens/index.js', 'app/**/*.tsx'), false);
+  }
+  assert.equal(require('follow-redirects/package.json').version, '1.16.2');
+});
