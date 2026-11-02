@@ -1,5 +1,4 @@
 /* src/index.css */
-@import "https://unpkg.com/@googlemaps/extension-placeautocomplete@1.0.0-beta.3/dist/place_autocomplete.css";
 
 @tailwind base;
 @tailwind components;
@@ -67,4 +66,13 @@ button, input, select, textarea {
 /* Make Google Places dropdown float above MUI Dialogs/Popovers */
 .pac-container {
   z-index: 2000 !important;
+}
+
+.ct-route-loading {
+  display: grid;
+  min-height: 12rem;
+  place-items: center;
+  padding: 2rem;
+  font: 500 1rem/1.6 var(--ct-font-body, sans-serif);
+  color: inherit;
 }

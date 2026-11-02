@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { ReactRouterAppProvider } from "@toolpad/core/react-router";
+import RouteLoadingState from "./components/ui/RouteLoadingState";
 import { useAuth } from "./contexts/AuthContext";
 import { useWorkspace } from "./contexts/WorkspaceContext";
 import {
@@ -183,7 +184,7 @@ export default function App() {
     orgMembership,
   ]);
 
-  if (isLoading) return null;
+  if (isLoading) return <RouteLoadingState label="Checking your session…" />;
   if (!user) return <Outlet />;
 
   return (

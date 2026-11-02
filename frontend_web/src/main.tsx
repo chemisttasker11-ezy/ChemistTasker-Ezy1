@@ -19,7 +19,10 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import App from './App';
 import PublicRouteBridge from './components/PublicRouteBridge';
 function WebRoot(){return <PublicRouteBridge><App/></PublicRouteBridge>;}
-import LandingPage from './pages/LandingPage';
+import RouteLoadingState from './components/ui/RouteLoadingState';
+// Fetch home graphics alongside the session check, without loading them on app routes.
+const initialLanding = window.location.pathname === '/' ? import('./pages/LandingPage') : null;
+const LandingPage = React.lazy(() => initialLanding ?? import('./pages/LandingPage'));
 import PricingPage from './pages/PricingPage';
 import OrganizationPricingPage from './pages/OrganizationPricingPage';
 import Login from './pages/login';
@@ -598,7 +601,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <WorkspaceProvider> {/* Add this wrapper */}
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <ToastProvider>
-            <React.Suspense fallback={null}>
+            <React.Suspense fallback={<RouteLoadingState />}>
               <RouterProvider router={router} />
             </React.Suspense>
           </ToastProvider>
