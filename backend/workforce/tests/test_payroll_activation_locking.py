@@ -1,5 +1,5 @@
 """Payroll settlement changes serialize with the reviewed timesheet-period freeze."""
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from queue import Queue
 from threading import Barrier, Event, Thread
 from unittest import skipUnless
@@ -192,6 +192,63 @@ class PayrollFreezeContracts(PayrollFreezeFixture, TestCase):
         )
         response = self.activate(offer_id=offer.pk)
         self.assertEqual(response.status_code, 409, response.data)
+
+
+    def overnight_finishing_period(self, *, locked=True, end=time(6)):
+        # Set up an overnight fixture; published-roster editing is a separate contract.
+        ShiftSlot.objects.filter(pk=self.slot.pk).update(start_time=time(22), end_time=end)
+        self.slot.refresh_from_db()
+        next_day = self.slot.date + timedelta(days=1)
+        return TimesheetPeriod.objects.create(
+            pharmacy=self.pharmacy, start_date=next_day, end_date=next_day,
+            timezone=self.pharmacy.timezone, created_by=self.manager,
+            status=TimesheetPeriod.Status.LOCKED if locked else TimesheetPeriod.Status.OPEN,
+        )
+
+    def test_overnight_finishing_lock_refuses_activation_without_partial_writes(self):
+        finishing = self.overnight_finishing_period()
+        response = self.activate()
+        self.assertEqual(response.status_code, 409, response.data)
+        self.assertEqual(response.data["period_ids"], [finishing.pk])
+        self.assert_not_activated()
+
+    def test_midnight_finishing_lock_matches_ordinary_assignment_guard(self):
+        finishing = self.overnight_finishing_period(end=time(0))
+        response = self.activate()
+        self.assertEqual(response.status_code, 409, response.data)
+        self.assertEqual(response.data["period_ids"], [finishing.pk])
+        self.assert_not_activated()
+
+    def test_unlocked_overnight_activation_succeeds(self):
+        self.overnight_finishing_period(locked=False)
+        with patch("workforce.signals.rebuild_timesheet_task.delay"):
+            response = self.activate()
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_pending_overnight_slot_and_whole_offer_check_finishing_lock(self):
+        finishing = self.overnight_finishing_period()
+        shift = Shift.objects.create(
+            pharmacy=self.pharmacy, created_by=self.manager, role_needed="ASSISTANT", employment_type="LOCUM",
+        )
+        slot = ShiftSlot.objects.create(
+            shift=shift, date=self.slot.date, start_time=time(22), end_time=time(6),
+        )
+        for whole_shift in (False, True):
+            with self.subTest(whole_shift=whole_shift):
+                offer = ShiftOffer.objects.create(
+                    shift=shift, slot=None if whole_shift else slot, user=self.worker,
+                    status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+                    payment_preference_snapshot="TFN", engagement_kind="SHIFT_EMPLOYMENT",
+                    settlement_channel="TIMESHEET_ONLY",
+                    engagement_terms_snapshot={"occurrences": [{"slot_id": slot.pk, "date": str(slot.date)}]},
+                )
+                response = self.activate(offer_id=offer.pk)
+                self.assertEqual(response.status_code, 409, response.data)
+                self.assertEqual(response.data["period_ids"], [finishing.pk])
+                offer.refresh_from_db()
+                self.assertIsNone(offer.payroll_activated_at)
+                self.assertEqual(offer.settlement_channel, "TIMESHEET_ONLY")
+                self.assertFalse(ShiftSlotAssignment.objects.filter(source_offer=offer).exists())
 
 
 @skipUnless(connection.vendor == "postgresql", "Real PostgreSQL row locks and independent connections required")
