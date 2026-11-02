@@ -17,12 +17,13 @@ class RefreshGatewayPreflightTests(unittest.TestCase):
                 root=Path(directory)
                 (root/'scripts').mkdir()
                 shutil.copyfile(Path(__file__).with_name('refresh-staging-db.sh'), root/'scripts/refresh-staging-db.sh')
+                shutil.copyfile(Path(__file__).with_name('staging_provider_preflight.py'), root/'scripts/staging_provider_preflight.py')
                 (root/'env').mkdir()
                 for name in ('secrets','runtime','integrations','web'):
                     (root/f'env/staging.{name}.env').write_text('DISPOSABLE=1\n')
                 (root/'bin').mkdir()
                 docker=root/'bin/docker'
-                docker.write_text("#!/usr/bin/env python3\nimport json,os,pathlib,sys\na=sys.argv[1:]\np=pathlib.Path(os.environ['FAKE_ROOT'])/'calls.jsonl'\nwith p.open('a') as f:f.write(json.dumps(a)+'\\n')\nif 'ps' in a and '-q' in a:\n if not os.environ.get('MISSING_GATEWAY'):print('gateway-id')\nelif a and a[0]=='inspect':print('false')\n")
+                docker.write_text("#!/usr/bin/env python3\nimport json,os,pathlib,sys\na=sys.argv[1:]\np=pathlib.Path(os.environ['FAKE_ROOT'])/'calls.jsonl'\nwith p.open('a') as f:f.write(json.dumps(a)+'\\n')\nif 'config' in a and '--format' in a:print(json.dumps({'services':{owner:{'environment':{}} for owner in ('web','migration')}}))\nelif 'ps' in a and '-q' in a:\n if not os.environ.get('MISSING_GATEWAY'):print('gateway-id')\nelif a and a[0]=='inspect':print('false')\n")
                 docker.chmod(0o755)
                 backups=root/'backups'
                 backups.mkdir(parents=True,exist_ok=True)

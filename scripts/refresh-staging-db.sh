@@ -34,15 +34,40 @@ for file in "$SECRETS_FILE" "$RUNTIME_FILE" "$INTEGRATIONS_FILE" "$WEB_FILE"; do
   test -s "$file" || { echo "Missing staging environment file: $file" >&2; exit 1; }
 done
 
+# Explicit shell-level acknowledgement after representative-load acceptance.
+resource_budget="${STAGING_RESOURCE_BUDGET_APPROVED:-0}"
+[[ "$resource_budget" == 0 || "$resource_budget" == 1 ]] || { echo 'STAGING_RESOURCE_BUDGET_APPROVED must be 0 or 1.' >&2; exit 1; }
+COMPOSE_FILES=(-f docker-compose.staging.yml)
+if [[ "$resource_budget" == 1 ]]; then COMPOSE_FILES+=(-f docker-compose.staging.resources.yml); fi
+
+# Do not silently remove accepted limits when an operator omits the overlay flag.
+if [[ "$resource_budget" == 0 ]]; then
+  running_names="$(docker ps --all --format '{{.Names}}')"
+  retained_names="$(printf '%s\n' "$running_names" | grep -E '^chemisttasker_(postgres_staging|redis_staging|backend_staging|celery_staging|celery_beat_staging|frontend_staging|public_staging|gateway_staging|staging_migrate)$' || true)"
+  if [[ -n "$retained_names" ]]; then
+    mapfile -t retained <<< "$retained_names"
+    limits="$(docker inspect -f '{{.HostConfig.Memory}} {{.HostConfig.NanoCpus}} {{.HostConfig.PidsLimit}}' "${retained[@]}")"
+    if printf '%s\n' "$limits" | awk '($1+0)>0 || ($2+0)>0 || ($3+0)>0 {found=1} END {exit !found}'; then
+      echo 'Existing staging limits detected. Use STAGING_RESOURCE_BUDGET_APPROVED=1 or a reviewed runtime-limit rollback; refusing implicit limit removal.' >&2
+      exit 1
+    fi
+  fi
+fi
+
 compose() {
   docker compose \
     --env-file "$SECRETS_FILE" \
     --env-file "$RUNTIME_FILE" \
     --env-file "$INTEGRATIONS_FILE" \
     --env-file "$WEB_FILE" \
-    -f docker-compose.staging.yml \
+    "${COMPOSE_FILES[@]}" \
     "$@"
 }
+
+compose --profile release config --format json | python3 scripts/staging_provider_preflight.py
+if [[ "$resource_budget" == 1 ]]; then
+  compose --profile workers --profile release config --format json | python3 scripts/staging_resource_budget.py
+fi
 
 set_runtime_value() {
   local name="$1"
@@ -66,6 +91,9 @@ rollback_path="$rollback_dir/staging-before-production-refresh-${timestamp}.dump
 mkdir -p "$rollback_dir"
 chmod 700 "$rollback_dir"
 
+if active_migration="$(docker inspect -f '{{.State.Running}}' chemisttasker_staging_migrate 2>/dev/null)" && [[ "$active_migration" == true ]]; then
+  echo 'A prior migration/static owner is still running; reconcile it before refreshing data.' >&2; exit 1
+fi
 gateway_id="$(compose ps --all -q gateway)"
 [[ -n "$gateway_id" ]] || { echo "DB refresh requires the existing staging gateway; install it in a separate maintenance step." >&2; exit 1; }
 [[ "$(docker inspect -f '{{.State.Running}}' "$gateway_id")" == true ]] || {
@@ -133,7 +161,7 @@ docker exec chemisttasker_postgres_staging \
 
 compose build web frontend landing
 # Prepare current static assets without applying schema changes to restored data.
-compose --profile release run -T --rm --no-deps -e RUN_MIGRATIONS=0 migration < /dev/null
+compose --profile release run -T --rm --no-deps --name chemisttasker_staging_migrate -e RUN_MIGRATIONS=0 migration < /dev/null
 compose up -d --no-deps --wait --wait-timeout 300 web frontend landing
 compose start gateway
 test "$(compose ps --all -q gateway)" = "$gateway_id"

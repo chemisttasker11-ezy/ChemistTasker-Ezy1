@@ -59,11 +59,35 @@ WEB_FILE=env/staging.web.env
 for file in "$SECRETS_FILE" "$RUNTIME_FILE" "$INTEGRATIONS_FILE" "$WEB_FILE"; do
   [[ -s "$file" && ! -L "$file" ]] || { echo "Missing or symlinked staging environment file: $file" >&2; exit 1; }
 done
+# Explicit shell-level acknowledgement after representative-load acceptance.
+resource_budget="${STAGING_RESOURCE_BUDGET_APPROVED:-0}"
+[[ "$resource_budget" == 0 || "$resource_budget" == 1 ]] || { echo 'STAGING_RESOURCE_BUDGET_APPROVED must be 0 or 1.' >&2; exit 1; }
+COMPOSE_FILES=(-f docker-compose.staging.yml)
+if [[ "$resource_budget" == 1 ]]; then COMPOSE_FILES+=(-f docker-compose.staging.resources.yml); fi
+
+# Do not silently remove accepted limits when an operator omits the overlay flag.
+if [[ "$resource_budget" == 0 ]]; then
+  running_names="$(docker ps --all --format '{{.Names}}')"
+  retained_names="$(printf '%s\n' "$running_names" | grep -E '^chemisttasker_(postgres_staging|redis_staging|backend_staging|celery_staging|celery_beat_staging|frontend_staging|public_staging|gateway_staging|staging_migrate)$' || true)"
+  if [[ -n "$retained_names" ]]; then
+    mapfile -t retained <<< "$retained_names"
+    limits="$(docker inspect -f '{{.HostConfig.Memory}} {{.HostConfig.NanoCpus}} {{.HostConfig.PidsLimit}}' "${retained[@]}")"
+    if printf '%s\n' "$limits" | awk '($1+0)>0 || ($2+0)>0 || ($3+0)>0 {found=1} END {exit !found}'; then
+      echo 'Existing staging limits detected. Use STAGING_RESOURCE_BUDGET_APPROVED=1 or a reviewed runtime-limit rollback; refusing implicit limit removal.' >&2
+      exit 1
+    fi
+  fi
+fi
+
 compose() {
   docker compose --env-file "$SECRETS_FILE" --env-file "$RUNTIME_FILE" \
-    --env-file "$INTEGRATIONS_FILE" --env-file "$WEB_FILE" -f docker-compose.staging.yml "$@"
+    --env-file "$INTEGRATIONS_FILE" --env-file "$WEB_FILE" "${COMPOSE_FILES[@]}" "$@"
 }
 compose config --quiet
+compose --profile release config --format json | python3 scripts/staging_provider_preflight.py
+if [[ "$resource_budget" == 1 ]]; then
+  compose --profile workers --profile release config --format json | python3 scripts/staging_resource_budget.py
+fi
 sha256sum "$SECRETS_FILE" "$RUNTIME_FILE" "$INTEGRATIONS_FILE" "$WEB_FILE" > "$attempt_dir/env.before"
 container_state() {
   for name in "$@"; do

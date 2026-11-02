@@ -28,9 +28,19 @@ if tool!='docker': sys.exit(0)
 if args[0]=='compose':
     operation=next(x for x in args if x in ['config','build','ps','up','restart','stop','exec','run','start'])
     if operation=='config' and '--format' in args:
-        services={'gateway':{'image':'nginx:1.27.5-alpine'}}
-        if '--profile' in args and args[args.index('--profile')+1]=='release':
-            services['migration']={'environment':{'RUN_MIGRATIONS':'0' if os.environ.get('DISABLE_MIGRATIONS') else '1'}}
+        services={'gateway':{'image':'nginx:1.27.5-alpine'},'web':{'environment':{'STRIPE_SECRET_KEY':os.environ.get('WEB_STRIPE_KEY','sk_test_disposable123')}}}
+        if '--profile' in args and 'release' in args:
+            services['migration']={'environment':{'RUN_MIGRATIONS':'0' if os.environ.get('DISABLE_MIGRATIONS') else '1','STRIPE_SECRET_KEY':os.environ.get('MIGRATION_STRIPE_KEY','sk_test_disposable123')}}
+        if 'docker-compose.staging.resources.yml' in args:
+            budgets={'postgres':(1024,.75,128),'redis':(768,.25,64),'redis_cache':(160,.25,64),
+                'web':(1024,1,128),'migration':(1024,1,128),'celery_worker':(1536,1,128),
+                'celery_beat':(384,.25,64),'frontend':(128,.25,64),'landing':(768,.75,128),'gateway':(128,.25,64)}
+            for role,(memory,cpu,pids) in budgets.items():
+                services.setdefault(role,{}).update(mem_limit=str(memory*1024**2),cpus=str(cpu),pids_limit=pids,
+                    logging={'driver':'json-file','options':{'max-size':'10m','max-file':'5'}})
+            services['redis']['command']=['redis-server','--maxmemory','256mb']
+            services['redis_cache']['command']=['redis-server','--maxmemory','96mb']
+            if os.environ.get('STAGING_WEB_MEMORY_LIMIT')=='9g': services['web']['mem_limit']=str(9*1024**3)
         print(json.dumps({'services':services}))
     if operation=='build' and os.environ.get('FAIL_BUILD'): sys.exit(10)
     if operation=='build' and os.environ.get('POLICY_CHANGED_DURING_BUILD'): (root/'policy-changed').touch()
@@ -51,6 +61,7 @@ elif args[0]=='inspect':
     if args[-1]=='chemisttasker_staging_migrate':
         if os.environ.get('MIGRATION_RUNNING'): print('true')
         else: sys.exit(1)
+    elif 'HostConfig.Memory' in args[2]: print('1073741824 0 0' if os.environ.get('EXISTING_RESOURCE_CAPS') else '0 0 0')
     elif 'State.ExitCode' in args[2]:
         print('137' if os.environ.get('FORCED_STOP') else '0')
     elif 'State.OOMKilled' in args[2]: print('false')
@@ -84,6 +95,9 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         (self.root/'scripts').mkdir()
+        source_root=Path(__file__).resolve().parent.parent
+        for name in ('scripts/staging_resource_budget.py','scripts/staging_provider_preflight.py','docker-compose.staging.resources.yml'):
+            shutil.copyfile(source_root/name,self.root/name)
         shutil.copyfile(Path(__file__).with_name('deploy-staging.sh'), self.root/'scripts/deploy-staging.sh')
         (self.root/'scripts/smoke-staging.sh').write_text('#!/bin/sh\n[ -z \"${FAIL_SMOKE:-}\" ] || exit 14\ncurl --fail https://example.test/health/\n')
         (self.root/'env').mkdir()
@@ -100,7 +114,7 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         env={**os.environ, 'FAKE_ROOT':str(self.root),
              'PATH':str(self.root/'bin')+os.pathsep+os.environ['PATH'],
              'STAGING_BACKUP_DIR':str(self.root/'backups'), 'STAGING_OPS_DIR':str(self.root/'ops'),
-             'STAGING_EXPECTED_SHA':'1'*40, 'STAGING_STOP_TIMEOUT':'2', **extra}
+             'STAGING_EXPECTED_SHA':'1'*40, 'STAGING_STOP_TIMEOUT':'2','STAGING_RESOURCE_BUDGET_APPROVED':'0', **extra}
         result=subprocess.run(['bash',str(self.root/'scripts/deploy-staging.sh'),*args],
                               env=env,capture_output=True,text=True,timeout=30)
         path=self.root/'calls.jsonl'
@@ -165,6 +179,100 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         self.assertTrue(self.operations('build'))
         self.assertFalse(any(x[:2]==['docker','kill'] or 'pg_dump' in x for x in self.calls))
 
+    def test_live_provider_refuses_deploy_before_build_or_writer_pause(self):
+        for owner,key in [('WEB_STRIPE_KEY','sk_live_disposable123'),('MIGRATION_STRIPE_KEY','rk_live_disposable123')]:
+            with self.subTest(owner=owner):
+                result=self.release(**{owner:key})
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn('provider preflight',result.stderr)
+                self.assertNotIn(key,result.stderr+result.stdout)
+                self.assertFalse(self.operations('build'))
+                self.assertFalse(any(x[:2]==['docker','kill'] or 'pg_dump' in x for x in self.calls))
+
+    def test_live_provider_refuses_refresh_before_service_or_database_changes(self):
+        for owner,key in [('WEB_STRIPE_KEY','sk_live_disposable123'),('MIGRATION_STRIPE_KEY','rk_live_disposable123')]:
+            with self.subTest(owner=owner):
+                result,calls=self.refresh(**{owner:key})
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn('provider preflight',result.stderr)
+                self.assertNotIn(key,result.stderr+result.stdout)
+                self.assertFalse(any('up' in x or x[:2]==['docker','kill'] or 'pg_dump' in x or 'pg_restore' in x for x in calls))
+
+    def test_provider_preflight_fails_closed_without_echoing_invalid_input(self):
+        import sys
+        helper=Path(__file__).with_name('staging_provider_preflight.py')
+        for payload in ('not-echoed-disposable',json.dumps({'services':{'web':{'environment':'not-echoed-disposable'}}})):
+            result=subprocess.run([sys.executable,str(helper)],input=payload,capture_output=True,text=True,timeout=10)
+            self.assertNotEqual(result.returncode,0)
+            self.assertIn('provider preflight',result.stderr)
+            self.assertNotIn('not-echoed-disposable',result.stderr+result.stdout)
+
+    def test_provider_preflight_accepts_test_or_disabled_collection(self):
+        helper=Path(__file__).with_name('staging_provider_preflight.py')
+        import sys
+        for key in ('','sk_test_disposable123','rk_test_disposable123'):
+            config={'services':{owner:{'environment':{'STRIPE_SECRET_KEY':key}} for owner in ('web','migration')}}
+            result=subprocess.run([sys.executable,str(helper)],input=json.dumps(config),capture_output=True,text=True,timeout=10)
+            self.assertEqual(result.returncode,0,result.stderr)
+
+    def test_resource_budgets_require_explicit_opt_in(self):
+        result=self.release()
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertFalse(any('docker-compose.staging.resources.yml' in x for x in self.calls))
+
+    def test_accepted_resource_budget_is_used_by_every_compose_operation(self):
+        result=self.release(STAGING_RESOURCE_BUDGET_APPROVED='1')
+        self.assertEqual(result.returncode,0,result.stderr)
+        compose=[x for x in self.calls if x[:2]==['docker','compose']]
+        self.assertTrue(compose)
+        self.assertTrue(all('docker-compose.staging.resources.yml' in x for x in compose))
+
+    def test_invalid_resolved_resource_override_refuses_before_build_or_pause(self):
+        result=self.release(STAGING_RESOURCE_BUDGET_APPROVED='1',STAGING_WEB_MEMORY_LIMIT='9g')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('aggregate',result.stderr)
+        self.assertFalse(self.operations('build'))
+        self.assertFalse(any(x[:2]==['docker','kill'] or 'pg_dump' in x for x in self.calls))
+
+    def test_omitted_overlay_never_removes_existing_runtime_limits(self):
+        result=self.release(EXISTING_RESOURCE_CAPS='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('Existing staging limits',result.stderr)
+        self.assertFalse(self.operations('build'))
+        self.assertFalse(self.operations('up'))
+        self.assertFalse(any(x[:2]==['docker','kill'] for x in self.calls))
+
+    def test_refresh_uses_accepted_overlay_and_named_static_owner(self):
+        result,calls=self.refresh(STAGING_RESOURCE_BUDGET_APPROVED='1')
+        self.assertEqual(result.returncode,0,result.stderr)
+        compose=[x for x in calls if x[:2]==['docker','compose']]
+        self.assertTrue(all('docker-compose.staging.resources.yml' in x for x in compose))
+        prepare=next(x for x in compose if 'run' in x)
+        self.assertIn('chemisttasker_staging_migrate',prepare)
+
+    def test_refresh_invalid_budget_refuses_before_database_or_writer_changes(self):
+        result,calls=self.refresh(STAGING_RESOURCE_BUDGET_APPROVED='1',STAGING_WEB_MEMORY_LIMIT='9g')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('aggregate',result.stderr)
+        self.assertFalse(any('up' in x or 'pg_dump' in x or x[:2]==['docker','kill'] for x in calls))
+
+    def test_refresh_omitted_overlay_keeps_existing_limits(self):
+        result,calls=self.refresh(EXISTING_RESOURCE_CAPS='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('Existing staging limits',result.stderr)
+        self.assertFalse(any('up' in x or 'pg_dump' in x or x[:2]==['docker','kill'] for x in calls))
+
+    def test_refresh_refuses_prior_running_migration_before_service_changes(self):
+        result,calls=self.refresh(MIGRATION_RUNNING='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('still running',result.stderr)
+        self.assertFalse(any('up' in x or 'pg_dump' in x or x[:2]==['docker','kill'] for x in calls))
+
+    def test_invalid_resource_acknowledgement_refuses_before_docker(self):
+        result=self.release(STAGING_RESOURCE_BUDGET_APPROVED='yes')
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse(any(x[0]=='docker' for x in self.calls))
+
     def test_explicit_worker_opt_out(self):
         result=self.release('--without-workers')
         self.assertEqual(result.returncode,0,result.stderr)
@@ -226,7 +334,7 @@ class StagingReleaseSafetyTests(unittest.TestCase):
     def refresh(self, **extra):
         source=Path(__file__).with_name('refresh-staging-db.sh').read_text()
         backups=self.root/'backups'
-        backups.mkdir()
+        backups.mkdir(exist_ok=True)
         source=source.replace('/opt/backups/chemisttasker',str(backups))
         script=self.root/'scripts/refresh-staging-db.sh'
         script.write_text(source)
@@ -234,7 +342,7 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         archive=backups/'synthetic.dump'
         archive.write_bytes(b'fixture')
         env={**os.environ,'FAKE_ROOT':str(self.root),'STAGING_OPS_DIR':str(self.root/'ops'),
-             'PATH':str(self.root/'bin')+os.pathsep+os.environ['PATH'],'STAGING_STOP_TIMEOUT':'2',**extra}
+             'PATH':str(self.root/'bin')+os.pathsep+os.environ['PATH'],'STAGING_STOP_TIMEOUT':'2','STAGING_RESOURCE_BUDGET_APPROVED':'0',**extra}
         result=subprocess.run(['bash',str(script),'--confirm-production-data',str(archive)],
                               env=env,capture_output=True,text=True,timeout=30)
         calls=[json.loads(x) for x in (self.root/'calls.jsonl').read_text().splitlines()]
