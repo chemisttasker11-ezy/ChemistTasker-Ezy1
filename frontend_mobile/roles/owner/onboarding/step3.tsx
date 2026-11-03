@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, type TextInput, View } from 'react-native';
+import { StyleSheet, type TextInputInstance, View } from 'react-native';
 import { Store, Network } from 'lucide-react-native';
 import { TextField } from '@/components/ui';
 import { space } from '@/constants/tokens';
@@ -9,7 +9,7 @@ import { OptionCard, optionIconColor, StepIntro, type StepProps } from './parts'
 /** Your pharmacies: one or several (web "Do you have more than one pharmacy?") and how many. */
 export default function OwnerOnboardingStep3({ titleRef, attempt, onContinue }: StepProps) {
   const { form, update, errors } = useOnboarding();
-  const countRef = useRef<TextInput>(null);
+  const countRef = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     if (attempt && errors.number_of_pharmacies) countRef.current?.focus();

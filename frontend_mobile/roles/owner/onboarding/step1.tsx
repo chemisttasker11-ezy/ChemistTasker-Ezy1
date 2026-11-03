@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, Text, type TextInput, View } from 'react-native';
+import { StyleSheet, Text, type TextInputInstance, View } from 'react-native';
 import { Camera, CircleCheck, Clock3 } from 'lucide-react-native';
 import { Button, InitialsAvatar, Pill, TextField } from '@/components/ui';
 import { AuthLink } from '@/components/AuthLayout';
@@ -14,7 +14,7 @@ const LOCKED_HINT = 'Locked after initial registration.';
 /** About you: photo, legal name, username, phone and gender (web OwnerOnboarding "Profile"). */
 export default function OwnerOnboardingStep1({ titleRef, attempt, onContinue }: StepProps) {
   const { form, update, errors, lockedNames, isMobileVerified, photo, pickPhoto, removePhoto } = useOnboarding();
-  const refs = useRef<Partial<Record<TextKey, TextInput | null>>>({});
+  const refs = useRef<Partial<Record<TextKey, TextInputInstance | null>>>({});
 
   const editable = (key: TextKey) =>
     !(key === 'first_name' && lockedNames.first) &&
@@ -37,7 +37,7 @@ export default function OwnerOnboardingStep1({ titleRef, attempt, onContinue }: 
   }, [attempt]);
 
   const field = (key: TextKey) => ({
-    ref: (node: TextInput | null) => {
+    ref: (node: TextInputInstance | null) => {
       refs.current[key] = node;
     },
     value: form[key],

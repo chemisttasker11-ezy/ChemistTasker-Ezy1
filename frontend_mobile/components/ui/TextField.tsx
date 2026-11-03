@@ -4,6 +4,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  type TextInputInstance,
   type TextInputProps,
   View,
   type ViewStyle,
@@ -27,7 +28,7 @@ export type TextFieldProps = Omit<TextInputProps, 'style'> & {
  * Label above, 48/44pt input, hint or error below (taste 4.6). Takes every native TextInput prop so screens
  * set textContentType / autoComplete / returnKeyType chains; the ref is the TextInput, for focus().
  */
-export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
+export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function TextField(
   {
     label,
     error,

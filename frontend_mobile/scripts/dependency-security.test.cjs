@@ -17,33 +17,31 @@ function isolated(source) {
 
 test('installed patches and exact supported leaf versions are present', verifyInstalled);
 
-test('percent-encoded runs decode promptly without quadratic fallback replacement', () => {
-  isolated(`
+// SDK 58: expo-router parses link queries with URLSearchParams (query-string and decode-uri-component are gone).
+const routerQuery = `
     const assert = require('node:assert/strict');
-    const decoder = require('decode-uri-component');
-    const decode = typeof decoder === 'function' ? decoder : decoder.default;
+    const { parseQueryParams } = require('expo-router/build/fork/getStateFromPath-forks.js');
+    const parse = query => parseQueryParams('/link?' + query, { name: 'link', params: {} });
+`;
+
+test('percent-encoded runs decode promptly without quadratic fallback replacement', () => {
+  isolated(`${routerQuery}
     let input = '';
     for (let i = 0; i < 32000; i++) {
       input += '%' + Math.floor(i / 256).toString(16).padStart(2, '0')
         + '%' + (i % 256).toString(16).padStart(2, '0') + 'x';
     }
     input += '%zz';
-    assert.ok(decode(input).endsWith('%zz'));
+    assert.ok(parse('q=' + input).q.endsWith('%zz'));
   `);
 });
 
 test('percent-encoded links keep valid Unicode and legacy query-string decoding', () => {
-  isolated(`
-    const assert = require('node:assert/strict');
-    const decoder = require('decode-uri-component');
-    const decode = typeof decoder === 'function' ? decoder : decoder.default;
-    const { createRequire } = require('node:module');
-    const routerRequire = createRequire(require.resolve('expo-router/package.json'));
-    const query = routerRequire('query-string');
+  isolated(`${routerQuery}
     for (const text of ['Chemist Tasker', 'Ångström', 'صيدلية', 'a/b?c=d&x=1']) {
-      assert.equal(decode(encodeURIComponent(text)), text);
+      assert.equal(parse('t=' + encodeURIComponent(text)).t, text);
     }
-    const parsed = query.parse('name=Chemist+Tasker&role=%D8%B5%D9%8A%D8%AF%D9%84%D9%8A&bad=%zz&tag=a&tag=b');
+    const parsed = parse('name=Chemist+Tasker&role=%D8%B5%D9%8A%D8%AF%D9%84%D9%8A&bad=%zz&tag=a&tag=b');
     assert.equal(parsed.name, 'Chemist Tasker');
     assert.equal(parsed.role, 'صيدلي');
     assert.equal(parsed.bad, '%zz');
@@ -172,9 +170,10 @@ test('patched deepmerge rejects returned-object prototype poisoning and preserve
   );
 });
 
-test('Metro image parsers reject zero-size entries and keep valid dimensions', () => {
+for (const metro of ['metro', '@expo/metro']) test(`${metro} image parsers reject zero-size entries and keep valid dimensions`, () => {
   isolated(`
-    const assert=require('node:assert/strict'), assets=require('metro/private/Assets');
+    const assert=require('node:assert/strict');
+    const assets=require('node:module').createRequire(require.resolve('${metro}/package.json'))('metro/private/Assets');
     const icns=Buffer.alloc(16);icns.write('icns');icns.writeUInt32BE(16,4);icns.write('ic07',8);
     const jxl=Buffer.from('0000000c4a584c200d0a870a000000006a786c7000000000','hex');
     for (const bytes of [icns, jxl, Buffer.alloc(0)]) {
@@ -188,7 +187,7 @@ test('Metro image parsers reject zero-size entries and keep valid dimensions', (
   `);
 });
 
-test('Metro reads filesystem images as bytes for dimension parsing', () => {
+for (const metro of ['metro', '@expo/metro']) test(`${metro} reads filesystem images as bytes for dimension parsing`, () => {
   isolated(`
     const assert = require('node:assert/strict');
     const path = require('node:path');
@@ -198,7 +197,8 @@ test('Metro reads filesystem images as bytes for dimension parsing', () => {
     writeFileSync(asset, Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489', 'hex'));
     (async () => {
       try {
-        const data = await require('metro/private/Assets').getAssetData(asset, 'pixel.png', [], 'web', '/assets');
+        const assets = require('node:module').createRequire(require.resolve('${metro}/package.json'))('metro/private/Assets');
+        const data = await assets.getAssetData(asset, 'pixel.png', [], 'web', '/assets');
         assert.equal(data.width, 1);
         assert.equal(data.height, 1);
         assert.equal(data.type, 'png');
@@ -289,7 +289,7 @@ test('a stale removed package left in node_modules fails even with a clean lockf
   }
 });
 
-test('a stale @expo/cli minimatch copy fails while the allowed minimatch copies stay installed', () => {
+test('stale minimatch and nested deepmerge copies fail while allowed root copies stay installed', () => {
   const folder = mkdtempSync(path.join(process.env.SECURITY_TEST_TMP || tmpdir(), 'mobile-security-cli-'));
   const plant = (...parts) => {
     mkdirSync(path.join(folder, ...parts), { recursive: true });
@@ -302,6 +302,15 @@ test('a stale @expo/cli minimatch copy fails while the allowed minimatch copies 
     }
     assert.throws(() => assertNoStaleCopies(folder), /Stale nested copies[\s\S]*@expo[\\/]cli[\\/]node_modules[\\/]minimatch/);
     rmSync(path.join(folder, 'node_modules', '@expo', 'cli'), { recursive: true });
+    assertNoStaleCopies(folder);
+    // The deepmerge override hoists one patched root copy; an old nested 2.2.1/3.3.0 copy would ship unpatched.
+    plant('node_modules', 'deepmerge');
+    assertNoStaleCopies(folder);
+    for (const consumer of [['formik'], ['@callstack', 'react-theme-provider'], ['@scope', 'other']]) {
+      plant('node_modules', ...consumer, 'node_modules', 'deepmerge');
+      assert.throws(() => assertNoStaleCopies(folder), /Stale nested copies[\s\S]*node_modules[\\/]deepmerge/);
+      rmSync(path.join(folder, 'node_modules', ...consumer), { recursive: true });
+    }
     assertNoStaleCopies(folder);
   } finally {
     assert.equal(path.dirname(folder), path.resolve(process.env.SECURITY_TEST_TMP || tmpdir()));
@@ -367,6 +376,64 @@ for (const entry of ['deepmerge', 'deepmerge/dist/umd.js']) {
     });
   });
 }
+
+test('deepmerge override keeps Formik values, validation errors and Paper themes compatible', () => {
+  isolated(`
+    const assert = require('node:assert/strict');
+    const React = require('react');
+    const { renderToString } = require('react-dom/server');
+    const { Formik, setIn, prepareDataForValidation } = require('formik');
+    const { createTheming } = require('@callstack/react-theme-provider');
+    // Frozen expectations also checked against the former deepmerge 2.2.1/3.3.0 consumers.
+    const initialValues = { profile: { name: 'Ada' }, shifts: [{ start: '', end: '17:00' }], tags: ['a', ''] };
+    const values = setIn(initialValues, 'shifts[0].start', '09:00');
+    assert.deepEqual(values, { profile: { name: 'Ada' }, shifts: [{ start: '09:00', end: '17:00' }], tags: ['a', ''] });
+    assert.equal(initialValues.shifts[0].start, '');
+    assert.deepEqual(prepareDataForValidation(values), {
+      profile: { name: 'Ada' }, shifts: [{ start: '09:00', end: '17:00' }], tags: ['a', undefined],
+    });
+    let form;
+    const schema = { validate: (normalized, options) => {
+      assert.deepEqual(normalized, prepareDataForValidation(values));
+      assert.equal(options.abortEarly, false);
+      return Promise.reject({ name: 'ValidationError', inner: [
+        { path: 'shifts[0].end', message: 'schema' },
+        { path: 'profile.name', message: 'schema' },
+      ] });
+    } };
+    renderToString(React.createElement(Formik, {
+      initialValues: values, onSubmit: () => {}, validationSchema: schema,
+      validate: input => {
+        assert.deepEqual(input, values);
+        return { shifts: [{ rate: 'form' }, { start: 'second' }], profile: { name: 'form' } };
+      },
+    }, bag => { form = bag; return null; }));
+    assert.deepEqual(form.values, values);
+    form.registerField('shifts[0].start', { validate: value => {
+      assert.equal(value, '09:00');
+      return 'field';
+    } });
+    // validateForm reaches Formik's real runAllValidations deepmerge.all + private arrayMerge.
+    form.validateForm().then(errors => {
+      assert.deepEqual(errors, {
+        shifts: [{ start: 'field', end: 'schema', rate: 'form' }, { start: 'second' }],
+        profile: { name: 'form' },
+      });
+      assert.deepEqual(form.values, values);
+    }).catch(error => { console.error(error); process.exitCode = 1; });
+
+    const { ThemeProvider, useTheme, withTheme } = createTheming({});
+    const base = { dark: false, colors: { primary: '#1', bg: '#2' }, fonts: { regular: { family: 'I', weight: '400' } }, list: [1, 2] };
+    const overrides = { colors: { primary: '#9' }, fonts: { regular: { weight: '500' } }, list: [3] };
+    const before = JSON.stringify([base, overrides]);
+    const expected = { dark: false, colors: { primary: '#9', bg: '#2' }, fonts: { regular: { family: 'I', weight: '500' } }, list: [1, 2, 3] };
+    const HookProbe = () => { assert.deepEqual(useTheme(overrides), expected); return null; };
+    const WrappedProbe = withTheme(({ theme }) => { assert.deepEqual(theme, expected); return null; });
+    renderToString(React.createElement(ThemeProvider, { theme: base },
+      React.createElement(HookProbe), React.createElement(WrappedProbe, { theme: overrides })));
+    assert.equal(JSON.stringify([base, overrides]), before);
+  `);
+});
 
 test('Expo config modifications preserve valid plugin merging without inherited injected flags', async () => {
   const { readFileSync } = require('node:fs');

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
-import { useIsFocused, useNavigation } from 'expo-router';
+import { useIsFocused } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useUnsavedChangesDialog } from './UnsavedChangesDialogProvider';
 import { useUnsavedChangesRegistry } from './UnsavedChangesRegistryProvider';
@@ -52,7 +52,6 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
     onSave,
     saveLabel = 'Save Changes',
   } = options;
-  const navigation = useNavigation();
   const isFocused = useIsFocused();
   const dialog = useUnsavedChangesDialog();
   const registry = useUnsavedChangesRegistry();
@@ -174,43 +173,19 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
     leave(onDiscardAction);
   }, [isDirty, isSaveInFlight, leave, saving]);
 
-  useEffect(
-    () => navigation.addListener('beforeRemove', (event) => {
-      if (isSaveInFlight()) event.preventDefault();
-    }),
-    [isSaveInFlight, navigation]
-  );
-
-  // Stays on while saving so native gestures (iOS swipe) cannot dismiss a saving form; that removal is refused silently.
-  usePreventRemove(Platform.OS !== 'web' && (isDirty || saving), ({ data }) => {
+  // Stays on while saving so native gestures (iOS swipe) and web back cannot dismiss a saving form; that removal is refused silently.
+  // expo-router 58 has no beforeRemove event and keeps blocking a re-dispatch, so an allowed removal goes through repeat().
+  usePreventRemove(isDirty || saving, ({ repeat }) => {
     if (isSaveInFlight()) {
       return;
     }
     if (approvedLeaveRef.current || savedRef.current) {
       approvedLeaveRef.current = false;
-      navigation.dispatch(data.action);
+      repeat();
       return;
     }
-    leave(() => navigation.dispatch(data.action));
+    leave(repeat);
   });
-
-  useEffect(() => {
-    if (Platform.OS !== 'web') {
-      return;
-    }
-
-    const unsubscribe = navigation.addListener('beforeRemove', (event: any) => {
-      if (!isDirty || saving || approvedLeaveRef.current) {
-        approvedLeaveRef.current = false;
-        return;
-      }
-
-      event.preventDefault();
-      leave(() => navigation.dispatch(event.data.action));
-    });
-
-    return unsubscribe;
-  }, [isDirty, leave, navigation, saving]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !isDirty || saving || typeof window === 'undefined') {

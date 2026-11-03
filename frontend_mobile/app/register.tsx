@@ -4,7 +4,7 @@ import {
   View,
   StyleSheet,
   Text,
-  type TextInput,
+  type TextInputInstance,
   Linking,
   Modal,
 } from 'react-native';
@@ -117,8 +117,8 @@ export default function RegisterScreen() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaModalVisible, setCaptchaModalVisible] = useState(false);
   const [captchaLoading, setCaptchaLoading] = useState(true);
-  const passwordRef = useRef<TextInput>(null);
-  const confirmRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
+  const confirmRef = useRef<TextInputInstance>(null);
   const referralCode = Array.isArray(params.referral_code)
     ? params.referral_code[0]
     : params.referral_code;

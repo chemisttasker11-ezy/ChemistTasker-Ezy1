@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, type Text } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, type TextInstance } from 'react-native';
 
 /**
  * Moves the screen reader into a just-opened Modal: pass `onShow` to the Modal and `target` to its
@@ -7,7 +7,7 @@ import { AccessibilityInfo, findNodeHandle, type Text } from 'react-native';
  * `open` cancels a pending focus as soon as the overlay starts closing, so an exiting overlay is never focused.
  */
 export function useOverlayFocus(open: boolean) {
-  const target = useRef<Text>(null);
+  const target = useRef<TextInstance>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const isOpen = useRef(open);
 

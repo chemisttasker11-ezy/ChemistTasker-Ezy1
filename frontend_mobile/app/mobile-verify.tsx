@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, type TextInput, View } from 'react-native';
+import { StyleSheet, Text, type TextInputInstance, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Globe } from 'lucide-react-native';
 import {
@@ -32,10 +32,10 @@ export default function MobileVerifyScreen() {
     const [identityLocked, setIdentityLocked] = useState(false);
     // The code step appears once a code is on its way, so only one step leads at a time.
     const [codeSent, setCodeSent] = useState(false);
-    const otpInputRef = useRef<TextInput | null>(null);
-    const lastNameRef = useRef<TextInput | null>(null);
-    const usernameRef = useRef<TextInput | null>(null);
-    const mobileRef = useRef<TextInput | null>(null);
+    const otpInputRef = useRef<TextInputInstance | null>(null);
+    const lastNameRef = useRef<TextInputInstance | null>(null);
+    const usernameRef = useRef<TextInputInstance | null>(null);
+    const mobileRef = useRef<TextInputInstance | null>(null);
     // Which button shows the spinner; `loading` still locks every action as before.
     const [pending, setPending] = useState<PendingAction | null>(null);
     const run = (action: PendingAction, handler: () => Promise<void>) => {

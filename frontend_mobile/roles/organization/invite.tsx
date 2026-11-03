@@ -619,7 +619,7 @@ export default function OrganizationInviteScreen() {
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>No organization members found.</Text>
             </View>
-          ) : null
+          ) : undefined
         }
       />
 

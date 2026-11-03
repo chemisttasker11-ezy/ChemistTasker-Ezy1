@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, AppState, type AppStateStatus } from 'react-native';
+import { AccessibilityInfo, AppState } from 'react-native';
 import { useIsFocused } from 'expo-router';
 
 /**
@@ -8,7 +8,7 @@ import { useIsFocused } from 'expo-router';
  */
 export function useAnimationEnabled() {
   const isFocused = useIsFocused();
-  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  const [appState, setAppState] = useState(AppState.currentState);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(true);
 
   useEffect(() => {

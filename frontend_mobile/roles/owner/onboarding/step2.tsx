@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, Text, type TextInput, View } from 'react-native';
+import { StyleSheet, Text, type TextInputInstance, View } from 'react-native';
 import { BriefcaseBusiness, CircleCheck, CircleX, Clock3, Pill as PillIcon } from 'lucide-react-native';
 import AhpraStatus from '@/components/AhpraStatus';
 import { Pill, TextField } from '@/components/ui';
@@ -16,7 +16,7 @@ const ROLE_COPY = {
 /** Your role: Pharmacy Manager or Pharmacist, then AHPRA when it applies (same rules as web). */
 export default function OwnerOnboardingStep2({ titleRef, attempt, onContinue }: StepProps) {
   const { form, update, errors, showAhpra, isAhpraVerified, ahpraSummary } = useOnboarding();
-  const ahpraRef = useRef<TextInput>(null);
+  const ahpraRef = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     if (attempt && errors.ahpra_number) ahpraRef.current?.focus();
