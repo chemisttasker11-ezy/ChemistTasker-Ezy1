@@ -56,6 +56,12 @@ for the phone with the kit → contrast check → emulator screenshot → decisi
 banner + retry, 401 → login, 403 → clear message, reduced motion, splash until session ready, Crashlytics, no
 console noise.
 
+**Feature-parity gate (owner target, 3 Nov):** every shared-core function web uses must be used by mobile too,
+unless it is web-only by nature (browser session/storage). Checked by diffing runtime imports from
+`@chemisttasker/shared-core` in `frontend_web/src` vs `frontend_mobile` (first run 3 Nov: web 295, mobile 308,
+66 web-only, being classified as covered / missing / platform). Release needs zero unexplained web-only
+exports, and no mobile screen calling the API outside shared-core.
+
 **5. Gates and release** per wave: tsc, lint, `expo install --check`, mobile + shared-core tests, boundary audit,
 `expo export` both platforms, debug build + emulator screenshots, Codex A review; agy front-end code also gets a
 Claude B review. First release after Phase 2 = new EAS binary; later waves can ship OTA on that runtime.
