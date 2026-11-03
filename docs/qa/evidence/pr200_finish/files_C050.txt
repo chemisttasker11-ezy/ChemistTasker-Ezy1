@@ -1,0 +1,17 @@
+frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/PharmacyOverview.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/PharmacyProfileCard.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/PharmacySettings.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/TopBar.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/inviteUtils.ts
+frontend_web/src/pages/dashboard/sidebar/owner/membershipApi.ts
+frontend_web/src/pages/dashboard/sidebar/owner/pharmacyDetailParts.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/teamUi.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/types.ts
+frontend_web/src/pages/dashboard/sidebar/owner/usePayrollSetting.ts
+frontend_web/src/pages/dashboard/sidebar/rewards/PillsPage.tsx
+frontend_web/src/pages/finance/Editors.tsx
+frontend_web/src/pages/finance/FinanceTheme.tsx
+frontend_web/src/pages/finance/FinanceWorkspace.tsx
+frontend_web/src/pages/finance/InvoiceComposer.tsx

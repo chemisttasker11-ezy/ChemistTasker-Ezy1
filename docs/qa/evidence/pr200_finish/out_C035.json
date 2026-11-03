@@ -1,0 +1,85 @@
+{
+ "chunk": "C035",
+ "files": [
+  {
+   "path": "frontend_web/src/components/roster/HorizontalCalendarGrid.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Horizontal weekly calendar timeline with store hours toggle, drag scheduling, and accessible shift blocks."
+  },
+  {
+   "path": "frontend_web/src/components/roster/RosterGridViews.model.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Type definitions, interfaces, and role styling helpers for roster grid and stacked views."
+  },
+  {
+   "path": "frontend_web/src/components/roster/RosterGridViews.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Weekly roster matrix supporting drag-and-drop, quick shift creation, reassignments, and mobile daily view."
+  },
+  {
+   "path": "frontend_web/src/components/roster/RosterManagerOverview.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Manager overview card presenting weekly metrics, unassigned slots, and pending leave/cover requests."
+  },
+  {
+   "path": "frontend_web/src/components/roster/RosterPlanningToolbar.model.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "TypeScript interfaces for roster period management, validation diagnostics, templates, and acknowledgements."
+  },
+  {
+   "path": "frontend_web/src/components/roster/RosterPlanningToolbar.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Toolbar with week navigation, pre-publish validation diagnostics, week copying, templates, and unpublish controls."
+  },
+  {
+   "path": "frontend_web/src/components/roster/RosterStackedDayView.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Daily stacked staffing plan view grouping shifts and vacancies with edit and add capabilities."
+  },
+  {
+   "path": "frontend_web/src/components/roster/RosterWorkerAcknowledgements.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Worker UI for reviewing published weekly shifts and acknowledging roster receipt."
+  },
+  {
+   "path": "frontend_web/src/components/roster/RosterWorkerAgenda.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Weekly worker agenda displaying assigned shifts, cover requests, and open team shifts."
+  },
+  {
+   "path": "frontend_web/src/components/roster/RosterWorkforceSummary.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Workforce settlement details, pay classification, payroll readiness, and timesheet review hours."
+  },
+  {
+   "path": "frontend_web/src/components/roster/useCalendarDragScroll.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Hook handling automated viewport scrolling during calendar drag operations with animation frame cleanup."
+  },
+  {
+   "path": "frontend_web/src/components/routeAccess.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Route access control checking user roles, admin status, organization privileges, and delegated capabilities."
+  },
+  {
+   "path": "frontend_web/src/components/social/socialFormat.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Social and chat date formatting, message grouping, safe URL link rendering, and reaction constants."
+  }
+ ],
+ "findings": [],
+ "reviewer": "agy-g2"
+}

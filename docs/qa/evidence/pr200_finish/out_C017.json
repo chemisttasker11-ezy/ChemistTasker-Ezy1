@@ -1,0 +1,207 @@
+{
+ "chunk": "C017",
+ "files": [
+  {
+   "path": "backend/pharmacy_hub/migrations/0001_initial.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only model move plus content-type relabel; no business data change."
+  },
+  {
+   "path": "backend/pharmacy_hub/migrations/0002_clean_table_and_index_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Table and index renames only."
+  },
+  {
+   "path": "backend/pharmacy_hub/migrations/0003_clean_constraint_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Database object renames only."
+  },
+  {
+   "path": "backend/pharmacy_hub/migrations/0004_role_labels_pharmacy_team.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Choice label change only."
+  },
+  {
+   "path": "backend/pharmacy_hub/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file."
+  },
+  {
+   "path": "backend/pharmacy_hub/models.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Scope constraints and save normalisation are consistent."
+  },
+  {
+   "path": "backend/pharmacy_hub/notifications.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N3"
+   ],
+   "note": "Notifies the post author without checking they can still see the hub."
+  },
+  {
+   "path": "backend/pharmacy_hub/polls.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B22"
+   ],
+   "note": "Org-scope poll filter includes pharmacy-only polls (polls.py:86-89)."
+  },
+  {
+   "path": "backend/pharmacy_hub/posts.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B48",
+    "N2",
+    "N3"
+   ],
+   "note": "Edit validates tags before scope is known; comment alerts reach former members."
+  },
+  {
+   "path": "backend/pharmacy_hub/profiles.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Profile edits gated by admin or org-admin scope."
+  },
+  {
+   "path": "backend/pharmacy_hub/scoping.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Multipart normalising turns a one-item list into a plain string."
+  },
+  {
+   "path": "backend/pharmacy_hub/selectors.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Simple staff-member prefetch."
+  },
+  {
+   "path": "backend/pharmacy_hub/serialization/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Docstring only."
+  },
+  {
+   "path": "backend/pharmacy_hub/serialization/common.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Author summaries leave out email."
+  },
+  {
+   "path": "backend/pharmacy_hub/serialization/groups.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Member ids limited to active staff in allowed pharmacies."
+  },
+  {
+   "path": "backend/pharmacy_hub/serialization/polls.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Any edit that resends options deletes every vote."
+  },
+  {
+   "path": "backend/pharmacy_hub/serialization/posts.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B48",
+    "N2"
+   ],
+   "note": "Tag check needs a scope that is missing on edit; known mention-audience gap."
+  },
+  {
+   "path": "backend/pharmacy_hub/serialization/profiles.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Image validation and old-file cleanup are fine."
+  },
+  {
+   "path": "backend/pharmacy_hub/serializers.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Re-export file only."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Hub",
+   "title": "Editing a poll, even just to fix a typo in the question, deletes every vote already cast.",
+   "scenario": "Tom posts a poll in his pharmacy hub and Omar, Ali and Mia vote. Tom opens Edit to fix a spelling mistake in the question and saves. Web and mobile always resend the option list, so the server deletes all votes and rebuilds the options. The poll goes back to zero votes and nobody is warned.",
+   "evidence": [
+    "backend/pharmacy_hub/serialization/polls.py:149-160",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:315-318",
+    "frontend_mobile/roles/shared/hub/PollComposer.tsx:87-92",
+    "shared-core/src/domains/pharmacyHub/api.ts:214-215"
+   ],
+   "confidence": "high",
+   "test_needed": "PATCH a poll that has votes, sending the same option labels and a new question; assert the votes and vote counts are kept.",
+   "owner_question": {
+    "question": "Tom edits a poll that Omar, Ali and Mia have already voted on. What should happen to their votes?",
+    "options": [
+     "Votes are kept when the options are unchanged; only changed options lose their votes",
+     "Options are locked once anyone has voted; only the question can change",
+     "Keep today's behaviour: every edit clears all votes, but show Tom a warning first"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Hub",
+   "title": "Tagging teammates fails when editing a post, and when a new post has a file and exactly one tag.",
+   "scenario": "Tom edits his pharmacy hub post on mobile to tag Omar and gets 'Unable to determine post scope for tagging', so the edit is refused. Separately, Tom writes a new post on web with a photo and tags only Omar. The upload turns the single tag into plain text instead of a list, so the post is rejected. It works only with no attachment or with two or more tags.",
+   "evidence": [
+    "backend/pharmacy_hub/posts.py:262-269",
+    "backend/pharmacy_hub/serialization/posts.py:231-236",
+    "backend/pharmacy_hub/serialization/posts.py:310-311",
+    "backend/pharmacy_hub/scoping.py:103-107",
+    "shared-core/src/domains/pharmacyHub/mappers.ts:239",
+    "frontend_mobile/roles/shared/hub/PostComposer.tsx:239-247"
+   ],
+   "confidence": "high",
+   "test_needed": "PATCH an existing pharmacy post with tagged_member_ids=[staff id], and multipart-POST a post with one attachment and one tagged_member_ids value; both should return 200/201.",
+   "owner_question": {
+    "question": "Tom edits a post to tag Omar, or posts a photo tagging only Omar. What should happen?",
+    "options": [
+     "Both work and Omar is notified",
+     "Tags can only be added when a post is first created; the edit screen hides tagging",
+     "Keep today's behaviour (both requests fail with an error)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P2",
+   "area": "Notifications",
+   "title": "Comment alerts with the comment text still go to a post's author after they lose access to that private hub.",
+   "scenario": "Nadia wrote a post in her pharmacy's private hub and later left that pharmacy. Mia comments on the old post. Nadia's account is still active, so she gets an alert with the first 280 characters of Mia's internal comment and a link to a hub she can no longer open. The only check is whether the author's account is active, not whether they can still see the hub.",
+   "evidence": [
+    "backend/pharmacy_hub/notifications.py:51-56",
+    "backend/pharmacy_hub/posts.py:440-446",
+    "backend/pharmacy_hub/posts.py:517-523"
+   ],
+   "confidence": "medium",
+   "test_needed": "Make the post author's membership inactive, comment as another member, and assert the former author gets no notification.",
+   "owner_question": {
+    "question": "Nadia left the pharmacy, but her old hub post gets a new comment from Mia. Should Nadia hear about it?",
+    "options": [
+     "No alert once she can no longer see that hub",
+     "An alert with no comment text (just 'someone commented')",
+     "Keep today's behaviour (alert includes the comment text)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

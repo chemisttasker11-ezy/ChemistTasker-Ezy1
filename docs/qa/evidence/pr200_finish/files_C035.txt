@@ -1,0 +1,13 @@
+frontend_web/src/components/roster/HorizontalCalendarGrid.tsx
+frontend_web/src/components/roster/RosterGridViews.model.ts
+frontend_web/src/components/roster/RosterGridViews.tsx
+frontend_web/src/components/roster/RosterManagerOverview.tsx
+frontend_web/src/components/roster/RosterPlanningToolbar.model.ts
+frontend_web/src/components/roster/RosterPlanningToolbar.tsx
+frontend_web/src/components/roster/RosterStackedDayView.tsx
+frontend_web/src/components/roster/RosterWorkerAcknowledgements.tsx
+frontend_web/src/components/roster/RosterWorkerAgenda.tsx
+frontend_web/src/components/roster/RosterWorkforceSummary.tsx
+frontend_web/src/components/roster/useCalendarDragScroll.ts
+frontend_web/src/components/routeAccess.ts
+frontend_web/src/components/social/socialFormat.tsx

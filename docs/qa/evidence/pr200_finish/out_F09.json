@@ -1,0 +1,199 @@
+{
+ "chunk": "F09",
+ "paths_read": [
+  "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md",
+  "docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md",
+  "backend/core/api_v1_urls.py",
+  "backend/core/urls.py",
+  "backend/core/routing.py",
+  "backend/core/settings.py",
+  "backend/chat/apps.py",
+  "backend/chat/models.py",
+  "backend/chat/views.py",
+  "backend/chat/serializers.py",
+  "backend/chat/consumers.py",
+  "backend/chat/signals.py",
+  "backend/chat/realtime.py",
+  "backend/chat/urls.py",
+  "backend/chat/routing.py",
+  "backend/notifications/models.py",
+  "backend/notifications/views.py",
+  "backend/notifications/services.py",
+  "backend/notifications/serializers.py",
+  "backend/notifications/consumers.py",
+  "backend/notifications/urls.py",
+  "backend/notifications/routing.py",
+  "backend/pharmacy_hub/apps.py",
+  "backend/pharmacy_hub/access.py",
+  "backend/pharmacy_hub/context.py",
+  "backend/pharmacy_hub/directory.py",
+  "backend/pharmacy_hub/groups.py",
+  "backend/pharmacy_hub/models.py",
+  "backend/pharmacy_hub/notifications.py",
+  "backend/pharmacy_hub/posts.py",
+  "backend/pharmacy_hub/polls.py",
+  "backend/pharmacy_hub/scoping.py",
+  "backend/pharmacy_hub/urls.py",
+  "backend/pharmacy_hub/serialization/common.py",
+  "backend/pharmacy_hub/serialization/groups.py",
+  "backend/pharmacy_hub/serialization/posts.py",
+  "backend/pharmacy_hub/serialization/polls.py",
+  "backend/memberships/views.py",
+  "backend/users/api_auth.py",
+  "backend/users/models.py",
+  "backend/users/presentation.py",
+  "backend/users/tasks.py",
+  "backend/public_hub/attachment_access.py",
+  "backend/public_hub/community.py",
+  "backend/public_hub/media.py",
+  "backend/public_hub/permissions.py",
+  "backend/public_hub/serializers.py",
+  "backend/public_hub/urls.py",
+  "backend/templates/emails/hub_post_tagged.txt",
+  "backend/templates/emails/hub_post_tagged.html",
+  "shared-core/src/domains/chat/api.ts",
+  "shared-core/src/domains/notifications/api.ts",
+  "shared-core/src/domains/pharmacyHub/api.ts",
+  "shared-core/src/domains/pharmacyHub/mappers.ts",
+  "frontend_web/src/api/hub.ts",
+  "frontend_web/src/api/notifications.ts",
+  "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx",
+  "frontend_web/src/layouts/TopBarActions.tsx",
+  "frontend_web/landing_next/lib/hub-server.ts",
+  "frontend_web/landing_next/app/api/hub/[...path]/route.ts",
+  "frontend_web/landing_next/app/hubs/community-client.tsx",
+  "frontend_mobile/context/AuthContext.tsx",
+  "frontend_mobile/utils/pushNotifications.ts",
+  "frontend_mobile/utils/notificationNavigation.ts",
+  "frontend_mobile/features/notifications/NotificationsScreen.tsx",
+  "frontend_mobile/roles/shared/chat/hooks.ts",
+  "frontend_mobile/roles/shared/chat/ChatPage.tsx",
+  "frontend_mobile/roles/shared/messages/[id].tsx",
+  "frontend_mobile/roles/shared/messages/useLiveMessages.ts",
+  "frontend_mobile/roles/shared/hub/api.ts",
+  "frontend_mobile/roles/shared/hub/HubScreen.tsx",
+  "frontend_mobile/roles/shared/hub/HubFeed.tsx",
+  "frontend_mobile/roles/shared/hub/PostCard.tsx",
+  "frontend_mobile/roles/shared/hub/PostComposer.tsx",
+  "frontend_mobile/roles/owner/hub.tsx",
+  "frontend_mobile/app/_layout.tsx",
+  "frontend_mobile/app/explorer/messages/[id].tsx",
+  "frontend_mobile/app/pharmacist/messages/[id].tsx",
+  "frontend_mobile/app/organization/hub.tsx"
+ ],
+ "confirmed_known": [
+  "B03",
+  "B05",
+  "B22",
+  "B30",
+  "B46",
+  "B48",
+  "B50",
+  "B51",
+  "C004-N1",
+  "C005-N1"
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Hub privacy",
+   "title": "Deleting a restricted Hub group exposes its posts to the whole pharmacy.",
+   "scenario": "Tom and Omar share confidential posts and attachments in a restricted Hub group that Mia cannot access. When Tom deletes the group, its posts remain and appear in the pharmacy-wide feed. Mia can now read those posts, their comments and their attachments.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx:421",
+    "backend/pharmacy_hub/groups.py:147",
+    "backend/pharmacy_hub/models.py:143",
+    "backend/pharmacy_hub/scoping.py:156",
+    "backend/pharmacy_hub/serialization/posts.py:366"
+   ],
+   "confidence": "high",
+   "test_needed": "Delete Tom's restricted group containing a post, comment and attachment, then fetch the pharmacy feed as Mia, who was never a group member; verify none of that content becomes accessible.",
+   "owner_question": {
+    "question": "After Tom deletes a restricted Hub group, what should happen to Omar's confidential posts and attachments?",
+    "options": [
+     "Archive them with their restricted audience preserved",
+     "Delete the group's posts and attachments",
+     "Make them visible to Mia and the whole pharmacy (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Notification privacy",
+   "title": "Removed Hub group members still receive new private comment text.",
+   "scenario": "Omar writes a post in a restricted Hub group, then Tom removes Omar from that group while keeping him employed. Mia subsequently adds a confidential comment to Omar's old post. Omar still receives up to 280 characters of the new comment through notifications and push, even though he can no longer open the group.",
+   "evidence": [
+    "backend/pharmacy_hub/serialization/groups.py:189",
+    "backend/pharmacy_hub/access.py:271",
+    "backend/pharmacy_hub/posts.py:440",
+    "backend/pharmacy_hub/notifications.py:50",
+    "backend/notifications/services.py:88"
+   ],
+   "confidence": "high",
+   "test_needed": "Remove Omar from a restricted group, confirm his post access is denied, then add Mia's comment to his old post and verify no notification or push containing that comment is delivered to Omar.",
+   "owner_question": {
+    "question": "After Tom removes Omar from a restricted Hub group, should Omar receive new comments on posts he previously wrote there?",
+    "options": [
+     "Stop all notifications about subsequent group activity",
+     "Send only a generic alert without private comment text",
+     "Continue sending comment previews to Omar (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Push notification privacy",
+   "title": "Mobile sign-out leaves private message previews enabled on the signed-out device.",
+   "scenario": "Sara signs out of ChemistTasker on a borrowed phone and returns it to Mia. Tom later sends Sara a private chat message. The phone remains registered for Sara's push notifications, so Mia can see Tom's name and the message preview without signing into Sara's account.",
+   "evidence": [
+    "frontend_mobile/context/AuthContext.tsx:216",
+    "frontend_mobile/context/AuthContext.tsx:502",
+    "backend/users/api_auth.py:155",
+    "backend/notifications/services.py:90",
+    "backend/chat/signals.py:110"
+   ],
+   "confidence": "high",
+   "test_needed": "Register Sara's phone for push, complete a successful mobile logout and close all sockets, then send Sara a new chat message from Tom; verify the signed-out device receives no push.",
+   "owner_question": {
+    "question": "After Sara signs out of the borrowed phone, what should Mia be able to receive on that phone?",
+    "options": [
+     "No further notifications for Sara",
+     "Generic alerts only if Sara explicitly opted in",
+     "Sara's sender names and message previews (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P1",
+   "area": "Hub permissions",
+   "title": "Users without pharmacy memberships can overwrite or delete each other's Hub polls.",
+   "scenario": "Sara creates a public Hub poll while she has no pharmacy membership, and Zoe also has no pharmacy membership. Zoe can replace Sara's question and choices or delete the poll despite having no management rights. Replacing the choices also erases the votes already cast.",
+   "evidence": [
+    "backend/pharmacy_hub/access.py:338",
+    "backend/pharmacy_hub/serialization/polls.py:119",
+    "backend/pharmacy_hub/polls.py:137",
+    "backend/pharmacy_hub/polls.py:157",
+    "backend/pharmacy_hub/serialization/polls.py:149",
+    "backend/pharmacy_hub/serialization/polls.py:257"
+   ],
+   "confidence": "high",
+   "test_needed": "Create Sara's public Hub poll with no author membership and existing votes, then PATCH its choices as Zoe without a membership; expect 403 and unchanged choices and votes.",
+   "owner_question": {
+    "question": "Should Zoe be allowed to change or delete Sara's public Hub poll when neither belongs to a pharmacy?",
+    "options": [
+     "Only Sara and authorized moderators may change it",
+     "Zoe may suggest changes for Sara to approve",
+     "Zoe may directly change or delete it (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-2"
+}

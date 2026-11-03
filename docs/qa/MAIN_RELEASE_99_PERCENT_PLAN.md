@@ -1,0 +1,191 @@
+# PR #200 — 99% release-audit coverage execution plan (senior revision)
+
+**As checked on 25 October 2026, Brisbane time.** This revision supersedes earlier planning estimates. **AUDIT-ONLY:** do not edit product code, migrations or deploy/merge from this PR. Remediation and final release tests belong in separate, authorised implementation work.
+
+## 1. Immutable baseline and truthful coverage accounting
+
+- Target repository: chemisttasker11-ezy/ChemistTasker-Ezy1. Frozen production-code baseline and current remote main: **b77e9fd296bc2710350ef6f3cd402ce2529ffc06**. PR #200 head at this assessment: **793b83121d058f12f6e9fa1645b7a015f3bfd39c** (refresh head and main before starting another tranche).
+- Frozen main production/source denominator: **2,149** tracked paths with source extensions (.py/.ts/.tsx/.js/.jsx/.mjs/.cjs/.rs) under existing inventory exclusions. The current finish ledger lists **2,151** because it also includes two PR200 audit Python scripts; keep these two separate in the headline baseline percentage.
+- Automated Git-blob/static acquisition = **2,149/2,149 (100%)**, but is NOT source-semantic or runtime verification.
+- Older independently fetched/outlined cohort = **1,054/2,149 (49.05%)** structural triage, NOT a second independent semantic numerator.
+- New file-by-file agent pass = **1,134/2,151 (52.72%)** reported complete-file verdicts: 745 OK, 148 ISSUE, 64 NOTE, 177 NA. All 1,134 are frozen-main paths; **1,015 original-main source paths remain unreviewed**. 38/89 chunks and F12/12 end-to-end flow trace are pending. The same 1,134 should not be treated as independently accepted semantic certifications without validating evidence and context.
+- **99% of the frozen main source inventory = ceil(0.99 × 2,149) = 2,128** qualifying files. This is **994 additional main-file reviews** above the 1,134 reported; 21 main paths could remain uncounted at the numerical threshold, but no high-risk file or entire domain may be excluded. For the 2,151-row audit ledger, 99% = 2,130 and 996 additional reviews. **Finish all 1,015 remaining main paths (100%) where possible** to avoid arbitrary exclusions.
+- F01–F11 are source-traced but have no blanket runtime verification. Existing findings B01–B71 = 71 candidates; the finish pass adds 139 candidate reports (3 P0, 95 P1, 41 P2). **210 is the gross pre-deduplication count, not 210 independently proven distinct defects**. The finish-pass findings are unconfirmed; targeted tests were not executed in that pass.
+
+**Never collapse these four measures:** (S0) automatically scanned, (S1) full-file reviewed, (S2) independently validated source/call-path reasoning, (S3) exercised and passed by exact-head HTTP/provider/database/browser/native tests. Print all four separately; do not call S1 99% semantic correctness or S3 production ready.
+
+## 2. What a file must have before counting in S1 and S2
+
+1. Path and exact frozen-main Git blob SHA; reviewer, actual review date and source-reading method; completed entire content (not just outline, grep or AST).
+2. Verdict OK / ISSUE / NOTE / NA with a path-specific rationale. NA must show why it has no executable user or data effect; schema/data migrations, security-sensitive configs and deployment scripts do not default to NA.
+3. For endpoints and production behavior: record inbound route, authentication and object-level/tenant authorization, caller and downstream service/serializer, mutations/transaction constraints/notifications, error handling, Vite/Next/Expo consumers, existing test coverage, a plausible denied case and a permitted case.
+4. For purely declarative files/tests: record the actual contracts reviewed and why no further chain is applicable.
+5. Every new issue gets an immutable source-line URL, positive/negative test contract, affected personas/tenant, factual impact, confidence and distinct issue ID. Do not mark an issue reproduced without execution evidence.
+6. Cross-file S2 and all P0/P1 decisions require a second reviewer independent of the initial finder. Reviewed OK files in high-risk paths need independent spot-checks; a failed sample reopens the affected chunk.
+
+**Current data-quality gaps:** the finish ledger has zero populated per-file test_contract fields; security_notes is written only for ISSUE rows; reviewed_at is hardcoded by merge.mjs; and proof_ref usually points to an agent chunk JSON rather than proof that every relevant cross-file behavior was checked. The merge script presently counts a row just because a path appears in an output. Fix these *audit accounting* defects before declaring verified S2 percentage. Preserve old results as reported S1 until validated, never silently inflate or discard them.
+
+## 3. Remaining 38 chunks — ordered assignment queue, not just folder scanning
+
+Use docs/qa/evidence/pr200_finish/chunks.json and files_Cxxx.txt as the authoritative chunk map. Each chunk must have one unique out_Cxxx.json with every assigned path exactly once; skip work already completed. Choose unassigned high-risk chunks before lower-risk utilities:
+
+**Wave A — security-critical Django business logic (C008–C016; 9 chunks).** Audit core permissions, dashboards, marketplace/ethical stock, memberships, onboarding/AHPRA, organisations and pharmacy hub. Trace tenancy and permission grants into database writes and notifications. Also verify the high-confidence P0 chains F03-N1 and F04-N1/F04-N2 against exact code; no remediation on this PR.
+
+**Wave B — worker and admin mobile journeys (C054, C056–C058, C060–C061; 6 chunks).** Expo account switching/auth guard, shift browsing and pay/booking, organisation/manager routes, pharmacist and other-staff dashboards, rosters, attendance and parity. Test-plan no stale auth or cross-role UI after revocation/log-out.
+
+**Wave C — Expo shared business components (C064–C071; 8 chunks).** Shared messages/hub, invoices, pharmacy forms, shift posting/booking and talent cards. Validate request mapping to shared-core, response contracts, accessibility and user-facing errors.
+
+**Wave D — Vite/Next and web test infrastructure (C046, C048, C072–C078; 9 chunks).** Shift and chat/hub UI, authenticated Playwright fixtures, Next public pages, migrated Next components, SEO/public privacy, API proxies, SSR, public/private separation and route parity.
+
+**Wave E — operational/runtime and skill scripts (C080, C082–C086; 6 chunks).** Security-sensitive utilities, AHPRA extension, audited automation scripts, archived sources and development tooling. Document a narrow supported exception for truly non-production sources; do not exclude executable production tools by convenience.
+
+**F12 — complete web/mobile comparison** concurrently with Waves B–D. Compare apply, accept, counter-offer, cancellation, clock-in/out, invoice send and chat send across Vite/Next where applicable, shared-core, Expo and the same backend. Record differences in auth, request data, status transitions, error text and user-visible state.
+
+The five waves above account for exactly **38 pending chunk IDs**. Rescan the directory for out_Cxxx.json and remeasure the ledger after each committed output; do not duplicate another worker's completed chunk.
+
+## 4. Senior semantic validation: required workflow matrix beyond file counts
+
+The 12 existing F01–F12 flow reports are a starting index, not a complete release acceptance inventory. Break each into atomic transition/role/tenant cases with explicit required outputs.
+
+**Personas:** anonymous, Explorer, owner, pharmacy manager, organisation chief/admin/region/communications-only, internal and external pharmacist, favourite locum, intern, technician, assistant/other staff, suspended user, removed staff member and revoked admin. Set up **two unrelated organisations, two pharmacies in each**, plus a shared-owner multi-site case.
+
+**Cross-tenant negative matrix:** GET list/detail/search, POST, PATCH/PUT, DELETE, background task, signed file URL, chat/WebSocket, push and Expo cache. Attack surface includes URL IDs, nested POST/PATCH foreign keys, query filters, role/scope switches, inactive memberships, removed admin records and delayed callbacks. Test also the legitimate same-tenant permitted path: denial alone is not sufficient.
+
+**Money and Stripe:** checkout quantity and amount, subscriber discounts, competing offers/slot capacity, failed/duplicate/late webhooks, refunds, repeated cancellation fee sessions, plan/seat changes, free trials, disputed paid invoices, credits and paid-once idempotency. Require PostgreSQL transactions with genuine concurrent requests and Stripe test-mode or verifiable fake events; never live card charges.
+
+**Worker lifecycle:** shift publish/list/apply/counter/accept/confirm/cancel/repost/escalate/cover/swap; offboarding and re-invite; membership/admin grant/revoke; roster attendance/correction, breaks, leave overlap, payroll export and kiosk offline replay; notification delivery and failure-after-commit semantics.
+
+**Other surface:** AHPRA/onboarding and identity storage, chat/hub/DM participation/mentions, talents/marketplace and anonymous/public Next pages, all user roles, attachment/file handling, authentication refresh/recovery/logout, privacy and rate limiting.
+
+**Acceptance:** 100% of identified P0/security/finance/tenant-boundary routes and state transitions must have complete causal S2 traces. Critical cross-platform user journeys must have verified positive AND negative scenarios. 99% global source-path counting cannot hide any missing critical workflow.
+
+## 5. Deduplicate and independently verify findings
+
+1. Freeze and de-duplicate the **71 B-IDs + 139 new IDs** by root cause, code path and effect, not by title. Maintain alias IDs and previous evidence, including B66–B71 added after earlier agents started. Keep rejection and duplicates visible.
+2. Verify **all 3 P0 and 95 P1 new candidates**, plus outstanding historical high-severity B findings, with a different reviewer from the finder. Exact line proof alone can support SOURCE-CONFIRMED, not RUNTIME-REPRODUCED. Classify each as CONFIRMED_SOURCE, REPRODUCED, REJECTED with reason, DUPLICATE_OF, or CONDITIONAL/POLICY.
+3. Prioritize F03-N1 (revoked admin regain), F04-N2 (cross-tenant shift movement/rate defaults/payment_status), F04-N1 (worker can list another pharmacy's staff), and then subscriptions, double-payment, refund/credit, offboarding and notification data exposure.
+4. When source is inconclusive, run isolated negative HTTP/PostgreSQL/Stripe tests; capture exact command, commit, fixture, expected vs actual, and relevant logs. Run legitimate positive control to guard against false fixes.
+5. Classify each real issue as **FIX** (obvious correctness/security defect) or **GRILL** (genuine unresolved owner business-policy decision), with a recommended minimal behavior and known settled policy. Do not send the owner hundreds of duplicate scenarios.
+
+Keep PR200 audit-only. Implement corrections on an independently controlled remediation branch based on current remote main, not on PR200 and not on unmerged PR182, after the owner grants implementation authority.
+
+## 6. Source-review integrity gates and milestone checkpoints
+
+Enhance audit-only merge/validation tooling before relying on numerical coverage: enforce unique inventory paths, exact SHA, complete chunk coverage, required reviewer/verdict/proof, valid issue references, stale/out-of-baseline detection, exclusion rationale and no duplicate source-file counting. Reviewer-report JSON alone is not independent code proof.
+
+At the frozen **2,149**-file baseline:
+| Milestone | Qualifying main source files | Additional from 1,134 |
+| --- | ---: | ---: |
+| 60% | 1,290 | 156 |
+| 75% | 1,612 | 478 |
+| 90% | 1,935 | 801 |
+| 99% | 2,128 | 994 |
+| Stretch 100% | 2,149 | 1,015 |
+
+Require 99% *within each production domain*, not just globally; strive for 100% in backend sensitive routes, shared-core transport, production UI routes and Expo critical journeys. The old 1,054 structurally outlined files never increase the S1 numerator unless a later full-file review was recorded. For each milestone publish S0/S1/S2/S3 separately and commit the exact-latest ledger, risk status and next chunk queue.
+
+## 7. Separate release verification after audit completion
+
+PR200's 99% source audit is **not** a release approval. Follow docs/qa/SENIOR_PACKAGE_TESTING.md on the remediation head: backend SQLite and real PostgreSQL/concurrency; serializer/API boundary checks; shared-core, Vite, Next, Expo typecheck/lint/build; CodeQL and dependency/security; isolated Docker QA; authenticated Playwright and 390/1440 light/dark visual review; Windows Rust kiosk, offline queue/replay; Android and iOS emulator AND physical device; Stripe test-mode; migrations fresh-install/populated-upgrade/rollback on disposable databases; permitted staging smoke and log/alert review. Capture pass/fail/skip per exact final SHA.
+
+**Release stop conditions:** no confirmed P0, no unresolved security/tenancy/financially consequential P1 without explicit controlled mitigation and owner acceptance, all required behavioral negatives/positives passed, no unexplained skipped critical CI, and no cross-platform or migration data-loss regression. Report NOT RELEASE READY until all are met.
+
+**PR hygiene:** .github/workflows/pr200_readonly_static_audit.yml currently grants contents: write and supports workflow_dispatch, despite its read-only name. Remove the workflow from main-bound changes or make its permissions truly read-only before any merge; it should not accidentally ship as-is.
+
+## 8. Living evidence deliverables and exact handover rule
+
+- Update docs/qa/MAIN_RELEASE_AUDIT_TRACKER.md and MAIN_RELEASE_AUDIT_EVIDENCE.md with each meaningful tranche.
+- Preserve the reported S1 ledger docs/qa/evidence/MAIN_RELEASE_FINISH_LEDGER.csv, but add explicit S2 validation and test-contract columns or a joinable, SHA-pinned review evidence file. Do not overwrite honest statuses with guessed passes.
+- Populate docs/qa/evidence/pr200_finish/VERIFIED.json with independent findings decisions; add one atomic route/role/tenant matrix and a test-execution record with exact SHAs.
+- Update MAIN_RELEASE_FINISH_HANDOVER.md, de-duplicated findings and PR description at milestones, naming only the incomplete chunks/flows and next owner.
+- Do not merge PR200 to make it production ready; audit-only evidence and any fixes/releases are separate deliverables.
+
+**Current decision: 99% NOT ACHIEVED; NOT RELEASE READY.** The next concrete action is to lock the ledger validator and independently verify the three P0 paths while the first previously unreviewed high-risk chunk (C008) is completed.
+
+## Status amendment — Phase 1 completed (25 October 2026)
+
+All nine priority backend chunk outputs **C008–C016 are now committed**. See [tracker](MAIN_RELEASE_AUDIT_TRACKER.md) and [handover](MAIN_RELEASE_FINISH_HANDOVER.md). This phase's 234 files have reviewer verdicts; **60/89 chunks** have outputs across the repository. The expected full-file count following regeneration is **1,368/2,151 (63.60%)** versus a currently stale generated CSV of 1,134. This is S1 reported review accounting only, **not S2 independent semantic certification or S3 executed safety tests**. Eight new provisional P1s from C010–C016 need deduplication and verification. **Phase 2 Expo, Phase 3 web/Next, Phase 4 operational, F12 parity and source-independent/regression test gates remain uncompleted.** The earlier queue text under section 3 should now be read as historical assignment order; skip all completed C008–C016 outputs.
+
+## Phase 2 Expo review in progress — 25 October 2026
+
+- Started Phase 2 directly after the completed C008–C016 Phase 1 records. Frozen application baseline remains `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. Reviewed and committed [C071](evidence/pr200_finish/out_C071.json) (**31** mobile shared/util and security files) and [C058](evidence/pr200_finish/out_C058.json) (**8** mobile parity screens). Prior `out_C059.json` existed and was preserved.
+- New source-supported **unconfirmed** P1 findings: **C071-N1** asynchronous token refresh/profile bootstrap can restore former identity after logout or user switching, and **C071-N2** Expo logout does not unregister an active push token while backend notification delivery continues to look up active device tokens. Evidence includes mobile auth context, session/refresh storage, backend logout and device notification delivery. Both include negative/positive test contracts in C071; no runtime reproduction and no independent S2 verification.
+- C058 traced attendance, ethical marketplace, finance, public marketplace, roster, ratings and reward entry paths to existing shared API calls; linked known B24/B25/B33/B35/B36/B41 and C009-N3 without creating duplicate findings. C058 creates no new candidate.
+- **62/89 chunk reports complete; 27 remain.** Expected source-file count after regenerating the aggregate: **1407/2,151 (65.41%)** agent-reported S1 files. Checked-in CSV is stale and should not be described as updated. This does not certify S2 or S3. Expo Phase 2 still has **C054, C056–C057, C060–C061, C064–C070** remaining (C059 already done); F12 full web/mobile comparison outstanding. No application code, test, migration, merge or deployment changes. **NOT RELEASE READY.**
+
+## Phase 2 Expo source-review milestone — 25 October 2026
+
+- **Phase 2 assigned source-reporting work complete: all 15/15 outputs exist**, verified at PR head `eded1cbc312cc6b9a8cf374b13719ccf58f53081`: C054, C056, C057, C058, C059, C060, C061, C064, C065, C066, C067, C068, C069, C070 and C071. These contain **443 distinct mobile source-file verdicts**. All outputs reference frozen main `b77e9fd296bc2710350ef6f3cd402ce2529ffc06` or were read at that baseline.
+- The earlier C054/C058/C059/C071 outputs were preserved; this continuation added **376** file verdicts across C056/C057/C060/C061/C064–C070. Overall **74/89** source chunks now reported with **15 other chunks** remaining; F12 cross-client flow is still absent.
+- **Expected** source-file tally following regeneration of `MAIN_RELEASE_FINISH_LEDGER.csv`: **1,783/2,151 = 82.89%**; against the frozen main 2,149 paths, 82.97%. **The checked-in generated aggregate remains stale at 1,134/2,151**, so expected coverage is not a regenerated result. The global numeric 99% frozen-main threshold needs at least **345 additional qualifying main files**, plus required per-domain and security-critical criteria.
+- New Phase 2 source-only findings: C071-N1 (auth refresh/bootstrap race after logout/account change), C071-N2 (push registration survives mobile logout), C070-N1 (globally keyed AsyncStorage applied/rejected markers can mix accounts when local persistence is enabled). **C070-N1 is P2 conditional**, given some board instances explicitly disable local persistence. It is not a proven cross-tenant backend information leak. No new distinct findings were reported in the other Phase 2 chunks; existing B-series/F-series issues are linked by ID and must be deduplicated/verified.
+- **Integrity qualification:** chunk outputs represent first-pass S1 source inspection and business-call-path mapping. They DO NOT demonstrate independently validated full semantic correctness (S2), HTTP/PostgreSQL/browser/device tests (S3), or that every line of large UI files has independently been certified. Do not describe 'Phase 2 complete' as 'Expo verified safe' or 'production-ready'.
+- **Next tasks:** regenerate and integrity-validate aggregate CSV from all 74 committed reports; independently verify conditional and high-impact findings, negative/positive auth and tenant tests, Android/iOS device evidence; complete 15 remaining source chunks, F12 client parity and source/release gates. No product source, migrations, tests or deployment changed during this audit phase. **PR remains DRAFT; NOT RELEASE READY.**
+
+
+## Phase 3/4 continuation — 25 October 2026, ledger reconciled
+
+- All remaining thirteen source-chunk outputs (C046,C048,C072,C073,C074,C076,C077,C078,C080,C082,C083,C084,C085) now have complete manifest path sets; existing C086 was preserved. No duplicate paths within those outputs; Phase 3/4 source acquisition is complete. These newly generated chunk reports intentionally say **SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING** and must NOT be described as independent semantic S2 certification.
+- Regenerated [MAIN_RELEASE_FINISH_LEDGER.csv](evidence/MAIN_RELEASE_FINISH_LEDGER.csv) from all 89 chunk outputs and the 2,151-row source inventory: **2,151 / 2,151 unique paths accounted for**; 0 missing paths, 0 unexpected paths, 0 duplicate paths. **323 fresh source-acquisition rows** have individual Git blob SHAs matching the inventory; earlier **1,828 agent-reported S1 rows** do not include individually independently re-fetched SHA in their chunk JSON. Two C082 PR-audit Python files do not exist on frozen main and must not contribute to the 2,149 frozen-main production-file denominator.
+- The 2,151 figure is **source report inventory coverage, not 99% independent semantic coverage**; S0 existing static scanner unchanged; S1 existing 1,828 agent-reported records plus 323 new source acquisition/annotation, qualification outstanding; S2 independent cross-file certification remains incomplete, with three separately logged P0 source-supported traces from the earlier review; S3 actual targeted runtime/browser/PostgreSQL/Stripe/native testing NOT EXECUTED in this continuation. The F12 comparative worklog remains unfinished.
+- Previously recorded B01–B71, all C/F candidates and the three P0 source-confirmed candidates remain preserved. The paediatric clinical release gate remains provisional pending independent validation, with no clinically incorrect dose demonstrated. **No production application source, migrations, tests, deployment or merge performed. PR stays DRAFT / NOT RELEASE READY.**
+- Next required substantive gate is independent security/finance workflow causal tracing with second reviewer plus exact-head negative/positive execution. A source-retrieval milestone is not a production readiness approval.
+
+
+## 25 October 2026 — F12 fourteen-action senior semantic continuation
+
+- **Same draft PR #200:** source-verification commit `fffaa125fb4713fd92bf0012a57d48c2690d7f63`; frozen application baseline `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. No application source, migrations, deployment, merge or real-payment actions changed.
+- **S0:** 2,149/2,149 frozen-main files were statically inventoried in the existing audit. **S1:** 2,151/2,151 ledger paths are represented without duplicates, but 323 recently acquired paths are explicitly first-pass semantic-pending, and older 1,828 agent-reported rows are not independently re-certified; two extra audit-script paths are excluded from the frozen-main denominator. **S2:** bounded source challenges and 14 cross-client action traces, not 99% full-file independently validated semantic coverage. **S3:** no HTTP/PostgreSQL, browser, Stripe sandbox or native device test was run in this continuation.
+- `SOURCE_CHALLENGE_20261025.json` now records **20 challenges**: 16 source-supported, 2 qualified source-supported (conditional/UI), 1 duplicated root, 1 refuted. Seven newly source-checked historic records: **B01, F07-N1, F08-N3, F09-N1, F10-N5, C064-N1 and F12-N1**. Each has immutable source links and negative/positive tests; these are NOT independent second-agent P1 certifications or runtime proof.
+- The existing 101 C/F outputs and canonical raw findings already contain **155 findings (3 P0, 107 P1, 45 P2)**, including C064-N1 and F12-N1; the B01–B71 history remains in this tracker/discovery records and must not be mixed into or silently removed from the 155. Deduplication retains aliases and **C016-N2 is refuted for the cited ordinary Hub-group PATCH route**.
+- The three original P0 candidates **F03-N1, F04-N1 and F04-N2** remain `CONFIRMED_SOURCE` only, without exploit reproduction. F12 now compares fourteen source-level actions spanning authentication, shifts, bookings, cancellations, Stripe, invoices, attendance, private Hub, chat and notifications. The public Next Hub and Next-to-Vite dashboard handoffs do NOT establish Next authenticated parity. See [F12 worklog](MAIN_RELEASE_F12_PARITY_WORKLOG_20261025.md) and [structured comparisons](evidence/pr200_finish/out_F12.json).
+- **Not release-ready.** Correct blockers on a separate authorized implementation PR, then independently execute two-tenant negative and positive HTTP/PostgreSQL, browser, Stripe and Android/iOS device tests. Avoid substituting source comparison for S3.
+
+
+## 25 October 2026 — high-risk audit continuation and actual CI release gate
+
+- Source-audit-only commit `005e3977357d1bd3ecccfdbf56dbd91f122adf30`, frozen main `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. Rechecked ten existing B-series high-risk candidates **B03/B06/B07/B15/B29/B33/B36/B68/B69/B70**, with exact source calls, positive and negative test contracts and qualified status. See [senior challenge report](MAIN_RELEASE_HIGH_RISK_SOURCE_CHALLENGE_20261025.md). No new duplicate finding IDs.
+- `SOURCE_CHALLENGE_20261025.json` contains **30** challenged entries: 24 source-supported, 4 source-supported with qualification, one duplicate-root and one refuted. All source reviews here by the same assistant; **0 new independent second-agent P1 sign-offs and 0 exploit reproductions**.
+- **Refutation:** Next `dedicated_user` handoff is protected by backend `protect_direct_booking`, `announce_posted_shift` and `announce_availability_matches`. The old narrow 'general notify flags leak direct booking to other staff' subclaim is contradicted by code; do NOT treat every booking path or user flow as signed off.
+- **Actual GitHub CI checked:** [Shared Core Consolidation run](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40166190041) on audit commit `c8fe2c8e` completed **FAILURE** (mobile dependency gate and release-gate). Backend, PostgreSQL concurrency, kiosk, Vite, Next, shared-core, architectural and boundary checks passed in that run; CodeQL and public repository secret scan succeeded; native iOS acceptance skipped. Passing general CI does not clear the historical P0s.
+- **Mobile blocker:** npm's advisory `GHSA-w74x-v6f9-j3xg` reported at `frontend_mobile/scripts/verify-dependency-security.cjs` against locked `fast-uri@3.1.8` (dependency via Expo `ajv`; patched 3.x version 3.1.9). This establishes failing CI and the remediation requirement, **not live app exploitation**. Structured data: [CI_GATE_OBSERVED_20261025.json](evidence/pr200_finish/CI_GATE_OBSERVED_20261025.json).
+- Coverage stays split: **S0 source inventory complete; S1 source paths reconciled 2,151 but not all deep semantic; S2 independent 99% unproven; S3 targeted payment/tenant/browser/native acceptance unexecuted by this audit**. NO-GO; no code, migrations, deployment, merge, or payment touched.
+
+
+## Phase 5 source verification continuation — 25 October 2026
+
+- Audit-only P0/P1 validation commit `6865b99e3c7ff567e5125d76a01aeaa714715c17` adds five real authenticated negative contracts without modifying product logic or migrations. Exact frozen-main SHA `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`; [workflow run 40174286021](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021) was **IN PROGRESS at inspection; results not yet classified**.
+- New contracts: F03-N1 removed pharmacy-admin still active staff must not regain privileges using the old invitation (GET listing AND POST accept); F04-N1 ordinary platform shift can be viewed but member-response/staff directory requires manager authority; F09-N1 deleting a private Hub group must not promote restricted posts into pharmacy-wide audience; B03 offboarding must retain historic chat messages for coworkers. Positive controls exercise owner response visibility and authorised private-group reads.
+- Earlier [baseline runtime run 40169055953](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953) demonstrated eight failed negative tests over seven distinct IDs; separate [remediation PR #201](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/201) has 17 green targeted tests on an earlier code SHA. **Do not conflate the fix-branch green tests with source-baseline S3 or declare Phase 5 complete.**
+- SOURCE_CHALLENGE currently has 30 challenged entries, 155 C/F candidate rows are in canonical raw findings, plus historical B01–B71. Most P1 candidate records still lack independent verification or runtime contracts. S0 static 2,149/2,149; S1 ledger 2,151 unique (including two audit scripts); S2 cannot honestly be expressed as 99% independent; S3 bounded baseline HTTP/SQLite only. F12 fourteen source comparisons are not native/Next/Vite runtime parity.
+- Phase 5 gate remains **OPEN** pending full P1/root-cause reconciliation, negative/positive checks, per-domain independently verified S2 coverage, definitive test classifications, and corrected canonical status counts. **Release NO-GO.**
+
+
+## Phase 5 verified RED findings — 25 October 2026
+
+- [PR200 run 40174286021](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40174286021) against frozen main yielded **20 Django tests: 12 failing negative assertions, 1 fixture ERROR and 7 passes**. The 8 older failures remain. New verified F03-N1 (both GET/POST old admin invite), F04-N1 (outsider member-status disclosure), F09-N1 (private group deletion widens pharmacy feed) all reproduced in SQLite HTTP tests.
+- B03 chat-retention test was **TEST_INFRA_BLOCKED** by a unique pharmacy conversation fixture, not classified as reproduced. Fixed the test fixture on separate audit commit `13661c46ff9b82699ece08713a2b2bfac1fd7511`; rerun pending.
+- These findings are baseline red tests and not production attacks. They do not establish whole-repository 99% independent S2. Phase 5 still open for unresolved P1s and root checks.
+
+
+## Phase 5 P1 negative test results — 25 October 2026
+
+- [Frozen-main CI 40176725005](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40176725005) on audit-only commit `81cfd9c9370be6770598f47432e78378f5ba9a01`: **28 isolated Django tests, 19 failed security/integrity negative assertions, 9 passed, 0 test setup errors**. This adds **six new failing scenarios across five IDs** F09-N4 (2), C005-N1, C004-N1, C012-N2 and C024-N1. Existing 13 baseline failures persisted. C004-N1 remains **policy conditional** (cross-pharmacy voluntary chat intent). Exact evidence in VERIFIED.json.
+- **F09-N4 root nuance:** despite source authorization guard, `_assert_can_manage_poll` treats `created_by_membership_id == request_membership.id` as proof; when both are None on a platform poll, any authenticated verified user becomes creator. This was confirmed by HTTP 200 unauthorized PATCH and 204 DELETE; preceding source counterevidence was incomplete, now superseded.
+- **C012-N1** negative 400 while legitimate magic-link positive 201; status **INCONCLUSIVE_PASS** because failure could be due to unrelated input checks. Do not call source claim refuted until reason for 400 is verified. Positive unknown-email password reset control also passed.
+- C005-N1 non-admin PATCH can update custom-room membership; C012-N2 reviewer can delete decided application; C024-N1 password reset credential copied into signed-in notification; each observed against disposable baseline. All P1 verdicts are isolated runtime only, not staging/production exploits, and still lack independent second-person S2 signoff. **Phase 5 is OPEN; S0/S1 do not imply 99% S2.**
+
+
+## Phase 5 money and Stripe source challenge — 25 October 2026
+
+- [Frozen-main audit CI run 40178675029](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40178675029) ran **37 Django tests, 26 expected failed negative assertions, 11 passed controls, zero test fixture errors**. New finance tests added 7 failing negative cases and 2 positive controls; full existing 19 failures preserved. Source baseline `b77e9fd296bc2710350ef6f3cd402ce2529ffc06` unchanged; audit commit `845b911957c8703f365bdc7c63da8f2a4cbb7360`.
+- **Seven additional distinct runtime-reproduced finding IDs:** C004-N2 (quantity undercharge), B70 (repeated subscription setup), F08-N2 (unpaid subscription status), B68 (unknown provider subscription customer fallback), B69 (duplicate payment intent across webhook event IDs), F01-N3 (worker deletes accepted-awaiting-payment offer), F08-N5 (account deletion leaves local recurring subscription active). Some financial impacts require real Stripe test-mode/provider reconciliation; mock events alone cannot prove actual external charges.
+- Paid-once webhook event-id idempotency and valid explicit single-offer checkout are positive controls. **Baseline cumulative S3 isolated: 23 distinct IDs, 26 failed negative scenarios, 11 passing tests** out of 37. The 23 should not be counted as remediated or green. C004-N2 finalization of multiple offers was source-traced; actual provider charge and assignment not executed.
+- **Phase 5 not defensibly CLOSED:** 107 source P1 candidates plus 71 historical B candidates remain a larger verification and root-cause queue; only a limited subset has negative executable proofs, no independent second-agent S2 certification. S0 is 2,149/2,149; S1 ledger rows 2,151 including two audit scripts (reported not 99% semantic); S2 99% not established; S3 described above, not a release acceptance pass. No app/migration/merge/deploy changes. PR201 untouched.
+
+
+## Phase 5 duplicate-identity correction, mobile push and overnight penalties — 25 October 2026
+
+- [Isolated frozen-main run 40179151885](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40179151885) on commit `ce5609527e256fc228914e7d2e3d11d277a54947` ran **40 tests, 29 red negative failures and 11 passed controls, no fixture errors**. Three new distinct runtime-confirmed IDs: C012-N1 expired inactive numeric invitation POST returns 201 after unique-mobile fixture correction; B66 overnight assigned shift incorrectly receives zero cancellation penalty while a valid day shift positive control generated checkout; C071-N2 device token stays active after native-style logout while refresh token was supplied.
+- The old C012-N1 apparent 400 was a duplicate identity fixture false positive; no source refutation. Cross-pharmacy chats C004-N1 remain policy-qualified; runtime response confirmed but a product rule needed. B43 password reset refresh revocation test is committed separately and awaiting its exact run as of this note.
+- Cumulative frozen-main **26 distinct runtime-reproduced IDs, 29 failed security/integrity negative tests out of 40 tests**, all SQLite/synthetic; no real device, provider charge, production access, independent source-review certification or 99% S2. Keep Phase 5 OPEN and release NO-GO.

@@ -1,0 +1,169 @@
+{
+ "chunk": "C002",
+ "files": [
+  {
+   "path": "backend/attendance/transitions.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "B29"
+   ],
+   "note": "30s retry guards bypassed by kiosk PIN toggle; occurred_at accepted without order checks"
+  },
+  {
+   "path": "backend/attendance/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Plain route table"
+  },
+  {
+   "path": "backend/attendance/views.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Manager views check pharmacy manager authority before acting"
+  },
+  {
+   "path": "backend/attendance/worker_api.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Worker endpoints scoped to request.user; QR verified"
+  },
+  {
+   "path": "backend/attendance_tests/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Docstring only"
+  },
+  {
+   "path": "backend/attendance_tests/migration_settings.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Guarded disposable test DB settings"
+  },
+  {
+   "path": "backend/attendance_tests/postgres_settings.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Guarded disposable test DB settings"
+  },
+  {
+   "path": "backend/attendance_tests/roster_fixtures.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Leave fixture in pharmacy local time"
+  },
+  {
+   "path": "backend/attendance_tests/roster_schema.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "In-memory sqlite asserted before schema changes"
+  },
+  {
+   "path": "backend/attendance_tests/runtime_pin_actions.py",
+   "verdict": "NOTE",
+   "ids": [
+    "B64"
+   ],
+   "note": "Reads PIN OTP from Notification payload; uses real gmail identifier"
+  },
+  {
+   "path": "backend/attendance_tests/runtime_pin_delivery.py",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Targets real gmail address through SMTP acceptance server"
+  },
+  {
+   "path": "backend/attendance_tests/runtime_settings.py",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Real SMTP backend in local acceptance; mails real inboxes"
+  },
+  {
+   "path": "backend/attendance_tests/seed_runtime.py",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Seeds worker@kiosk-acceptance but PIN scripts use another identifier"
+  },
+  {
+   "path": "backend/attendance_tests/settings.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Isolated in-memory test settings"
+  },
+  {
+   "path": "backend/attendance_tests/test_acceptance_matrix.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Scenario tests assert sensible outcomes"
+  },
+  {
+   "path": "backend/attendance_tests/test_attendance_api.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "No double-submit PIN coverage, but assertions correct"
+  },
+  {
+   "path": "backend/attendance_tests/test_attendance_approvals.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Wrong-site, idempotency and append-only checks correct"
+  },
+  {
+   "path": "backend/attendance_tests/test_attendance_credentials.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "QR expiry, tamper, lockout assertions correct"
+  },
+  {
+   "path": "backend/attendance_tests/test_attendance_eligibility.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tier and negative eligibility matrix assertions correct"
+  },
+  {
+   "path": "backend/attendance_tests/test_attendance_transitions.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Lifecycle and open-session invariant tests correct"
+  },
+  {
+   "path": "backend/attendance_tests/test_kiosk_offline_protocol.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Signature, tamper, gap, revoke-drain tests correct"
+  },
+  {
+   "path": "backend/attendance_tests/test_kiosk_pairing_code.py",
+   "verdict": "NOTE",
+   "ids": [
+    "B64"
+   ],
+   "note": "Test requires pairing code stored in notification body and payload"
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Kiosk",
+   "title": "A repeated kiosk PIN submit flips the worker's clock state instead of being treated as a retry.",
+   "scenario": "Omar types his PIN at Tom's kiosk and presses Clock, but the screen lags (or the kiosk resends after a slow network), so the same request arrives twice. The first request clocks him in. The second one sees an open session and clocks him straight back out, leaving a session of almost zero minutes while Omar thinks he is on the clock. The same thing happens at clock-out: a repeated request starts a new session that stays open overnight, so Tom's timesheet shows hours Omar never worked.",
+   "evidence": [
+    "backend/attendance/kiosk_api.py:454-474",
+    "backend/attendance/transitions.py:63-72",
+    "backend/attendance/transitions.py:256-271"
+   ],
+   "confidence": "medium",
+   "test_needed": "Send POST kiosk/pin-clock/ twice within 5 seconds with the same PIN and check that exactly one CLOCK_IN exists and the session is still open.",
+   "owner_question": {
+    "question": "Omar presses Clock twice within a few seconds at Tom's kiosk. What should happen?",
+    "options": [
+     "The second press within 30 seconds counts as the same action; Omar stays clocked in",
+     "The kiosk asks Omar to confirm before clocking out someone who clocked in under a minute ago",
+     "Keep today's behaviour: each press flips Omar between clocked in and clocked out"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeA-2"
+}

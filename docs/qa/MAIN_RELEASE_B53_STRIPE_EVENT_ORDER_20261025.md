@@ -1,0 +1,13 @@
+# B53 — out-of-order subscription entitlement challenge
+
+**Frozen main:** `b77e9fd296bc2710350ef6f3cd402ce2529ffc06`. **Initial status: SOURCE-SUPPORTED, test queued; no S3 until fixture-valid run.**
+
+`POST /api/v1/billing/stripe/webhook/` (route resolved from `api_v1:billing:stripe_webhook`) → signature verification + event-id receipt dedup → `backend/billing/views.py:897-948`. `customer.subscription.deleted` sets the local subscription inactive but retains the old Stripe ID; a later, separately identified `invoice.paid` event for the *same deleted subscription ID* finds it and sets it active. Event-id dedup alone does not impose causal ordering.
+
+**Positive:** Current tracked subscription receiving a matching invoice.paid stays active. **Negative:** First send subscription.deleted event, verify inactive and processed receipt, then send a *different event ID* invoice.paid for the deleted subscription. Confirm the subscription does not return to active. Test uses actual HTTP handler and local DB; Stripe's cryptographic construct_event is mocked only to supply two valid synthetic events. No live Stripe charges, real provider event ordering or customer entitlement side effects tested. Distinguish B53 (stale event on originally tracked subscription) from B68 (customer fallback for an unknown subscription ID) and B70 (duplicate creation of recurring subscriptions).
+
+Workflow: `.github/workflows/pr200_targeted_b53_webhook.yml` with exactly two targeted tests on disposable SQLite; intentional RED is a discovery, not a release PASS. The S2 whole-file coverage counter remains untouched.
+
+## 25 October 2026 — B53 fixture-valid Stripe event-order reproduction
+
+[Targeted run 40192054923](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40192054923) at `31558d5c63f29564b2c270c06d8afc143a6fc29a`: 2 tests, **1 passing positive / 1 expected-red negative**, no fixture errors. After the real HTTP webhook processes `customer.subscription.deleted` and marks `sub_b53` inactive, a distinct later `invoice.paid` for the same *deleted* subscription reactivates it to active. Event receipts are individually processed; signature construction mocked, no provider/money involved. B53 distinct from B68 unknown-subscription fallback and B70 duplicate-create. Canonical totals **49 distinct tested IDs / 57 cumulative negative reds**. B31 PostgreSQL run 40191894383 and repeated unpatched run 40192054917 failed on `TypeError(UUID not JSON serializable)` during EthicalRequestReceipt outcome JSONField persistence; B31 race **NOT counted**. Test-only DRF JSON encoding isolation is committed separately; must inspect new rerun. 226 IDs preserved and independent S2 remains uncertified.

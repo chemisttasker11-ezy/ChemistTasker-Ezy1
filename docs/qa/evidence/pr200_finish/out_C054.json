@@ -1,0 +1,439 @@
+{
+  "chunk": "C054",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 full-source route/semantic inspection; S2 and S3 pending",
+  "files": [
+    {
+      "path": "frontend_mobile/app/+not-found.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Unknown-route redirect to user persona or login; identity from AuthContext, not independent authorization."
+    },
+    {
+      "path": "frontend_mobile/app/_layout.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B52",
+        "C071-N1"
+      ],
+      "note": "Root Expo auth gate handles AHPRA, owner setup, role route and manager capabilities; stale cached identity and in-flight session race tracked B52/C071-N1."
+    },
+    {
+      "path": "frontend_mobile/app/admin-invitations.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router user route wrapper that delegates \"admin-invitations.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/[pharmacyId]/pills.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"pills.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/[pharmacyId]/post-shift.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"post-shift.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/_layout.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B16"
+      ],
+      "note": "Selected delegated admin workspace navigation, capability-aware communications links and sign-out; per-route backend authority required."
+    },
+    {
+      "path": "frontend_mobile/app/admin/calendar.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"calendar.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/chat.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"chat.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/hub.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"hub.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Admin dashboard loads owner-style scoped activity and pills on active pharmacy change; server owns object authorization."
+    },
+    {
+      "path": "frontend_mobile/app/admin/invoice.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"invoice.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/invoice/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"[id].tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/invoice/new.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"new.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/messages/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"[id].tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/notifications.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"notifications.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/pharmacies/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Admin pharmacy details loads selected ID, pharmacy admins and membership summaries for shared pharmacy view."
+    },
+    {
+      "path": "frontend_mobile/app/admin/pharmacies/[id]/edit.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Pharmacy edit binds explicit route ID to shared PharmacyForm; backend must authorize destination."
+    },
+    {
+      "path": "frontend_mobile/app/admin/pharmacies/[id]/locums.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Selected pharmacy's locums and membership manager load through shared APIs."
+    },
+    {
+      "path": "frontend_mobile/app/admin/pharmacies/[id]/staff.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Selected pharmacy's membership list and staff manager load through shared APIs."
+    },
+    {
+      "path": "frontend_mobile/app/admin/pharmacies/add.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Pharmacy creation delegates to shared PharmacyForm and navigates on successful save."
+    },
+    {
+      "path": "frontend_mobile/app/admin/pharmacies/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"index.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/pills.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"pills.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/post-shift.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"post-shift.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/shifts/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"[id].tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/admin/shifts/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router admin route wrapper that delegates \"index.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/attendance-pin.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Native attendance PIN setup uses shared-core get-pin-pharmacies and authenticated update-pin."
+    },
+    {
+      "path": "frontend_mobile/app/attendance/clock.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router attendance route wrapper that delegates \"clock.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/attendance/corrections/new.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router attendance route wrapper that delegates \"new.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/attendance/exceptions/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router attendance route wrapper that delegates \"[id].tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/attendance/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router attendance route wrapper that delegates \"index.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/attendance/kiosk-status.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router attendance route wrapper that delegates \"kiosk-status.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/attendance/reviews/[id]/decision.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router attendance route wrapper that delegates \"decision.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/attendance/reviews/[id]/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router attendance route wrapper that delegates \"index.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/attendance/reviews/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router attendance route wrapper that delegates \"index.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/contact.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Authenticated/anonymous support form invokes shared contactSupport with local validation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/_layout.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Explorer navigation, notification feed, unread actions and logout anchored to auth persona."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/availability.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"availability.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/calendar.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"calendar.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/chat.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"chat.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/dashboard.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"dashboard.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/messages/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"[id].tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/notifications.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"notifications.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/profile-basic-info.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"profile-basic-info.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/profile-bio.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"profile-bio.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/profile-identity.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"profile-identity.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/profile-interests.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"profile-interests.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/profile-referees.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"profile-referees.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/profile.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"profile.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/shifts.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"shifts.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/shifts/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"[id].tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/explorer/talent-board.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router explorer route wrapper that delegates \"talent-board.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/bas.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"bas.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/customers/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"index.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/customers/new.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"new.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/expenses/[id]/receipt.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"receipt.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/expenses/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"index.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/expenses/new.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"new.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"index.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/invoices/[id]/history.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"history.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/invoices/[id]/payment.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"payment.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/items/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"index.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/items/new.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"new.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/receipts/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"[id].tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/received/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"[id].tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/finance/received/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router finance route wrapper that delegates \"index.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/forgot-password.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Password-reset request UI calls shared-core passwordReset and validates email."
+    },
+    {
+      "path": "frontend_mobile/app/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Login/owner setup/persona redirect after AuthContext load, otherwise displays welcome entrypoint."
+    },
+    {
+      "path": "frontend_mobile/app/invoices.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo Router user route wrapper that delegates \"invoices.tsx\" to a shared role or parity screen; no independent business mutation."
+    },
+    {
+      "path": "frontend_mobile/app/kiosk-link.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B63"
+      ],
+      "note": "Authenticated kiosk link UI creates pairing codes through shared attendance service; server must verify native intent (B63)."
+    },
+    {
+      "path": "frontend_mobile/app/login.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B52",
+        "C071-N1"
+      ],
+      "note": "Password or optional biometric credential sign-in and persona routing; cached-session verification and logout races tracked B52/C071-N1."
+    }
+  ],
+  "findings": []
+}

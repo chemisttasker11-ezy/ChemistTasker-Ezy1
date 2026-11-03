@@ -1,0 +1,199 @@
+{
+  "chunk": "C016",
+  "files": [
+    {
+      "path": "backend/organizations/models.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Organisation, pharmacy owner and admin models with membership, claim and chain constraints"
+    },
+    {
+      "path": "backend/organizations/pharmacy_profile.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Service, script band and software normalization validators"
+    },
+    {
+      "path": "backend/organizations/serializers.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Pharmacy details, immutable owner handling and admin assignment serialization"
+    },
+    {
+      "path": "backend/organizations/test_app_registration.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Organisations Django app ownership test"
+    },
+    {
+      "path": "backend/organizations/test_model_code_ownership.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Model source owner and application label assertions"
+    },
+    {
+      "path": "backend/organizations/test_pharmacy_access_characterization.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Pharmacy object visibility and owner/region admin authorization tests"
+    },
+    {
+      "path": "backend/organizations/test_pharmacy_create_idempotency.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Idempotency replay after revoked ownership, body changes and multipart fingerprints"
+    },
+    {
+      "path": "backend/organizations/test_pharmacy_manager_onboarding.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Manager onboarding authority, role conversion, no org escalation and cross-site tests"
+    },
+    {
+      "path": "backend/organizations/test_pharmacy_profile_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Pharmacy profile query/field validator cases"
+    },
+    {
+      "path": "backend/organizations/test_pharmacy_upload_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Multipart pharmacy files and no-mutation invalid upload tests"
+    },
+    {
+      "path": "backend/organizations/test_urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Pharmacy, organisation, claim and admin route resolution"
+    },
+    {
+      "path": "backend/organizations/timezone.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Australian pharmacy timezone selection helper"
+    },
+    {
+      "path": "backend/organizations/urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Organisation, claims, chains and pharmacy-admin API route registration"
+    },
+    {
+      "path": "backend/organizations/views.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B16",
+        "B17",
+        "F03-N1"
+      ],
+      "note": "Admin update bypass, revoked assignment reactivation, chain cross-tenant edits and claim boundaries"
+    },
+    {
+      "path": "backend/pharmacy_hub/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Empty pharmacy hub package marker"
+    },
+    {
+      "path": "backend/pharmacy_hub/access.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B46"
+      ],
+      "note": "Active membership scope lacks accepted-status guard; known B46"
+    },
+    {
+      "path": "backend/pharmacy_hub/admin.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Hub post/comment administrative visibility and moderation"
+    },
+    {
+      "path": "backend/pharmacy_hub/apps.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Hub AppConfig registration"
+    },
+    {
+      "path": "backend/pharmacy_hub/context.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
+      "note": "Hub permission projections, organization context and group visibility"
+    },
+    {
+      "path": "backend/pharmacy_hub/directory.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Staff name and role directory scoped through HubScopeResolver"
+    },
+    {
+      "path": "backend/pharmacy_hub/groups.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1",
+        "N2"
+      ],
+      "note": "Group list includes all pharmacy groups and update may change pharmacy without destination authority"
+    }
+  ],
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P1",
+      "area": "Hub",
+      "title": "Ordinary pharmacy workers can list private hub groups and obtain their full membership rosters without joining them.",
+      "scenario": "Mia works at Tom's pharmacy but is not a member of its restricted managers' group. Mia requests all pharmacy groups with include_members=true. The group list is authorized only against Mia's general pharmacy membership and exposes the managers' group name, description and member details, despite group-specific access forbidding her.",
+      "evidence": [
+        "backend/pharmacy_hub/groups.py:29",
+        "backend/pharmacy_hub/groups.py:35",
+        "backend/pharmacy_hub/groups.py:47",
+        "backend/pharmacy_hub/groups.py:108",
+        "backend/pharmacy_hub/groups.py:114",
+        "backend/pharmacy_hub/serialization/groups.py:29",
+        "backend/pharmacy_hub/serialization/groups.py:140",
+        "backend/pharmacy_hub/access.py:225",
+        "backend/pharmacy_hub/access.py:271"
+      ],
+      "confidence": "high",
+      "test_needed": "Create private manager group G at pharmacy A and ordinary nonmember Mia at A; GET /api/v1/hub/community-groups/?pharmacy_id=A&include_members=true must not return G or its members. Authorized group member and managers still see permitted details.",
+      "owner_question": {
+        "question": "Should Mia see the names, descriptions and member rosters of private groups at Tom's pharmacy when she is not a group member?",
+        "options": [
+          "No, hide restricted groups from nonmembers",
+          "Show group titles only without rosters or descriptions",
+          "Yes, every pharmacy member can view complete group rosters"
+        ]
+      }
+    },
+    {
+      "id": "N2",
+      "severity": "P1",
+      "area": "Hub",
+      "title": "Hub group PATCH can reassign an existing group to an unrelated pharmacy without checking destination tenant authority.",
+      "scenario": "Tom administers a community group at his own pharmacy. He edits it and includes Nadia's unrelated pharmacy identifier. The group update authorizes only the original group and accepts the serializer's writable pharmacy field, moving the group and its existing memberships into a different pharmacy context without Nadia's consent.",
+      "evidence": [
+        "backend/pharmacy_hub/groups.py:138",
+        "backend/pharmacy_hub/groups.py:139",
+        "backend/pharmacy_hub/groups.py:144",
+        "backend/pharmacy_hub/serialization/groups.py:30",
+        "backend/pharmacy_hub/serialization/groups.py:42",
+        "backend/pharmacy_hub/serialization/groups.py:127",
+        "backend/pharmacy_hub/serialization/groups.py:137"
+      ],
+      "confidence": "high",
+      "test_needed": "As Tom, manage group G in pharmacy A; PATCH G with pharmacy=B owned by unrelated Nadia. Assert mutation rejected and group pharmacy, member links and posts remain in A. Valid same-pharmacy description change succeeds.",
+      "owner_question": {
+        "question": "May Tom move an existing group and its posts into Nadia's unrelated pharmacy using an ordinary group edit?",
+        "options": [
+          "No, pharmacy ownership of a group is immutable",
+          "Only through an explicit, audited two-party transfer workflow",
+          "Yes, source manager authorization is sufficient"
+        ]
+      }
+    }
+  ],
+  "reviewer": "gpt6-senior-20261025"
+}

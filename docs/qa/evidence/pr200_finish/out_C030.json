@@ -1,0 +1,381 @@
+{
+ "chunk": "C030",
+ "files": [
+  {
+   "path": "shared-core/src/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; export facade introduces no identified problem."
+  },
+  {
+   "path": "shared-core/src/authApi.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Logout and overseas mobile-check assertions match their request contracts."
+  },
+  {
+   "path": "shared-core/src/constants/brandIdentity.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Brand identity assertions are consistent."
+  },
+  {
+   "path": "shared-core/src/constants/brandIdentity.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Static brand identity values."
+  },
+  {
+   "path": "shared-core/src/constants/capabilities.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Capability identifiers are consistent."
+  },
+  {
+   "path": "shared-core/src/constants/colors.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Roster presentation colors introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/constants/endpoints.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Still exposes the obsolete referee-decline route used by the browser flow."
+  },
+  {
+   "path": "shared-core/src/constants/personas.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Persona and workspace identifiers introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/constants/platformEndpoints.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Includes the correct signed-token referee route assertion."
+  },
+  {
+   "path": "shared-core/src/constants/platformEndpoints.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific endpoint defect identified."
+  },
+  {
+   "path": "shared-core/src/constants/roles.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no concrete user-facing defect identified."
+  },
+  {
+   "path": "shared-core/src/contracts/accounts.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Account and onboarding wire contracts introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/contracts/attendanceRoster.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Attendance and roster wire contracts introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/contracts/calendar.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no demonstrated consumer failure identified."
+  },
+  {
+   "path": "shared-core/src/contracts/common.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Collection and response contracts introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/contracts/ethicalMarketplace.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Ethical marketplace wire contracts introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/contracts/invoiceDetail.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Invoice wire contract retains decimal and nullable field representations."
+  },
+  {
+   "path": "shared-core/src/contracts/marketplace.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Marketplace wire contracts introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/contracts/membershipRecords.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Membership contracts preserve nullable identities."
+  },
+  {
+   "path": "shared-core/src/contracts/organizations.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Organisation and pharmacy contracts introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/contracts/publicContent.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Public content contracts introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/contracts/workforce.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no concrete contract failure identified."
+  },
+  {
+   "path": "shared-core/src/domain.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no demonstrated production failure identified."
+  },
+  {
+   "path": "shared-core/src/domains/attendance/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Attendance operations preserve request fields and mobile pairing headers."
+  },
+  {
+   "path": "shared-core/src/domains/attendance/pairing.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Pairing assertions match the mobile request contract."
+  },
+  {
+   "path": "shared-core/src/domains/auth/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific defect identified in these request adapters."
+  },
+  {
+   "path": "shared-core/src/domains/auth/browserOperations.test.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Asserts the obsolete two-value referee-decline route as correct."
+  },
+  {
+   "path": "shared-core/src/domains/auth/browserOperations.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Referee decline calls a route Django no longer exposes."
+  },
+  {
+   "path": "shared-core/src/domains/auth/index.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Domain export facade introduces no identified problem."
+  },
+  {
+   "path": "shared-core/src/domains/auth/nativeWire.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Native identity route assertions are consistent."
+  },
+  {
+   "path": "shared-core/src/domains/auth/nativeWire.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Native identity route definitions introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/domains/billing/api.fulfillment.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tests preserve the existing fulfillment request contract."
+  },
+  {
+   "path": "shared-core/src/domains/billing/api.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Subscription and seat tests preserve platform return destinations."
+  },
+  {
+   "path": "shared-core/src/domains/billing/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Billing adapters preserve supplied identifiers and platform fields."
+  },
+  {
+   "path": "shared-core/src/domains/calendar/api.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; request, error and abort assertions introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/domains/calendar/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Calendar requests preserve partial updates, explicit nulls and occurrence dates."
+  },
+  {
+   "path": "shared-core/src/domains/calendar/mappers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no demonstrated production consumer failure identified."
+  },
+  {
+   "path": "shared-core/src/domains/chat/api.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Reaction tests correctly accept empty success responses."
+  },
+  {
+   "path": "shared-core/src/domains/chat/api.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2",
+    "N3"
+   ],
+   "note": "Title-only group updates remove members; mapped participant identity conflicts with mobile search."
+  },
+  {
+   "path": "shared-core/src/domains/chat/index.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Domain export facade introduces no identified problem."
+  },
+  {
+   "path": "shared-core/src/domains/chat/mappers.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N3"
+   ],
+   "note": "Participant names remain nested while mobile member search reads top-level fields."
+  },
+  {
+   "path": "shared-core/src/domains/chat/unreadSummary.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Unread summary assertions preserve query filtering and raw response fields."
+  },
+  {
+   "path": "shared-core/src/domains/content/operations.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Content operation assertions match the adapter's request contracts."
+  },
+  {
+   "path": "shared-core/src/domains/content/operations.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Content operations preserve methods, bodies and encoded query values."
+  },
+  {
+   "path": "shared-core/src/domains/dashboards/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Dashboard request adapters introduce no identified problem."
+  },
+  {
+   "path": "shared-core/src/domains/domainContracts.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no incorrect assertion causing a demonstrated failure identified."
+  },
+  {
+   "path": "shared-core/src/domains/finance/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Finance requests constrain destinations and preserve binary downloads and pagination."
+  },
+  {
+   "path": "shared-core/src/domains/invoicing/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Invoice adapters preserve payloads and authenticated binary downloads."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Onboarding",
+   "title": "Referee decline links cannot complete the browser flow.",
+   "scenario": "Omar asks Tom to provide a reference. Tom clicks the decline link in the email, but its signed-token address does not match the browser page. The browser operation also calls an obsolete address, so Tom cannot record his refusal.",
+   "evidence": [
+    "backend/onboarding/emails.py:79",
+    "frontend_web/src/main.tsx:158",
+    "shared-core/src/constants/endpoints.ts:47",
+    "shared-core/src/domains/auth/browserOperations.ts:71",
+    "shared-core/src/domains/auth/browserOperations.test.ts:53",
+    "backend/onboarding/urls.py:41"
+   ],
+   "confidence": "high",
+   "test_needed": "Follow Omar's actual emailed decline link as Tom and verify it records rejection through the signed-token endpoint.",
+   "owner_question": {
+    "question": "When Tom clicks the decline link for Omar's reference request, what should happen?",
+    "options": [
+     "Record Tom's refusal and show confirmation",
+     "Ask Tom to confirm before recording refusal",
+     "Leave Tom unable to decline through the link (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Chat",
+   "title": "Renaming a group on mobile silently removes its other members.",
+   "scenario": "Tom renames a custom group containing Omar and Mia using the mobile app. Saving the name also removes Omar and Mia from the group because the omitted member selection becomes an empty replacement list. Tom remains as creator, while Omar and Mia lose access.",
+   "evidence": [
+    "frontend_mobile/roles/shared/chat/ChatPage.tsx:293",
+    "shared-core/src/domains/chat/api.ts:131",
+    "backend/chat/views.py:416",
+    "backend/chat/views.py:464",
+    "backend/chat/serializers.py:347"
+   ],
+   "confidence": "high",
+   "test_needed": "Rename Tom's group without supplying participants and verify Omar and Mia remain participants.",
+   "owner_question": {
+    "question": "When Tom changes only a group's name, what should happen to Omar and Mia?",
+    "options": [
+     "Keep Omar and Mia in the group",
+     "Require Tom to confirm any membership changes",
+     "Remove everyone except Tom (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P2",
+   "area": "Chat",
+   "title": "Mobile group member search cannot find returned participants.",
+   "scenario": "Tom opens mobile group creation and searches for Omar, who is available in his chat contacts. Omar's name is returned inside his identity details, but the search checks a different location and shows no match. Tom cannot select Omar to create the group or add him to an existing group.",
+   "evidence": [
+    "shared-core/src/domains/chat/mappers.ts:62",
+    "shared-core/src/domains/chat/api.ts:154",
+    "frontend_mobile/roles/shared/chat/hooks.ts:69",
+    "frontend_mobile/roles/shared/chat/NewGroupModal.tsx:33",
+    "frontend_mobile/roles/shared/chat/NewGroupModal.tsx:73",
+    "frontend_mobile/roles/shared/chat/GroupManageModal.tsx:77"
+   ],
+   "confidence": "high",
+   "test_needed": "Return Omar with a nested user identity, search his name in mobile group creation, and verify he is selectable.",
+   "owner_question": {
+    "question": "When Tom searches for Omar among available mobile group contacts, what should happen?",
+    "options": [
+     "Find Omar by his displayed name",
+     "Show all available contacts for Tom to select",
+     "Return no matches for nested contact names (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-1"
+}

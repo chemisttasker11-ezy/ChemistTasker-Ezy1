@@ -1,0 +1,339 @@
+{
+ "chunk": "C023",
+ "files": [
+  {
+   "path": "backend/talent/models.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N3"
+   ],
+   "note": "Board visibility never checks whether the author's account was deleted"
+  },
+  {
+   "path": "backend/talent/serializers/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file"
+  },
+  {
+   "path": "backend/talent/serializers/availability.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Plain serializer; user is set by the view"
+  },
+  {
+   "path": "backend/talent/serializers/explorer.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Logged-in read serializer returns full name and user id for anonymous posts"
+  },
+  {
+   "path": "backend/talent/test_access.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Publishing verification gates tested correctly"
+  },
+  {
+   "path": "backend/talent/test_availability_api.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Own-row scoping tested"
+  },
+  {
+   "path": "backend/talent/test_explorer_api.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B34"
+   ],
+   "note": "Test pins plain list returning expired posts as expected behaviour"
+  },
+  {
+   "path": "backend/talent/test_newcomer_rules.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Newcomer one-post and under-18 rules tested"
+  },
+  {
+   "path": "backend/talent/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Router registration only"
+  },
+  {
+   "path": "backend/talent/views/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file"
+  },
+  {
+   "path": "backend/talent/views/availability.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Queryset limited to the caller's own rows"
+  },
+  {
+   "path": "backend/talent/views/explorer.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B34",
+    "N1",
+    "N3"
+   ],
+   "note": "Unfiltered retrieve/list/like; anonymous identity exposed; deleted authors' posts stay"
+  },
+  {
+   "path": "backend/team_calendar/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file"
+  },
+  {
+   "path": "backend/team_calendar/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "App config"
+  },
+  {
+   "path": "backend/team_calendar/migrations/0001_initial.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only move plus content-type relabel"
+  },
+  {
+   "path": "backend/team_calendar/migrations/0002_clean_table_and_index_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Renames only"
+  },
+  {
+   "path": "backend/team_calendar/migrations/0003_clean_constraint_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Database name renames only"
+  },
+  {
+   "path": "backend/team_calendar/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file"
+  },
+  {
+   "path": "backend/team_calendar/models.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Model definitions"
+  },
+  {
+   "path": "backend/team_calendar/recurrence.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N4"
+   ],
+   "note": "Fortnightly weeks counted from viewed range, not from series start"
+  },
+  {
+   "path": "backend/team_calendar/serializers.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Pharmacy can be changed on update; assignees checked against the new pharmacy"
+  },
+  {
+   "path": "backend/team_calendar/tasks.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N5"
+   ],
+   "note": "29 Feb birthday crashes that pharmacy's birthday run in non-leap years"
+  },
+  {
+   "path": "backend/team_calendar/test_api.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Characterization tests; no test for moving items between pharmacies"
+  },
+  {
+   "path": "backend/team_calendar/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Router registration only"
+  },
+  {
+   "path": "backend/team_calendar/views.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B06",
+    "B07",
+    "N2"
+   ],
+   "note": "Org feed scope, scoped-admin writes, unchecked target pharmacy/organisation"
+  },
+  {
+   "path": "backend/testing/seed_e2e_acceptance.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Refuses to run outside the isolated test database"
+  },
+  {
+   "path": "backend/testing/staging_test_data.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Fails closed on any non-staging database"
+  },
+  {
+   "path": "backend/users/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file"
+  },
+  {
+   "path": "backend/users/account_deletion.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B13",
+    "N3"
+   ],
+   "note": "Anonymises the user but leaves talent posts and availability live"
+  },
+  {
+   "path": "backend/users/admin.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Admin registration"
+  },
+  {
+   "path": "backend/users/api_account.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B13",
+    "N3"
+   ],
+   "note": "Delete flow skips future shifts and the public talent post"
+  },
+  {
+   "path": "backend/users/api_auth.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Login, refresh and logout flows look correct"
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Talent",
+   "title": "Anonymous talent posts reveal the author's full name and user id to any signed-in account.",
+   "scenario": "Sara posts her availability as anonymous, which is the default, because she is quietly looking for other work. Tom, or Zoe with a free account she just made, opens the logged-in talent feed or a single post. The server's answer carries Sara's full name and account id. Only the public feed hides them, so anonymity holds only for logged-out visitors.",
+   "evidence": [
+    "backend/talent/serializers/explorer.py:73-83",
+    "backend/talent/serializers/explorer.py:187-196",
+    "backend/talent/views/explorer.py:184",
+    "backend/talent/views/explorer.py:81"
+   ],
+   "confidence": "medium",
+   "test_needed": "A signed-in owner fetches feed/ and retrieve for an is_anonymous post and must not receive explorer_name, author_user_id or explorer_user_id",
+   "owner_question": {
+    "question": "Sara posts anonymously. When Tom is logged in and looks at the talent board, what should he learn about who she is?",
+    "options": [
+     "Nothing until Sara accepts his contact request",
+     "Name visible only to verified owners and organisation admins",
+     "Keep today: every logged-in user gets her full name and id"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Organisations",
+   "title": "Work notes and calendar events can be moved into, or attached to, a pharmacy or organisation the person has no rights over.",
+   "scenario": "Omar is an ordinary staff member at Tom's pharmacy. He edits one of his own work notes, changes its pharmacy to Nadia's pharmacy and assigns Nadia. The permission check only looks at the note's old pharmacy. The assignee check uses the new pharmacy, so it passes, and Nadia is notified with Omar's text. Separately, Tom can create an event naming his own pharmacy plus Lina's organisation. Only the pharmacy is checked, so the event appears in Lina's organisation calendar.",
+   "evidence": [
+    "backend/team_calendar/views.py:377-383",
+    "backend/team_calendar/serializers.py:61-66",
+    "backend/team_calendar/serializers.py:78-91",
+    "backend/team_calendar/views.py:241-264",
+    "backend/team_calendar/views.py:217-227",
+    "backend/team_calendar/tasks.py:303-319"
+   ],
+   "confidence": "high",
+   "test_needed": "A staff member PATCHes a work note with another pharmacy's id (expect 403 or no change); an owner POSTs an event with own pharmacy plus a foreign organisation (expect 403)",
+   "owner_question": {
+    "question": "Omar wants to move a work note from Tom's pharmacy to Nadia's pharmacy, and Tom tags an event with Lina's organisation. What should happen?",
+    "options": [
+     "Never allowed: a note or event stays in the pharmacy or organisation it was made in",
+     "Allowed only if the person can manage both pharmacies or organisations",
+     "Keep today's behaviour"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Talent",
+   "title": "Deleting an account leaves the person's talent post live on the public and logged-in boards.",
+   "scenario": "Sara deletes her ChemistTasker account. Her name, email and ID documents are removed, but her talent post is never touched: headline, free-text body, suburb, postcode and reference code stay. Logged-out visitors and owners like Tom keep seeing it, and a full-time post never expires. Tom may try to book or contact someone who has left the platform, and Sara's own words stay public after she asked to be removed.",
+   "evidence": [
+    "backend/users/api_account.py:76-82",
+    "backend/users/account_deletion.py:92-119",
+    "backend/talent/models.py:119-127",
+    "backend/talent/views/explorer.py:172-199"
+   ],
+   "confidence": "high",
+   "test_needed": "Delete an account that has an ExplorerPost, then public-feed/ and feed/ must not return that post",
+   "owner_question": {
+    "question": "Sara deletes her account while her availability post is on the talent board. What should happen to the post?",
+    "options": [
+     "Delete the post along with the account",
+     "Hide it from every board but keep it for audit",
+     "Keep today: it stays visible"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P2",
+   "area": "Roster",
+   "title": "Fortnightly (and longer) weekly-repeat calendar items land on the wrong weeks in some months.",
+   "scenario": "Tom sets a fortnightly 'controlled drug register check' work note starting Monday 2 March. When Omar opens a month whose first week is an odd number of weeks after 2 March, the note shows in the off weeks. Omar does the check in the wrong week and his ticks are saved against dates that are not real occurrences. Which weeks appear changes with the month being viewed.",
+   "evidence": [
+    "backend/team_calendar/recurrence.py:71-92",
+    "backend/team_calendar/views.py:598",
+    "backend/team_calendar/views.py:616"
+   ],
+   "confidence": "high",
+   "test_needed": "Weekly interval=2 from 2026-03-02, expanded for 2026-06-01..2026-06-30, must return 8 and 22 June, not 1, 15 and 29 June",
+   "owner_question": {
+    "question": "Tom sets a task to repeat every two weeks from 2 March. Which weeks should Omar see it in?",
+    "options": [
+     "Always every second week counted from 2 March",
+     "Keep today: the weeks shift depending on the month viewed"
+    ]
+   }
+  },
+  {
+   "id": "N5",
+   "severity": "P2",
+   "area": "Notifications",
+   "title": "A staff member born on 29 February stops birthday events for the rest of their pharmacy in non-leap years.",
+   "scenario": "Ali was born on 29 February. In a non-leap year, the daily birthday job crashes when it reaches Ali, and the error is caught for the whole pharmacy. Every colleague processed after Ali, like Mia, gets no birthday entry on Tom's calendar all year.",
+   "evidence": [
+    "backend/team_calendar/tasks.py:55",
+    "backend/team_calendar/tasks.py:117-122"
+   ],
+   "confidence": "high",
+   "test_needed": "generate_birthday_events_for_pharmacy with a 29 February DOB and a 2027 target date must not raise, and must still create other staff members' events",
+   "owner_question": {
+    "question": "Ali's birthday is 29 February. In a non-leap year, what should Tom's calendar show?",
+    "options": [
+     "Ali on 28 February, and everyone else as normal",
+     "Ali on 1 March, and everyone else as normal",
+     "Skip Ali that year, everyone else as normal"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-2"
+}

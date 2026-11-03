@@ -1,0 +1,181 @@
+{
+ "chunk": "C037",
+ "files": [
+  {
+   "path": "frontend_web/src/features/workforce/timesheetDisplay.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Timesheet status and duration formatting helpers."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/types.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Type re-exports from @chemisttasker/shared-core for workforce features."
+  },
+  {
+   "path": "frontend_web/src/hooks/useUnsavedChangesGuard.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused dead code hook and boundary; not imported across the frontend."
+  },
+  {
+   "path": "frontend_web/src/kiosk/KioskSetup.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Desktop kiosk pairing setup interface with mobile QR link."
+  },
+  {
+   "path": "frontend_web/src/kiosk/desktopBridge.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tauri IPC bridge functions for desktop attendance terminal."
+  },
+  {
+   "path": "frontend_web/src/kiosk/main.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Entry point bootstrapping desktop attendance kiosk application."
+  },
+  {
+   "path": "frontend_web/src/layouts/AuthLayout.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Dedicated auth page container layout and themed card wrapper."
+  },
+  {
+   "path": "frontend_web/src/layouts/CustomAppTitle.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy app title component from earlier Toolpad layout."
+  },
+  {
+   "path": "frontend_web/src/layouts/DashboardShell.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy dashboard shell with Toolpad drawer styles."
+  },
+  {
+   "path": "frontend_web/src/layouts/DashboardSideNav.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Main dashboard sidebar navigation with collapsible groups and query parameter scoping."
+  },
+  {
+   "path": "frontend_web/src/layouts/DashboardSidebarFooter.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy Toolpad sidebar footer component."
+  },
+  {
+   "path": "frontend_web/src/layouts/DashboardTopShell.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Top-level responsive dashboard shell with header, sidebar, and workspace scope."
+  },
+  {
+   "path": "frontend_web/src/layouts/HubDashboardWrapper.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Redundant wrapper delegating to identical role wrappers, with dead PHARMACY_ADMIN branch."
+  },
+  {
+   "path": "frontend_web/src/layouts/OrganizationDashboardWrapper.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Organization layout wrapper injecting organization title into DashboardTopShell."
+  },
+  {
+   "path": "frontend_web/src/layouts/SharedDashboardWrapper.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shared layout wrapper providing DashboardTopShell for direct workforce routes."
+  },
+  {
+   "path": "frontend_web/src/layouts/TopBarActions.model.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Data models, role constants, and notification helpers for TopBarActions."
+  },
+  {
+   "path": "frontend_web/src/layouts/TopBarActions.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Dashboard header actions for notifications, chat badges, search, and persona menu."
+  },
+  {
+   "path": "frontend_web/src/layouts/WorkspaceSwitcher.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy workspace toggle component."
+  },
+  {
+   "path": "frontend_web/src/layouts/adminDashboard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegated admin layout wrapper strictly enforcing pharmacy scope and admin capabilities."
+  },
+  {
+   "path": "frontend_web/src/layouts/dashboardRouteScope.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Routing helper maintaining workspace and pharmacy query parameters across links."
+  },
+  {
+   "path": "frontend_web/src/layouts/dashboardShell/DashboardMegaMenu.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Mega menu overlay displaying grouped dashboard navigation destinations."
+  },
+  {
+   "path": "frontend_web/src/layouts/dashboardShell/DashboardPersonaSwitcher.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Header switcher allowing staff to toggle between worker and delegated admin personas."
+  },
+  {
+   "path": "frontend_web/src/layouts/dashboardShell/DashboardPharmacySelector.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Header selector switching between accessible pharmacies, all org locations, and platform."
+  },
+  {
+   "path": "frontend_web/src/layouts/dashboardShell/shellModel.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Color tokens, accent resolvers, and accessible pharmacy collection utilities."
+  },
+  {
+   "path": "frontend_web/src/layouts/dashboardShell/useDashboardWorkspaceScope.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Workspace state hook synchronizing active pharmacy, platform access, and query parameters."
+  },
+  {
+   "path": "frontend_web/src/layouts/explorerDashboard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Explorer dashboard wrapper rendering DashboardTopShell with color mode provider."
+  },
+  {
+   "path": "frontend_web/src/layouts/otherStaffDashboard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Other staff dashboard wrapper rendering DashboardTopShell with color mode provider."
+  },
+  {
+   "path": "frontend_web/src/layouts/ownerDashboard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Owner dashboard wrapper rendering DashboardTopShell with color mode provider."
+  },
+  {
+   "path": "frontend_web/src/layouts/pharmacistDashboard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Pharmacist dashboard wrapper rendering DashboardTopShell with color mode provider."
+  }
+ ],
+ "findings": [],
+ "reviewer": "agy-g1"
+}

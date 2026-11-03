@@ -1,0 +1,283 @@
+{
+ "chunk": "C024",
+ "files": [
+  {
+   "path": "backend/users/api_organizations.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B47",
+    "N3"
+   ],
+   "note": "Re-inviting an existing member overwrites their role, skipping the last-Org-Admin guard"
+  },
+  {
+   "path": "backend/users/api_otp.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Mobile resend clears the verified flag, which unlocks the mobile number and legal name"
+  },
+  {
+   "path": "backend/users/api_passwords.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B43",
+    "N1"
+   ],
+   "note": "Reset email context is turned into an in-app notification that holds the reset link"
+  },
+  {
+   "path": "backend/users/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "App config"
+  },
+  {
+   "path": "backend/users/authentication.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Cookie JWT checks CSRF; email backend checks the account is active"
+  },
+  {
+   "path": "backend/users/browser_session.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "CSRF token endpoint with no-store"
+  },
+  {
+   "path": "backend/users/delivery.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Best-effort enqueue wrapper with redacted logging"
+  },
+  {
+   "path": "backend/users/jwt_ws.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "One-time tickets locked and deleted; cookie fallback checks origin"
+  },
+  {
+   "path": "backend/users/login_security.py",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unlocked branch of _login_failure_response builds a message, returns None; callers never reach it"
+  },
+  {
+   "path": "backend/users/migrations/0001_squashed_baseline.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Schema baseline"
+  },
+  {
+   "path": "backend/users/migrations/0002_onboarded_pharmacy_managers.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Data migration converts only the exact onboarding shape and warns otherwise"
+  },
+  {
+   "path": "backend/users/migrations/0003_pharmacy_manager_account_type.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Choices only"
+  },
+  {
+   "path": "backend/users/migrations/0004_role_labels_pharmacy_team.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Choices only"
+  },
+  {
+   "path": "backend/users/migrations/0005_mobile_check_skipped.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Adds a boolean field with a default"
+  },
+  {
+   "path": "backend/users/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Package marker"
+  },
+  {
+   "path": "backend/users/models.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Plain model definitions"
+  },
+  {
+   "path": "backend/users/navigation.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Dashboard URL helpers"
+  },
+  {
+   "path": "backend/users/normalization.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Email clean-up helpers"
+  },
+  {
+   "path": "backend/users/org_roles.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B62"
+   ],
+   "note": "Region Admin always gets roster and admin capabilities, whatever its admin level"
+  },
+  {
+   "path": "backend/users/otp.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Identity lock depends only on is_mobile_verified, which resend can clear"
+  },
+  {
+   "path": "backend/users/permissions.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Role permission fails closed"
+  },
+  {
+   "path": "backend/users/presentation.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Display helpers"
+  },
+  {
+   "path": "backend/users/recaptcha.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Fails closed and logs are redacted"
+  },
+  {
+   "path": "backend/users/role_labels.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Label mapping"
+  },
+  {
+   "path": "backend/users/serializers.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Pharmacies checked to belong to the org; refresh rejects inactive users"
+  },
+  {
+   "path": "backend/users/sessions.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Browser detection and httpOnly cookie helpers"
+  },
+  {
+   "path": "backend/users/tasks.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Auto-notification copies reset_url (live reset token) into Notification action_url"
+  },
+  {
+   "path": "backend/users/test_account_security_contract.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Lockout, non-enumeration and deletion contracts look right"
+  },
+  {
+   "path": "backend/users/test_current_user_newcomer_contract.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Newcomer subtype contract"
+  },
+  {
+   "path": "backend/users/test_delivery_resilience.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Queue and provider failure rollback contracts"
+  },
+  {
+   "path": "backend/users/test_org_role_scope.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Org scope and pharmacy write contracts"
+  },
+  {
+   "path": "backend/users/test_presentation_compatibility.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-export identity check"
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Auth",
+   "title": "Password-reset links are copied into the user's in-app notifications, so anyone holding a signed-in session can take over the account without email access.",
+   "scenario": "Mia stays signed in on the shared dispensary computer. A coworker goes to the public 'forgot password' page and enters Mia's email. The reset email also creates a 'Reset your password' notification in Mia's bell, and that notification holds the live reset link. The coworker opens it from Mia's session, sets a new password and locks Mia out, without ever touching her mailbox.",
+   "evidence": [
+    "backend/users/api_passwords.py:70-84",
+    "backend/users/tasks.py:65-102",
+    "backend/users/tasks.py:80",
+    "backend/core/task_queue.py:63-100",
+    "backend/notifications/services.py:80-88"
+   ],
+   "confidence": "high",
+   "test_needed": "POST password-reset/ for a known user, then assert that no Notification for that user has an action_url (or payload) containing the uid/token reset path.",
+   "owner_question": {
+    "question": "When someone asks for a password reset for Mia, what should Mia see inside the app?",
+    "options": [
+     "Nothing in-app: the reset link goes by email only",
+     "An in-app alert 'A password reset was requested' with no link",
+     "Keep today's behaviour (notification carries the working reset link)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Onboarding",
+   "title": "Asking for a mobile code again clears the verified-mobile flag, which unlocks the 'locked' mobile number and legal name while the profile keeps its Verified badge.",
+   "scenario": "Sara has verified her mobile, and her profile is Verified with her AHPRA-matched name. She calls 'resend mobile code', which marks her mobile as unverified straight away. Now the lock checks no longer apply, so she requests a code for a new number under a different first and last name, and her name changes. Verified profiles are never automatically demoted, so Tom sees a Verified locum whose name and phone are not the ones that were checked.",
+   "evidence": [
+    "backend/users/api_otp.py:519-533",
+    "backend/users/api_otp.py:344-349",
+    "backend/users/otp.py:119-134",
+    "backend/onboarding/verification/policy.py:82-89"
+   ],
+   "confidence": "medium",
+   "test_needed": "For a user with is_mobile_verified=True, POST mobile/resend-otp/ and then mobile/request-otp/ with a new number and new names; assert 400 and that the names and number are unchanged.",
+   "owner_question": {
+    "question": "Sara is already verified and asks for a new mobile code. What should happen to her verified mobile and name?",
+    "options": [
+     "Resend is refused for an already-verified mobile; changes go through support",
+     "She can change the number, her Verified badge is removed until she re-verifies, and her name stays locked",
+     "Keep today's behaviour (resend unlocks the number and name, badge stays)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P2",
+   "area": "Organisations",
+   "title": "The invite endpoint can change an existing Org Admin's role, which skips the rule that every organisation keeps at least one Org Admin.",
+   "scenario": "Lina is the only Org Admin of her chain. She, or the invite form, sends an organisation invite to her own email with the role Chief Admin. The invite finds her existing membership and overwrites its role without the 'must retain one Org Admin' check that normal edits run. The chain now has no Org Admin, and no Chief or Region Admin is allowed to create one.",
+   "evidence": [
+    "backend/users/api_organizations.py:36-37",
+    "backend/users/api_organizations.py:110-125",
+    "backend/users/api_organizations.py:498-504"
+   ],
+   "confidence": "medium",
+   "test_needed": "As the only ORG_ADMIN, POST the org invite with your own email and role CHIEF_ADMIN; assert 403 and that the membership role is still ORG_ADMIN.",
+   "owner_question": {
+    "question": "Lina sends an invite to someone who is already an admin of her organisation, possibly herself. What should the invite do?",
+    "options": [
+     "Refuse it: existing members are changed only through the member edit screen",
+     "Allow the role change, but never if it leaves the organisation without an Org Admin",
+     "Keep today's behaviour (the invite silently overwrites the role)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

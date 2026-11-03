@@ -1,0 +1,114 @@
+{
+ "chunk": "C049",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubSidebar.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Selected state compares bare numeric ids; pharmacy, org and group ids can collide and double-highlight."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/HubSpace.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Presentational layout; members come from the loader the caller passes in."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/hub/hubUtils.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "getHubAuthorName falls back to the email, but getMemberDisplayName hides emails."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/InviteStaffModal.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused dead code: builds a fake client-side invite link the backend never issued."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/LocumManager.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Invite, link and removal flows go through server services; the filters are display-only."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/MembershipApplicationReviewDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Backend applies max() against the Award floor, so lower above-award rates can't underpay."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/MembershipApplicationsPanel.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Loads only the first page of 50 pending applications, then filters by pharmacy in the browser."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "B02"
+   ],
+   "note": "Seat change is disabled below 1 extra seat, so owners can't drop back to zero."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/OwnerOverviewContainer.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "staffCounts counts pending, rejected, left and owner memberships, so the Staff number is too high."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/OwnerOverviewHome.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read-only dashboard; activity links limited to /dashboard/ paths."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/OwnerPharmaciesPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Presentational cards; edit and delete only send the user to the manager page."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/OwnerPharmacyDetailPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tab shell and counts; actions are passed to the child managers."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/owner/OwnerPillsPage.tsx",
+   "verdict": "NA",
+   "ids": [],
+   "note": "One-line re-export of the rewards PillsPage."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Memberships",
+   "title": "The pharmacy applications panel reads only the newest 50 pending applications across every pharmacy the admin manages, so older ones for a given pharmacy vanish.",
+   "scenario": "Lina manages a large organisation, and more than 50 people have applied through invite links across its pharmacies. When she opens Tom's pharmacy, the panel picks out Tom's applicants from only the newest 50. Sara applied to Tom's pharmacy two weeks ago, so she is not shown, the tab badge says nothing needs review, and Sara waits forever with no approve or decline.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/owner/MembershipApplicationsPanel.tsx:164",
+    "frontend_web/src/pages/dashboard/sidebar/owner/MembershipApplicationsPanel.tsx:165",
+    "shared-core/src/domains/memberships/api.ts:99",
+    "backend/memberships/selectors.py:197",
+    "backend/core/settings.py:360"
+   ],
+   "confidence": "medium",
+   "test_needed": "Create 51 pending applications across two pharmacies the admin manages, with the oldest at pharmacy A, and check that pharmacy A's panel still lists it and counts 1.",
+   "owner_question": {
+    "question": "When Lina opens Tom's pharmacy and Sara's application is older than 50 newer applications at other pharmacies, what should Lina see?",
+    "options": [
+     "Every pending application for Tom's pharmacy, however many there are org-wide",
+     "The newest applications plus a 'load more' link and a correct total count",
+     "Keep today's behaviour (only the newest 50 across all pharmacies are checked)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-2"
+}

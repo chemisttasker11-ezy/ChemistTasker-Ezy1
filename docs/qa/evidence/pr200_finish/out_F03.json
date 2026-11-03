@@ -1,0 +1,161 @@
+{
+ "chunk": "F03",
+ "paths_read": [
+  "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md",
+  "docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md",
+  "backend/memberships/views.py",
+  "backend/memberships/access.py",
+  "backend/memberships/models.py",
+  "backend/memberships/invites.py",
+  "backend/organizations/views.py",
+  "backend/organizations/models.py",
+  "backend/organizations/access.py",
+  "backend/organizations/serializers.py",
+  "backend/chat/signals.py",
+  "backend/chat/realtime.py",
+  "backend/attendance/eligibility.py",
+  "backend/workforce/models.py",
+  "backend/workforce/roster/views.py",
+  "backend/workforce/roster/periods.py",
+  "backend/workforce/roster/validation.py",
+  "backend/team_calendar/models.py",
+  "backend/client_profile/test_admin_invitations.py",
+  "shared-core/src/domains/memberships/api.ts",
+  "shared-core/src/domains/organizations/api.ts"
+ ],
+ "confirmed_known": [
+  "B03",
+  "B13"
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P0",
+   "area": "Pharmacy admins",
+   "title": "A staff member whose admin role was removed can give it back to themselves by accepting it as a pending admin invitation.",
+   "scenario": "Mia is a Manager admin at Tom's pharmacy. Tom takes away her admin role but keeps her on as an assistant. The system switches the admin role off but keeps it on file, and that leftover record looks exactly like a fresh admin invitation to an existing staff member. Mia sees it under her admin invitations, taps Accept, and is a Manager again, able to manage staff, rosters and admins, without Tom knowing.",
+   "evidence": [
+    "backend/organizations/views.py:586",
+    "backend/organizations/views.py:590",
+    "backend/organizations/views.py:313",
+    "backend/organizations/views.py:318",
+    "backend/organizations/views.py:336",
+    "backend/organizations/views.py:341",
+    "backend/organizations/views.py:359",
+    "shared-core/src/domains/organizations/api.ts:134"
+   ],
+   "confidence": "high",
+   "test_needed": "Owner removes the admin role of an accepted staff member; that member's GET my-pending-invitations must be empty and POST accept-invitation on the old record must return 404 and leave the role switched off.",
+   "owner_question": {
+    "question": "Tom took Mia's Manager role away but kept her on staff. If Mia later opens her admin invitations, what should she see?",
+    "options": [
+     "Nothing: a removed admin role is gone, and only a new invite from Tom can bring it back",
+     "The old role, shown as 'removed by Tom', with no way to accept it",
+     "Keep today's behaviour: she can accept it and is a Manager again"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Memberships / Pharmacy admins",
+   "title": "When the owner removes a staff member who is also a pharmacy admin, their admin rights stay on, but when they quit themselves the rights are switched off.",
+   "scenario": "Mia is an assistant and a Manager admin at Tom's pharmacy. Tom removes her from the staff list. Her staff membership is deleted (or switched off), but her Manager admin record stays on, now with no membership linked to it. Every admin check looks only at that record, so Mia can still manage staff, rosters and admins at the pharmacy she was removed from. If Mia had quit herself, the system would have switched her admin role off.",
+   "evidence": [
+    "backend/memberships/views.py:112",
+    "backend/memberships/views.py:129",
+    "backend/memberships/views.py:131",
+    "backend/memberships/views.py:494",
+    "backend/organizations/models.py:400",
+    "backend/organizations/access.py:33",
+    "backend/organizations/access.py:57",
+    "shared-core/src/domains/memberships/api.ts:30"
+   ],
+   "confidence": "high",
+   "test_needed": "Owner sends DELETE on an admin's staff membership; afterwards that user must fail the manage-staff and manage-roster checks for the pharmacy and must be missing from the active admin list.",
+   "owner_question": {
+    "question": "Tom removes Mia, who is also a Manager admin, from his staff list. What should happen to her admin access?",
+    "options": [
+     "Switched off at the same moment, the same as when she quits",
+     "Tom is asked whether to remove her admin role too before he confirms",
+     "Keep today's behaviour: she stays an admin until it is removed separately"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Re-invite",
+   "title": "Re-inviting someone who left as an admin brings back their old admin role the moment they accept a plain staff invitation.",
+   "scenario": "Mia was a Manager admin and quit Tom's pharmacy, which switched her admin role off. Months later Tom re-invites her only as an assistant. The re-invite reuses her old membership, and when Mia accepts it, every admin role tied to that membership is switched back on. Mia is a Manager again even though Tom only invited her as an assistant.",
+   "evidence": [
+    "backend/memberships/views.py:494",
+    "backend/memberships/invites.py:123",
+    "backend/memberships/invites.py:163",
+    "backend/memberships/views.py:443",
+    "backend/memberships/views.py:447"
+   ],
+   "confidence": "high",
+   "test_needed": "An admin quits; the owner re-invites them as ASSISTANT; they accept; their old admin record must stay switched off.",
+   "owner_question": {
+    "question": "Mia left as a Manager admin. Tom re-invites her as an assistant and she accepts. What access should she get?",
+    "options": [
+     "Assistant only; admin needs a separate new invite",
+     "Assistant, and Tom is asked whether to give back her old Manager role",
+     "Keep today's behaviour: her old Manager role comes back on its own"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P1",
+   "area": "Roster / Attendance",
+   "title": "Removing a staff member leaves all their future rostered shifts in place, so the roster looks covered and they can still clock in as rostered.",
+   "scenario": "Tom removes Ali on Monday. Ali stays on next week's published roster: Tom's roster view still counts those slots as filled, so no gap or cover request shows up. Ali's own roster still lists the shifts, and if he turns up at the kiosk he is clocked in as normally rostered, not flagged for review, so the hours flow into his timesheet. New roster edits would refuse Ali because he has no active membership, but shifts already on the roster are never checked again.",
+   "evidence": [
+    "backend/memberships/views.py:112",
+    "backend/memberships/views.py:494",
+    "backend/workforce/roster/periods.py:129",
+    "backend/workforce/roster/periods.py:135",
+    "backend/workforce/roster/views.py:552",
+    "backend/attendance/eligibility.py:141",
+    "backend/attendance/eligibility.py:241",
+    "backend/workforce/roster/validation.py:31"
+   ],
+   "confidence": "high",
+   "test_needed": "Owner removes a staff member who has a published future roster assignment; afterwards that slot must show as vacant (or flagged) in the owner's roster, and a clock-in by the removed worker at shift time must not come back as a confirmed assignment.",
+   "owner_question": {
+    "question": "Tom removes Ali, who is rostered for three shifts next week. What should happen to those shifts?",
+    "options": [
+     "They become open gaps straight away and Tom is prompted to find cover",
+     "Tom is shown the shifts and chooses for each one whether to keep Ali or free the slot",
+     "Keep today's behaviour: Ali stays rostered and can still clock in"
+    ]
+   }
+  },
+  {
+   "id": "N5",
+   "severity": "P2",
+   "area": "Memberships / Records",
+   "title": "Deleting a staff membership also deletes that person's past work-note completions and their contracted-hours settings.",
+   "scenario": "Tom removes Mia, who ticked off daily pharmacy tasks such as fridge checks for a year. Her membership is fully deleted unless an employment record blocks it, and her task-completion history and contracted-hours settings are deleted with it. Tom's task history no longer shows who did those checks, and timesheet comparisons for her past weeks lose her contracted hours. This is the same pattern as B03 (chat messages), but for task and work records.",
+   "evidence": [
+    "backend/memberships/views.py:129",
+    "backend/team_calendar/models.py:180",
+    "backend/team_calendar/models.py:148",
+    "backend/workforce/models.py:55"
+   ],
+   "confidence": "medium",
+   "test_needed": "Owner removes a staff member who has work-note completion records; those completion records must still exist afterwards.",
+   "owner_question": {
+    "question": "When Tom removes Mia, what should happen to her record of completed pharmacy tasks?",
+    "options": [
+     "Kept, still showing Mia's name as the person who completed each task",
+     "Kept, but with her name replaced by 'former staff'",
+     "Keep today's behaviour: deleted along with her membership"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeA-3"
+}

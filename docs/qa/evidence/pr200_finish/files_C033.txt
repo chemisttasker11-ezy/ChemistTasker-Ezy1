@@ -1,0 +1,11 @@
+shared-core/src/transport/convergence.test.ts
+shared-core/src/transport/errors.ts
+shared-core/src/transport/operational.ts
+shared-core/src/transport/urlResolution.test.ts
+shared-core/src/transport/urls.ts
+shared-core/src/types.ts
+shared-core/src/utils/asyncScope.test.ts
+shared-core/src/utils/asyncScope.ts
+shared-core/src/utils/pricing.ts
+shared-core/src/utils/serialization.ts
+shared-core/tests/finance.transport.cjs

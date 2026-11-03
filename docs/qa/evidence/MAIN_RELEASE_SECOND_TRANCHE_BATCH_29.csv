@@ -1,0 +1,8 @@
+"767","shared-core/src/domains/memberships/memberActions.test.ts","e122d15224fec1f33df454a29b5859f64a4487f2","e122d15224fec1f33df454a29b5859f64a4487f2","214","YES","","STATIC_OUTLINE_NOT_SEMANTIC"
+"768","shared-core/src/domains/organizations/pharmacyMultipart.test.ts","302b053e151ec7cb8f800c5a480b28c8ae59fa79","302b053e151ec7cb8f800c5a480b28c8ae59fa79","226","YES","5:function collect(payload: Record<string, unknown>) {","STATIC_OUTLINE_NOT_SEMANTIC"
+"769","shared-core/src/domains/shifts/bookedRate.test.ts","e6c6277b6394c5e2e7b005187baa96aab6a905ff","e6c6277b6394c5e2e7b005187baa96aab6a905ff","29","YES","","STATIC_OUTLINE_NOT_SEMANTIC"
+"770","shared-core/src/domains/shifts/context.test.ts","e4052c53f9c62036248cad53fcd95c1986135242","e4052c53f9c62036248cad53fcd95c1986135242","73","YES","","STATIC_OUTLINE_NOT_SEMANTIC"
+"771","shared-core/src/domains/shifts/draftSlots.test.ts","3890518a7d447e33fef44da943e11a9227da539a","3890518a7d447e33fef44da943e11a9227da539a","23","YES","","STATIC_OUTLINE_NOT_SEMANTIC"
+"772","shared-core/src/domains/shifts/postingDraft.test.ts","abdf86596934ff6022abf32b9d859f0ec685b213","abdf86596934ff6022abf32b9d859f0ec685b213","48","YES","","STATIC_OUTLINE_NOT_SEMANTIC"
+"773","shared-core/src/domains/shifts/skillPresets.test.ts","e707edf41be4b8a3c99c5a4c1ca0ba9c5cf6620a","e707edf41be4b8a3c99c5a4c1ca0ba9c5cf6620a","59","YES","","STATIC_OUTLINE_NOT_SEMANTIC"
+"774","shared-core/src/domains/shifts/visibility.test.ts","5fb80d173442645b82398f8b936daaa455e9404a","5fb80d173442645b82398f8b936daaa455e9404a","38","YES","","STATIC_OUTLINE_NOT_SEMANTIC"

@@ -1,0 +1,427 @@
+{
+ "chunk": "C007",
+ "files": [
+  {
+   "path": "backend/client_profile/migrations/0044_roster_v2_and_attendance_v1.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Schema migration; no data transformation."
+  },
+  {
+   "path": "backend/client_profile/migrations/0045_roster_slot_ownership.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive schema migration."
+  },
+  {
+   "path": "backend/client_profile/migrations/0046_kiosk_offline_protocol.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Existing devices receive individual installation identifiers before uniqueness is enforced."
+  },
+  {
+   "path": "backend/client_profile/migrations/0047_kiosk_event_preserve_unresolved_worker.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Submitted employee identifiers are backfilled before becoming required."
+  },
+  {
+   "path": "backend/client_profile/migrations/0048_kiosk_pairing_authorization.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive pairing schema migration."
+  },
+  {
+   "path": "backend/client_profile/migrations/0049_reclassify_existing_native_kiosks.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Reclassification checks desktop platform and signing key length."
+  },
+  {
+   "path": "backend/client_profile/migrations/0050_align_kiosk_schema_state.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Index names and field metadata alignment."
+  },
+  {
+   "path": "backend/client_profile/migrations/0051_kiosk_pairing_recovery_attempt.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive nullable pairing attempt identifier."
+  },
+  {
+   "path": "backend/client_profile/migrations/0052_membershipapplication_date_of_birth.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive nullable application field."
+  },
+  {
+   "path": "backend/client_profile/migrations/0053_shift_engagement_routing.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive engagement snapshot schema."
+  },
+  {
+   "path": "backend/client_profile/migrations/0054_membership_application_review_payroll_optin.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive application review and payroll schema."
+  },
+  {
+   "path": "backend/client_profile/migrations/0055_shift_casual_employment_type.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Employment type choices update."
+  },
+  {
+   "path": "backend/client_profile/migrations/0056_payroll_activation_invoice_source_snapshot.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive payroll and invoice provenance schema."
+  },
+  {
+   "path": "backend/client_profile/migrations/0057_shift_roster_container.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Backfill identifies shifts through existing roster slots or assignments."
+  },
+  {
+   "path": "backend/client_profile/migrations/0058_ratingreport.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Rating report schema and uniqueness constraint."
+  },
+  {
+   "path": "backend/client_profile/migrations/0059_invoice_finance_workspace_state.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive invoice workspace schema."
+  },
+  {
+   "path": "backend/client_profile/migrations/0060_owner_marketplace_identity.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive owner identity schema."
+  },
+  {
+   "path": "backend/client_profile/migrations/0061_move_rewards_out.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only model ownership transfer; no database deletion."
+  },
+  {
+   "path": "backend/client_profile/migrations/0062_move_ratings_out.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only model ownership transfer; no database deletion."
+  },
+  {
+   "path": "backend/client_profile/migrations/0063_move_talent_out.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only model ownership transfer; no database deletion."
+  },
+  {
+   "path": "backend/client_profile/migrations/0064_move_team_calendar_out.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only model ownership transfer; no database deletion."
+  },
+  {
+   "path": "backend/client_profile/migrations/0065_move_notifications_out.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only model ownership transfer; no database deletion."
+  },
+  {
+   "path": "backend/client_profile/migrations/0066_move_chat_out.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only model ownership transfer; no database deletion."
+  },
+  {
+   "path": "backend/client_profile/migrations/0067_move_pharmacy_hub_out.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only model ownership transfer; no database deletion."
+  },
+  {
+   "path": "backend/client_profile/migrations/0068_move_invoicing_out.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only transfer depends on invoice relation repointing."
+  },
+  {
+   "path": "backend/client_profile/migrations/0069_move_attendance_out.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only transfer depends on attendance relation repointing."
+  },
+  {
+   "path": "backend/client_profile/migrations/0070_move_roster_out.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only roster transfer and slot relation repointing."
+  },
+  {
+   "path": "backend/client_profile/migrations/0071_abn_details_for.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Backfill associates previously checked ABN details with the current ABN."
+  },
+  {
+   "path": "backend/client_profile/migrations/0072_shiftslot_unpublished_at.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive nullable roster publication field."
+  },
+  {
+   "path": "backend/client_profile/migrations/0073_pharmacy_profile_and_shift_support.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive pharmacy profile and shift support fields."
+  },
+  {
+   "path": "backend/client_profile/migrations/0074_otherstaffonboarding_dispensary_qualification_and_more.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive dispensary qualification fields."
+  },
+  {
+   "path": "backend/client_profile/migrations/0075_otherstaff_intern_ahpra.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive intern registration fields."
+  },
+  {
+   "path": "backend/client_profile/migrations/0076_role_labels_pharmacy_team.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Role choice labels update."
+  },
+  {
+   "path": "backend/client_profile/migrations/0077_new_to_pharmacy_profile.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive Explorer fields and role choices."
+  },
+  {
+   "path": "backend/client_profile/migrations/0078_board_reports.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive nullable moderation field."
+  },
+  {
+   "path": "backend/client_profile/migrations/0079_work_rights.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive work rights fields."
+  },
+  {
+   "path": "backend/client_profile/migrations/0080_ahpra_registration.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Deterministic registration ownership backfill preserves legacy profiles under the documented owner decision."
+  },
+  {
+   "path": "backend/client_profile/migrations/0081_ahpra_check.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Registration check schema and active-check uniqueness."
+  },
+  {
+   "path": "backend/client_profile/migrations/0082_ahpra_check_stages.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Existing queued checks retain bridge routing."
+  },
+  {
+   "path": "backend/client_profile/migrations/0083_owner_ahpra_switched_to_manager.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive owner workflow flag."
+  },
+  {
+   "path": "backend/client_profile/migrations/0084_ahpra_check_public_recheck.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Registration check reason choices update."
+  },
+  {
+   "path": "backend/client_profile/migrations/0085_ahpra_check_type_not_accepted.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Reverse conversion precedes shrinking the outcome field."
+  },
+  {
+   "path": "backend/client_profile/migrations/0086_pharmacy_create_idempotency.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive pharmacy idempotency schema."
+  },
+  {
+   "path": "backend/client_profile/migrations/0087_pharmacy_idempotency_fingerprint.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Additive nullable idempotency fingerprint."
+  },
+  {
+   "path": "backend/client_profile/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/client_profile/models/__init__.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Compatibility exports preserve domain model and helper imports."
+  },
+  {
+   "path": "backend/client_profile/models/common.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shared choices and historical upload helpers remain available."
+  },
+  {
+   "path": "backend/client_profile/models/memberships.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Membership compatibility exports are consistent."
+  },
+  {
+   "path": "backend/client_profile/models/onboarding.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Onboarding compatibility exports are consistent."
+  },
+  {
+   "path": "backend/client_profile/models/orgs.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Organization compatibility exports are consistent."
+  },
+  {
+   "path": "backend/client_profile/models/shifts.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shift compatibility exports retain roster mutation helpers."
+  },
+  {
+   "path": "backend/client_profile/tasks.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exported tasks retain their historical registered names."
+  },
+  {
+   "path": "backend/client_profile/test_admin_invitations.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Assertions preserve invitation acceptance, existing memberships, and owner-level restrictions."
+  },
+  {
+   "path": "backend/client_profile/test_characterization_chains.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Authentication and chain listing assertions are consistent."
+  },
+  {
+   "path": "backend/client_profile/test_characterization_claims.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Claim listing and PATCH decision assertions are consistent."
+  },
+  {
+   "path": "backend/client_profile/test_characterization_magic_links.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Link metadata, expiry, and invalid-token assertions are consistent."
+  },
+  {
+   "path": "backend/client_profile/test_characterization_shift_offers.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Offer visibility and prohibited creation assertions are consistent."
+  },
+  {
+   "path": "backend/client_profile/test_membership_application_integrity.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Application integrity, payroll routing, privacy, and invoice boundary assertions show no specific defect."
+  },
+  {
+   "path": "backend/client_profile/test_postgres_concurrency.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Concurrency assertions and lock expectations show no specific defect; tests were not executed."
+  },
+  {
+   "path": "backend/client_profile/test_request_validation.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Invalid-request and quota assertions show no specific defect."
+  },
+  {
+   "path": "backend/client_profile/test_url_contract.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Route resolution and empty compatibility URLconf assertions are consistent."
+  },
+  {
+   "path": "backend/client_profile/tests.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Role invariants, admin forms, and cover-role resolution assertions show no specific defect."
+  },
+  {
+   "path": "backend/client_profile/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Empty compatibility URLconf matches canonical domain composition."
+  },
+  {
+   "path": "backend/core/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Celery application package export."
+  },
+  {
+   "path": "backend/core/admin_site.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Additional lookup route uses the OTP admin permission wrapper."
+  },
+  {
+   "path": "backend/core/ahpra_e2e_settings.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Local AHPRA test configuration."
+  },
+  {
+   "path": "backend/core/api_v1_urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Finance guards precede generic invoice routes; domain URLconfs remain mounted."
+  },
+  {
+   "path": "backend/core/asgi.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Django initializes before routing imports; WebSockets use authentication middleware."
+  },
+  {
+   "path": "backend/core/baseline_schema.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Complete existing baselines are preserved; partial baselines fail before table creation."
+  },
+  {
+   "path": "backend/core/celery.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Task discovery and marketplace periodic registrations show no specific defect."
+  }
+ ],
+ "findings": [],
+ "reviewer": "codexA-1"
+}

@@ -1,0 +1,153 @@
+{
+ "chunk": "F11",
+ "paths_read": [
+  "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md",
+  "docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md",
+  "backend/core/settings.py",
+  "backend/core/api_v1_urls.py",
+  "backend/core/serializer_lifecycle.py",
+  "backend/users/urls.py",
+  "backend/users/views.py",
+  "backend/users/models.py",
+  "backend/users/permissions.py",
+  "backend/users/authentication.py",
+  "backend/users/api_auth.py",
+  "backend/users/serializers.py",
+  "backend/users/sessions.py",
+  "backend/users/login_security.py",
+  "backend/users/api_passwords.py",
+  "backend/users/api_otp.py",
+  "backend/users/otp.py",
+  "backend/users/api_account.py",
+  "backend/users/account_deletion.py",
+  "backend/onboarding/urls.py",
+  "backend/onboarding/views.py",
+  "backend/onboarding/serializers.py",
+  "backend/onboarding/middleware.py",
+  "backend/onboarding/services/basic.py",
+  "backend/onboarding/services/upgrade.py",
+  "backend/onboarding/verification/policy.py",
+  "backend/notifications/views.py",
+  "backend/notifications/serializers.py",
+  "backend/notifications/services.py",
+  "backend/notifications/consumers.py",
+  "backend/chat/signals.py",
+  "shared-core/src/domains/auth/api.ts",
+  "shared-core/src/domains/auth/browserOperations.ts",
+  "shared-core/src/domains/auth/nativeWire.ts",
+  "shared-core/src/domains/onboarding/api.ts",
+  "shared-core/src/domains/notifications/api.ts",
+  "shared-core/src/transport/application.ts",
+  "shared-core/src/transport/client.ts",
+  "shared-core/src/constants/personas.ts",
+  "shared-core/src/policy/accessPolicy.ts",
+  "frontend_web/src/contexts/AuthContext.tsx",
+  "frontend_web/src/utils/tokenService.ts",
+  "frontend_web/src/utils/browserMobileOtp.ts",
+  "frontend_web/src/pages/login.tsx",
+  "frontend_web/src/pages/ResetPasswordPage.tsx",
+  "frontend_web/src/pages/MobileOTPVerify.tsx",
+  "frontend_web/src/pages/onboarding/onboarding_pharmacist/BasicInfoV2.tsx",
+  "frontend_web/landing_next/shared/browser-session.ts",
+  "frontend_web/landing_next/shared/session-provider.tsx",
+  "frontend_web/landing_next/lib/chemisttasker-api.ts",
+  "frontend_web/landing_next/migrated/contexts/AuthContext.tsx",
+  "frontend_web/landing_next/migrated/pages/login.tsx",
+  "frontend_web/landing_next/migrated/pages/ResetPasswordPage.tsx",
+  "frontend_mobile/config/api.ts",
+  "frontend_mobile/context/AuthContext.tsx",
+  "frontend_mobile/context/WorkspaceContext.tsx",
+  "frontend_mobile/utils/apiClient.ts",
+  "frontend_mobile/utils/authSession.ts",
+  "frontend_mobile/utils/nativeIdentityTransport.ts",
+  "frontend_mobile/utils/pushNotifications.ts",
+  "frontend_mobile/app/login.tsx",
+  "frontend_mobile/app/mobile-verify.tsx",
+  "frontend_mobile/app/reset-password.tsx",
+  "frontend_mobile/roles/explorer/profile-tabs/BasicInfoScreen.tsx",
+  "frontend_mobile/roles/pharmacist/profile-tabs/BasicInfoScreen.tsx"
+ ],
+ "confirmed_known": [
+  "B30",
+  "B43",
+  "B52"
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Auth",
+   "title": "Changing a pending phone number leaves the previous number's verification code usable.",
+   "scenario": "Zoe requests a verification code on her own phone, then saves Tom's number in her profile before entering that code. The app accepts Zoe's code and marks Tom's number as verified on Zoe's account, although Tom never received or approved a verification request.",
+   "evidence": [
+    "backend/onboarding/views.py:293",
+    "backend/onboarding/serializers.py:825",
+    "backend/onboarding/services/basic.py:159",
+    "backend/core/serializer_lifecycle.py:129",
+    "backend/users/api_otp.py:463",
+    "backend/onboarding/verification/policy.py:57"
+   ],
+   "confidence": "high",
+   "test_needed": "Issue a phone code for Zoe's number, change her phone through the onboarding update to Tom's number, then submit the original code and assert that Tom's number remains unverified.",
+   "owner_question": {
+    "question": "When Zoe changes her phone number while a verification code is pending, what should happen to the old code?",
+    "options": [
+     "Reject the old code and require a new code sent to the replacement number",
+     "Block number changes until Zoe cancels the pending verification",
+     "Let the old code verify the replacement number (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Auth",
+   "title": "Signing out of Expo leaves private push notifications active on that device.",
+   "scenario": "Sara signs out of the mobile app and hands the phone to Omar. When Tom subsequently sends Sara a private chat message, that phone still receives Sara's notification with Tom's name and a preview of the message. This continues after the app closes because signing out leaves the phone registered for Sara's notifications.",
+   "evidence": [
+    "frontend_mobile/context/AuthContext.tsx:220",
+    "frontend_mobile/context/AuthContext.tsx:502",
+    "backend/users/api_auth.py:159",
+    "backend/notifications/services.py:91",
+    "backend/chat/signals.py:110"
+   ],
+   "confidence": "high",
+   "test_needed": "Register a push token for Sara, successfully log her out, send her a private message from Tom, and assert that the logged-out device token receives no push.",
+   "owner_question": {
+    "question": "After Sara signs out of a phone, should that phone still display previews of her private messages from Tom?",
+    "options": [
+     "Stop Sara's push notifications on that phone until she signs in again",
+     "Send only a generic notification without names or private content",
+     "Continue displaying Sara's private previews (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Auth",
+   "title": "Phone verification replaces a browser-only session with a persistent 90-day session.",
+   "scenario": "Sara signs in on Tom's shared computer with 'Keep me signed in' unchecked, then completes her first phone verification. Verification silently changes her login into one that persists after the browser closes. Tom can subsequently reopen the browser into Sara's account without her password.",
+   "evidence": [
+    "frontend_web/src/pages/login.tsx:59",
+    "frontend_web/src/pages/MobileOTPVerify.tsx:79",
+    "backend/users/serializers.py:365",
+    "backend/users/api_otp.py:477",
+    "backend/users/api_otp.py:489",
+    "backend/users/sessions.py:43",
+    "backend/core/settings.py:495"
+   ],
+   "confidence": "high",
+   "test_needed": "Log Sara in with remember_me=false, complete phone verification, and assert that the replacement auth cookies remain session cookies rather than gaining a persistent expiry.",
+   "owner_question": {
+    "question": "When Sara completes phone verification after declining 'Keep me signed in', how should her login behave on Tom's computer?",
+    "options": [
+     "Preserve Sara's choice and end the browser session when it closes",
+     "Require Sara to sign in again after verification",
+     "Create a persistent 90-day session (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-4"
+}

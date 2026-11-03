@@ -1,0 +1,8 @@
+frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx
+frontend_web/src/pages/dashboard/sidebar/PharmacyPageDialogs.tsx
+frontend_web/src/pages/dashboard/sidebar/PharmacySoftwareFields.tsx
+frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx
+frontend_web/src/pages/dashboard/sidebar/PosterShiftDetailPage.tsx
+frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx
+frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx
+frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.model.ts

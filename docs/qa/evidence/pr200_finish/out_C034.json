@@ -1,0 +1,145 @@
+{
+ "chunk": "C034",
+ "files": [
+  {
+   "path": "frontend_web/src-tauri/build.rs",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Tauri build script configuring KIOSK_BUILD_PROFILE and tauri_build."
+  },
+  {
+   "path": "frontend_web/src-tauri/src/lib.rs",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Kiosk desktop engine managing pairing, secure SQLite, Ed25519 signing, and offline attendance sync."
+  },
+  {
+   "path": "frontend_web/src-tauri/src/main.rs",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Boilerplate desktop application entry point calling kiosk library run."
+  },
+  {
+   "path": "frontend_web/src/App.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Dashboard shell configuring navigation, persona switches, admin routing, and onboarding progress."
+  },
+  {
+   "path": "frontend_web/src/api/axiosInstance.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Re-export shim forwarding to apiClient utility."
+  },
+  {
+   "path": "frontend_web/src/api/hub.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Re-export shim exposing hub API methods from shared-core."
+  },
+  {
+   "path": "frontend_web/src/api/notifications.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Re-export shim exposing notification functions from shared-core."
+  },
+  {
+   "path": "frontend_web/src/components/AccountDeletionSection.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Account deletion confirmation modal invoking shared-core deleteAccount and logout."
+  },
+  {
+   "path": "frontend_web/src/components/AhpraStatus.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "AHPRA registration status indicator with retry cooldown timer and support CTA."
+  },
+  {
+   "path": "frontend_web/src/components/AnimatedBackground.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Decorative Three.js background canvas with safe event listener cleanup."
+  },
+  {
+   "path": "frontend_web/src/components/ChooseAccountTypeCard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Card allowing pharmacy managers to convert to worker profiles with role selection."
+  },
+  {
+   "path": "frontend_web/src/components/OwnerDashboardGate.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Owner setup gate directing incomplete owner onboarding to setup routes."
+  },
+  {
+   "path": "frontend_web/src/components/ProtectedRoute.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Route protection wrapper checking authentication, mobile verification, AHPRA state, and permissions."
+  },
+  {
+   "path": "frontend_web/src/components/PublicContactFormSection.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Public support contact form with reCAPTCHA verification and submission handling."
+  },
+  {
+   "path": "frontend_web/src/components/PublicLogoTopBar.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Sticky top bar component displaying the ChemistTasker logo banner."
+  },
+  {
+   "path": "frontend_web/src/components/PublicRouteBridge.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Bridge component redirecting public routes to external Next.js marketing site."
+  },
+  {
+   "path": "frontend_web/src/components/SkillGlyph.tsx",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Re-export shim for SkillGlyph and SkillSymbol components."
+  },
+  {
+   "path": "frontend_web/src/components/coverPhoto/CoverPhotoUploader.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Cover photo upload component with cropping dialog, zoom, and rotation."
+  },
+  {
+   "path": "frontend_web/src/components/dashboard/DashboardContentState.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Reusable dashboard UI feedback component for loading, empty, and error states."
+  },
+  {
+   "path": "frontend_web/src/components/dashboard/DashboardOverviewTemplate.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shared dashboard overview template rendering metrics, previews, and quick actions."
+  },
+  {
+   "path": "frontend_web/src/components/dashboard/RecentActivityDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Modal dialog displaying recent activity items with timestamps and action navigation."
+  },
+  {
+   "path": "frontend_web/src/components/profilePhoto/ProfilePhotoUploader.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Profile photo upload component with circular crop dialog and validation."
+  },
+  {
+   "path": "frontend_web/src/components/roster/HorizontalCalendarGrid.model.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Horizontal calendar models, operating hours calculations, time formatters, and role styles."
+  }
+ ],
+ "findings": [],
+ "reviewer": "agy-g1"
+}

@@ -1,0 +1,14 @@
+frontend_web/src/pages/dashboard/sidebar/chat/MessageComposer.tsx
+frontend_web/src/pages/dashboard/sidebar/chat/NewChatModal.tsx
+frontend_web/src/pages/dashboard/sidebar/chat/chatFormat.tsx
+frontend_web/src/pages/dashboard/sidebar/chat/types.ts
+frontend_web/src/pages/dashboard/sidebar/chat/useConversationScroll.ts
+frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.helpers.tsx
+frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx
+frontend_web/src/pages/dashboard/sidebar/hub/HubFeedDialogs.tsx
+frontend_web/src/pages/dashboard/sidebar/hub/HubGroupModal.tsx
+frontend_web/src/pages/dashboard/sidebar/hub/HubPage.tsx
+frontend_web/src/pages/dashboard/sidebar/hub/HubPollCard.tsx
+frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx
+frontend_web/src/pages/dashboard/sidebar/hub/HubProfileModals.tsx
+frontend_web/src/pages/dashboard/sidebar/hub/HubSections.tsx

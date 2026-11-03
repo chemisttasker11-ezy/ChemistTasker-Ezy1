@@ -1,0 +1,13 @@
+frontend_web/src/pages/dashboard/sidebar/hub/HubSidebar.tsx
+frontend_web/src/pages/dashboard/sidebar/hub/HubSpace.tsx
+frontend_web/src/pages/dashboard/sidebar/hub/hubUtils.ts
+frontend_web/src/pages/dashboard/sidebar/owner/InviteStaffModal.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/LocumManager.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/MembershipApplicationReviewDialog.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/MembershipApplicationsPanel.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/OwnerOverviewContainer.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/OwnerOverviewHome.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/OwnerPharmaciesPage.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/OwnerPharmacyDetailPage.tsx
+frontend_web/src/pages/dashboard/sidebar/owner/OwnerPillsPage.tsx

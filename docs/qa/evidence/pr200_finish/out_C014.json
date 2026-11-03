@@ -1,0 +1,97 @@
+{
+  "chunk": "C014",
+  "files": [
+    {
+      "path": "backend/onboarding/test_ahpra_access.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AHPRA freeze and public booking cancellation tests including adverse status and rollback"
+    },
+    {
+      "path": "backend/onboarding/test_ahpra_core.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AHPRA number uniqueness, parsing, profession, expiry, restrictions and role classification cases"
+    },
+    {
+      "path": "backend/onboarding/test_ahpra_desktop.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Desktop verifier queue lease, handoff, errors, stale result and administrative review tests"
+    },
+    {
+      "path": "backend/onboarding/test_ahpra_e2e.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Isolated AHPRA E2E fixtures and safety gates"
+    },
+    {
+      "path": "backend/onboarding/test_ahpra_name_match.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Name matching and mismatch classification tests"
+    },
+    {
+      "path": "backend/onboarding/test_ahpra_test_lookup.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Disabled diagnostic lookup, OTP, throttling, CSRF, repair isolation and data exposure tests"
+    },
+    {
+      "path": "backend/onboarding/test_app_registration.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Onboarding Django app registration assertion"
+    },
+    {
+      "path": "backend/onboarding/test_model_code_ownership.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Onboarding model label and source ownership assertions"
+    },
+    {
+      "path": "backend/onboarding/test_review3_fixes.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Review-3 regressions for mismatches, public access, cancellation rollback and suspension notice"
+    },
+    {
+      "path": "backend/onboarding/test_review3_repro.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Review-3 reproduction cases including mismatch and cancellation rollback"
+    },
+    {
+      "path": "backend/onboarding/test_review_183_fixes.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PR183 fixes for source switches, rechecks, rejections and role eligibility"
+    },
+    {
+      "path": "backend/onboarding/test_review_183_repro.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PR183 reproductions for suspended workers, admin rejection and queue handoff"
+    },
+    {
+      "path": "backend/onboarding/test_role_tabs_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Role tab tests for AHPRA, verification, certificate lifecycle, regulated documents and profile updates"
+    },
+    {
+      "path": "backend/onboarding/test_skill_identity.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Skill identity registry uniqueness and alias/capability distinction tests"
+    },
+    {
+      "path": "backend/onboarding/test_skill_review_regressions.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Skill claim regression suite covering role restrictions, canonical certificate and publication gating"
+    }
+  ],
+  "findings": [],
+  "reviewer": "gpt6-senior-20261025"
+}

@@ -1,0 +1,236 @@
+{
+ "chunk": "C018",
+ "files": [
+  {
+   "path": "backend/pharmacy_hub/test_api.py",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Line 132 assertGreaterEqual always passes; contradicts contract test saying posting must not create memberships."
+  },
+  {
+   "path": "backend/pharmacy_hub/test_hub_scope_contract.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Recorded scope, permission and posting tables; assertions consistent with intended rules."
+  },
+  {
+   "path": "backend/pharmacy_hub/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Route map only; comment detail exposes no unauthenticated verbs."
+  },
+  {
+   "path": "backend/pharmacy_hub/views.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-export shim for the split hub modules."
+  },
+  {
+   "path": "backend/public_hub/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file."
+  },
+  {
+   "path": "backend/public_hub/admin.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Article admin read-only; comment/report moderation actions permission-gated."
+  },
+  {
+   "path": "backend/public_hub/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "App config."
+  },
+  {
+   "path": "backend/public_hub/attachment_access.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Legacy media URL gated by public check or hub resolver; inherits resolver scope (see B46)."
+  },
+  {
+   "path": "backend/public_hub/community.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Board report re-submission after resolution silently returns existing resolved report."
+  },
+  {
+   "path": "backend/public_hub/content_schema.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Strict rich-text allowlist, URL scheme and credential checks."
+  },
+  {
+   "path": "backend/public_hub/content_urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Route map only."
+  },
+  {
+   "path": "backend/public_hub/content_views.py",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Documents.post accepts board:* moderation areas, letting stray hub posts be published there."
+  },
+  {
+   "path": "backend/public_hub/editorial.py",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "publish() on board:* area creates PharmacyHubPost with platform_hub talent/jobs; invisible junk row."
+  },
+  {
+   "path": "backend/public_hub/integration_settings.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Isolated test settings."
+  },
+  {
+   "path": "backend/public_hub/integration_urls.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Test URL conf."
+  },
+  {
+   "path": "backend/public_hub/management/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file."
+  },
+  {
+   "path": "backend/public_hub/management/commands/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file."
+  },
+  {
+   "path": "backend/public_hub/management/commands/bootstrap_content_admin.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Invitation-based activation, no staff grant, row-locked pending check."
+  },
+  {
+   "path": "backend/public_hub/management/commands/check_content_migrations.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Deployment guard for migration sources and graph consistency."
+  },
+  {
+   "path": "backend/public_hub/management/commands/import_editorial_guides.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Requires verified publisher, skips existing slugs, validated payloads."
+  },
+  {
+   "path": "backend/public_hub/management/commands/seed_editorial_content.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "No environment guard; grants content admin, overwrites articles, posts fake comments as real users."
+  },
+  {
+   "path": "backend/public_hub/management/commands/seed_hub_preview.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Refuses unless test settings and DEBUG."
+  },
+  {
+   "path": "backend/public_hub/media.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Media served only to uploader, accessible editors, or published public references."
+  },
+  {
+   "path": "backend/public_hub/migrations/0001_initial.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Schema migration."
+  },
+  {
+   "path": "backend/public_hub/migrations/0002_article_body_document_communityreport_and_more.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Schema migration."
+  },
+  {
+   "path": "backend/public_hub/migrations/0003_contentmedia.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Schema migration."
+  },
+  {
+   "path": "backend/public_hub/migrations/0004_backfill_editorial_documents.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Idempotent backfill; skips documents that already have revisions."
+  },
+  {
+   "path": "backend/public_hub/migrations/0005_board_reports.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Unique (kind, object, reporter) includes resolved reports, blocking later re-reports."
+  },
+  {
+   "path": "backend/public_hub/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Tooling",
+   "title": "The editorial seed command has no production guard and changes admin access, live articles and comments under real users' names.",
+   "scenario": "An operator runs the seed command on the live server, maybe after copying it from a setup note. If the hard-coded author emails do not exist, the very first account in the database (for example Tom) silently becomes a full content administrator, with publishing, invitation and moderation powers. Live launch guides are overwritten with localhost cover images, and made-up 'news' plus sample comments and reactions are posted under real members' accounts. Readers see fake regulatory news and comments that real pharmacists never wrote.",
+   "evidence": [
+    "backend/public_hub/management/commands/seed_editorial_content.py:52",
+    "backend/public_hub/management/commands/seed_editorial_content.py:65",
+    "backend/public_hub/management/commands/seed_editorial_content.py:78",
+    "backend/public_hub/management/commands/seed_editorial_content.py:432",
+    "backend/public_hub/management/commands/seed_editorial_content.py:464",
+    "backend/public_hub/management/commands/seed_editorial_content.py:501",
+    "backend/public_hub/management/commands/seed_hub_preview.py:14"
+   ],
+   "confidence": "medium",
+   "test_needed": "Run seed_editorial_content with production settings (DEBUG off, not public_hub.test_settings) and assert that it raises CommandError and makes no ContentAdministrator, Article or Comment changes.",
+   "owner_question": {
+    "question": "If someone runs the editorial seed command on the live site, what should happen to Tom's account, the published guides and the comments shown to readers?",
+    "options": [
+     "Refuse to run outside local/test settings, like the hub preview seed",
+     "Allow it on live only with an explicit --i-know flag, and never grant admin or post comments as real users",
+     "Keep today's behaviour (seed runs anywhere)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Talent",
+   "title": "After a board report is resolved, the same user can never report that talent post or job shift again, yet is told the report was received.",
+   "scenario": "Sara reports a job board shift Tom posted, and a moderator resolves it without hiding it. Tom later edits the shift description into something abusive. When Sara reports it again she sees 'Report received', but the system only finds her old resolved report, so nothing new reaches the moderators.",
+   "evidence": [
+    "backend/public_hub/community.py:217",
+    "backend/public_hub/migrations/0005_board_reports.py:28",
+    "backend/public_hub/content_views.py:307"
+   ],
+   "confidence": "high",
+   "test_needed": "Create a BoardReport by Sara, mark it resolved, have Sara POST the report again, and assert that an unresolved report now appears in the moderation queue.",
+   "owner_question": {
+    "question": "Sara's report on a job shift was dismissed, and the shift then changed. When she reports it again, what should happen?",
+    "options": [
+     "A new open report reaches the moderators",
+     "Sara's old report reopens with her new reason",
+     "Keep today's behaviour (silently ignored, but she is told it was received)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-2"
+}

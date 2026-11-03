@@ -1,0 +1,266 @@
+{
+  "chunk": "C071",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "files": [
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/components/FiltersSidebar.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Client filter/toggle and shared canonical skill aliases, without direct tenant mutation."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/components/PitchDialog.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Creates local availability/time-window form; submit callback owned by enclosing talent board."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/components/TalentCardV2.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Displays worker verification/skill evidence and delegates booking/like to callbacks."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/constants.ts",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Static filter and presentation constants."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/hooks/index.ts",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Exports local talent feed/filter hooks."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/hooks/useTalentFeed.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Shared-core paginated talent feed and role-normalized candidate projection."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/hooks/useTalentFilters.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Shared-core worker/role filters and canonical registry."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Talent board identity and posting state, shared create/update APIs and public verification gate."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/types.ts",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Typed talent post, public verification and display models."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/useTalentFeed.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Alternative exported feed wrapper with normalized verification summary."
+    },
+    {
+      "path": "frontend_mobile/roles/shared/talent-board/useTalentFilters.ts",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Barrel re-export for talent filtering hook."
+    },
+    {
+      "path": "frontend_mobile/scripts/calendar-request-budget.test.cjs",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Tests cancellation, default budget, timer clear on resolve/timeout/error."
+    },
+    {
+      "path": "frontend_mobile/scripts/dependency-security.test.cjs",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Tests patched dependency behavior, RSA parsing, asset formats and advisory denylist."
+    },
+    {
+      "path": "frontend_mobile/scripts/reset-project.js",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Explicit interactive developer reset that deletes or renames Expo directories; no runtime import."
+    },
+    {
+      "path": "frontend_mobile/scripts/verify-dependency-security.cjs",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Validates installed security patch fingerprints, leaf versions and npm audit advisory allowlist."
+    },
+    {
+      "path": "frontend_mobile/utils/apiClient.ts",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
+      "note": "Global token-refresh retry and out-of-band logout queue do not guard session generation; refresh response could repopulate a cleared identity."
+    },
+    {
+      "path": "frontend_mobile/utils/apiUrl.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Versioned API URL resolution; web loopback host normalization for same-site cookies."
+    },
+    {
+      "path": "frontend_mobile/utils/appUpdates.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Store minimum-version and OTA update decision; errors do not imply successful update."
+    },
+    {
+      "path": "frontend_mobile/utils/authSession.ts",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
+      "note": "Asynchronous refresh commits tokens without revalidating active account or logout generation."
+    },
+    {
+      "path": "frontend_mobile/utils/biometricAuth.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Biometric opt-in stored separately from secure credentials; requires local device authentication."
+    },
+    {
+      "path": "frontend_mobile/utils/browserAuth.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo web asks CSRF endpoint with browser credentials; native does not."
+    },
+    {
+      "path": "frontend_mobile/utils/chatRoutes.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Persona-specific chat route mapper, no data authority decision."
+    },
+    {
+      "path": "frontend_mobile/utils/mobilePersona.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Per-user remembered admin persona, shared-core capability resolver and role home choice."
+    },
+    {
+      "path": "frontend_mobile/utils/nativeIdentityTransport.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Axios auth endpoints use shared-core canonical paths; currentUser forces server identity."
+    },
+    {
+      "path": "frontend_mobile/utils/networkDiagnostics.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Opt-in local network diagnostic buffer; no automatic remote export."
+    },
+    {
+      "path": "frontend_mobile/utils/notificationNavigation.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Maps notification metadata to in-app role-specific paths; backend must enforce object-level authorization."
+    },
+    {
+      "path": "frontend_mobile/utils/ownerSetup.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Owner onboarding and pharmacy-setup continuation with server-derived pharmacy list and local skip preference."
+    },
+    {
+      "path": "frontend_mobile/utils/pushNotifications.ts",
+      "verdict": "ISSUE",
+      "ids": [
+        "N2"
+      ],
+      "note": "Push token registered on login, but native logout does not unregister; server continues to target prior user."
+    },
+    {
+      "path": "frontend_mobile/utils/secureStorage.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Native access/refresh stored with Expo SecureStore, web fallback uses AsyncStorage."
+    },
+    {
+      "path": "frontend_mobile/utils/sslPinning.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Opt-in public HTTPS key pinning; missing pins warn, not treated as a security guarantee."
+    },
+    {
+      "path": "frontend_mobile/utils/unread.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Shared unread room count projector with list fallback."
+    }
+  ],
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P1",
+      "area": "Mobile authentication",
+      "title": "Concurrent mobile logout and in-flight refresh/profile hydration can resurrect old tokens or overwrite the newly signed-in account.",
+      "scenario": "Sara opens Expo and an expired access token triggers refresh or /users/me. Sara signs out or switches to Tom before the request finishes. The older success callback unconditionally calls writeStoredSession/setUser, or a late refresh writes Sara's tokens after clearStoredSession. The old identity becomes active on the device even though the user intentionally left it.",
+      "evidence": [
+        "frontend_mobile/context/AuthContext.tsx:115",
+        "frontend_mobile/context/AuthContext.tsx:120",
+        "frontend_mobile/context/AuthContext.tsx:160",
+        "frontend_mobile/context/AuthContext.tsx:163",
+        "frontend_mobile/context/AuthContext.tsx:169",
+        "frontend_mobile/context/AuthContext.tsx:170",
+        "frontend_mobile/context/AuthContext.tsx:191",
+        "frontend_mobile/context/AuthContext.tsx:523",
+        "frontend_mobile/utils/authSession.ts:198",
+        "frontend_mobile/utils/authSession.ts:217",
+        "frontend_mobile/utils/authSession.ts:227",
+        "frontend_mobile/utils/authSession.ts:268"
+      ],
+      "confidence": "high",
+      "verification": "SOURCE_ONLY_UNCONFIRMED",
+      "test_needed": "Defer initial /me success and refresh response; logout or log in as another user before resolving each. Assert no old /me user or refresh token persisted, no old API Authorization and role home remains intended. Repeat native and Expo-web cases, including refresh failures and storage/network exceptions.",
+      "owner_question": {
+        "question": "When Sara logs out while an earlier refresh/profile request is pending, may the app silently restore Sara's saved account or overwrite Tom's subsequent login?",
+        "options": [
+          "No; invalidate all in-flight auth writes on identity change and logout",
+          "Only if the earlier HTTP call was already sent before logout",
+          "Yes; accept current asynchronous restoration behavior"
+        ]
+      }
+    },
+    {
+      "id": "N2",
+      "severity": "P1",
+      "area": "Mobile push privacy",
+      "title": "Signing out of Expo leaves its push token registered to the prior account, so private alerts can keep arriving on a signed-out device.",
+      "scenario": "Sara signs out from a shared iPhone. Native logout clears local secure tokens but never deletes/deactivates that device's push registration. The backend logout only blacklists the refresh token. Notifications notify_users still looks up every active DeviceToken for Sara and delivers future alert titles/bodies to the same phone.",
+      "evidence": [
+        "frontend_mobile/context/AuthContext.tsx:502",
+        "frontend_mobile/context/AuthContext.tsx:523",
+        "frontend_mobile/context/AuthContext.tsx:528",
+        "frontend_mobile/utils/pushNotifications.ts:62",
+        "frontend_mobile/utils/pushNotifications.ts:78",
+        "backend/users/api_auth.py:155",
+        "backend/users/api_auth.py:164",
+        "backend/users/api_auth.py:170",
+        "backend/notifications/views.py:44",
+        "backend/notifications/services.py:64",
+        "backend/notifications/services.py:87",
+        "backend/users/models.py:128"
+      ],
+      "confidence": "high",
+      "verification": "SOURCE_ONLY_UNCONFIRMED",
+      "test_needed": "Register an Expo push token while Sara is logged in. Sign out through native app. Trigger a new private message/notification for Sara; assert DeviceToken is inactive or removed and no push sent. Log in as Tom and confirm token belongs only to Tom. Server logout should revoke current device independently of client network reliability.",
+      "owner_question": {
+        "question": "Should Sara's private shift, employment and chat alerts continue displaying on a phone after she signs out?",
+        "options": [
+          "No; revoke the current device's push token on logout server-side",
+          "Only send generic notifications without personal details until next login",
+          "Yes; preserve notifications after signing out"
+        ]
+      }
+    }
+  ],
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source semantic inspection; S2 independent review and S3 runtime not performed"
+}

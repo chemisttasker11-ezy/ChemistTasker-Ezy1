@@ -1,0 +1,295 @@
+{
+ "chunk": "C019",
+ "files": [
+  {
+   "path": "backend/public_hub/models.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no specific problem found."
+  },
+  {
+   "path": "backend/public_hub/permissions.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Verified-member and editorial access checks are scoped."
+  },
+  {
+   "path": "backend/public_hub/serializers.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Public responses omit account contact details and deleted comment text."
+  },
+  {
+   "path": "backend/public_hub/sitemap.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates public URL generation to sitemap helpers."
+  },
+  {
+   "path": "backend/public_hub/tasks.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates scheduled publication to editorial service."
+  },
+  {
+   "path": "backend/public_hub/test_board_reports.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Report ownership and moderation assertions are consistent."
+  },
+  {
+   "path": "backend/public_hub/test_editorial.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion identified."
+  },
+  {
+   "path": "backend/public_hub/test_settings.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Isolated test configuration."
+  },
+  {
+   "path": "backend/public_hub/test_urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Local authentication harness; no production route change."
+  },
+  {
+   "path": "backend/public_hub/tests.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Publication, discussion, privacy and reaction assertions are consistent."
+  },
+  {
+   "path": "backend/public_hub/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no routing problem found."
+  },
+  {
+   "path": "backend/public_hub/views.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Published-content visibility, comment ownership and reaction targets are checked."
+  },
+  {
+   "path": "backend/ratings/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/ratings/admin.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no specific admin problem found."
+  },
+  {
+   "path": "backend/ratings/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Application configuration."
+  },
+  {
+   "path": "backend/ratings/migrations/0001_initial.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "State transfer preserves existing content-type identities."
+  },
+  {
+   "path": "backend/ratings/migrations/0002_clean_table_and_index_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Table and index metadata renames."
+  },
+  {
+   "path": "backend/ratings/migrations/0003_clean_constraint_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Database object metadata renames."
+  },
+  {
+   "path": "backend/ratings/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty migration package initializer."
+  },
+  {
+   "path": "backend/ratings/models.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Rating values, targets and relationship uniqueness are validated."
+  },
+  {
+   "path": "backend/ratings/serializers.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Write validation checks rating direction, target shape and stars."
+  },
+  {
+   "path": "backend/ratings/test_api.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion identified."
+  },
+  {
+   "path": "backend/ratings/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no routing problem found."
+  },
+  {
+   "path": "backend/ratings/views.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B12"
+   ],
+   "note": "Rating eligibility accepts assignments without completed work."
+  },
+  {
+   "path": "backend/rewards/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/rewards/admin.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Ledger fields are read-only; no additional specific problem found."
+  },
+  {
+   "path": "backend/rewards/apps.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Registers onboarding reward signal receivers."
+  },
+  {
+   "path": "backend/rewards/migrations/0001_initial.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "State transfer preserves existing content-type identities."
+  },
+  {
+   "path": "backend/rewards/migrations/0002_clean_table_and_index_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Table and index metadata renames."
+  },
+  {
+   "path": "backend/rewards/migrations/0003_clean_constraint_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Database object metadata renames."
+  },
+  {
+   "path": "backend/rewards/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty migration package initializer."
+  },
+  {
+   "path": "backend/rewards/models.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Referral claims lack relationship uniqueness, allowing separate reward-bearing duplicates."
+  },
+  {
+   "path": "backend/rewards/serializers.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional specific problem found."
+  },
+  {
+   "path": "backend/rewards/services.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B10",
+    "N1"
+   ],
+   "note": "Known spending issue; concurrent claims can create separately credited referral events."
+  },
+  {
+   "path": "backend/rewards/signals.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Verification-triggered awards run after commit and recheck eligibility."
+  },
+  {
+   "path": "backend/rewards/test_api.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion identified."
+  },
+  {
+   "path": "backend/rewards/test_rewards.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Sequential claim idempotency and verification assertions are consistent."
+  },
+  {
+   "path": "backend/rewards/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no routing problem found."
+  },
+  {
+   "path": "backend/rewards/views.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B10",
+    "B62",
+    "N1"
+   ],
+   "note": "Exposes duplicate-claim race and known payment and regional capability problems."
+  },
+  {
+   "path": "backend/shifts/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Package documentation."
+  },
+  {
+   "path": "backend/shifts/access.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully and checked relevant callers; no additional specific problem found."
+  },
+  {
+   "path": "backend/shifts/admin.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no specific admin problem found."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Billing",
+   "title": "Concurrent referral claims can award the same referral twice",
+   "scenario": "Tom shares his friend referral with Sara. Sara has a verified account and submits the same claim twice at the same time. Both claims can succeed, giving Tom two 100-Pill rewards for referring Sara once; the extra credit can pay for shifts.",
+   "evidence": [
+    "backend/rewards/views.py:139",
+    "backend/rewards/services.py:297",
+    "backend/rewards/services.py:333",
+    "backend/rewards/services.py:188",
+    "backend/rewards/models.py:119"
+   ],
+   "confidence": "high",
+   "test_needed": "Submit two concurrent first claims by verified Sara for Tom's same referral code, synchronizing their initial lookups; assert one claimed referral and one 100-Pill credit.",
+   "owner_question": {
+    "question": "When Sara submits Tom's same referral claim twice simultaneously, what should Tom receive?",
+    "options": [
+     "One reward, with both submissions resolving to the same referral",
+     "One reward, with the duplicate submission rejected",
+     "Two rewards (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-1"
+}

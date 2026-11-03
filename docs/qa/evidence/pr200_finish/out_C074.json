@@ -1,0 +1,383 @@
+{
+  "chunk": "C074",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source acquisition and first-pass annotation; S2/S3 pending",
+  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3",
+  "files": [
+    {
+      "path": "frontend_web/landing_next/app/hubs/error.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "006a969fad3e90f2016d4f9f3660b70a08534dd6",
+      "lines": 3,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "3 lines retrieved. Thin Next wrapper; imports none; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/layout.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "c38f3d6d1ebd58bed757b2ae3b66664a2dbc6dcd",
+      "lines": 17,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "17 lines retrieved. Thin Next wrapper; imports @/public/header, @/public/footer; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/loading.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "de6a69da0247c3f6b27610bd3ca7e017f814c47a",
+      "lines": 2,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "2 lines retrieved. Thin Next wrapper; imports none; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/page.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "4867674c0a7c821bcd4b06a3692d93479f16c5b8",
+      "lines": 7,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "7 lines retrieved. Component/module; imports next/link, lucide-react, @/lib/hub-server, next/navigation; calls getPublicHubs; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/post-entry.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "e5e4456aab948f8648939b0bb9adae2f66aed06c",
+      "lines": 37,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "37 lines retrieved. Component/module; imports react, @/shared/session-provider, next/link, lucide-react; calls chemistTaskerApi.client.post, navigator.clipboard.writeText, like, share; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/posts/[id]/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "7761578a48fb0b398370e0dd22dd631e117ce001",
+      "lines": 6,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "6 lines retrieved. Thin Next wrapper; imports next/navigation, @/lib/hub-server, ../../community-client; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/hubs/social-format.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "efc995287fd44511cf1e1d483f5773a3e8c914b4",
+      "lines": 34,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "34 lines retrieved. Component/module; imports react; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/journal-teaser.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "fbdf37dfed6719aa5c3645f56b721f8f21705d76",
+      "lines": 6,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "6 lines retrieved. Component/module; imports lucide-react; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/landing-page.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "55a823f64ff2d4c3e953068e29a839b0f75229a8",
+      "lines": 210,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "210 lines retrieved. Component/module; imports @/public/header, next/link, next/image, ./persona-data; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/layout.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "c032e3903ad2cab6a4d6a60e838321a191fa144d",
+      "lines": 18,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "18 lines retrieved. Thin Next wrapper; imports @/shared/session-provider, next; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/not-found.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "72e80df251da305683b1f045924862c0105dbf5f",
+      "lines": 21,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "21 lines retrieved. Component/module; imports next/link, lucide-react; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/page.tsx",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "31e4e3941d650ebf87a6041263d89c33f814a9bc",
+      "lines": 4,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "4 lines retrieved. Thin Next wrapper; imports @/features/home/home-router; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/persona-data.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3d1f818849fca9b5232412288568bfee06c14bc6",
+      "lines": 93,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "93 lines retrieved. Component/module; imports none; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/robots.ts",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "4f19a329fdbd7455dfc4c52f0eaf368e4b63a9f9",
+      "lines": 4,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "4 lines retrieved. Thin Next wrapper; imports next, ../lib/hub; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/sitemap.ts",
+      "verdict": "NA",
+      "ids": [],
+      "blob_sha": "0429a0e8e077f035603a68b7b358b33d5bb04a49",
+      "lines": 9,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "9 lines retrieved. Thin Next wrapper; imports next, @/lib/hub-server; calls getPublicSitemap; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/app/tier-explainer.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "713ed3e5807847b2db9cfbbafa871f2ad083fb4b",
+      "lines": 79,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "79 lines retrieved. Component/module; imports react, lucide-react; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/components/rich-content.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "81a61eda671088bcdbc8a0ac1d2c908312527929",
+      "lines": 35,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "35 lines retrieved. Component/module; imports react; calls none; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/components/visual-editor.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "3a32125e9c06528551dcdd39e85cab2062fd75aa",
+      "lines": 28,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "28 lines retrieved. Component/module; imports react, @tiptap/react, @tiptap/starter-kit, @tiptap/extension-image; calls upload; source confirmation only, S2/S3 not performed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/home/home-router.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "c513127fe58d61630c744665ceeab3de96ecb2b8",
+      "lines": 20,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "20 lines retrieved. Imports next/link, react, lucide-react, @/app/landing-page; calls chemistTaskerApi.marketplace.getListingOptions, chemistTaskerApi.publicContent.listArticles, chemistTaskerApi.marketplace.listListings; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/access-steps.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "d3effa59cf39a8f128a445cda65588866295d048",
+      "lines": 52,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "52 lines retrieved. Imports next/link, react, ./api; calls marketplaceApi.acceptTerms, onAccepted, accept; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/add-item-wizard.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "8df0cbd5104a699628204d105c2f31b97a0239fa",
+      "lines": 951,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "951 lines retrieved. Imports next/link, next/navigation, react, lucide-react; calls marketplaceApi.getListingOptions, refreshOptions, marketplaceApi.lookupCatalogue, marketplaceApi.createListing, marketplaceApi.updateAudience, marketplaceApi.uploadImage; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/api.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b6912508fa32608880c3f1a5d8a324971feba6f1",
+      "lines": 9,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "9 lines retrieved. Imports @/lib/chemisttasker-api; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
+      "blob_sha": "f300480151b11600d872a4b98bf28f59ab32d29b",
+      "lines": 236,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "SOURCE-TRACED ACCOUNT-SWITCH RISK, not runtime reproduced. Ethical getAccess effect depends only on session.status, keeps old contexts/selected/rows; authenticated loading guard only hides if contexts.length===0. After another tab signs in as B, A's contexts/medicine stock can render while access for B is pending, and stale getAccess completion may overwrite fresh context. Server-side tenant checks must still block new unauthorized calls, but client-side retained private data is itself an issue. Tests: authenticated A -> cross-tab login B; block or reorder B access requests; never render A data as B, and success should render only B.",
+      "targeted_source_lines": [
+        18,
+        87
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
+      "blob_sha": "74c7d85c15ce88fdcf46217cd7517a5a57ae2824",
+      "lines": 25,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "SOURCE-TRACED ACCOUNT-SWITCH RISK, not runtime reproduced. GoodsListings load effect depends on session.status; on access/dashboard failure it sets error but leaves previous A rows and access intact. Returning to B authenticated status with load failure can show A listing drafts. Server-side tenant checks must still block new unauthorized calls, but client-side retained private data is itself an issue. Tests: authenticated A -> cross-tab login B; block or reorder B access requests; never render A data as B, and success should render only B.",
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/marketplace/workspace.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
+      "blob_sha": "225d825547e667d00ea37a6101bee6aa3f938b24",
+      "lines": 68,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "SOURCE-TRACED ACCOUNT-SWITCH RISK, not runtime reproduced. GoodsWorkspace keeps previous access, exchange conversations/messages in state and reloads Promise.all only after auth change; there is no purge on identity change or request generation guard, permitting a stale render for B. Server-side tenant checks must still block new unauthorized calls, but client-side retained private data is itself an issue. Tests: authenticated A -> cross-tab login B; block or reorder B access requests; never render A data as B, and success should render only B.",
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/components/calculator.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "af60af0a7ca43f86edbd3e971f3fe76df1ab4a8b",
+      "lines": 163,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 27-49): Calculator is client-side and renders mg/mL for routine cases; UI banner explicitly says clinical validation pending, which is not a production gate. The route is public. Release-governance P1 condition already recorded in MAIN_RELEASE_NEXT_CALCULATOR_BOUNDARY_REVIEW_20261025.md. Test contract: Negative: unauthenticated user with valid age/weight receives unvalidated numbers; positive: clinically signed-on clinical tool restricted or not released. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        27,
+        49
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/components/measuring-cylinder.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "9d7363b068784ab9b0b792c91bc6ea4be5671b30",
+      "lines": 10,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "10 lines retrieved. Imports none; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/components/medicine-icons.tsx",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "e30c905d50b922c0b439c36917dc65261862a958",
+      "lines": 15,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "15 lines retrieved. Imports none; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/data/medicines.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "d912e179df834e318ee27e34cc6ff956fd01ade8",
+      "lines": 26,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "26 lines retrieved. Imports @/features/paediatric-calculator/lib/types, ./legacy-regimens.json, ./regimens; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/data/regimens.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "566e8bfa39d41a128b2d225982ddf1bd26b54a08",
+      "lines": 28,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "28 lines retrieved. Imports @/features/paediatric-calculator/lib/types; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/data/sources.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "304b09d734b1e106fed607537205122a6d36a54f",
+      "lines": 21,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "21 lines retrieved. Imports @/features/paediatric-calculator/lib/types; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/lib/engine.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "7c9dd9228e502ef92cc3d9e2309e6b5ba7f3edd3",
+      "lines": 51,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 28-48): Dose engine applies age/weight/specialist/category blockers and dose caps before numeric results; routine regimens still render from unvalidated source transcriptions. Public release decision and pharmacist signoff required, no proof of specific wrong calculation. Test contract: Negative: neonatal, older child, contraindication flags, extreme capped dose; positive: independently validated regimen and formulation yields correct value. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        28,
+        48
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_web/landing_next/features/paediatric-calculator/lib/types.ts",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "830fa32934c73f7b0b5700050eab04f1cd7e2310",
+      "lines": 7,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "7 lines retrieved. Imports none; calls none; calculator and marketplace clinical/privacy call paths require S2; no tests executed.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    }
+  ],
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P1",
+      "area": "Next / cross-account private workspace privacy",
+      "title": "Next marketplace and publishing workspaces can display the previous account's private stock, messages or unpublished drafts after cross-tab login.",
+      "scenario": "Alice has private ethical-stock inventory, listing drafts and marketplace conversations open in a Next tab. In another tab, Bob signs in and the shared session-provider sets this tab to loading then authenticated as Bob. The marketplace components retain Alice's contexts and rows. EthicalWorkspaceV2 hides loading only when contexts is empty, and its getAccess callbacks are not bound to user/session generation. GoodsWorkspace can render old exchanges while reloading; GoodsListingsV2 preserves old rows and access even after Bob's getAccess/dashboard request fails. Bob may momentarily or persistently see Alice's private item names, batches, transfers, listings or messages in the existing tab even though backend requests for Bob would be forbidden. The publishing ContentDashboard is also session-insensitive: it loads editor and moderation content once on mount with useEffect([]), does not use the current session or clear its rows on account switch, so the original account's unpublished drafts can remain visible after an unrelated account signs in through another tab. GoodsWorkspace's child listing/exchange managers initialize their own rows from `initial` props and do not resynchronize after new user data arrives, so stale exchange messages can persist even after a successful reload.",
+      "evidence": [
+        "frontend_web/landing_next/shared/session-provider.tsx:11",
+        "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:27",
+        "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:78",
+        "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:86",
+        "frontend_web/landing_next/features/marketplace/workspace.tsx:15",
+        "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:14",
+        "frontend_web/landing_next/features/marketplace/goods-listings-v2.tsx:16",
+        "frontend_web/landing_next/app/content/workspace.tsx:20",
+        "frontend_web/landing_next/app/content/workspace.tsx:25",
+        "frontend_web/landing_next/features/marketplace/workspace.tsx:23",
+        "frontend_web/landing_next/features/marketplace/workspace.tsx:26"
+      ],
+      "confidence": "high for source-retained-state render possibility; account-switch timing and live UX untested",
+      "verification": "SOURCE_SUPPORTED_SAME_AGENT_NOT_RUNTIME_REPRODUCED",
+      "test_needed": "Two unrelated owner accounts A/B with separate ethical inventories, goods listings and exchanges. Open A's private pages in tab1, log in as B in tab2 while tab1 remains mounted; simulate slow B getAccess and 403/error, and delay old A promises to finish last. Assert tab1 never renders A names, stock levels or messages once B is authenticated; confirm B sees only permitted data on success and old rows are purged immediately on session change. Repeat with same-tab account switch and logout/reauth. Add publisher A and unrelated user B: open A content workspace and moderation queue in tab1, sign in B in tab2; tab1 must purge all A drafts immediately, while B's server requests are denied. Validate child GoodsExchangeManager rows update when initial data changes instead of using stale initial state."
+    }
+  ],
+  "targeted_recheck_files": 3
+}

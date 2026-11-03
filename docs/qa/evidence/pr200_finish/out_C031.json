@@ -1,0 +1,373 @@
+{
+ "chunk": "C031",
+ "files": [
+  {
+   "path": "shared-core/src/domains/invoicing/binaryPdf.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Authenticated binary download contract is consistent."
+  },
+  {
+   "path": "shared-core/src/domains/memberships/api.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Collection services discard pagination and silently omit later members and applications."
+  },
+  {
+   "path": "shared-core/src/domains/memberships/errors.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Preserves useful client errors and suppresses server details."
+  },
+  {
+   "path": "shared-core/src/domains/memberships/mappers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Preserves membership fields and client aliases."
+  },
+  {
+   "path": "shared-core/src/domains/memberships/memberActions.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Membership decision and error assertions match the transport."
+  },
+  {
+   "path": "shared-core/src/domains/moderation/reports.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Report submission preserves the authenticated endpoint contract."
+  },
+  {
+   "path": "shared-core/src/domains/notifications/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Notification pagination and unread counts remain available."
+  },
+  {
+   "path": "shared-core/src/domains/notifications/deviceToken.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Checks authenticated device registration payload."
+  },
+  {
+   "path": "shared-core/src/domains/notifications/mappers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Notification fields map consistently."
+  },
+  {
+   "path": "shared-core/src/domains/onboarding/ahpra.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Recovery, refusal details and cooldown assertions match the helpers."
+  },
+  {
+   "path": "shared-core/src/domains/onboarding/ahpra.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Status messaging and cooldown calculations are consistent."
+  },
+  {
+   "path": "shared-core/src/domains/onboarding/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Role routes and multipart onboarding submissions are preserved."
+  },
+  {
+   "path": "shared-core/src/domains/onboarding/newcomer.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tests newcomer eligibility and verification wording."
+  },
+  {
+   "path": "shared-core/src/domains/onboarding/newcomer.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "No production blocker found in newcomer presentation helpers."
+  },
+  {
+   "path": "shared-core/src/domains/onboarding/ownerSetup.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tests documented pharmacy count precedence and membership fallback."
+  },
+  {
+   "path": "shared-core/src/domains/onboarding/ownerSetup.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Owner pharmacy counting follows the documented fallback."
+  },
+  {
+   "path": "shared-core/src/domains/onboarding/qualifications.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Exports qualification vocabulary from the shared registry."
+  },
+  {
+   "path": "shared-core/src/domains/onboarding/verification.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Separate verification and registration payloads are tested consistently."
+  },
+  {
+   "path": "shared-core/src/domains/onboarding/verification.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Normalizes server verification states without changing eligibility."
+  },
+  {
+   "path": "shared-core/src/domains/organizations/api.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Pharmacy creation retry and conflict contracts are consistent."
+  },
+  {
+   "path": "shared-core/src/domains/organizations/api.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Several collection services omit later pages despite one organization helper correctly following pagination."
+  },
+  {
+   "path": "shared-core/src/domains/organizations/mappers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Organization records retain fields during case conversion."
+  },
+  {
+   "path": "shared-core/src/domains/organizations/pharmacyMultipart.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tests multipart arrays, document replacement and canonical readback."
+  },
+  {
+   "path": "shared-core/src/domains/organizations/pharmacyMultipart.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Encoding and readback verification preserve submitted selections."
+  },
+  {
+   "path": "shared-core/src/domains/organizations/pharmacyProfile.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Registry vocabulary and software grouping are consistent."
+  },
+  {
+   "path": "shared-core/src/domains/pharmacies/index.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Compatibility exports introduce no additional behavior."
+  },
+  {
+   "path": "shared-core/src/domains/pharmacyHub/api.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Poll and comment services discard pagination, hiding later records."
+  },
+  {
+   "path": "shared-core/src/domains/pharmacyHub/mappers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Hub payload construction and response mapping match inspected server contracts."
+  },
+  {
+   "path": "shared-core/src/domains/ratings/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Rating page services preserve pagination metadata."
+  },
+  {
+   "path": "shared-core/src/domains/rewards/api.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Reward routes, authentication and failure propagation are tested consistently."
+  },
+  {
+   "path": "shared-core/src/domains/rewards/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Reward operations preserve server-owned amounts and raw pagination."
+  },
+  {
+   "path": "shared-core/src/domains/rewards/shiftPayments.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tests settlement route and optional offer selection."
+  },
+  {
+   "path": "shared-core/src/domains/roster/api.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Roster command payload assertions match the shared API."
+  },
+  {
+   "path": "shared-core/src/domains/roster/api.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Assignment services return only the first page as the complete roster."
+  },
+  {
+   "path": "shared-core/src/domains/roster/mappers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Roster records retain fields during case conversion."
+  },
+  {
+   "path": "shared-core/src/domains/rosterPublication.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tests publication retry identity and reviewed command validation."
+  },
+  {
+   "path": "shared-core/src/domains/rosterPublication.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Publication attempts retain revision checks and selection guards."
+  },
+  {
+   "path": "shared-core/src/domains/shiftRequests/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Request operations preserve endpoint payloads and collection responses."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/api.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Detail endpoint assertions preserve trailing slashes."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/api.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Several shift services discard later pages, including worker history."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/bookedRate.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Existing assertions cover uniform rates and published-rate redaction."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/bookedRate.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Booked pay labels use the original shift rate instead of the worker's agreed occurrence rate."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/buzz.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Reminder request contract is consistent."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/context.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tests registry grouping, staffing inputs and escalation spacing."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/context.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "No production blocker found in context and selection helpers."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/descriptionTemplates.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Template operations preserve pharmacy and role filters."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/draftSlots.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Recurrence and per-date rate assertions match inspected backend expansion."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/draftSlots.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Calendar expansion and varied-rate materialization preserve occurrence dates."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/index.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Compatibility exports introduce no additional behavior."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/mappers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shift response mapping preserves rates, context and assignment fields."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Shared-core",
+   "title": "Collection helpers silently discard records after the first page",
+   "scenario": "Tom schedules 60 assignments at his pharmacy for one week. The roster screens receive only the first 50, so Omar's assignment can disappear from his schedule even though it remains booked. The same pagination loss hides later membership records, pharmacies, shift history and Hub comments.",
+   "evidence": [
+    "backend/core/settings.py:360",
+    "shared-core/src/domains/roster/api.ts:90",
+    "frontend_mobile/app/my-roster.tsx:132",
+    "shared-core/src/domains/memberships/api.ts:90",
+    "shared-core/src/domains/organizations/api.ts:25",
+    "shared-core/src/domains/shifts/api.ts:302",
+    "shared-core/src/domains/pharmacyHub/api.ts:245",
+    "frontend_web/src/pages/dashboard/sidebar/hub/HubPostCard.tsx:139"
+   ],
+   "confidence": "high",
+   "test_needed": "Return 50 roster assignments with a next page containing Omar's assignment; assert the complete roster includes his assignment.",
+   "owner_question": {
+    "question": "When Tom's weekly roster exceeds 50 assignments, how should Omar access all his scheduled work?",
+    "options": [
+     "Load the complete weekly roster automatically",
+     "Provide explicit pagination with the full assignment count",
+     "Show only the first 50 assignments (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Booked pharmacist cards can show a different rate from the agreed pay",
+   "scenario": "Tom posts a shift with a $65 weekday rate and an $80 Saturday rate. Sara accepts the Saturday work at $80 per hour. Her confirmed and history cards on web and mobile can still say $65 per hour fixed because they use the shift's general rate rather than her agreed pay.",
+   "evidence": [
+    "shared-core/src/domains/shifts/bookedRate.ts:15",
+    "backend/shifts/posting.py:84",
+    "backend/shifts/assignment.py:75",
+    "backend/shifts/finalize.py:63",
+    "backend/shifts/serialization/projections.py:21",
+    "frontend_web/src/pages/dashboard/shiftCenter/WorkerBookedShifts.tsx:82",
+    "frontend_mobile/roles/shared/shifts/WorkerBookedShifts.tsx:56"
+   ],
+   "confidence": "high",
+   "test_needed": "Give Sara an accepted Saturday assignment at $80 with the shift's fixed rate at $65; assert her booked pay label does not show $65.",
+   "owner_question": {
+    "question": "What should Sara's booked-shift card show when her accepted Saturday rate differs from Tom's general advertised rate?",
+    "options": [
+     "Sara's agreed rate for each booked date",
+     "A prompt to view agreed pay without an advertised-rate label",
+     "Tom's general advertised rate (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-4"
+}

@@ -1,0 +1,15 @@
+backend/onboarding/test_ahpra_access.py
+backend/onboarding/test_ahpra_core.py
+backend/onboarding/test_ahpra_desktop.py
+backend/onboarding/test_ahpra_e2e.py
+backend/onboarding/test_ahpra_name_match.py
+backend/onboarding/test_ahpra_test_lookup.py
+backend/onboarding/test_app_registration.py
+backend/onboarding/test_model_code_ownership.py
+backend/onboarding/test_review3_fixes.py
+backend/onboarding/test_review3_repro.py
+backend/onboarding/test_review_183_fixes.py
+backend/onboarding/test_review_183_repro.py
+backend/onboarding/test_role_tabs_contract.py
+backend/onboarding/test_skill_identity.py
+backend/onboarding/test_skill_review_regressions.py

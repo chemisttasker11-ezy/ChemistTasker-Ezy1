@@ -1,0 +1,133 @@
+{
+ "chunk": "C040",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/attendance/WorkerAttendancePage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Worker attendance dashboard with stopwatch, QR clocking, PIN self-service, and roster shift acknowledgement."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/admin/AdminActiveShiftsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Scoped admin wrapper invoking AdminScopeContext and rendering ActiveShiftsPage."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/admin/AdminConfirmedShiftsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Scoped admin wrapper invoking AdminScopeContext and rendering ConfirmedShiftsPage."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/admin/AdminHistoryShiftsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Scoped admin wrapper invoking AdminScopeContext and rendering HistoryShiftsPage."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/admin/AdminManagePharmaciesPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Loads pharmacy memberships and admin assignments within admin scope and renders owner pharmacy detail view."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/admin/AdminOverview.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Admin overview dashboard properly checking capabilities for roster, staff management, and pharmacy hub."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/admin/AdminPostShiftPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Scoped admin wrapper invoking AdminScopeContext and rendering PostShiftPage."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/admin/AdminPosterShiftDetailPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Scoped admin wrapper invoking AdminScopeContext and rendering PosterShiftDetailPage."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/admin/AdminRosterPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Scoped admin wrapper invoking AdminScopeContext and rendering RosterOwnerPage."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/organization/InviteStaffPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Organization member invitation and management with scope delegation checks for roles and admin levels."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/organization/OrganizationOverviewPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Organization dashboard overview with capability gating, claims summary, metrics, and billing invoice link."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/shiftCenter/ShiftBoardTabsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shift board tab container routing between community and public shift discovery views."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/shiftCenter/ShiftCenterPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Unified Shift Centre layout managing active, confirmed, and history sections across roles."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/shiftCenter/ShiftCentreParts.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Reusable Shift Centre presentation components for candidate columns, activity markers, and source sections."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/shiftCenter/StaffShiftCentreTabs.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Segmented tab navigation bar for worker Shift Centre sections preserving query parameters."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/shiftCenter/WorkerBookedShifts.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Worker booked shift list cards and pharmacy detail modal with reviews and documents."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Active shift card with audience badges, metric chips, candidate views, and payment options."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftsDialogs.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Dialogs for shift deletion confirmation, counter-offer reviews, and buzz notifications."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftsList.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Paginated list for active shifts sorting direct/dedicated shifts first with empty/error states."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Candidates/CommunityLevelView.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Internal candidate view organizing team responses into status columns with slot selection."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Candidates/CounterOfferList.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Counter-offer list filtered by slot ID with review and reveal action triggers."
+  }
+ ],
+ "findings": [],
+ "reviewer": "agy-g2"
+}

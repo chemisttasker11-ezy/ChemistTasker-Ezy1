@@ -1,0 +1,205 @@
+{
+ "chunk": "C053",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_staff/SkillsV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Sends files only for ticked skills; reloads saved state from the server response."
+  },
+  {
+   "path": "frontend_web/src/pages/register.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Client checks only; terms, captcha and referral IDs are passed to the backend."
+  },
+  {
+   "path": "frontend_web/src/pages/setup/OwnerSetupOnboardingPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Redirect based on setup status; unmount guard is correct."
+  },
+  {
+   "path": "frontend_web/src/pages/setup/OwnerSetupPharmaciesPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Redirects to onboarding or dashboard correctly; gating only."
+  },
+  {
+   "path": "frontend_web/src/react-big-calendar.d.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Type declarations only."
+  },
+  {
+   "path": "frontend_web/src/styles/app.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy styles; uses grayishBlue, which the live sleek theme doesn't define."
+  },
+  {
+   "path": "frontend_web/src/styles/footer.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy styles; uses grayishBlue, which the live sleek theme doesn't define."
+  },
+  {
+   "path": "frontend_web/src/styles/global.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy landing styles; only another unused style file imports it."
+  },
+  {
+   "path": "frontend_web/src/styles/modal.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy styles; nothing imports them."
+  },
+  {
+   "path": "frontend_web/src/styles/section2.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy styles; nothing imports them."
+  },
+  {
+   "path": "frontend_web/src/styles/section4.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy styles; nothing imports them."
+  },
+  {
+   "path": "frontend_web/src/styles/sectionNavigation.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy styles; uses darkGrayishBlue, which the live theme lacks."
+  },
+  {
+   "path": "frontend_web/src/theme/sleekTheme.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Theme tokens and saved colour mode; presentation only."
+  },
+  {
+   "path": "frontend_web/src/theme/theme.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy MUI theme; nothing imports it."
+  },
+  {
+   "path": "frontend_web/src/types/hub.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Type re-exports only."
+  },
+  {
+   "path": "frontend_web/src/types/index.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Type declarations only."
+  },
+  {
+   "path": "frontend_web/src/types/mui.d.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "MUI palette type extension only."
+  },
+  {
+   "path": "frontend_web/src/utils/apiClient.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Login redirect at line 79 never runs after refresh fails; auth context logs out instead."
+  },
+  {
+   "path": "frontend_web/src/utils/browserMobileOtp.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Thin wrapper around a shared-core endpoint."
+  },
+  {
+   "path": "frontend_web/src/utils/cropImage.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Canvas crop helper with error handling."
+  },
+  {
+   "path": "frontend_web/src/utils/dashboardPath.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Maps roles to dashboards; unknown roles go to the generic dashboard."
+  },
+  {
+   "path": "frontend_web/src/utils/displayName.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Greets by first name, then username."
+  },
+  {
+   "path": "frontend_web/src/utils/invoiceIssuer.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Picks the UI view only; the backend enforces who can issue."
+  },
+  {
+   "path": "frontend_web/src/utils/labels.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Turns codes into readable labels."
+  },
+  {
+   "path": "frontend_web/src/utils/ownerSetup.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Works out the setup step; only a 404 counts as 'no onboarding yet'."
+  },
+  {
+   "path": "frontend_web/src/utils/pharmacyPageCache.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Removes old cache keys from session storage, ignoring storage errors."
+  },
+  {
+   "path": "frontend_web/src/utils/roleLabels.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Role label helpers."
+  },
+  {
+   "path": "frontend_web/src/utils/rosterEventAppearance.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Picks dark or white text by contrast against the event colour."
+  },
+  {
+   "path": "frontend_web/src/utils/seo.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Sets page meta tags; JSON-LD is written as script text, not HTML."
+  },
+  {
+   "path": "frontend_web/src/utils/shiftDisplay.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Formats dates at local noon, so the day doesn't shift."
+  },
+  {
+   "path": "frontend_web/src/utils/tokenService.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Keeps tokens in memory, cleans up old stored tokens, shares one refresh call."
+  },
+  {
+   "path": "frontend_web/src/utils/wsUrl.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Builds the socket URL with the correct ws/wss scheme."
+  },
+  {
+   "path": "frontend_web/src/vite-env.d.ts",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Vite type reference."
+  }
+ ],
+ "findings": [],
+ "reviewer": "claudeB-2"
+}

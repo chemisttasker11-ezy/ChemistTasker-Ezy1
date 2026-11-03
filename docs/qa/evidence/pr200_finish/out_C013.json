@@ -1,0 +1,136 @@
+{
+  "chunk": "C013",
+  "files": [
+    {
+      "path": "backend/onboarding/models.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Defines separate onboarding profiles, referee answers and AHPRA check persistence"
+    },
+    {
+      "path": "backend/onboarding/qualifications.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Verified qualification predicates for dispensing authorization"
+    },
+    {
+      "path": "backend/onboarding/recheck.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Authenticated, throttled, locked AHPRA recheck endpoint"
+    },
+    {
+      "path": "backend/onboarding/routing.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "AHPRA WebSocket route mapping"
+    },
+    {
+      "path": "backend/onboarding/serializers.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B40",
+        "B44"
+      ],
+      "note": "Role-specific tab routers, read-only verification fields and AHPRA write guards"
+    },
+    {
+      "path": "backend/onboarding/services/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Service package marker"
+    },
+    {
+      "path": "backend/onboarding/services/basic.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Basic profile changes, protected role/account writes, manual AHPRA verification"
+    },
+    {
+      "path": "backend/onboarding/services/identity.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B44"
+      ],
+      "note": "Identity file replacement and verification reset before submit validation"
+    },
+    {
+      "path": "backend/onboarding/services/payment.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "TFN masking, ABN evidence matching and payroll preference validation"
+    },
+    {
+      "path": "backend/onboarding/services/preferences.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Rate and career-interest tab update constraints"
+    },
+    {
+      "path": "backend/onboarding/services/profile.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Profile image and biography edit workflow"
+    },
+    {
+      "path": "backend/onboarding/services/progress.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Per-role onboarding completion metrics"
+    },
+    {
+      "path": "backend/onboarding/services/referees.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B45"
+      ],
+      "note": "Referee edits and lock after confirmation; manual request dispatch"
+    },
+    {
+      "path": "backend/onboarding/services/regulatory.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Intern AHPRA and role classification with post-save file deletion"
+    },
+    {
+      "path": "backend/onboarding/services/skill_identity.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Shared canonical skills and role eligibility mapping"
+    },
+    {
+      "path": "backend/onboarding/services/skills.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Certificate and skill claim validation, storage updates and cleanup"
+    },
+    {
+      "path": "backend/onboarding/services/submission.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "First submission and tab timestamp transitions"
+    },
+    {
+      "path": "backend/onboarding/services/upgrade.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Atomic newcomer-to-worker conversion and verification reset"
+    },
+    {
+      "path": "backend/onboarding/services/work_profile.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Role profiles and associated referee/source record resolution"
+    },
+    {
+      "path": "backend/onboarding/tasks.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B40"
+      ],
+      "note": "Task-backed AHPRA and ABN verification, referee reminders and audit-safe document handling"
+    }
+  ],
+  "findings": [],
+  "reviewer": "gpt6-senior-20261025"
+}

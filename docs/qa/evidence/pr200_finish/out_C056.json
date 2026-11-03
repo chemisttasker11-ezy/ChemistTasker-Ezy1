@@ -1,0 +1,429 @@
+{
+  "chunk": "C056",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "files": [
+    {
+      "path": "frontend_mobile/app/organization/talent-board.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo organization router entrypoint organization/talent-board.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/_layout.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Other-staff navigation routes notification actions to workspace screens, marks notices read and signs out through AuthContext; server validates target resources."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/availability.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/availability.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/calendar.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/calendar.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/chat.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/chat.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/dashboard.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/dashboard.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/hub.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/hub.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/index.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/interests.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/interests.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/invoice.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/invoice.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/invoice/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/invoice/[id].tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/invoice/new.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/invoice/new.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/invoices.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/invoices.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/learning.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/learning.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/memberships.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/memberships.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/messages/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/messages/[id].tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/notifications.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/notifications.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/profile-basic-info.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/profile-basic-info.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/profile-bio.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/profile-bio.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/profile-identity.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/profile-identity.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/profile-payment.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/profile-payment.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/profile-referees.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/profile-referees.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/profile-regulatory.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/profile-regulatory.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/profile-skills.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/profile-skills.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/profile.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/profile.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/publish-availability.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/publish-availability.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/shifts/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Other-staff shift-detail route intentionally delegates to the pharmacist shared detail implementation, with backend eligibility owning access."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/shifts/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/shifts/index.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/otherstaff/talent-board.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo other-staff router entrypoint otherstaff/talent-board.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/_layout.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Owner navigation applies unsaved-change guard and routes new messages and shift notifications; administrative mutations stay in delegated screens."
+    },
+    {
+      "path": "frontend_mobile/app/owner/calendar.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/calendar.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/chat.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/chat.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/dashboard.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/dashboard.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/hub.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/hub.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/invoice.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/invoice.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/invoice/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/invoice/[id].tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/invoice/new.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/invoice/new.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/locums/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/locums/index.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/messages/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/messages/[id].tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/notifications.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/notifications.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/onboarding/_context.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/onboarding/_context.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/onboarding/_layout.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Owner onboarding Step1/Step2/Step3/review wrapped in per-route provider."
+    },
+    {
+      "path": "frontend_mobile/app/owner/onboarding/review.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/onboarding/review.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/onboarding/step1.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/onboarding/step1.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/onboarding/step2.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/onboarding/step2.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/onboarding/step3.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/onboarding/step3.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/pharmacies/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/pharmacies/[id].tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/pharmacies/[id]/edit.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/pharmacies/[id]/edit.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/pharmacies/[id]/locums.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/pharmacies/[id]/locums.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/pharmacies/[id]/staff.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/pharmacies/[id]/staff.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/pharmacies/add.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/pharmacies/add.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/pharmacies/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/pharmacies/index.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/pharmacy.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/pharmacy.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/pills.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/pills.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/post-shift.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/post-shift.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/profile-detail.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/profile-detail.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/profile.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/profile.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/shifts/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/shifts/[id].tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/shifts/[id]/applications.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/shifts/[id]/applications.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/shifts/create.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/shifts/create.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/shifts/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/shifts/index.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/staff/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/staff/index.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/subscription-seats.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/subscription-seats.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/owner/talent-board.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo owner router entrypoint owner/talent-board.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/_layout.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Pharmacist navigation subscribes to notification and shift activity, uses role-specific destinations, and calls centralized logout."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/availability.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo pharmacist router entrypoint pharmacist/availability.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/calendar.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo pharmacist router entrypoint pharmacist/calendar.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/chat.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo pharmacist router entrypoint pharmacist/chat.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/dashboard.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo pharmacist router entrypoint pharmacist/dashboard.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/hub.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo pharmacist router entrypoint pharmacist/hub.tsx: delegates user action to the role/shared component; no independent backend authority or financial mutation within this route alias."
+    }
+  ],
+  "findings": [],
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 read/route-call-path inspection only; S2 independent and S3 runtime not performed"
+}

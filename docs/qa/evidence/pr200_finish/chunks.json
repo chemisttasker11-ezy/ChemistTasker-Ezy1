@@ -1,0 +1,625 @@
+[
+ {
+  "id": "C001",
+  "n": 18,
+  "bytes": 199286,
+  "first": "backend/attendance/__init__.py",
+  "last": "backend/attendance/throttles.py"
+ },
+ {
+  "id": "C002",
+  "n": 22,
+  "bytes": 187253,
+  "first": "backend/attendance/transitions.py",
+  "last": "backend/attendance_tests/test_kiosk_pairing_code.py"
+ },
+ {
+  "id": "C003",
+  "n": 15,
+  "bytes": 199985,
+  "first": "backend/attendance_tests/test_kiosk_qr_pin_security.py",
+  "last": "backend/attendance_tests/test_worker_pin_setup.py"
+ },
+ {
+  "id": "C004",
+  "n": 30,
+  "bytes": 164730,
+  "first": "backend/attendance_tests/urls.py",
+  "last": "backend/chat/urls.py"
+ },
+ {
+  "id": "C005",
+  "n": 8,
+  "bytes": 44807,
+  "first": "backend/chat/views.py",
+  "last": "backend/client_profile/fields.py"
+ },
+ {
+  "id": "C006",
+  "n": 1,
+  "bytes": 184565,
+  "first": "backend/client_profile/migrations/0001_squashed_baseline.py",
+  "last": "backend/client_profile/migrations/0001_squashed_baseline.py"
+ },
+ {
+  "id": "C007",
+  "n": 70,
+  "bytes": 191552,
+  "first": "backend/client_profile/migrations/0044_roster_v2_and_attendance_v1.py",
+  "last": "backend/core/celery.py"
+ },
+ {
+  "id": "C008",
+  "n": 36,
+  "bytes": 167926,
+  "first": "backend/core/contract_test_settings.py",
+  "last": "backend/core/test_signal_registry_contract.py"
+ },
+ {
+  "id": "C009",
+  "n": 24,
+  "bytes": 197509,
+  "first": "backend/core/test_task_contracts.py",
+  "last": "backend/ethical_marketplace/owner_views.py"
+ },
+ {
+  "id": "C010",
+  "n": 33,
+  "bytes": 177213,
+  "first": "backend/ethical_marketplace/policy.py",
+  "last": "backend/marketplace/management/commands/seed_marketplace_categories.py"
+ },
+ {
+  "id": "C011",
+  "n": 24,
+  "bytes": 182474,
+  "first": "backend/marketplace/migrations/0001_initial.py",
+  "last": "backend/memberships/selectors.py"
+ },
+ {
+  "id": "C012",
+  "n": 37,
+  "bytes": 177935,
+  "first": "backend/memberships/serializers.py",
+  "last": "backend/onboarding/middleware.py"
+ },
+ {
+  "id": "C013",
+  "n": 20,
+  "bytes": 193773,
+  "first": "backend/onboarding/models.py",
+  "last": "backend/onboarding/tasks.py"
+ },
+ {
+  "id": "C014",
+  "n": 15,
+  "bytes": 199100,
+  "first": "backend/onboarding/test_ahpra_access.py",
+  "last": "backend/onboarding/test_skill_review_regressions.py"
+ },
+ {
+  "id": "C015",
+  "n": 24,
+  "bytes": 192773,
+  "first": "backend/onboarding/test_skills_catalog_path.py",
+  "last": "backend/organizations/claims.py"
+ },
+ {
+  "id": "C016",
+  "n": 21,
+  "bytes": 173526,
+  "first": "backend/organizations/models.py",
+  "last": "backend/pharmacy_hub/groups.py"
+ },
+ {
+  "id": "C017",
+  "n": 19,
+  "bytes": 194754,
+  "first": "backend/pharmacy_hub/migrations/0001_initial.py",
+  "last": "backend/pharmacy_hub/serializers.py"
+ },
+ {
+  "id": "C018",
+  "n": 29,
+  "bytes": 199650,
+  "first": "backend/pharmacy_hub/test_api.py",
+  "last": "backend/public_hub/migrations/__init__.py"
+ },
+ {
+  "id": "C019",
+  "n": 42,
+  "bytes": 179962,
+  "first": "backend/public_hub/models.py",
+  "last": "backend/shifts/admin.py"
+ },
+ {
+  "id": "C020",
+  "n": 13,
+  "bytes": 196667,
+  "first": "backend/shifts/announcements.py",
+  "last": "backend/shifts/escalation.py"
+ },
+ {
+  "id": "C021",
+  "n": 21,
+  "bytes": 199122,
+  "first": "backend/shifts/finalize.py",
+  "last": "backend/shifts/serialization/slots.py"
+ },
+ {
+  "id": "C022",
+  "n": 28,
+  "bytes": 196106,
+  "first": "backend/shifts/serialization/worker_requests.py",
+  "last": "backend/talent/migrations/__init__.py"
+ },
+ {
+  "id": "C023",
+  "n": 32,
+  "bytes": 181824,
+  "first": "backend/talent/models.py",
+  "last": "backend/users/api_auth.py"
+ },
+ {
+  "id": "C024",
+  "n": 32,
+  "bytes": 193684,
+  "first": "backend/users/api_organizations.py",
+  "last": "backend/users/test_presentation_compatibility.py"
+ },
+ {
+  "id": "C025",
+  "n": 39,
+  "bytes": 194684,
+  "first": "backend/users/test_region_delegation.py",
+  "last": "backend/worker_finance/tests/test_invoice_bridge.py"
+ },
+ {
+  "id": "C026",
+  "n": 28,
+  "bytes": 191617,
+  "first": "backend/worker_finance/tests/test_stale_invoice_record_contenttype.py",
+  "last": "backend/workforce/roster/assignment_rates.py"
+ },
+ {
+  "id": "C027",
+  "n": 20,
+  "bytes": 191897,
+  "first": "backend/workforce/roster/bulk_edit.py",
+  "last": "backend/workforce/roster/worker_actions.py"
+ },
+ {
+  "id": "C028",
+  "n": 21,
+  "bytes": 198497,
+  "first": "backend/workforce/signals.py",
+  "last": "backend/workforce/urls.py"
+ },
+ {
+  "id": "C029",
+  "n": 1,
+  "bytes": 46722,
+  "first": "backend/workforce/views.py",
+  "last": "backend/workforce/views.py"
+ },
+ {
+  "id": "C030",
+  "n": 48,
+  "bytes": 199590,
+  "first": "shared-core/src/api.ts",
+  "last": "shared-core/src/domains/invoicing/api.ts"
+ },
+ {
+  "id": "C031",
+  "n": 50,
+  "bytes": 199932,
+  "first": "shared-core/src/domains/invoicing/binaryPdf.test.ts",
+  "last": "shared-core/src/domains/shifts/mappers.ts"
+ },
+ {
+  "id": "C032",
+  "n": 37,
+  "bytes": 191694,
+  "first": "shared-core/src/domains/shifts/postingDraft.test.ts",
+  "last": "shared-core/src/transport/client.ts"
+ },
+ {
+  "id": "C033",
+  "n": 11,
+  "bytes": 78445,
+  "first": "shared-core/src/transport/convergence.test.ts",
+  "last": "shared-core/tests/finance.transport.cjs"
+ },
+ {
+  "id": "C034",
+  "n": 23,
+  "bytes": 165058,
+  "first": "frontend_web/src-tauri/build.rs",
+  "last": "frontend_web/src/components/roster/HorizontalCalendarGrid.model.ts"
+ },
+ {
+  "id": "C035",
+  "n": 13,
+  "bytes": 199548,
+  "first": "frontend_web/src/components/roster/HorizontalCalendarGrid.tsx",
+  "last": "frontend_web/src/components/social/socialFormat.tsx"
+ },
+ {
+  "id": "C036",
+  "n": 40,
+  "bytes": 199167,
+  "first": "frontend_web/src/components/ui/ActivityList.tsx",
+  "last": "frontend_web/src/features/workforce/index.ts"
+ },
+ {
+  "id": "C037",
+  "n": 29,
+  "bytes": 183301,
+  "first": "frontend_web/src/features/workforce/timesheetDisplay.ts",
+  "last": "frontend_web/src/layouts/pharmacistDashboard.tsx"
+ },
+ {
+  "id": "C038",
+  "n": 16,
+  "bytes": 193923,
+  "first": "frontend_web/src/main.tsx",
+  "last": "frontend_web/src/pages/PublicJobBoardPage.tsx"
+ },
+ {
+  "id": "C039",
+  "n": 10,
+  "bytes": 180971,
+  "first": "frontend_web/src/pages/PublicOrganizationPage.tsx",
+  "last": "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx"
+ },
+ {
+  "id": "C040",
+  "n": 21,
+  "bytes": 195393,
+  "first": "frontend_web/src/pages/attendance/WorkerAttendancePage.tsx",
+  "last": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Candidates/CounterOfferList.tsx"
+ },
+ {
+  "id": "C041",
+  "n": 28,
+  "bytes": 185478,
+  "first": "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/components/Candidates/PublicLevelView.tsx",
+  "last": "frontend_web/src/pages/dashboard/sidebar/ChainPage.tsx"
+ },
+ {
+  "id": "C042",
+  "n": 17,
+  "bytes": 199915,
+  "first": "frontend_web/src/pages/dashboard/sidebar/CommunityShiftsPage.tsx",
+  "last": "frontend_web/src/pages/dashboard/sidebar/MyConfirmedShiftsPage.tsx"
+ },
+ {
+  "id": "C043",
+  "n": 9,
+  "bytes": 158062,
+  "first": "frontend_web/src/pages/dashboard/sidebar/MyHistoryShiftsPage.tsx",
+  "last": "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.model.ts"
+ },
+ {
+  "id": "C044",
+  "n": 8,
+  "bytes": 184077,
+  "first": "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx",
+  "last": "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.model.ts"
+ },
+ {
+  "id": "C045",
+  "n": 11,
+  "bytes": 175452,
+  "first": "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx",
+  "last": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx"
+ },
+ {
+  "id": "C046",
+  "n": 22,
+  "bytes": 183680,
+  "first": "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx",
+  "last": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFilters.ts"
+ },
+ {
+  "id": "C047",
+  "n": 13,
+  "bytes": 198710,
+  "first": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx",
+  "last": "frontend_web/src/pages/dashboard/sidebar/chat/MessageBubble.tsx"
+ },
+ {
+  "id": "C048",
+  "n": 14,
+  "bytes": 194579,
+  "first": "frontend_web/src/pages/dashboard/sidebar/chat/MessageComposer.tsx",
+  "last": "frontend_web/src/pages/dashboard/sidebar/hub/HubSections.tsx"
+ },
+ {
+  "id": "C049",
+  "n": 13,
+  "bytes": 187753,
+  "first": "frontend_web/src/pages/dashboard/sidebar/hub/HubSidebar.tsx",
+  "last": "frontend_web/src/pages/dashboard/sidebar/owner/OwnerPillsPage.tsx"
+ },
+ {
+  "id": "C050",
+  "n": 17,
+  "bytes": 199874,
+  "first": "frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx",
+  "last": "frontend_web/src/pages/finance/InvoiceComposer.tsx"
+ },
+ {
+  "id": "C051",
+  "n": 22,
+  "bytes": 184953,
+  "first": "frontend_web/src/pages/finance/InvoiceReviewDialog.tsx",
+  "last": "frontend_web/src/pages/onboarding/onboarding_explorer/UpgradeAccountCard.tsx"
+ },
+ {
+  "id": "C052",
+  "n": 15,
+  "bytes": 197010,
+  "first": "frontend_web/src/pages/onboarding/onboarding_pharmacist/BasicInfoV2.tsx",
+  "last": "frontend_web/src/pages/onboarding/onboarding_staff/RegulatoryV2.tsx"
+ },
+ {
+  "id": "C053",
+  "n": 33,
+  "bytes": 87126,
+  "first": "frontend_web/src/pages/onboarding/onboarding_staff/SkillsV2.tsx",
+  "last": "frontend_web/src/vite-env.d.ts"
+ },
+ {
+  "id": "C054",
+  "n": 70,
+  "bytes": 92939,
+  "first": "frontend_mobile/app/+not-found.tsx",
+  "last": "frontend_mobile/app/login.tsx"
+ },
+ {
+  "id": "C055",
+  "n": 70,
+  "bytes": 79119,
+  "first": "frontend_mobile/app/manager/roster/acknowledgements.tsx",
+  "last": "frontend_mobile/app/organization/shifts/index.tsx"
+ },
+ {
+  "id": "C056",
+  "n": 70,
+  "bytes": 55764,
+  "first": "frontend_mobile/app/organization/talent-board.tsx",
+  "last": "frontend_mobile/app/pharmacist/hub.tsx"
+ },
+ {
+  "id": "C057",
+  "n": 70,
+  "bytes": 184996,
+  "first": "frontend_mobile/app/pharmacist/index.tsx",
+  "last": "frontend_mobile/features/parity/ParityUI.tsx"
+ },
+ {
+  "id": "C058",
+  "n": 8,
+  "bytes": 170601,
+  "first": "frontend_mobile/features/parity/attendance.tsx",
+  "last": "frontend_mobile/features/parity/utils.ts"
+ },
+ {
+  "id": "C059",
+  "n": 28,
+  "bytes": 182913,
+  "first": "frontend_mobile/features/parity/workforce.tsx",
+  "last": "frontend_mobile/roles/otherstaff/availability.tsx"
+ },
+ {
+  "id": "C060",
+  "n": 31,
+  "bytes": 185345,
+  "first": "frontend_mobile/roles/otherstaff/dashboard.tsx",
+  "last": "frontend_mobile/roles/owner/post-shift.tsx"
+ },
+ {
+  "id": "C061",
+  "n": 27,
+  "bytes": 197992,
+  "first": "frontend_mobile/roles/owner/profile-detail.tsx",
+  "last": "frontend_mobile/roles/pharmacist/profile-tabs/IdentityScreen.tsx"
+ },
+ {
+  "id": "C062",
+  "n": 21,
+  "bytes": 194173,
+  "first": "frontend_mobile/roles/pharmacist/profile-tabs/PaymentScreen.tsx",
+  "last": "frontend_mobile/roles/shared/chat/ChatPage.tsx"
+ },
+ {
+  "id": "C063",
+  "n": 20,
+  "bytes": 190195,
+  "first": "frontend_mobile/roles/shared/chat/ChatSidebar.tsx",
+  "last": "frontend_mobile/roles/shared/hub/PostCard.tsx"
+ },
+ {
+  "id": "C064",
+  "n": 13,
+  "bytes": 162698,
+  "first": "frontend_mobile/roles/shared/hub/PostComposer.tsx",
+  "last": "frontend_mobile/roles/shared/invoices/invoiceStats.ts"
+ },
+ {
+  "id": "C065",
+  "n": 11,
+  "bytes": 194397,
+  "first": "frontend_mobile/roles/shared/messages/[id].tsx",
+  "last": "frontend_mobile/roles/shared/pharmacies/PharmacyForm.styles.ts"
+ },
+ {
+  "id": "C066",
+  "n": 11,
+  "bytes": 178785,
+  "first": "frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx",
+  "last": "frontend_mobile/roles/shared/profile/RefereesScreen.tsx"
+ },
+ {
+  "id": "C067",
+  "n": 19,
+  "bytes": 199265,
+  "first": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/ActiveShiftCards.tsx",
+  "last": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/theme.ts"
+ },
+ {
+  "id": "C068",
+  "n": 17,
+  "bytes": 144259,
+  "first": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/types.ts",
+  "last": "frontend_mobile/roles/shared/shifts/PostShiftScreen.styles.ts"
+ },
+ {
+  "id": "C069",
+  "n": 12,
+  "bytes": 186242,
+  "first": "frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx",
+  "last": "frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftList.model.ts"
+ },
+ {
+  "id": "C070",
+  "n": 25,
+  "bytes": 199107,
+  "first": "frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftList.tsx",
+  "last": "frontend_mobile/roles/shared/talent-board/components/AvailabilitySidebar.tsx"
+ },
+ {
+  "id": "C071",
+  "n": 31,
+  "bytes": 170750,
+  "first": "frontend_mobile/roles/shared/talent-board/components/FiltersSidebar.tsx",
+  "last": "frontend_mobile/utils/unread.ts"
+ },
+ {
+  "id": "C072",
+  "n": 26,
+  "bytes": 194880,
+  "first": "frontend_web/e2e/authenticated/session.e2e.ts",
+  "last": "frontend_web/e2e/support/reviewFixture.mjs"
+ },
+ {
+  "id": "C073",
+  "n": 70,
+  "bytes": 130579,
+  "first": "frontend_web/e2e/support/start-authenticated-stack.mjs",
+  "last": "frontend_web/landing_next/app/hubs/community-client.tsx"
+ },
+ {
+  "id": "C074",
+  "n": 33,
+  "bytes": 199249,
+  "first": "frontend_web/landing_next/app/hubs/error.tsx",
+  "last": "frontend_web/landing_next/features/paediatric-calculator/lib/types.ts"
+ },
+ {
+  "id": "C075",
+  "n": 43,
+  "bytes": 189187,
+  "first": "frontend_web/landing_next/lib/api-root.mjs",
+  "last": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ReviewOfferSlotList.tsx"
+ },
+ {
+  "id": "C076",
+  "n": 20,
+  "bytes": 198739,
+  "first": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/components/ShiftList.tsx",
+  "last": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/loadAllTalentPages.ts"
+ },
+ {
+  "id": "C077",
+  "n": 41,
+  "bytes": 197129,
+  "first": "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts",
+  "last": "frontend_web/scripts/dev-all.mjs"
+ },
+ {
+  "id": "C078",
+  "n": 24,
+  "bytes": 197392,
+  "first": "frontend_web/scripts/render-mobile-skill-symbols.mjs",
+  "last": "frontend_web/shared/postShift/PostShiftWizardShell.tsx"
+ },
+ {
+  "id": "C079",
+  "n": 5,
+  "bytes": 37839,
+  "first": "frontend_web/shared/postShift/helpers.ts",
+  "last": "frontend_web/tests/finance.helpers.cjs"
+ },
+ {
+  "id": "C080",
+  "n": 25,
+  "bytes": 196071,
+  "first": "scripts/ahpra_extension/background.js",
+  "last": "scripts/inventory-client-api-boundaries.test.mjs"
+ },
+ {
+  "id": "C081",
+  "n": 8,
+  "bytes": 35855,
+  "first": "scripts/module_import_graph.py",
+  "last": "scripts/test_staging_assets.py"
+ },
+ {
+  "id": "C082",
+  "n": 4,
+  "bytes": 192391,
+  "first": "docs/qa/pr200_quarter_audit.py",
+  "last": "docs/roster-attendance/archive/2026-09-15-pre-repair-models.py"
+ },
+ {
+  "id": "C083",
+  "n": 19,
+  "bytes": 184731,
+  "first": ".agents/skills/brand/scripts/extract-colors.cjs",
+  "last": ".agents/skills/design/scripts/cip/search.py"
+ },
+ {
+  "id": "C084",
+  "n": 10,
+  "bytes": 154673,
+  "first": ".agents/skills/design/scripts/icon/generate.py",
+  "last": ".agents/skills/ui-ux-pro-max/scripts/core.py"
+ },
+ {
+  "id": "C085",
+  "n": 15,
+  "bytes": 197849,
+  "first": ".agents/skills/ui-ux-pro-max/scripts/design_system.py",
+  "last": ".agents/skills/ui-ux-pro-max/scripts/tests/test_text_layout_resilience.py"
+ },
+ {
+  "id": "C086",
+  "n": 2,
+  "bytes": 59929,
+  "first": ".agents/skills/ui-ux-pro-max/scripts/tests/test_web_stack_freshness.py",
+  "last": ".agents/skills/ui-ux-pro-max/scripts/validate_data.py"
+ },
+ {
+  "id": "C087",
+  "n": 1,
+  "bytes": 661,
+  "first": "backend/manage.py",
+  "last": "backend/manage.py"
+ },
+ {
+  "id": "C088",
+  "n": 4,
+  "bytes": 2947,
+  "first": "frontend_mobile/app.config.js",
+  "last": "frontend_mobile/react-native-ssl-public-key-pinning.d.ts"
+ },
+ {
+  "id": "C089",
+  "n": 4,
+  "bytes": 3820,
+  "first": "frontend_web/eslint.config.js",
+  "last": "frontend_web/vite.config.ts"
+ }
+]

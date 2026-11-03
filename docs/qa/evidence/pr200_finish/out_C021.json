@@ -1,0 +1,316 @@
+{
+ "chunk": "C021",
+ "files": [
+  {
+   "path": "backend/shifts/finalize.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B54",
+    "N2",
+    "N3"
+   ],
+   "note": "Finalization ignores negotiated times and selected recurring occurrence; known competing-offer problem."
+  },
+  {
+   "path": "backend/shifts/history.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Protects assignments linked to financial, leave, or attendance history."
+  },
+  {
+   "path": "backend/shifts/interest.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional specific problem found."
+  },
+  {
+   "path": "backend/shifts/leave.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates mutations to canonical workforce leave services."
+  },
+  {
+   "path": "backend/shifts/lifecycle.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B41",
+    "B65",
+    "N1",
+    "N4",
+    "N5",
+    "N6"
+   ],
+   "note": "Known audience and pricing exposure; additional public-response and lifecycle problems."
+  },
+  {
+   "path": "backend/shifts/limits.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no production-blocking problem established."
+  },
+  {
+   "path": "backend/shifts/models.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B13"
+   ],
+   "note": "Deleting a worker cascades their future assignments and offers."
+  },
+  {
+   "path": "backend/shifts/my_shifts.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N4",
+    "N5"
+   ],
+   "note": "Uses unbounded history matching and UTC clock comparisons."
+  },
+  {
+   "path": "backend/shifts/notifications.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B08"
+   ],
+   "note": "Organisation recipients include region admins without pharmacy scope filtering."
+  },
+  {
+   "path": "backend/shifts/offers.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B20",
+    "B11",
+    "B54"
+   ],
+   "note": "Known mutable interest targets, abandoned payment reservations, and competing confirmations."
+  },
+  {
+   "path": "backend/shifts/posting.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B39"
+   ],
+   "note": "Copying pharmacy defaults clears omitted rate fields."
+  },
+  {
+   "path": "backend/shifts/pricing.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B14"
+   ],
+   "note": "Uses known legacy award and incomplete holiday data."
+  },
+  {
+   "path": "backend/shifts/pricing_data.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B14"
+   ],
+   "note": "Loads the known legacy award and holiday datasets."
+  },
+  {
+   "path": "backend/shifts/rate_visibility.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional specific problem found."
+  },
+  {
+   "path": "backend/shifts/selectors.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N4",
+    "N5"
+   ],
+   "note": "History omits its past-date condition; lifecycle compares local shift times with UTC."
+  },
+  {
+   "path": "backend/shifts/serialization/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Package documentation only."
+  },
+  {
+   "path": "backend/shifts/serialization/interests.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B20"
+   ],
+   "note": "Interest and rejection shift references remain writable."
+  },
+  {
+   "path": "backend/shifts/serialization/offers.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional specific problem found."
+  },
+  {
+   "path": "backend/shifts/serialization/projections.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shared projection removes sensitive fields; worker projection scopes assigned slots."
+  },
+  {
+   "path": "backend/shifts/serialization/shifts.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B36",
+    "N1",
+    "N5",
+    "N6"
+   ],
+   "note": "Known unrestricted pharmacy input; exposes private fields and compares UTC against local slot times."
+  },
+  {
+   "path": "backend/shifts/serialization/slots.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional specific problem found."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Public shift responses expose other workers' names and email addresses.",
+   "scenario": "Tom posts a public shift with several vacancies, and Ben confirms one while payment is pending. Sara browses that shift without joining Tom's pharmacy. The response reveals Ben's name and email; it also exposes contact details for workers already assigned.",
+   "evidence": [
+    "backend/shifts/lifecycle.py:393",
+    "backend/shifts/serialization/shifts.py:440",
+    "backend/shifts/serialization/shifts.py:451",
+    "backend/shifts/serialization/shifts.py:480"
+   ],
+   "confidence": "high",
+   "test_needed": "Retrieve a public shift as unrelated Sara and assert Ben's pending-payment and assignment contact details are absent.",
+   "owner_question": {
+    "question": "When Sara browses Tom's public vacancy, whose contact details should she see?",
+    "options": [
+     "Only her own; Tom's managers can see other candidates",
+     "Confirmed coworkers' details after Sara is booked",
+     "Every candidate's details while browsing (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Invoicing",
+   "title": "Confirmed counteroffers are invoiced using the original shift hours.",
+   "scenario": "Tom advertises a flexible shift from 09:00 to 17:00. Sara proposes 10:00 to 14:00, Tom accepts, and Sara confirms. Her booking retains the original hours, and its invoice preview charges Tom for eight hours instead of the agreed four.",
+   "evidence": [
+    "backend/shifts/serialization/offers.py:123",
+    "backend/shifts/counter_offers.py:163",
+    "backend/shifts/engagement.py:272",
+    "backend/shifts/finalize.py:79",
+    "backend/invoicing/services.py:96"
+   ],
+   "confidence": "high",
+   "test_needed": "Confirm a 10:00–14:00 counteroffer against a 09:00–17:00 slot and assert the booking and invoice use four hours.",
+   "owner_question": {
+    "question": "After Tom and Sara agree to shorten the shift, which hours should her booking and invoice use?",
+    "options": [
+     "The agreed 10:00–14:00 hours",
+     "Require Tom to amend the vacancy before confirmation",
+     "The original 09:00–17:00 hours (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Confirming one recurring occurrence books the worker for the entire series.",
+   "scenario": "Tom posts a recurring Monday vacancy. Sara proposes working only the second Monday, and Tom accepts that date. When Sara confirms, she is assigned every Monday in the series, including dates she never accepted.",
+   "evidence": [
+    "backend/shifts/serialization/offers.py:17",
+    "backend/shifts/counter_offers.py:188",
+    "backend/shifts/engagement.py:271",
+    "backend/shifts/finalize.py:39",
+    "backend/shifts/finalize.py:82"
+   ],
+   "confidence": "high",
+   "test_needed": "Confirm an offer for the second of three recurring Mondays and assert no assignments exist for the other Mondays.",
+   "owner_question": {
+    "question": "When Sara accepts only the second Monday of Tom's recurring vacancy, what should be booked?",
+    "options": [
+     "Only the accepted Monday",
+     "Require explicit acceptance of every date together",
+     "Every occurrence automatically (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Upcoming bookings appear in completed-work history.",
+   "scenario": "Tom books Sara for next week. Before Sara works the shift, both Tom's history and Sara's history already include it. Their completed-work lists therefore contain future commitments alongside past work.",
+   "evidence": [
+    "backend/shifts/selectors.py:68",
+    "backend/shifts/lifecycle.py:178",
+    "backend/shifts/my_shifts.py:61",
+    "backend/shifts/test_shift_listing_contract.py:73",
+    "backend/shifts/test_shift_listing_contract.py:103"
+   ],
+   "confidence": "high",
+   "test_needed": "Create only a future assigned shift and assert both manager and worker history endpoints exclude it.",
+   "owner_question": {
+    "question": "Should Tom and Sara see next week's confirmed booking in History?",
+    "options": [
+     "Only after the shift ends",
+     "In a separate clearly labelled upcoming section",
+     "Alongside completed work immediately (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N5",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Shift lifecycle filters compare pharmacy clock times with UTC.",
+   "scenario": "Sara finishes Tom's Sydney shift at 17:00. At 20:00 Sydney time, the filters compare its finish against the UTC morning clock and still classify it as upcoming. Tom and Sara continue seeing an ended booking as confirmed, and ended vacancies can remain active.",
+   "evidence": [
+    "backend/core/settings.py:445",
+    "backend/core/settings.py:449",
+    "backend/shifts/lifecycle.py:148",
+    "backend/shifts/selectors.py:20",
+    "backend/shifts/my_shifts.py:20",
+    "backend/shifts/serialization/shifts.py:403"
+   ],
+   "confidence": "high",
+   "test_needed": "Freeze time at 20:00 Sydney time for a same-day 17:00 finish and assert the shift is excluded from upcoming and active results.",
+   "owner_question": {
+    "question": "When Tom's pharmacy clock passes the shift's finish time, when should Sara's booking leave Upcoming?",
+    "options": [
+     "At the finish time in that pharmacy's timezone",
+     "After a defined grace period in that pharmacy's timezone",
+     "When the UTC clock reaches the finish time (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N6",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Named public shifts disclose internal pharmacy document links.",
+   "scenario": "Tom uploads pharmacy procedures and controlled-drug protocols, then posts a named public vacancy. Sara opens the vacancy while merely browsing. Its response includes links to those internal documents before Tom has selected or booked her.",
+   "evidence": [
+    "backend/shifts/lifecycle.py:393",
+    "backend/shifts/serialization/shifts.py:54",
+    "backend/shifts/serialization/shifts.py:193",
+    "backend/organizations/serializers.py:139",
+    "backend/shifts/serialization/projections.py:110"
+   ],
+   "confidence": "high",
+   "test_needed": "Retrieve a named public shift as unrelated Sara and assert pharmacy procedure, protocol, and induction document links are absent.",
+   "owner_question": {
+    "question": "When should Sara gain access to Tom's internal pharmacy documents?",
+    "options": [
+     "After a confirmed booking authorises access",
+     "Only after Tom explicitly grants access",
+     "Whenever she browses a named vacancy (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-1"
+}

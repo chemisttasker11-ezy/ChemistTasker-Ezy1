@@ -1,0 +1,68 @@
+{
+  "chunk": "C058",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "files": [
+    {
+      "path": "frontend_mobile/features/parity/attendance.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Attendance uses shared-core status, QR clock actions and selected-pharmacy manager review with backend authorization required."
+    },
+    {
+      "path": "frontend_mobile/features/parity/ethicalMarketplace.tsx",
+      "verdict": "OK",
+      "ids": [
+        "B41",
+        "C009-N3"
+      ],
+      "note": "Ethical inventory and transfers route via shared APIs; existing feature-gate and import-commit findings apply."
+    },
+    {
+      "path": "frontend_mobile/features/parity/finance.tsx",
+      "verdict": "OK",
+      "ids": [
+        "B33"
+      ],
+      "note": "Finance parity delegates invoice operations to shared-core and retains server authority for received invoice status."
+    },
+    {
+      "path": "frontend_mobile/features/parity/marketplace.tsx",
+      "verdict": "OK",
+      "ids": [
+        "B24",
+        "B25"
+      ],
+      "note": "Marketplace public browsing, seller drafts, listing publication and buyer-exchange state map through shared APIs."
+    },
+    {
+      "path": "frontend_mobile/features/parity/marketplaceDraft.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Marketplace draft storage key includes user ID or email, with clear-on-submit persistence."
+    },
+    {
+      "path": "frontend_mobile/features/parity/roster.tsx",
+      "verdict": "OK",
+      "ids": [
+        "B35",
+        "B36"
+      ],
+      "note": "Roster parity calls shared rosterV2, scoped period, coverage, shift-request and audit routes."
+    },
+    {
+      "path": "frontend_mobile/features/parity/trustRewards.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Ratings and reward balance use shared fetch/report contracts and caller-level server permissions."
+    },
+    {
+      "path": "frontend_mobile/features/parity/utils.ts",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Shared formatting, date arithmetic and UUID construction helpers; no endpoint authority."
+    }
+  ],
+  "findings": [],
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source inspection only; S2 independent and S3 runtime outstanding"
+}

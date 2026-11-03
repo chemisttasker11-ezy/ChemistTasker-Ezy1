@@ -1,0 +1,186 @@
+{
+ "chunk": "F06",
+ "paths_read": [
+  "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md",
+  "docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md",
+  "backend/core/urls.py",
+  "backend/core/api_v1_urls.py",
+  "backend/attendance/urls.py",
+  "backend/attendance/views.py",
+  "backend/attendance/worker_api.py",
+  "backend/attendance/kiosk_api.py",
+  "backend/attendance/api_support.py",
+  "backend/attendance/credentials.py",
+  "backend/attendance/eligibility.py",
+  "backend/attendance/transitions.py",
+  "backend/attendance/approvals.py",
+  "backend/attendance/protocol.py",
+  "backend/attendance/models.py",
+  "backend/workforce/urls.py",
+  "backend/workforce/views.py",
+  "backend/workforce/models.py",
+  "backend/workforce/permissions.py",
+  "backend/workforce/leave_service.py",
+  "backend/workforce/attendance_edits.py",
+  "backend/workforce/timesheet_core.py",
+  "backend/workforce/timesheet_data.py",
+  "backend/workforce/timesheet_builder.py",
+  "backend/workforce/timesheet_checks.py",
+  "backend/workforce/timesheet_transitions.py",
+  "backend/workforce/timesheet_serialization.py",
+  "backend/workforce/signals.py",
+  "backend/workforce/tasks.py",
+  "backend/workforce/roster/permissions.py",
+  "backend/workforce/roster/assignment_rates.py",
+  "backend/organizations/access.py",
+  "backend/shifts/engagement.py",
+  "backend/shifts/leave.py",
+  "backend/workforce/tests/test_timesheets.py",
+  "backend/workforce/tests/test_timesheet_state_machine.py",
+  "backend/attendance_tests/test_attendance_approvals.py",
+  "backend/attendance_tests/test_provisional_approval_safety.py",
+  "shared-core/src/constants/endpoints.ts",
+  "shared-core/src/domains/attendance/api.ts",
+  "shared-core/src/domains/workforce/api.ts",
+  "frontend_web/src/pages/attendance/WorkerAttendancePage.tsx",
+  "frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx",
+  "frontend_web/src/pages/attendance/KioskPage.tsx",
+  "frontend_web/src/pages/attendance/KioskBreakDialog.tsx",
+  "frontend_web/src/features/workforce/api.ts",
+  "frontend_web/src/features/workforce/TimesheetsPage.tsx",
+  "frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx",
+  "frontend_web/src/features/workforce/MyHoursPage.tsx",
+  "frontend_web/src/features/workforce/MyLeavePage.tsx",
+  "frontend_web/src/features/workforce/ManagerLeavePage.tsx",
+  "frontend_web/src-tauri/src/lib.rs",
+  "frontend_mobile/features/parity/attendance.tsx",
+  "frontend_mobile/features/parity/workforce.tsx",
+  "frontend_mobile/app/workforce-timesheets.tsx",
+  "frontend_mobile/app/my-hours.tsx",
+  "frontend_mobile/app/my-leave.tsx",
+  "frontend_mobile/app/workforce/leave-requests.tsx",
+  "frontend_mobile/app/workforce/payroll-export.tsx"
+ ],
+ "confirmed_known": [
+  "B27",
+  "B28",
+  "B29",
+  "B32",
+  "B60",
+  "B61",
+  "B63",
+  "B64",
+  "C001-N1",
+  "C001-N2",
+  "C002-N1",
+  "C003-N1"
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Payroll",
+   "title": "Locking a period always produces an empty payroll handoff.",
+   "scenario": "Tom enables payroll, publishes Omar's payroll shifts and approves Omar's recorded hours. Tom locks the period successfully from web or mobile, but the saved payroll handoff contains no workers or shifts. The approved hours remain visible in timesheets while the payroll handoff silently omits Omar.",
+   "evidence": [
+    "backend/shifts/engagement.py:125",
+    "backend/workforce/timesheet_data.py:172",
+    "backend/workforce/timesheet_builder.py:183",
+    "backend/workforce/timesheet_builder.py:207",
+    "backend/workforce/timesheet_transitions.py:147",
+    "backend/workforce/timesheet_transitions.py:182",
+    "backend/workforce/views.py:744"
+   ],
+   "confidence": "high",
+   "test_needed": "With payroll enabled and Omar's completed published assignment routed to PAYROLL, build and approve his timesheet, then lock the period; assert that payroll_export contains Omar's assignment and worked day rather than an empty list.",
+   "owner_question": {
+    "question": "When Tom locks approved payroll hours for Omar, what should happen if the payroll handoff would omit Omar?",
+    "options": [
+     "Include Omar's approved payroll shifts in the handoff",
+     "Refuse locking until Omar's payroll rows can be generated",
+     "Allow locking with an empty payroll handoff (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Attendance and timesheets",
+   "title": "Rejecting provisional attendance permanently blocks the whole timesheet period.",
+   "scenario": "Omar clocks in without a rostered shift, clocks out, and Tom rejects those hours with a reason. The rejected attendance disappears from Tom's pending reviews but continues to block Omar's timesheet. Tom cannot waive the blocker or approve the rejected attendance, so he cannot lock the period for any staff.",
+   "evidence": [
+    "backend/attendance/approvals.py:53",
+    "backend/attendance/approvals.py:157",
+    "backend/attendance/approvals.py:274",
+    "backend/workforce/timesheet_data.py:241",
+    "backend/workforce/timesheet_transitions.py:67",
+    "backend/workforce/timesheet_transitions.py:103",
+    "backend/workforce/timesheet_transitions.py:139"
+   ],
+   "confidence": "high",
+   "test_needed": "Reject Omar's closed provisional attendance, rebuild his timesheet and attempt period locking after all payable hours are approved; assert that the rejected evidence does not leave an unresolvable approval blocker.",
+   "owner_question": {
+    "question": "After Tom rejects Omar's unrostered attendance, how should Tom finish that pay period?",
+    "options": [
+     "Exclude the rejected hours from payable time while retaining the audit evidence",
+     "Provide an explicit follow-up decision that resolves the rejected hours",
+     "Keep the entire period blocked with no recovery action (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Attendance corrections",
+   "title": "Clock corrections across pay-period boundaries can drop worked minutes.",
+   "scenario": "Omar's recorded clock-out is Sunday at 23:50, and Tom corrects it to Monday at 00:10 after confirming when Omar actually finished. Sunday's period counts only up to midnight, but Monday's period still treats Omar's session as having ended on Sunday. Even recalculating both periods loses the ten minutes Omar worked on Monday.",
+   "evidence": [
+    "backend/attendance/approvals.py:383",
+    "backend/workforce/timesheet_data.py:206",
+    "backend/workforce/timesheet_data.py:211",
+    "backend/workforce/timesheet_data.py:223",
+    "backend/workforce/timesheet_data.py:258",
+    "backend/workforce/signals.py:61",
+    "backend/workforce/timesheet_core.py:21"
+   ],
+   "confidence": "high",
+   "test_needed": "Correct Omar's Sunday 23:50 clock-out to Monday 00:10 across adjacent periods, rebuild both periods and assert that their combined worked minutes retain the full corrected duration, including Monday's ten minutes.",
+   "owner_question": {
+    "question": "When Tom corrects Omar's finish across midnight into another pay period, where should those extra ten minutes go?",
+    "options": [
+     "Count them in Omar's next period using the corrected finish",
+     "Require an explicit adjustment before accepting the correction",
+     "Accept the correction but omit those minutes from both periods (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P2",
+   "area": "Leave notifications",
+   "title": "Requests made through My Leave bypass request and decision notifications.",
+   "scenario": "Omar requests sick leave through My Leave on web or mobile, and Tom receives no email, push or in-app notification. When Tom later opens the leave list and approves it, Omar receives no decision notification either. Notifications are sent only when leave was requested against a particular roster shift, although both routes use the same approval workflow.",
+   "evidence": [
+    "frontend_web/src/features/workforce/MyLeavePage.tsx:12",
+    "frontend_mobile/app/my-leave.tsx:92",
+    "backend/workforce/leave_service.py:85",
+    "backend/workforce/leave_service.py:128",
+    "backend/workforce/leave_service.py:251",
+    "backend/workforce/leave_service.py:263",
+    "backend/workforce/leave_service.py:343",
+    "backend/workforce/signals.py:159"
+   ],
+   "confidence": "high",
+   "test_needed": "Create Omar's membership-based leave without a roster assignment and have Tom approve it; assert that Tom receives a request notification and Omar receives a decision notification.",
+   "owner_question": {
+    "question": "When Omar requests leave through My Leave rather than a roster shift, how should Tom and Omar be notified?",
+    "options": [
+     "Notify Tom of the request and Omar of the decision",
+     "Notify Tom of the request only",
+     "Require both people to check their leave lists manually (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-1"
+}

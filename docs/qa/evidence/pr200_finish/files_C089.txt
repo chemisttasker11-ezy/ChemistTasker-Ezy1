@@ -1,0 +1,4 @@
+frontend_web/eslint.config.js
+frontend_web/postcss.config.js
+frontend_web/tailwind.config.js
+frontend_web/vite.config.ts

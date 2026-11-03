@@ -1,0 +1,145 @@
+{
+  "chunk": "C085",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "source acquisition only S2/S3 pending",
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
+  "files": [
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/design_system.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "1114088ea5886c7e5b8986fb22aef61acecc83ea",
+      "lines": 1644,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "1644 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/reasoning_contract.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "63652a666b130c249ea1e2954316f1ac8a5a73d5",
+      "lines": 124,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "124 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/search.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "5038aa875a0d39f24dea803a4c73b38f8f56915f",
+      "lines": 178,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "178 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_catalog_refresh.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "8379cc3a224bb9f3dca2a3ebd561cd92b7e05ae4",
+      "lines": 355,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "355 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_catalog_summary_line_endings.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "056c8e5e7d8ba69c87c31c8ad7bcd32ca3d7223c",
+      "lines": 79,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "79 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_core.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b30c0ae54c25f38ec91b37a56cda04426b2510a9",
+      "lines": 344,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "344 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_core_data_quality.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "6d36c79b1f9f8c68c4b02f86a09c5e5f9ba410fe",
+      "lines": 199,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "199 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_data_contracts.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "312dc383b3f6548d7200e928c192673a907b5016",
+      "lines": 422,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "422 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_design_system_mode.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "abe615bade2d851d73c04be3d37e39231eb2d6d5",
+      "lines": 190,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "190 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_design_system_stack.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "50f0080300b56f4891014d878edddb781b36d7de",
+      "lines": 62,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "62 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_native_desktop_stack_freshness.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "5cad0795ed07131c645efe7212b37f048204fec7",
+      "lines": 177,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "177 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_relevance_evaluator.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "ed158e2d4e39a342090b29435dee25bcf5c4444f",
+      "lines": 183,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "183 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_skill_script_paths.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "36514964d7ea6edcadc169e0d713c18b1cc0bb09",
+      "lines": 83,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "83 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_style_taxonomy.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "09ec131ea6d609e21aaf81327a2e3ffe1ea59d4c",
+      "lines": 176,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "176 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    },
+    {
+      "path": ".agents/skills/ui-ux-pro-max/scripts/tests/test_text_layout_resilience.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "8db3b873f958b93906abb8f4e4d6ef75a344c76e",
+      "lines": 121,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "121 lines; UI/UX skill guidance generator or test contract, separate from app runtime; no test executed, source retrieval confirmed."
+    }
+  ],
+  "findings": []
+}

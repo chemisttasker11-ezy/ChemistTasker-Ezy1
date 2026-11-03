@@ -1,0 +1,300 @@
+{
+ "chunk": "C036",
+ "files": [
+  {
+   "path": "frontend_web/src/components/ui/ActivityList.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Dashboard recent activity list with themed icon tiles and action handlers."
+  },
+  {
+   "path": "frontend_web/src/components/ui/BrandBanner.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Welcome banner component with brand gradients, typography, and call-to-action buttons."
+  },
+  {
+   "path": "frontend_web/src/components/ui/ConfirmDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Standard confirmation modal with busy states and destructive action styling."
+  },
+  {
+   "path": "frontend_web/src/components/ui/Hint.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tooltip and accessibility hint wrappers for contextual information."
+  },
+  {
+   "path": "frontend_web/src/components/ui/IconTile.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Rounded icon tile with brand tone styling."
+  },
+  {
+   "path": "frontend_web/src/components/ui/InitialsAvatar.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Avatar component rendering user initials or anonymous indicator."
+  },
+  {
+   "path": "frontend_web/src/components/ui/MetricStrip.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Key metrics display strip with loading skeleton states."
+  },
+  {
+   "path": "frontend_web/src/components/ui/PageHeader.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Standard inner page header component with title and actions."
+  },
+  {
+   "path": "frontend_web/src/components/ui/Pill.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Status pill badge and counter badge component."
+  },
+  {
+   "path": "frontend_web/src/components/ui/SectionCard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Card container component with header, title, and action slots."
+  },
+  {
+   "path": "frontend_web/src/components/ui/SegmentTabs.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Accessible pill segment tabs navigation component."
+  },
+  {
+   "path": "frontend_web/src/components/ui/StatList.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Key-value statistical list with loading skeleton states."
+  },
+  {
+   "path": "frontend_web/src/components/ui/tone.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "CSS variable mappings for brand tone color palettes."
+  },
+  {
+   "path": "frontend_web/src/config-global.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Global configuration reading app name and version from package.json."
+  },
+  {
+   "path": "frontend_web/src/config/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Configures shared-core API client and browser storage adapters."
+  },
+  {
+   "path": "frontend_web/src/constants/adminCapabilities.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports admin capability constants from shared-core."
+  },
+  {
+   "path": "frontend_web/src/constants/ahpraConsent.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "AHPRA check consent declaration string constant."
+  },
+  {
+   "path": "frontend_web/src/constants/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Configures API base URL with local development proxy support."
+  },
+  {
+   "path": "frontend_web/src/constants/brandTheme.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "ChemistTasker brand color and typography design tokens."
+  },
+  {
+   "path": "frontend_web/src/constants/roles.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports organisation role constants from shared-core."
+  },
+  {
+   "path": "frontend_web/src/constants/rosterColors.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports roster role color definitions from shared-core."
+  },
+  {
+   "path": "frontend_web/src/contexts/AdminScopeContext.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Context provider for active admin pharmacy scope."
+  },
+  {
+   "path": "frontend_web/src/contexts/AhpraContext.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "AHPRA registration verification, cooldown timer, and error subscription context."
+  },
+  {
+   "path": "frontend_web/src/contexts/AuthContext.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Core authentication context managing tokens, user session, and persona switching."
+  },
+  {
+   "path": "frontend_web/src/contexts/DashboardNavigationContext.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Context provider for dashboard navigation structure."
+  },
+  {
+   "path": "frontend_web/src/contexts/ToastContext.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Application toast notification provider and hook."
+  },
+  {
+   "path": "frontend_web/src/contexts/WorkspaceContext.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Context managing internal versus platform workspace switching."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/EmploymentEngagementsPanel.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Manages dated employment terms, Award previews, penalty windows, and part-time hours."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/ManagerLeavePage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Manager interface to list, approve, or reject employee leave requests."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/MyHoursPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Employee view of rostered versus worked hours and timesheet submission."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/MyLeavePage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Passes undefined membership_id to createLeave because user memberships omit the membership primary key."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/RosterCoveragePanel.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Displays weekly roster coverage rules, validation errors, and staffing shortfalls."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/RosterPublishReviewDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Roster pre-publish review modal verifying revision numbers and warning acknowledgments."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/RosterSafePublishButton.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Button initializing periods and triggering revision-guarded roster publishing."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "CheckCard ignores managerMode and exposes manager check decision and punch actions to workers."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/TimesheetHealthBanners.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Summary status pills showing period health, blockers, and ready timesheets."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/TimesheetsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Manager timesheet dashboard for period management, recalculation, locking, and corrections."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/WorkforceSettingsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Settings page for coverage rules, contracted hours, payroll configuration, and kiosks."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Workforce API bridge delegating calls to shared-core workforce services."
+  },
+  {
+   "path": "frontend_web/src/features/workforce/index.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Workforce module barrel file exporting components, API helpers, and types."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Web",
+   "title": "Worker leave request submission always fails due to reading nonexistent membership id from session user",
+   "scenario": "Omar logs into the web dashboard and opens My Leave to submit annual leave for his shifts at Tom's pharmacy. The pharmacy selector assigns an undefined membership value because pharmacy memberships in the session profile omit the membership record identifier. When Omar submits the form, the server receives a missing membership parameter and rejects the request with a permission error, completely blocking him from requesting leave.",
+   "evidence": [
+    "frontend_web/src/features/workforce/MyLeavePage.tsx:7",
+    "frontend_web/src/features/workforce/MyLeavePage.tsx:11",
+    "frontend_web/src/features/workforce/MyLeavePage.tsx:12",
+    "backend/users/sessions.py:90",
+    "backend/workforce/leave_service.py:237"
+   ],
+   "confidence": "high",
+   "test_needed": "Submit a leave request from MyLeavePage using an authenticated worker whose profile memberships contain pharmacy details without an id attribute, asserting that a valid membership identifier is supplied to the API rather than null or NaN.",
+   "owner_question": {
+    "question": "When Omar requests leave on the web dashboard, how should the application identify his active pharmacy membership?",
+    "options": [
+     "Include the membership primary key on pharmacy memberships in the user profile payload so Omar's leave request submits a valid membership identifier.",
+     "Update the leave creation endpoint to accept the pharmacy identifier directly and resolve Omar's active membership automatically.",
+     "Require workers to submit leave requests through mobile or ask Tom to enter it directly (keep today's behaviour)."
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Timesheets",
+   "title": "Timesheet detail drawer renders manager check resolution and punch actions in worker mode",
+   "scenario": "Omar opens My Hours to review his worked hours at Tom's pharmacy and inspects a timesheet with an attendance warning. Because the details drawer fails to pass worker mode into check cards, Omar is shown active Resolve and Waive buttons as well as an Add missing clock time button. When Omar attempts to resolve the check or add a missing clock time, the request is rejected with a 403 error because only pharmacy managers like Tom may approve or waive attendance checks.",
+   "evidence": [
+    "frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:63",
+    "frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:95",
+    "frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:115",
+    "frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:288",
+    "backend/workforce/timesheet_transitions.py:101"
+   ],
+   "confidence": "high",
+   "test_needed": "Render TimesheetDetailDrawer with managerMode set to false and verify that CheckCard renders in read-only mode without Resolve, Waive, Reopen, or Add missing clock time buttons.",
+   "owner_question": {
+    "question": "When Omar reviews his own hours in the timesheet details drawer, how should checks and attendance issues be displayed?",
+    "options": [
+     "Display checks in read-only mode with instructions for Omar to contact his manager Tom to correct source attendance.",
+     "Allow Omar to submit explanations as comments on the timesheet without showing direct resolution or waiving controls.",
+     "Leave the manager resolution and punch buttons visible to workers even though server permissions reject their submissions (keep today's behaviour)."
+    ]
+   }
+  }
+ ],
+ "reviewer": "agy-g3"
+}

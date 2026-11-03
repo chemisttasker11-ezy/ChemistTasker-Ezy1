@@ -1,0 +1,269 @@
+{
+ "chunk": "F10",
+ "paths_read": [
+  "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md",
+  "docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md",
+  "docs/marketplace/IMPLEMENTATION.md",
+  "docs/marketplace/FINALISATION_HANDOVER_2026-09-17.md",
+  "docs/handover/verification-newcomer/HANDOVER.md",
+  "backend/core/urls.py",
+  "backend/core/api_v1_urls.py",
+  "backend/core/settings.py",
+  "backend/talent/urls.py",
+  "backend/talent/models.py",
+  "backend/talent/views/explorer.py",
+  "backend/talent/views/availability.py",
+  "backend/talent/serializers/explorer.py",
+  "backend/talent/serializers/availability.py",
+  "backend/talent/test_explorer_api.py",
+  "backend/talent/test_access.py",
+  "backend/onboarding/verification/policy.py",
+  "backend/organizations/urls.py",
+  "backend/organizations/views.py",
+  "backend/organizations/serializers.py",
+  "backend/shifts/urls.py",
+  "backend/shifts/browse.py",
+  "backend/shifts/serializers.py",
+  "backend/shifts/serialization/shifts.py",
+  "backend/shifts/serialization/projections.py",
+  "backend/shifts/serialization/slots.py",
+  "backend/shifts/rate_visibility.py",
+  "backend/ratings/urls.py",
+  "backend/ratings/views.py",
+  "backend/ratings/serializers.py",
+  "backend/ratings/models.py",
+  "backend/rewards/urls.py",
+  "backend/rewards/views.py",
+  "backend/rewards/services.py",
+  "backend/rewards/signals.py",
+  "backend/rewards/models.py",
+  "backend/rewards/serializers.py",
+  "backend/rewards/test_api.py",
+  "backend/rewards/test_rewards.py",
+  "backend/users/serializers.py",
+  "backend/marketplace/urls.py",
+  "backend/marketplace/views.py",
+  "backend/marketplace/serializers.py",
+  "backend/marketplace/services.py",
+  "backend/marketplace/models.py",
+  "backend/marketplace/policy.py",
+  "backend/marketplace/listing_policy.py",
+  "backend/marketplace/signals.py",
+  "backend/marketplace/tasks.py",
+  "backend/ethical_marketplace/urls.py",
+  "backend/ethical_marketplace/views.py",
+  "backend/ethical_marketplace/owner_views.py",
+  "backend/ethical_marketplace/serializers.py",
+  "backend/ethical_marketplace/models.py",
+  "backend/ethical_marketplace/policy.py",
+  "backend/ethical_marketplace/signals.py",
+  "backend/ethical_marketplace/tasks.py",
+  "backend/ethical_marketplace/test_finalisation.py",
+  "backend/ethical_marketplace/tests.py",
+  "shared-core/src/domains/talent/api.ts",
+  "shared-core/src/domains/ratings/api.ts",
+  "shared-core/src/domains/rewards/api.ts",
+  "shared-core/src/domains/organizations/api.ts",
+  "shared-core/src/domains/shifts/api.ts",
+  "shared-core/src/platformApi.ts",
+  "shared-core/src/constants/platformEndpoints.ts",
+  "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/TalentBoard/talentModel.ts",
+  "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts",
+  "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/TalentCardV2.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/PitchDialog.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/rewards/PillsPage.tsx",
+  "frontend_web/landing_next/public/entry.tsx",
+  "frontend_web/landing_next/public/routes.ts",
+  "frontend_web/landing_next/lib/chemisttasker-api.ts",
+  "frontend_web/landing_next/lib/platform-proxy.ts",
+  "frontend_web/landing_next/migrated/pages/PublicTalentBoardPage.tsx",
+  "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx",
+  "frontend_web/landing_next/migrated/pages/PublicOrganizationPage.tsx",
+  "frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx",
+  "frontend_web/landing_next/features/marketplace/api.ts",
+  "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx",
+  "frontend_web/landing_next/app/(public)/organization/[slug]/page.tsx",
+  "frontend_web/landing_next/app/(public)/shifts/public-board/page.tsx",
+  "frontend_web/landing_next/app/(public)/marketplace/items/[id]/[slug]/page.tsx",
+  "frontend_mobile/roles/shared/talent-board/index.tsx",
+  "frontend_mobile/roles/shared/talent-board/hooks/useTalentFeed.ts",
+  "frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx",
+  "frontend_mobile/roles/shared/availability/availabilityModel.ts",
+  "frontend_mobile/roles/shared/pills/PillsScreen.tsx",
+  "frontend_mobile/features/parity/ethicalMarketplace.tsx"
+ ],
+ "confirmed_known": [
+  "B10",
+  "B12",
+  "B24",
+  "B25",
+  "B26",
+  "B31",
+  "B34",
+  "B42"
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Talent",
+   "title": "Any signed-in account can identify authors of anonymous talent posts.",
+   "scenario": "Sara publishes anonymous availability, and the public board hides her identity. Zoe signs in and can obtain Sara's full name and account identifiers from the signed-in talent feed without any hiring relationship, verification or permission to reveal Sara. The same post number connects Sara's identity to her anonymous public availability.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:722",
+    "frontend_mobile/roles/shared/talent-board/hooks/useTalentFeed.ts:45",
+    "shared-core/src/domains/talent/api.ts:43",
+    "backend/talent/views/explorer.py:97",
+    "backend/talent/views/explorer.py:184",
+    "backend/talent/serializers/explorer.py:79",
+    "backend/talent/serializers/explorer.py:83",
+    "backend/talent/serializers/explorer.py:190"
+   ],
+   "confidence": "high",
+   "test_needed": "As unrelated, unverified Zoe, request the authenticated feed containing Sara's anonymous post and assert that Sara's name and identity links remain withheld.",
+   "owner_question": {
+    "question": "When Sara publishes anonymously, when should Zoe or Tom be allowed to learn her identity?",
+    "options": [
+     "After Sara accepts a hiring interaction",
+     "After an explicitly authorised employer reveal",
+     "Immediately after signing in (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Public job board",
+   "title": "Public search can identify pharmacies behind anonymous vacancies.",
+   "scenario": "Tom publishes a vacancy anonymously. Zoe searches the public job board using a distinctive part of Tom's pharmacy name or exact street address, and Tom's anonymous vacancy matches that hidden information. By comparing the vacancy across searches, Zoe can identify the pharmacy without signing in.",
+   "evidence": [
+    "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:193",
+    "frontend_web/landing_next/migrated/pages/PublicJobBoardPage.tsx:214",
+    "shared-core/src/domains/shifts/api.ts:218",
+    "backend/shifts/browse.py:537",
+    "backend/shifts/browse.py:589",
+    "backend/shifts/serialization/shifts.py:193",
+    "backend/organizations/serializers.py:56"
+   ],
+   "confidence": "high",
+   "test_needed": "Create Tom's anonymous vacancy with a unique pharmacy name and street address; assert that unauthenticated searches matching only those hidden fields do not return it.",
+   "owner_question": {
+    "question": "Should Zoe be able to discover Tom's anonymous vacancy by searching for its hidden pharmacy name or street address?",
+    "options": [
+     "Search only information visible on the anonymous card",
+     "Allow identifying searches only after authorised disclosure",
+     "Allow those public searches (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Rewards",
+   "title": "Concurrent claims can award multiple rewards for the same referral.",
+   "scenario": "Verified Sara sends her first claim for Tom's friend-referral code twice at the same time. Both claims can create a separate referral and award Tom 100 Pills, giving him 200 Pills for referring one person. Tom can spend the duplicated credit on a shift payment.",
+   "evidence": [
+    "shared-core/src/domains/rewards/api.ts:36",
+    "backend/rewards/views.py:139",
+    "backend/rewards/services.py:297",
+    "backend/rewards/services.py:333",
+    "backend/rewards/services.py:188",
+    "backend/rewards/models.py:119",
+    "backend/rewards/services.py:356"
+   ],
+   "confidence": "high",
+   "test_needed": "Submit two concurrent first claims by eligible Sara for Tom's same friend-referral code and assert exactly one referral event and one 100-Pill award.",
+   "owner_question": {
+    "question": "If Sara's first claim reaches the service twice simultaneously, how many referral rewards should Tom receive?",
+    "options": [
+     "One reward, with both claims returning the same result",
+     "One reward, with the duplicate claim rejected",
+     "A reward for each simultaneous claim (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P1",
+   "area": "Ethical marketplace",
+   "title": "Bulk ethical reads bypass the viewer's approved medicine schedules.",
+   "scenario": "Tom delegates inventory and listing access to Omar, whose reviewed professional access covers S4 medicines only. Omar opens the inventory or owned-listings screen and receives S8 stock or listing details too, including quantities and prices where present. Individual product checks would reject that S8 access, but these bulk screens omit them.",
+   "evidence": [
+    "frontend_mobile/features/parity/ethicalMarketplace.tsx:26",
+    "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:50",
+    "shared-core/src/platformApi.ts:150",
+    "backend/ethical_marketplace/views.py:163",
+    "backend/ethical_marketplace/views.py:228",
+    "backend/ethical_marketplace/owner_views.py:36",
+    "backend/ethical_marketplace/policy.py:50",
+    "backend/ethical_marketplace/serializers.py:38"
+   ],
+   "confidence": "high",
+   "test_needed": "Give Omar valid pharmacy grants but professional approval for S4 only, seed S4 and S8 stock and listings, and assert that bulk inventory and owned-listing responses exclude S8 records.",
+   "owner_question": {
+    "question": "When Omar is approved for S4 medicines only, what should he see of Tom's S8 stock?",
+    "options": [
+     "No S8 stock or listing details",
+     "Catalogue names only, with stock and prices withheld",
+     "All stock and listing details (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N5",
+   "severity": "P1",
+   "area": "Ethical marketplace",
+   "title": "Valid premises applications fail after saving because the response uses an undefined variable.",
+   "scenario": "Tom submits a valid premises application from the website or mobile app. The application is saved for review, but the app receives a server error instead of confirmation. Every valid submission reaches this failure, so Tom cannot tell whether his application succeeded and is encouraged to retry.",
+   "evidence": [
+    "frontend_web/landing_next/features/marketplace/ethical-workspace-v2.tsx:143",
+    "frontend_mobile/features/parity/ethicalMarketplace.tsx:54",
+    "shared-core/src/platformApi.ts:141",
+    "backend/ethical_marketplace/views.py:100",
+    "backend/ethical_marketplace/views.py:102",
+    "backend/ethical_marketplace/views.py:113",
+    "backend/ethical_marketplace/views.py:121"
+   ],
+   "confidence": "high",
+   "test_needed": "Submit Tom's first valid premises application and assert a successful creation response containing the saved pending-review application instead of a server error.",
+   "owner_question": {
+    "question": "What should Tom see after his valid premises application has been saved?",
+    "options": [
+     "Confirmation that the application is pending review",
+     "The saved application with its current status",
+     "An error despite the saved application (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N6",
+   "severity": "P1",
+   "area": "Ethical marketplace",
+   "title": "Ethical offers disclose full stock-lot records to viewers without inventory access.",
+   "scenario": "Tom publishes an offer for two packs from the pharmacy where Nadia works to his pharmacy chain. Omar has permission to browse chain offers through Tom's first pharmacy but cannot open Nadia's pharmacy inventory. Viewing the offer nevertheless reveals the lot's entire on-hand and reserved quantities, storage checks and source reference, beyond the two packs offered.",
+   "evidence": [
+    "backend/ethical_marketplace/policy.py:94",
+    "backend/ethical_marketplace/policy.py:100",
+    "backend/ethical_marketplace/views.py:229",
+    "backend/ethical_marketplace/views.py:286",
+    "backend/ethical_marketplace/views.py:288",
+    "backend/ethical_marketplace/serializers.py:38",
+    "backend/ethical_marketplace/serializers.py:47",
+    "backend/ethical_marketplace/serializers.py:56"
+   ],
+   "confidence": "high",
+   "test_needed": "As browse-only Omar, confirm that Nadia's pharmacy inventory request is denied, then retrieve its visible two-pack offer and assert that full lot balances, storage checks and source references are absent.",
+   "owner_question": {
+    "question": "When Omar may browse Tom's chain offer but cannot access Nadia's pharmacy inventory, how much stock information should he receive?",
+    "options": [
+     "Only offered quantities and necessary batch and expiry details",
+     "Additional inventory details after separate authorisation",
+     "The full underlying stock-lot record (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-1"
+}

@@ -1,0 +1,153 @@
+{
+ "chunk": "F04",
+ "paths_read": [
+  "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md",
+  "docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md",
+  "docs/qa/MAIN_RELEASE_AUDIT_EVIDENCE.md",
+  "docs/qa/MAIN_RELEASE_DISCOVERY_WAVE_7.md",
+  "backend/organizations/urls.py",
+  "backend/organizations/views.py",
+  "backend/organizations/access.py",
+  "backend/organizations/serializers.py",
+  "backend/organizations/models.py",
+  "backend/organizations/claims.py",
+  "backend/users/permissions.py",
+  "backend/users/api_organizations.py",
+  "backend/users/serializers.py",
+  "backend/users/org_roles.py",
+  "backend/users/api_account.py",
+  "backend/dashboards/views.py",
+  "backend/memberships/urls.py",
+  "backend/memberships/views.py",
+  "backend/memberships/access.py",
+  "backend/memberships/selectors.py",
+  "backend/memberships/serializers.py",
+  "backend/memberships/invites.py",
+  "backend/memberships/test_membership_workflows_contract.py",
+  "backend/client_profile/test_postgres_concurrency.py",
+  "backend/shifts/urls.py",
+  "backend/shifts/base.py",
+  "backend/shifts/lifecycle.py",
+  "backend/shifts/browse.py",
+  "backend/shifts/candidates.py",
+  "backend/shifts/selectors.py",
+  "backend/shifts/posting.py",
+  "backend/shifts/offers.py",
+  "backend/shifts/escalation.py",
+  "backend/shifts/description_templates.py",
+  "backend/shifts/serialization/shifts.py",
+  "backend/shifts/models.py",
+  "backend/shifts/test_shift_actions_contract.py",
+  "backend/rewards/views.py",
+  "backend/billing/views.py",
+  "backend/workforce/views.py",
+  "backend/workforce/leave_service.py",
+  "backend/workforce/roster/permissions.py",
+  "backend/attendance/approvals.py",
+  "backend/pharmacy_hub/groups.py",
+  "backend/pharmacy_hub/access.py",
+  "backend/pharmacy_hub/serialization/groups.py",
+  "backend/chat/views.py",
+  "shared-core/src/domains/organizations/api.ts",
+  "shared-core/src/domains/memberships/api.ts",
+  "shared-core/src/domains/shifts/api.ts",
+  "shared-core/src/constants/endpoints.ts"
+ ],
+ "confirmed_known": [
+  "B03",
+  "B16",
+  "B17",
+  "B23",
+  "B41",
+  "B46",
+  "B47",
+  "B62",
+  "B65"
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P0",
+   "area": "Shifts/Privacy",
+   "title": "Any worker who can see a shift can download the staff list of that pharmacy, or of its whole organisation, through the shift's member-status page.",
+   "scenario": "Sara, an external locum, opens one of Tom's public shifts. Using that shift's member-status address with a different team filter, she gets back every pharmacist on Tom's own staff (Omar included): names, user numbers, employment type and how each answered. Anyone with a pending offer also has their email and offered rate exposed. If the shift belongs to one of Lina's organisation pharmacies, the organisation filter returns every pharmacist across Lina's whole organisation. Only the manager's version of this page checks that the caller manages the pharmacy. The general shift page lets anyone in who can merely see the shift, and the team filter is taken from the request without checking it.",
+   "evidence": [
+    "backend/shifts/lifecycle.py:287",
+    "backend/shifts/lifecycle.py:393",
+    "backend/shifts/base.py:124",
+    "backend/shifts/base.py:169",
+    "backend/shifts/candidates.py:212",
+    "backend/shifts/candidates.py:245",
+    "backend/shifts/candidates.py:273",
+    "backend/shifts/candidates.py:448",
+    "backend/shifts/candidates.py:417",
+    "backend/shifts/base.py:316"
+   ],
+   "confidence": "high",
+   "test_needed": "Sara (pharmacist, no membership at Tom's pharmacy) calls GET /api/v1/shifts/<Tom's PLATFORM shift>/member_status/?visibility=FULL_PART_TIME (and ?visibility=ORG_CHAIN on an org pharmacy shift) and must get 403/404, not Omar's row.",
+   "owner_question": {
+    "question": "Sara can see Tom's public shift. Should she ever see which of Tom's staff, or Lina's organisation staff, were offered it and how they answered?",
+    "options": [
+     "No: only Tom and the people who manage that pharmacy can see member status",
+     "Sara sees only her own status on that shift",
+     "Keep today's behaviour"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P0",
+   "area": "Shifts/Organizations",
+   "title": "Editing a shift can move it into another owner's pharmacy and overwrite that pharmacy's saved pay rates.",
+   "scenario": "Tom edits one of his own pharmacist shifts and changes the pharmacy number in the request to a pharmacy in another organisation. The edit check only looks at the pharmacy the shift was in before, so the save goes through. The shift now appears in the other owner's shift lists. If Tom also ticks 'apply these rates to the pharmacy', the other pharmacy's default rates are overwritten with his numbers, or wiped. The same edit also accepts a payment status from the request, so a manager can mark a shift paid or not needing payment.",
+   "evidence": [
+    "backend/shifts/base.py:128",
+    "backend/shifts/base.py:132",
+    "backend/shifts/serialization/shifts.py:49",
+    "backend/shifts/serialization/shifts.py:102",
+    "backend/shifts/serialization/shifts.py:105",
+    "backend/shifts/serialization/shifts.py:338",
+    "backend/shifts/posting.py:182",
+    "backend/shifts/posting.py:193",
+    "backend/shifts/posting.py:262"
+   ],
+   "confidence": "high",
+   "test_needed": "Tom sends PATCH /api/v1/shifts/<his shift>/ with {\"pharmacy\": <another org's pharmacy>, \"apply_rates_to_pharmacy\": true, \"role_needed\": \"PHARMACIST\"} and must get 400/403, and the shift's pharmacy and the other pharmacy's rates must be unchanged.",
+   "owner_question": {
+    "question": "Tom wants a shift to be at a different pharmacy. What should happen?",
+    "options": [
+     "The pharmacy can never change after posting; Tom reposts it",
+     "Tom can move it only between pharmacies he manages himself (for example to Nadia's site)",
+     "Keep today's behaviour"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Memberships",
+   "title": "A pharmacy manager can silently make any registered person an active staff member, with no invitation, email or consent.",
+   "scenario": "Tom invites Sara by email with the hidden 'activate immediately' flag (meant for approving her own application). Sara becomes an accepted, active member of Tom's pharmacy straight away and gets no email or notice. She is now on Tom's team for rosters, chat and hub, and it uses one of her three pharmacy places, so a genuine pharmacy may be unable to add her. Tom can do the same by editing a pending invite's status to accepted. This is the pharmacy-staff version of B47, through a different endpoint and with no notice at all.",
+   "evidence": [
+    "backend/memberships/views.py:142",
+    "backend/memberships/invites.py:149",
+    "backend/memberships/invites.py:240",
+    "backend/memberships/applications.py:121",
+    "backend/memberships/serializers.py:67",
+    "backend/memberships/views.py:84",
+    "backend/memberships/test_membership_workflows_contract.py:116"
+   ],
+   "confidence": "high",
+   "test_needed": "Tom POSTs /api/v1/memberships/ with Sara's email and activate_immediately=true (and separately PATCHes Sara's pending invite to status ACCEPTED); Sara's membership must stay PENDING until she accepts it from My Memberships.",
+   "owner_question": {
+    "question": "Tom adds Sara, who already has an account, to his pharmacy. Should she join straight away?",
+    "options": [
+     "No: Sara must accept the invitation first; only approving her own application activates her at once",
+     "Activate at once but always notify Sara and let her leave",
+     "Keep today's behaviour"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-2"
+}

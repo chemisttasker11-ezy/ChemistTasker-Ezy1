@@ -1,0 +1,67 @@
+{
+  "audit_head": "d9a278031c251584589aa5f20b5e9831394d30a9",
+  "frozen_main": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "run_id": 40169055953,
+  "run_url": "https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/40169055953",
+  "job_id": 121095994565,
+  "environment": "GitHub-hosted Ubuntu; Python 3.12; Django contract_test_settings; disposable SQLite DB",
+  "tests_run": 10,
+  "assertions_failed": 8,
+  "positive_controls_passed": 2,
+  "failed_tests": [
+    {
+      "id": "B07",
+      "test": "test_b07_event_patch_denies_destination_pharmacy",
+      "observed": "HTTP 200; destination pharmacy field accepted"
+    },
+    {
+      "id": "B07",
+      "test": "test_b07_work_note_patch_denies_destination_pharmacy",
+      "observed": "HTTP 200; note destination accepted"
+    },
+    {
+      "id": "B33",
+      "test": "test_b33_invoice_post_denies_foreign_pharmacy",
+      "observed": "HTTP 201; unrelated user's paid invoice created for pharmacy B"
+    },
+    {
+      "id": "B36",
+      "test": "test_b36_roster_post_denies_unmanaged_pharmacy",
+      "observed": "HTTP 201; unrelated worker creates B roster shift"
+    },
+    {
+      "id": "F04-N2",
+      "test": "test_f04_shift_patch_denies_cross_tenant_and_paid_override",
+      "observed": "HTTP 200; unrelated target pharmacy and PAID accepted"
+    },
+    {
+      "id": "B15",
+      "test": "test_b15_cancellation_webhook_never_finalizes_worker_offer",
+      "observed": "Penalty session invoked fulfillment finalizer"
+    },
+    {
+      "id": "F10-N5",
+      "test": "test_f10_approval_valid_post_returns_201",
+      "observed": "HTTP 500; NameError creating variable"
+    },
+    {
+      "id": "B06",
+      "test": "test_b06_organization_feed_does_not_expose_sibling_notes",
+      "observed": "Ordinary A staff received B's organization work note"
+    }
+  ],
+  "passed_tests": [
+    "test_b33_invoice_positive_control",
+    "test_b36_roster_positive_control"
+  ],
+  "gate_status": "FAILED_INTENTIONALLY_RED_TESTS",
+  "interpretation": "8 runtime reproducible negative safety contracts, not real production exploit; some e.g B06 require explicit product access-policy adjudication.",
+  "limitations": [
+    "No staging/production requests",
+    "No real Stripe sandbox, synthetic signed-provider event only",
+    "No PostgreSQL adversarial reproduction",
+    "No Expo/iOS or physical device proof",
+    "No remediation in audit PR"
+  ],
+  "source": "workflow stderr/test summary and step logs; Ran 10 tests in 0.583s, FAILED (failures=8)"
+}
