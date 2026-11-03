@@ -80,7 +80,7 @@ export default function OwnerProfileDetailScreen({
   const [lockedNames, setLockedNames] = useState({ first: false, last: false });
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [profilePhotoAsset, setProfilePhotoAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
-  const saveRef = useRef<(() => Promise<void>) | null>(null);
+  const saveRef = useRef<(() => Promise<boolean | void>) | null>(null);
   const [form, setForm] = useState<OwnerFormData>({
     username: '',
     first_name: '',
@@ -189,15 +189,16 @@ export default function OwnerProfileDetailScreen({
     }
   };
 
-  const submit = async () => {
+  // Saves only; the unsaved-changes dialog calls this and the guard does the navigating.
+  const persist = async () => {
     setError('');
     if (!form.first_name || !form.last_name || !form.username || !form.phone_number) {
       setError('Please complete first name, last name, username, and phone number.');
-      return;
+      return false;
     }
     if (form.role === 'PHARMACIST' && !form.ahpra_number) {
       setError('AHPRA number is required for Pharmacist role.');
-      return;
+      return false;
     }
 
     const payload = new FormData();
@@ -224,29 +225,39 @@ export default function OwnerProfileDetailScreen({
     setSaving(true);
     try {
       await updateOnboardingForm('owner', payload);
-      await ahpra.refresh();
-      await refreshUser();
+      setProfilePhotoAsset(null);
+      // The save is done; a failed refresh must not report it as failed.
+      try {
+        await ahpra.refresh();
+        await refreshUser();
+      } catch {}
+      // Last, right before the caller navigates: marking clean releases the save lock, so nothing may leave earlier.
       unsaved.markClean({
         form,
         profilePhotoPreview,
         profilePhotoUri: null,
       });
-      setProfilePhotoAsset(null);
-      if (standalone && onSuccessPath) {
-        router.replace(onSuccessPath as any);
-      } else {
-        Alert.alert('Saved', 'Owner profile detail updated.');
-        router.back();
-      }
+      return true;
     } catch (err: any) {
       setError(err?.response?.data?.detail || err?.message || 'Failed to save owner profile detail.');
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
+  const submit = async () => {
+    if (!(await persist())) return;
+    if (standalone && onSuccessPath) {
+      router.replace(onSuccessPath as any);
+    } else {
+      Alert.alert('Saved', 'Owner profile detail updated.');
+      router.back();
+    }
+  };
+
   useEffect(() => {
-    saveRef.current = submit;
+    saveRef.current = persist;
   });
 
   if (loading) {
@@ -516,13 +527,14 @@ export default function OwnerProfileDetailScreen({
                   router.back();
                 });
               }}
+              disabled={saving}
               textColor="#111827"
             >
               Cancel
             </Button>
             <Button
               mode="contained"
-              onPress={submit}
+              onPress={() => void submit()}
               loading={saving}
               disabled={saving}
               buttonColor="#7C8CF8"

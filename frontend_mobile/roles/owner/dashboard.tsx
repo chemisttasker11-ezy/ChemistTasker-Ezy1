@@ -15,7 +15,6 @@ import {
   DashboardErrorState,
   DashboardLoadingState,
   DashboardPersonaSwitcher,
-  DashboardScopeSwitcher,
   DashboardStatsOverview,
   type DashboardPayload,
   useScopedDashboard,
@@ -171,15 +170,6 @@ export default function OwnerDashboard() {
         showsVerticalScrollIndicator={false}
       >
         <DashboardPersonaSwitcher role="OWNER" />
-        <DashboardScopeSwitcher
-          pharmacies={scope.pharmacies}
-          scopeLabel={scope.scopeLabel}
-          workspace={scope.workspace}
-          selectedPharmacyId={scope.selectedPharmacyId}
-          canSelectPlatform={scope.canSelectPlatform}
-          onSelectPlatform={scope.selectPlatform}
-          onSelectPharmacy={scope.selectPharmacy}
-        />
         {errorMessage ? <DashboardErrorState message={errorMessage} onRetry={fetchData} /> : null}
         {/* <View style={styles.statsContainer}>
           <View style={styles.sectionHeader}>

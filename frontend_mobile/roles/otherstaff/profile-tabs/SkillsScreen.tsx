@@ -106,6 +106,7 @@ export default function OtherStaffSkillsScreen() {
       } else {
         setError(err?.message || 'Failed to save skills.');
       }
+      return false;
     } finally {
       setSaving(false);
     }

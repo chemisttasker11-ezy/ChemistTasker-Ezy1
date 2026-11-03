@@ -228,7 +228,7 @@ export default function PostShiftPayRateStep({
                 <Chip
                   key={mode}
                   selected={selected}
-                  onPress={() => setFtptPayMode(mode)}
+                  onPress={() => { if (mode !== ftptPayMode) setFtptPayMode(mode); }}
                   style={chipStyle(selected)}
                   textStyle={chipTextStyle(selected)}
                 >
@@ -295,7 +295,7 @@ export default function PostShiftPayRateStep({
                   <Chip
                     key={mode}
                     selected={selected}
-                    onPress={() => setRateType(mode)}
+                    onPress={() => { if (mode !== rateType) setRateType(mode); }}
                     style={chipStyle(selected)}
                     textStyle={chipTextStyle(selected)}
                   >
@@ -319,7 +319,7 @@ export default function PostShiftPayRateStep({
                 <Chip
                   key={preference}
                   selected={selected}
-                  onPress={() => setPaymentPreference(preference)}
+                  onPress={() => { if (preference !== paymentPreference) setPaymentPreference(preference); }}
                   style={chipStyle(selected)}
                   textStyle={chipTextStyle(selected)}
                 >
@@ -430,7 +430,7 @@ export default function PostShiftPayRateStep({
                 <Chip
                   key={preference}
                   selected={selected}
-                  onPress={() => setPaymentPreference(preference)}
+                  onPress={() => { if (preference !== paymentPreference) setPaymentPreference(preference); }}
                   style={chipStyle(selected)}
                   textStyle={chipTextStyle(selected)}
                 >

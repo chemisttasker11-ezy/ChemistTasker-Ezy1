@@ -14,7 +14,7 @@ import { DashboardActivity, DashboardPersonaSwitcher, type DashboardPayload } fr
 export default function AdminHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { assignments, activeAssignment, activePharmacyId: pharmacyId, activePharmacyName: pharmacyName, selectAssignment } = useAdminWorkspace();
+  const { activePharmacyId: pharmacyId, activePharmacyName: pharmacyName } = useAdminWorkspace();
   const [pillSummary, setPillSummary] = useState({ balance: 0, shift_post_cost: 0 });
   const [dashboardData, setDashboardData] = useState<DashboardPayload | null>(null);
 
@@ -54,25 +54,6 @@ export default function AdminHomeScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <DashboardPersonaSwitcher role={user?.role} />
-
-        {assignments.length > 1 ? <Surface style={styles.pharmacyPicker}>
-          <Text variant="titleSmall" style={styles.pharmacyPickerTitle}>Administering pharmacy</Text>
-          <View style={styles.pharmacyPickerOptions}>
-            {assignments.map((item) => {
-              const assignmentId = Number(item.id);
-              const itemId = Number(item.pharmacy_id);
-              const selected = assignmentId === Number(activeAssignment?.id);
-              if (!Number.isFinite(assignmentId) || !Number.isFinite(itemId)) return null;
-              return <Chip
-                key={String(assignmentId)}
-                selected={selected}
-                mode={selected ? 'flat' : 'outlined'}
-                onPress={() => void selectAssignment(assignmentId)}
-                style={selected ? styles.pharmacyPickerChipSelected : styles.pharmacyPickerChip}
-              >{item?.pharmacy_name ?? `Pharmacy #${itemId}`}</Chip>;
-            })}
-          </View>
-        </Surface> : null}
 
         <ChooseAccountTypeCard pharmacyId={pharmacyId} />
 
@@ -136,11 +117,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   scrollView: { flex: 1 },
   content: { padding: 20, gap: 16 },
-  pharmacyPicker: { borderRadius: 18, padding: 16, backgroundColor: '#FFFFFF' },
-  pharmacyPickerTitle: { fontWeight: '700', color: '#111827', marginBottom: 12 },
-  pharmacyPickerOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pharmacyPickerChip: { backgroundColor: '#FFFFFF' },
-  pharmacyPickerChipSelected: { backgroundColor: '#EEF2FF' },
   hero: { borderRadius: 22, padding: 20, backgroundColor: '#FFFFFF' },
   eyebrow: { color: '#6366F1', textTransform: 'uppercase', letterSpacing: 1 },
   title: { color: '#111827', fontWeight: '900', marginTop: 6 },

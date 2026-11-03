@@ -3,7 +3,7 @@ import { Button, Dialog, Portal, Text } from 'react-native-paper';
 
 type ConfirmOptions = {
   message: string;
-  onSave?: () => Promise<void> | void;
+  onSave?: () => Promise<boolean | void> | boolean | void;
   saveLabel?: string;
   title: string;
 };
@@ -40,18 +40,25 @@ export function UnsavedChangesDialogProvider({ children }: { children: React.Rea
 
     setDialogState((prev) => ({ ...prev, saving: true }));
     void (async () => {
+      let saved = false;
       try {
-        await onSave();
-      } finally {
-        setDialogState((prev) => ({ ...prev, open: false, saving: false }));
-        setTimeout(() => {
-          resolverRef.current?.('save');
-          resolverRef.current = null;
-          pendingConfirmationRef.current = null;
-        }, 0);
+        // A throw or an explicit `false` means the save failed: stay on the screen with its data.
+        saved = (await onSave()) !== false;
+      } catch {
+        saved = false;
       }
+      if (!saved) {
+        closeDialog('keep');
+        return;
+      }
+      setDialogState((prev) => ({ ...prev, open: false, saving: false }));
+      setTimeout(() => {
+        resolverRef.current?.('save');
+        resolverRef.current = null;
+        pendingConfirmationRef.current = null;
+      }, 0);
     })();
-  }, [dialogState.onSave, dialogState.saving]);
+  }, [closeDialog, dialogState.onSave, dialogState.saving]);
 
   const confirmAction = useCallback((options: ConfirmOptions) => {
     if (pendingConfirmationRef.current) {

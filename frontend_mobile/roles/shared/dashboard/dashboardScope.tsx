@@ -5,10 +5,10 @@ import { usePathname, useRouter } from 'expo-router';
 import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOwnerDashboard, getPharmacistDashboard, getOtherStaffDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import { useUnsavedChangesRegistry } from '@/roles/shared/forms/UnsavedChangesRegistryProvider';
 import {
   getAdminAssignments,
   getAssignmentId,
-  getAssignmentPharmacyName,
   selectAdminPersona,
   selectRolePersona,
 } from '@/utils/mobilePersona';
@@ -248,100 +248,6 @@ export function useScopedDashboard(roleOverride?: string | null) {
   };
 }
 
-export function DashboardScopeSwitcher({
-  pharmacies,
-  scopeLabel,
-  workspace,
-  selectedPharmacyId,
-  canSelectPlatform = false,
-  onSelectPlatform,
-  onSelectPharmacy,
-  onSelectAllOrganizationPharmacies,
-}: {
-  pharmacies: PharmacyOption[];
-  scopeLabel: string;
-  workspace: 'platform' | 'internal';
-  selectedPharmacyId: number | null;
-  canSelectPlatform?: boolean;
-  onSelectPlatform: () => void;
-  onSelectPharmacy: (pharmacy: PharmacyOption) => void;
-  onSelectAllOrganizationPharmacies?: () => void;
-}) {
-  const [visible, setVisible] = useState(false);
-
-  return (
-    <>
-      <TouchableOpacity style={styles.scopeButton} onPress={() => setVisible(true)} activeOpacity={0.82}>
-        <View style={styles.scopeIcon}>
-          <Icon source={workspace === 'internal' ? 'store-outline' : 'earth'} size={20} color="#4338CA" />
-        </View>
-        <View style={styles.scopeText}>
-          <Text style={styles.scopeLabel}>Dashboard scope</Text>
-          <Text style={styles.scopeValue} numberOfLines={1}>
-            {scopeLabel}
-          </Text>
-        </View>
-        <View importantForAccessibility="no-hide-descendants"><Icon source="chevron-down" size={20} color="#6B7280" /></View>
-      </TouchableOpacity>
-
-      <Portal>
-        <Modal visible={visible} onDismiss={() => setVisible(false)} contentContainerStyle={styles.modal}>
-          <Text variant="titleMedium" style={styles.modalTitle}>
-            Dashboard scope
-          </Text>
-          {onSelectAllOrganizationPharmacies && (
-            <Button
-              mode={workspace === 'internal' && selectedPharmacyId == null ? 'contained' : 'text'}
-              icon="store-multiple-outline"
-              contentStyle={styles.optionContent}
-              onPress={() => {
-                onSelectAllOrganizationPharmacies();
-                setVisible(false);
-              }}
-            >
-              All organization pharmacies
-            </Button>
-          )}
-          {canSelectPlatform && (
-            <>
-              <Button
-                mode={workspace === 'platform' ? 'contained' : 'text'}
-                icon="earth"
-                contentStyle={styles.optionContent}
-                onPress={() => {
-                  onSelectPlatform();
-                  setVisible(false);
-                }}
-              >
-                ChemistTasker Platform
-              </Button>
-              <Divider style={styles.divider} />
-            </>
-          )}
-          {pharmacies.length === 0 ? (
-            <Text style={styles.emptyText}>No internal pharmacies are available for this account.</Text>
-          ) : (
-            pharmacies.map((pharmacy) => (
-              <Button
-                key={pharmacy.id}
-                mode={workspace === 'internal' && selectedPharmacyId === pharmacy.id ? 'contained' : 'text'}
-                icon="store-outline"
-                contentStyle={styles.optionContent}
-                onPress={() => {
-                  onSelectPharmacy(pharmacy);
-                  setVisible(false);
-                }}
-              >
-                {pharmacy.name}
-              </Button>
-            ))
-          )}
-        </Modal>
-      </Portal>
-    </>
-  );
-}
-
 const toNumber = (value: unknown) => Number(value ?? 0) || 0;
 
 export function DashboardStatsOverview({ data }: { data: DashboardPayload | null }) {
@@ -372,13 +278,65 @@ export function DashboardStatsOverview({ data }: { data: DashboardPayload | null
   );
 }
 
-export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
+/** Persona switching (role / delegated admin / organization). The shell header's workspace pill drives it. */
+export function usePersonaSwitch(role?: string | null) {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuth();
   const { reloadWorkspace } = useWorkspace();
+  const unsavedRegistry = useUnsavedChangesRegistry();
+  const normalizedRole = String(role || user?.role || '').toUpperCase();
+  const assignments = getAdminAssignments(user).filter((assignment) => getAssignmentId(assignment) != null);
+  const canSwitchToOrg = hasOrganizationAccess(user) &&
+    !ORG_PORTAL_ROLES.includes(normalizedRole as (typeof ORG_PORTAL_ROLES)[number]);
+  const roleLabel = normalizedRole === 'OTHER_STAFF' ? 'Pharmacy team' :
+    normalizedRole === 'PHARMACIST' ? 'Pharmacist' :
+    normalizedRole === 'OWNER' ? 'Owner' :
+    normalizedRole === 'EXPLORER' ? 'New to pharmacy' : 'Organization';
+  const activeAdmin = String(pathname || '').startsWith('/admin');
+  const activeOrg = String(pathname || '').startsWith('/organization');
+
+  // A switch leaves the screen and changes the stored persona, so a dirty form is asked first.
+  const guarded = (action: () => void | Promise<void>) => {
+    if (unsavedRegistry) void unsavedRegistry.requestNavigation(action);
+    else void action();
+  };
+
+  const openRoleWorkspace = () => guarded(async () => {
+    const route = await selectRolePersona(user);
+    await reloadWorkspace();
+    router.replace(route as any);
+  });
+
+  // Callers list every assignment and let the user pick: never guess between delegated pharmacies, since an
+  // OWNER can be a delegated admin elsewhere while OWNER-level rows remain owner authority only.
+  const enterAdminWorkspace = (assignmentId: number) => guarded(async () => {
+    const selected = await selectAdminPersona(user, assignmentId);
+    if (!selected) return;
+    await reloadWorkspace();
+    router.replace('/admin' as any);
+  });
+
+  const openOrganizationWorkspace = () => guarded(() => router.replace('/organization/dashboard' as any));
+
+  return {
+    roleLabel,
+    assignments,
+    canSwitchToOrg,
+    activeAdmin,
+    activeOrg,
+    openRoleWorkspace,
+    enterAdminWorkspace,
+    openOrganizationWorkspace,
+  };
+}
+
+/** Pending delegated-admin invitations on the dashboard; switching itself lives in the shell header. */
+export function DashboardPersonaSwitcher(_props: { role?: string | null }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user } = useAuth();
   const [pendingAdminCount, setPendingAdminCount] = useState(0);
-  const [adminPickerVisible, setAdminPickerVisible] = useState(false);
   useEffect(() => {
     if (!user) return;
     let active = true;
@@ -387,119 +345,14 @@ export function DashboardPersonaSwitcher({ role }: { role?: string | null }) {
       .catch(() => { if (active) setPendingAdminCount(0); });
     return () => { active = false; };
   }, [user?.id, pathname]);
-  const normalizedRole = String(role || user?.role || '').toUpperCase();
-  const assignments = getAdminAssignments(user).filter((assignment) => getAssignmentId(assignment) != null);
-  const canSwitchToOrg = hasOrganizationAccess(user) &&
-    !ORG_PORTAL_ROLES.includes(normalizedRole as (typeof ORG_PORTAL_ROLES)[number]);
 
-  if (assignments.length === 0 && !canSwitchToOrg && pendingAdminCount === 0) return null;
-
-  const roleLabel = normalizedRole === 'OTHER_STAFF' ? 'Pharmacy team' :
-    normalizedRole === 'PHARMACIST' ? 'Pharmacist' :
-    normalizedRole === 'OWNER' ? 'Owner' :
-    normalizedRole === 'EXPLORER' ? 'New to pharmacy' : 'Organization';
-  const activeAdmin = String(pathname || '').startsWith('/admin');
-  const activeOrg = String(pathname || '').startsWith('/organization');
-
-  const openRoleWorkspace = async () => {
-    const route = await selectRolePersona(user);
-    await reloadWorkspace();
-    router.replace(route as any);
-  };
-
-  const enterAdminWorkspace = async (assignmentId: number) => {
-    const selected = await selectAdminPersona(user, assignmentId);
-    if (!selected) return;
-    setAdminPickerVisible(false);
-    await reloadWorkspace();
-    router.replace('/admin' as any);
-  };
-
-  const openAdminWorkspace = async () => {
-    if (assignments.length === 1) {
-      const assignmentId = getAssignmentId(assignments[0]);
-      if (assignmentId != null) {
-        await enterAdminWorkspace(assignmentId);
-      }
-      return;
-    }
-    if (assignments.length > 1) {
-      // Never guess between multiple delegated pharmacies. This is especially
-      // important for an OWNER who can legitimately be a delegated admin
-      // elsewhere while OWNER-level rows remain owner authority only.
-      setAdminPickerVisible(true);
-    }
-  };
+  if (pendingAdminCount === 0) return null;
 
   return (
-    <>
-    {pendingAdminCount > 0 ? <Surface style={{ padding: 14, borderRadius: 14, marginBottom: 12, backgroundColor: '#EEF2FF' }}>
+    <Surface style={{ padding: 14, borderRadius: 14, marginBottom: 12, backgroundColor: '#EEF2FF' }}>
       <Text variant="titleSmall">{pendingAdminCount} admin invitation{pendingAdminCount === 1 ? '' : 's'} awaiting your decision</Text>
       <Button mode="text" onPress={() => router.push('/admin-invitations' as any)}>Review invitations</Button>
-    </Surface> : null}
-    {(assignments.length > 0 || canSwitchToOrg) ? <View style={styles.personaSwitcher} accessibilityRole="tablist">
-      <TouchableOpacity
-        accessibilityRole="tab"
-        accessibilityState={{ selected: !activeAdmin && (!activeOrg || !canSwitchToOrg) }}
-        accessibilityLabel={`${roleLabel} workspace`}
-        style={[styles.personaButton, !activeAdmin && (!activeOrg || !canSwitchToOrg) && styles.personaButtonActive]}
-        onPress={() => void openRoleWorkspace()}
-        activeOpacity={0.82}
-      >
-        <Icon source="account-outline" size={18} color={!activeAdmin && (!activeOrg || !canSwitchToOrg) ? '#FFFFFF' : '#4F46E5'} />
-        <Text style={[styles.personaButtonText, !activeAdmin && (!activeOrg || !canSwitchToOrg) && styles.personaButtonTextActive]}>{roleLabel}</Text>
-      </TouchableOpacity>
-      {assignments.length > 0 ? <TouchableOpacity
-        accessibilityRole="tab"
-        accessibilityState={{ selected: activeAdmin }}
-        accessibilityLabel="Admin workspace"
-        style={[styles.personaButton, activeAdmin && styles.personaButtonActive]}
-        onPress={() => void openAdminWorkspace()}
-        activeOpacity={0.82}
-      >
-        <Icon source="shield-account-outline" size={18} color={activeAdmin ? '#FFFFFF' : '#4F46E5'} />
-        <Text style={[styles.personaButtonText, activeAdmin && styles.personaButtonTextActive]}>Admin</Text>
-      </TouchableOpacity> : null}
-      {canSwitchToOrg ? <TouchableOpacity
-        accessibilityRole="tab"
-        accessibilityState={{ selected: activeOrg }}
-        accessibilityLabel="Organization workspace"
-        style={[styles.personaButton, activeOrg && styles.personaButtonActive]}
-        onPress={() => router.replace('/organization/dashboard' as any)}
-        activeOpacity={0.82}
-      >
-        <Icon source="domain" size={18} color={activeOrg ? '#FFFFFF' : '#4F46E5'} />
-        <Text style={[styles.personaButtonText, activeOrg && styles.personaButtonTextActive]}>Organization</Text>
-      </TouchableOpacity> : null}
-    </View> : null}
-    <Portal>
-      <Modal
-        visible={adminPickerVisible}
-        onDismiss={() => setAdminPickerVisible(false)}
-        contentContainerStyle={styles.modal}
-      >
-        <Text variant="titleMedium" style={styles.modalTitle}>Choose admin pharmacy</Text>
-        <Text style={styles.emptyText}>
-          Select the pharmacy whose delegated Admin workspace you want to open.
-        </Text>
-        {assignments.map((assignment) => {
-          const assignmentId = getAssignmentId(assignment);
-          return (
-            <Button
-              key={assignmentId ?? assignment.pharmacy_id}
-              mode="text"
-              icon="shield-account-outline"
-              contentStyle={styles.optionContent}
-              disabled={assignmentId == null}
-              onPress={() => assignmentId != null && void enterAdminWorkspace(assignmentId)}
-            >
-              {getAssignmentPharmacyName(assignment)}
-            </Button>
-          );
-        })}
-      </Modal>
-    </Portal>
-    </>
+    </Surface>
   );
 }
 
@@ -632,28 +485,7 @@ export function DashboardLoadingState({ label = 'Loading your dashboard...' }: {
 }
 
 const styles = StyleSheet.create({
-  scopeButton: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 1,
-  },
-  scopeIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
-  scopeText: { flex: 1, minWidth: 0, marginLeft: 10 },
-  scopeLabel: { color: '#6B7280', fontSize: 12 },
-  scopeValue: { color: '#111827', fontWeight: '800', fontSize: 15 },
-  modal: { marginHorizontal: 18, borderRadius: 18, backgroundColor: '#FFFFFF', padding: 18 },
   modalTitle: { fontWeight: '800', color: '#111827', marginBottom: 12 },
-  optionContent: { justifyContent: 'flex-start', minHeight: 46 },
-  divider: { marginVertical: 8 },
-  emptyText: { color: '#6B7280', paddingVertical: 10 },
   statsSection: { paddingHorizontal: 20, marginBottom: 18 },
   statsGrid: { flexDirection: 'row', gap: 8 },
   statCard: {
@@ -669,26 +501,6 @@ const styles = StyleSheet.create({
   statIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 7 },
   statValue: { color: '#111827', fontSize: 18, fontWeight: '900' },
   statLabelText: { color: '#6B7280', fontSize: 11, marginTop: 2 },
-  personaSwitcher: {
-    marginHorizontal: 20,
-    marginBottom: 10,
-    borderRadius: 16,
-    backgroundColor: '#EEF2FF',
-    padding: 4,
-    flexDirection: 'row',
-    gap: 4,
-  },
-  personaButton: {
-    flex: 1,
-    minHeight: 42,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  personaButtonActive: { backgroundColor: '#4F46E5' },
-  personaButtonText: { color: '#4F46E5', fontWeight: '800' },
-  personaButtonTextActive: { color: '#FFFFFF' },
   activitySection: { paddingHorizontal: 20, marginBottom: 20 },
   activityHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   sectionTitle: { color: '#111827', fontWeight: '800', marginBottom: 10 },

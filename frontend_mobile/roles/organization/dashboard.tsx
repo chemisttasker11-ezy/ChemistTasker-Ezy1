@@ -15,7 +15,6 @@ import {
   DashboardErrorState,
   DashboardLoadingState,
   DashboardPersonaSwitcher,
-  DashboardScopeSwitcher,
   DashboardStatsOverview,
   useScopedDashboard,
 } from '@/roles/shared/dashboard/dashboardScope';
@@ -142,16 +141,6 @@ export default function OrganizationDashboard() {
         showsVerticalScrollIndicator={false}
       >
         <DashboardPersonaSwitcher role={user?.role} />
-        <DashboardScopeSwitcher
-          pharmacies={scope.pharmacies}
-          scopeLabel={scope.scopeLabel}
-          workspace={scope.workspace}
-          selectedPharmacyId={scope.selectedPharmacyId}
-          canSelectPlatform={scope.canSelectPlatform}
-          onSelectPlatform={scope.selectPlatform}
-          onSelectPharmacy={scope.selectPharmacy}
-          onSelectAllOrganizationPharmacies={scope.selectAllOrganizationPharmacies}
-        />
         {errorMessage ? <DashboardErrorState message={errorMessage} onRetry={loadData} /> : null}
         <TouchableOpacity
           style={styles.pillHero}

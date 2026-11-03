@@ -64,6 +64,7 @@ export default function ExplorerInterestsScreen() {
       } else {
         setError(err?.message || 'Failed to save interests.');
       }
+      return false;
     } finally {
       setSaving(false);
     }

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchPharmaciesService, getOnboarding } from '@chemisttasker/shared-core';
+import { countOwnedPharmaciesFromUser, fetchPharmaciesService, getOnboarding } from '@chemisttasker/shared-core';
 import type { User } from '../context/AuthContext';
 
 export type OwnerSetupStatus = {
@@ -25,39 +25,6 @@ export async function clearOwnerPharmacySetupSkipped() {
 
 async function isOwnerPharmacySetupSkipped() {
   return (await AsyncStorage.getItem(OWNER_PHARMACY_SETUP_SKIPPED_KEY)) === 'true';
-}
-
-function countOwnedPharmaciesFromUser(user?: User | null) {
-  if (!user) return 0;
-
-  for (const key of ['owned_pharmacies', 'owner_pharmacies', 'pharmacies']) {
-    const value = (user as any)[key];
-    if (Array.isArray(value) && value.length > 0) {
-      return value.length;
-    }
-  }
-
-  if (!Array.isArray(user.memberships)) return 0;
-
-  const ownedPharmacyIds = new Set<number>();
-  for (const membership of user.memberships) {
-    if (!membership || typeof membership !== 'object') {
-      continue;
-    }
-
-    const pharmacyId = Number((membership as any).pharmacy_id ?? (membership as any).pharmacyId);
-    const role = String((membership as any).role || '').toUpperCase();
-    const isOwner =
-      role === 'OWNER' ||
-      role === 'PHARMACY_OWNER' ||
-      (membership as any).is_pharmacy_owner === true;
-
-    if (isOwner && Number.isFinite(pharmacyId)) {
-      ownedPharmacyIds.add(pharmacyId);
-    }
-  }
-
-  return ownedPharmacyIds.size;
 }
 
 export async function getOwnerSetupStatus(user?: User | null): Promise<OwnerSetupStatus> {

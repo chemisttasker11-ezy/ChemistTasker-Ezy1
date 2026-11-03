@@ -92,7 +92,7 @@ export default function PostShiftDetailsStep({
         {ROLE_OPTIONS.map((role) => {
           const selected = roleNeeded === role;
           return (
-            <Chip key={role} selected={selected} onPress={() => setRoleNeeded(role)} accessibilityRole="radio"
+            <Chip key={role} selected={selected} onPress={() => { if (role !== roleNeeded) setRoleNeeded(role); }} accessibilityRole="radio"
               accessibilityState={{ checked: selected }} style={chipStyle(selected)} textStyle={chipTextStyle(selected)}>
               {ROLE_LABELS[role] ?? role}
             </Chip>
@@ -105,7 +105,7 @@ export default function PostShiftDetailsStep({
         {EMPLOYMENT_TYPES.map((employment) => {
           const selected = employmentType === employment || (employment === 'LOCUM' && employmentType === 'CASUAL');
           return (
-            <Chip key={employment} selected={selected} onPress={() => setEmploymentType(employment)}
+            <Chip key={employment} selected={selected} onPress={() => { if (employment !== employmentType) setEmploymentType(employment); }}
               style={chipStyle(selected)} textStyle={chipTextStyle(selected)}>
               {getEmploymentLabel(employment)}
             </Chip>
@@ -128,7 +128,7 @@ export default function PostShiftDetailsStep({
           >
             {pharmacies.map((pharmacy) => (
               <Menu.Item key={pharmacy.id} title={pharmacy.name || `Pharmacy ${pharmacy.id}`}
-                onPress={() => { setPharmacyId(pharmacy.id); setPharmacyMenuVisible(false); }} />
+                onPress={() => { if (pharmacy.id !== pharmacyId) setPharmacyId(pharmacy.id); setPharmacyMenuVisible(false); }} />
             ))}
           </Menu>
         </>

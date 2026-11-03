@@ -16,7 +16,7 @@ import { en, registerTranslation } from 'react-native-paper-dates';
 import { getOwnerSetupStatus, ownerSetupPaths } from '../utils/ownerSetup';
 import { initializeMobileSslPinning } from '../utils/sslPinning';
 import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChangesDialogProvider';
-import { UnsavedChangesRegistryProvider } from '../roles/shared/forms/UnsavedChangesRegistryProvider';
+import { UnsavedChangesRegistryProvider, useGuardedNavigation } from '../roles/shared/forms/UnsavedChangesRegistryProvider';
 import { decideAppUpdate, fetchMobileAppConfig, getInstalledAppVersion } from '../utils/appUpdates';
 import {
   getAssignmentPharmacyId,
@@ -406,7 +406,8 @@ function AuthGate() {
         }
       }
 
-      if (!user && !isPublic) {
+      // `/` has no segments; it is the landing (app/index.tsx), which also routes a signed-in user itself.
+      if (!user && !isPublic && top !== undefined) {
         router.replace('/login');
       }
     };
@@ -427,17 +428,18 @@ function AuthGate() {
 
 function KioskLinkNotificationGate() {
   const router = useRouter();
+  const guardedNavigation = useGuardedNavigation();
 
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data: any = response?.notification?.request?.content?.data || {};
       const route = String(data.kiosk_link_route || '');
       if (route.startsWith('/kiosk-link?source=kiosk&')) {
-        router.push(route as any);
+        guardedNavigation(() => router.push(route as any));
       }
     });
     return () => subscription.remove();
-  }, [router]);
+  }, [guardedNavigation, router]);
 
   return null;
 }

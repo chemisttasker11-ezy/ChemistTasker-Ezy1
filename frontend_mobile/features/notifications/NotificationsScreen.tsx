@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Pressable, RefreshControl } from 'react-native';
+import React, { useRef, useState, useCallback } from 'react';
+import { View, StyleSheet, FlatList, Pressable, RefreshControl, DeviceEventEmitter } from 'react-native';
 import { Text, Surface, Icon, IconButton, Badge, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
@@ -14,6 +14,7 @@ import {
   resolveShiftNotificationRoute,
 } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { NOTIFICATIONS_READ_EVENT } from './events';
 
 type Notification = {
   id: number;
@@ -33,11 +34,10 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  // Only the newest list response may set rows: an older one would restore rows from before a mark-read.
+  const generation = useRef(0);
 
-  // Refresh when screen gains focus and mark any unread as read.
+  // Load on every focus (the first one included) and mark any unread as read.
   useFocusEffect(
     useCallback(() => {
       fetchNotifications(true); // mark all as read when opening
@@ -56,8 +56,10 @@ export default function NotificationsScreen() {
   });
 
   const fetchNotifications = async (markAllRead = false) => {
+    const id = ++generation.current;
     try {
       const response = await getNotifications();
+      if (id !== generation.current) return;
       const list = Array.isArray((response as any)?.results)
         ? (response as any).results
         : Array.isArray(response)
@@ -71,7 +73,7 @@ export default function NotificationsScreen() {
           setNotifications((prev) =>
             prev.map((n: Notification) => (unreadIds.includes(n.id) ? { ...n, readAt: new Date().toISOString() } : n))
           );
-          void markNotificationsAsRead(unreadIds);
+          void markNotificationsAsRead(unreadIds).then(() => DeviceEventEmitter.emit(NOTIFICATIONS_READ_EVENT));
         }
       }
     } catch (error) {
@@ -83,16 +85,18 @@ export default function NotificationsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchNotifications();
+    await fetchNotifications(true); // rows on screen are seen, and a refresh may supersede the focus fetch
     setRefreshing(false);
   };
 
   const markAsRead = async (id: number) => {
+    generation.current++; // drop any list response still in flight, it predates this read
     try {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
       );
       await markNotificationsAsRead([id]);
+      DeviceEventEmitter.emit(NOTIFICATIONS_READ_EVENT);
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }

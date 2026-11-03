@@ -104,6 +104,7 @@ export default function PharmacistSkillsScreen() {
       } else {
         setError(err?.message || 'Failed to save skills.');
       }
+      return false;
     } finally {
       setSaving(false);
     }

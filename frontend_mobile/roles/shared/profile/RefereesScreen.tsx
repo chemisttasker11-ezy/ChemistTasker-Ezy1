@@ -101,6 +101,7 @@ export default function RefereesScreen({ roleKey }: { roleKey: RefereeRoleKey })
       } else {
         setError(err?.message || 'Failed to save referees.');
       }
+      return false;
     } finally {
       setSaving(false);
     }

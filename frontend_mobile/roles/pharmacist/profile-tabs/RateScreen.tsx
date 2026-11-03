@@ -81,6 +81,7 @@ export default function PharmacistRateScreen() {
       } else {
         setError(err?.message || 'Failed to save rates.');
       }
+      return false;
     } finally {
       setSaving(false);
     }

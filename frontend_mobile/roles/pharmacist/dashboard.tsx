@@ -13,7 +13,6 @@ import {
   DashboardErrorState,
   DashboardLoadingState,
   DashboardPersonaSwitcher,
-  DashboardScopeSwitcher,
   DashboardStatsOverview,
   type DashboardPayload,
   useScopedDashboard,
@@ -233,15 +232,6 @@ export default function PharmacistOverviewScreen() {
         showsVerticalScrollIndicator={false}
       >
         <DashboardPersonaSwitcher role="PHARMACIST" />
-        <DashboardScopeSwitcher
-          pharmacies={scope.pharmacies}
-          scopeLabel={scope.scopeLabel}
-          workspace={scope.workspace}
-          selectedPharmacyId={scope.selectedPharmacyId}
-          canSelectPlatform={scope.canSelectPlatform}
-          onSelectPlatform={scope.selectPlatform}
-          onSelectPharmacy={scope.selectPharmacy}
-        />
         {errorMessage ? <DashboardErrorState message={errorMessage} onRetry={loadDashboard} /> : null}
         {/* Header */}
         {/* Stats Grid */}

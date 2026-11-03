@@ -1,41 +1,21 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Text, Button } from 'react-native-paper';
+import React, { useEffect } from 'react';
+import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import AuthLayout from '../components/AuthLayout';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import WelcomeScreen from './welcome';
+import { officialLogo } from '../components/AuthLayout';
 import { useAuth } from '../context/AuthContext';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
 import { hasOrganizationAccess, resolveInitialWorkspace } from '../utils/mobilePersona';
-import { useAnimationEnabled } from '../hooks/useAnimationEnabled';
+import { colors, font, space, type } from '../constants/tokens';
+import { durations } from '../constants/motion';
+
+const LOGO_RATIO = 900 / 436;
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const animationEnabled = useAnimationEnabled();
-  const heroMotion = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    heroMotion.stopAnimation();
-    if (!animationEnabled) {
-      heroMotion.setValue(0);
-      return;
-    }
-
-    const heroLoop = Animated.loop(
-      Animated.timing(heroMotion, {
-        toValue: 1,
-        duration: 10000,
-        easing: Easing.inOut(Easing.sin),
-        useNativeDriver: true,
-        isInteraction: false,
-      }),
-    );
-    heroLoop.start();
-    return () => heroLoop.stop();
-  }, [animationEnabled, heroMotion]);
-
-  const heroY = heroMotion.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -8, 0] });
-  const heroRotate = heroMotion.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '0.6deg', '0deg'] });
 
   useEffect(() => {
     if (isLoading || !user) return;
@@ -60,74 +40,38 @@ export default function HomeScreen() {
     };
   }, [isLoading, user, router]);
 
-  const shouldShowAuthActions = !isLoading && !user;
+  // Signed out: the one landing (same screen as /welcome).
+  if (!isLoading && !user) return <WelcomeScreen />;
 
   return (
-    <AuthLayout title="Welcome" showTitle={false}>
-      <View style={styles.hero}>
-        <Animated.Image
-          source={require('../assets/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png')}
-          style={[styles.heroImage, { transform: [{ translateY: heroY }, { rotate: heroRotate }] }]}
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+      {/* Delayed fade: a fast session restore never flashes the status line. */}
+      <Animated.View entering={FadeIn.duration(durations.fast).delay(durations.slow)} style={styles.boot}>
+        <Image
+          source={officialLogo}
+          style={styles.logo}
           resizeMode="contain"
+          accessibilityRole="image"
+          accessibilityLabel="ChemistTasker"
         />
-        <Text variant="headlineSmall" style={styles.title}>
-          Pharmacy staffing, simplified.
-        </Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
-          Manage shifts, teams, and chats in one place.
-        </Text>
-      </View>
-
-      {shouldShowAuthActions ? (
-        <View style={styles.actions}>
-          <Button mode="contained" onPress={() => router.push('/login')} style={styles.primaryButton}>
-            Go to Login
-          </Button>
-          <Button mode="text" onPress={() => router.push('/register')}>
-            Create an account
-          </Button>
+        <View style={styles.status} accessible accessibilityLiveRegion="polite">
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.statusText}>Loading your workspace...</Text>
         </View>
-      ) : (
-        <View style={styles.loadingState}>
-          <ActivityIndicator size="small" color="#6366F1" />
-          <Text style={styles.loadingText}>Loading your workspace...</Text>
-        </View>
-      )}
-    </AuthLayout>
+      </Animated.View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  heroImage: {
-    width: 220,
-    height: 220,
-  },
-  title: {
-    fontWeight: '700',
-    textAlign: 'center',
-    color: '#0f172a',
-  },
-  subtitle: {
-    textAlign: 'center',
-    color: '#4b5563',
-  },
-  actions: {
-    marginTop: 12,
-    gap: 8,
-  },
-  loadingState: {
-    marginTop: 16,
-    alignItems: 'center',
-    gap: 10,
-  },
-  loadingText: {
-    color: '#6b7280',
-  },
-  primaryButton: {
-    borderRadius: 10,
+  container: { flex: 1, backgroundColor: colors.pageBg },
+  boot: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space['2xl'], padding: space.xl },
+  logo: { width: 200, height: 200 / LOGO_RATIO },
+  status: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  statusText: {
+    color: colors.textSecondary,
+    fontFamily: font.inter.regular,
+    fontSize: type.bodyMedium.fontSize,
+    lineHeight: type.bodyMedium.lineHeight,
   },
 });

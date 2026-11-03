@@ -34,12 +34,12 @@ const explorerTools: PlatformTool[] = [
 
 const managerRoles = new Set(['OWNER','ORGANIZATION','ORG_ADMIN','ORG_OWNER','ORG_STAFF','CHIEF_ADMIN','REGION_ADMIN']);
 
-export default function ParityToolsCard() {
-  const router = useRouter();
+/** The work and platform tools this user may open (capability-gated); the dashboard card and the More tab list them. */
+export function usePlatformTools(): PlatformTool[] {
   const { user, hasCapability } = useAuth();
   const { selectedPharmacyId } = useWorkspace();
   const role = String(user?.role || '').toUpperCase();
-  const tools = useMemo(() => {
+  return useMemo(() => {
     if (role === 'EXPLORER') return explorerTools;
 
     const canManageRoster = hasCapability('MANAGE_ROSTER', selectedPharmacyId);
@@ -58,6 +58,11 @@ export default function ParityToolsCard() {
     delegated.push(...(isOrganizationRole ? managerTools.slice(3) : workerTools));
     return delegated.filter((tool, index, rows) => rows.findIndex((candidate) => candidate.route === tool.route) === index);
   }, [hasCapability, role, selectedPharmacyId]);
+}
+
+export default function ParityToolsCard() {
+  const router = useRouter();
+  const tools = usePlatformTools();
 
   return (
     <View style={styles.section}>

@@ -10,7 +10,7 @@ type Options = {
   title?: string;
   message?: string;
   onDiscard?: () => void | Promise<void>;
-  onSave?: () => void | Promise<void>;
+  onSave?: () => boolean | void | Promise<boolean | void>;
   saveLabel?: string;
 };
 
@@ -38,6 +38,9 @@ const normalizeValue = (value: unknown): unknown => {
 
 const serializeValue = (value: unknown) => JSON.stringify(normalizeValue(value));
 
+// Baseline marker after a discard: take the value the next render shows (onDiscard's reset), never the old snapshot.
+const REBASELINE = '<rebaseline>';
+
 export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
   const {
     enabled = true,
@@ -53,12 +56,41 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
   const dialog = useUnsavedChangesDialog();
   const registry = useUnsavedChangesRegistry();
   const handlingBlockedNavigationRef = useRef(false);
+  // Refs, not state: a save's own success navigation runs in the same tick the save ends, before a re-render.
+  const savingRef = useRef(saving);
+  const savedRef = useRef(false);
+  // Set the moment the user confirms leaving, so the removal that follows does not prompt again before a re-render.
+  const approvedLeaveRef = useRef(false);
   const [baseline, setBaseline] = useState<string | null>(null);
 
   const serializedValue = useMemo(() => serializeValue(value), [value]);
-  const isDirty = enabled && baseline !== null && baseline !== serializedValue;
+  const isDirty = enabled && baseline !== null && baseline !== REBASELINE && baseline !== serializedValue;
+
+  useEffect(() => {
+    if (baseline === REBASELINE) setBaseline(serializedValue);
+  }, [baseline, serializedValue]);
+
+  // The approved removal runs in the same tick as the confirmation; any later render (an edit, a new baseline) ends it.
+  useEffect(() => {
+    approvedLeaveRef.current = false;
+  }, [baseline, serializedValue]);
+
+  // Save: onSave already set the clean baseline via markClean. Discard: baseline whatever the reset leaves.
+  const approveLeave = useCallback((decision: 'discard' | 'save') => {
+    approvedLeaveRef.current = true;
+    if (decision === 'discard') setBaseline(REBASELINE);
+  }, []);
+
+  useEffect(() => {
+    savingRef.current = saving;
+    if (!saving) savedRef.current = false;
+  }, [saving]);
+
+  // Leaving is blocked while a save runs, until that save marks the form clean.
+  const isSaveInFlight = useCallback(() => savingRef.current && !savedRef.current, []);
 
   const markClean = useCallback((nextValue?: T) => {
+    if (savingRef.current) savedRef.current = true;
     setBaseline(serializeValue(nextValue === undefined ? value : nextValue));
   }, [value]);
 
@@ -84,6 +116,9 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
   }, [dialog, message, onSave, saveLabel, title]);
 
   const discardChanges = useCallback(async () => {
+    if (isSaveInFlight()) {
+      return false;
+    }
     if (!isDirty || saving) {
       if (onDiscard) {
         await onDiscard();
@@ -99,41 +134,63 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
     if (decision === 'discard' && onDiscard) {
       await onDiscard();
     }
-    setBaseline(serializedValue);
+    approveLeave(decision);
     return true;
-  }, [isDirty, onDiscard, requestConfirmation, saving, serializedValue]);
+  }, [approveLeave, isDirty, isSaveInFlight, onDiscard, requestConfirmation, saving]);
+
+  const guard = useMemo(
+    () => ({ discardChanges, isBlocking: () => isDirty || isSaveInFlight() }),
+    [discardChanges, isDirty, isSaveInFlight]
+  );
+
+  // Every leave attempt from this form (Cancel, native removal, web back) joins the registry's one transaction.
+  const leave = useCallback((action: () => void) => {
+    if (registry) {
+      void registry.requestNavigation(action, guard);
+      return;
+    }
+    if (handlingBlockedNavigationRef.current) {
+      return;
+    }
+    handlingBlockedNavigationRef.current = true;
+    void (async () => {
+      try {
+        if (await discardChanges()) action();
+      } finally {
+        handlingBlockedNavigationRef.current = false;
+      }
+    })();
+  }, [discardChanges, guard, registry]);
 
   const confirmDiscard = useCallback((onDiscardAction: () => void) => {
+    if (isSaveInFlight()) {
+      return;
+    }
     if (!isDirty || saving) {
       onDiscardAction();
       return;
     }
+    leave(onDiscardAction);
+  }, [isDirty, isSaveInFlight, leave, saving]);
 
-    void (async () => {
-      const confirmed = await discardChanges();
-      if (confirmed) {
-        onDiscardAction();
-      }
-    })();
-  }, [discardChanges, isDirty, saving]);
+  useEffect(
+    () => navigation.addListener('beforeRemove', (event) => {
+      if (isSaveInFlight()) event.preventDefault();
+    }),
+    [isSaveInFlight, navigation]
+  );
 
-  usePreventRemove(Platform.OS !== 'web' && isDirty && !saving, ({ data }) => {
-    if (handlingBlockedNavigationRef.current) {
+  // Stays on while saving so native gestures (iOS swipe) cannot dismiss a saving form; that removal is refused silently.
+  usePreventRemove(Platform.OS !== 'web' && (isDirty || saving), ({ data }) => {
+    if (isSaveInFlight()) {
       return;
     }
-
-    handlingBlockedNavigationRef.current = true;
-    void (async () => {
-      const decision = await requestConfirmation();
-      if (decision === 'discard' || decision === 'save') {
-        setBaseline(serializedValue);
-        handlingBlockedNavigationRef.current = false;
-        navigation.dispatch(data.action);
-        return;
-      }
-
-      handlingBlockedNavigationRef.current = false;
-    })();
+    if (approvedLeaveRef.current || savedRef.current) {
+      approvedLeaveRef.current = false;
+      navigation.dispatch(data.action);
+      return;
+    }
+    leave(() => navigation.dispatch(data.action));
   });
 
   useEffect(() => {
@@ -142,32 +199,17 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
     }
 
     const unsubscribe = navigation.addListener('beforeRemove', (event: any) => {
-      if (!isDirty || saving) {
-        handlingBlockedNavigationRef.current = false;
+      if (!isDirty || saving || approvedLeaveRef.current) {
+        approvedLeaveRef.current = false;
         return;
       }
 
-      if (handlingBlockedNavigationRef.current) {
-        return;
-      }
-
-      handlingBlockedNavigationRef.current = true;
       event.preventDefault();
-      void (async () => {
-        const decision = await requestConfirmation();
-        if (decision === 'discard' || decision === 'save') {
-          setBaseline(serializedValue);
-          handlingBlockedNavigationRef.current = false;
-          navigation.dispatch(event.data.action);
-          return;
-        }
-
-        handlingBlockedNavigationRef.current = false;
-      })();
+      leave(() => navigation.dispatch(event.data.action));
     });
 
     return unsubscribe;
-  }, [isDirty, navigation, requestConfirmation, saving, serializedValue]);
+  }, [isDirty, leave, navigation, saving]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !isDirty || saving || typeof window === 'undefined') {
@@ -188,15 +230,8 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
       return;
     }
 
-    registry.setActiveGuard({
-      discardChanges,
-      isDirty,
-    });
-
-    return () => {
-      registry.setActiveGuard(null);
-    };
-  }, [discardChanges, isDirty, isFocused, registry]);
+    return registry.registerGuard(guard);
+  }, [guard, isFocused, registry]);
 
   return {
     discardChanges,

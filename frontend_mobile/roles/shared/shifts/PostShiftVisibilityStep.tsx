@@ -105,7 +105,7 @@ export default function PostShiftVisibilityStep({
             {allowedVis.map((tier, index) => {
               const on = initialAudience === tier;
               return (
-                <Pressable key={tier} onPress={() => setInitialAudience(tier)} accessibilityRole="radio" accessibilityState={{ checked: on }}
+                <Pressable key={tier} onPress={() => { if (tier !== initialAudience) setInitialAudience(tier); }} accessibilityRole="radio" accessibilityState={{ checked: on }}
                   accessibilityLabel={AUDIENCE[tier].label} style={[s.card, on && s.cardOn]}>
                   <View style={[s.badge, on && s.badgeOn]}>
                     {on ? <MaterialCommunityIcons name="check" size={16} color="#FFFFFF" /> : <Text style={s.badgeText}>{index + 1}</Text>}
@@ -125,13 +125,13 @@ export default function PostShiftVisibilityStep({
         <View style={s.section}>
           <Text style={s.h2}>Still not filled? Open it up later</Text>
           <Text style={s.muted}>The audience widens one group at a time, and only while nobody has shown interest.</Text>
-          <SegmentedButtons value={mode} onValueChange={value => chooseMode(value as Mode)} style={{ marginTop: 12 }}
+          <SegmentedButtons value={mode} onValueChange={value => { if (value !== mode) chooseMode(value as Mode); }} style={{ marginTop: 12 }}
             buttons={[{ value: 'auto', label: 'Automatic' }, { value: 'custom', label: 'Choose dates' }, { value: 'off', label: "Don't widen" }]} />
           {mode === 'auto' ? (
             <View style={s.chips}>
               <Text style={s.title}>Next group every</Text>
               {AUTO_STEPS.map(hours => (
-                <Chip key={hours} selected={autoHours === hours} mode={autoHours === hours ? 'flat' : 'outlined'} onPress={() => applyAuto(hours)}>
+                <Chip key={hours} selected={autoHours === hours} mode={autoHours === hours ? 'flat' : 'outlined'} onPress={() => { if (hours !== autoHours) applyAuto(hours); }}>
                   {hours < 24 ? `${hours} hours` : hours === 24 ? '1 day' : `${hours / 24} days`}
                 </Chip>
               ))}

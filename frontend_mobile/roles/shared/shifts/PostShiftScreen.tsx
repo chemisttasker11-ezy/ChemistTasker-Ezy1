@@ -44,6 +44,7 @@ import {
     normalizePrefillRole,
 } from './PostShiftScreen.helpers';
 import { styles } from './PostShiftScreen.styles';
+import { useUnsavedChangesGuard } from '../forms/useUnsavedChangesGuard';
 import PostShiftDetailsStep from './PostShiftDetailsStep';
 import PostShiftSkillsStep from './PostShiftSkillsStep';
 import PostShiftVisibilityStep from './PostShiftVisibilityStep';
@@ -1002,6 +1003,36 @@ export default function PostShiftScreen() {
         return currentRatesJson !== JSON.stringify(initialRates) || haveShiftPostingSlotRatesChanged(initialSlotRates, slotRateRows);
     };
 
+    // No dialog Save: posting validates and navigates on its own, so the prompt offers Keep editing / Discard only.
+    const draftSnapshot = {
+        pharmacyId, roleNeeded, employmentType, workloadTags, supportOnShift, mustHave, niceToHave, hasTravel, hasAccommodation,
+        isUrgent, flexibleTiming, singleUserOnly, hideName, initialAudience, rateType, ownerBonus, slots, selectedDates,
+        selectedDateTimes, slotStart, slotEnd, slotRecurring, slotRecurringDays, slotRecurringEnd, escalationDates, escalationPlan,
+        description, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, paymentPreference, locumSuperIncluded,
+        superPercent, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode,
+        minHourly, maxHourly, minAnnual, maxAnnual, dedicatedUserId,
+        // Server-calculated slot rates are not edits; only rates the user typed count.
+        slotRates: slotRateRows.map((row) => (row.dirty ? row.rate : '')),
+    };
+    const unsaved = useUnsavedChangesGuard(draftSnapshot, { saving: loading });
+    // Loads, prefills and pharmacy defaults fill the form in a cascade of effects; until the user's first edit after
+    // loading, the baseline follows them, so only the user's own edits make the draft dirty.
+    const touchedRef = React.useRef(false);
+    // Never during a save: markClean there is the save's success signal and would release the leave lock early.
+    useEffect(() => {
+        if (!touchedRef.current && !loading) unsaved.markClean(draftSnapshot);
+    });
+    // While hydrating the form takes no input, so an edit can never be absorbed into the baseline.
+    const hydrating = !pharmaciesLoaded || (Boolean(editingId) && initialSlotsJsonRef.current === null);
+    const markTouched = () => {
+        if (!hydrating) touchedRef.current = true;
+    };
+    // Wraps a data-change handler handed to a step so the user's edit freezes the baseline (UI-only setters stay unwrapped).
+    const edited = <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A) => {
+        markTouched();
+        return fn(...args);
+    };
+
     const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff: !isPrivateBooking, showNotifyFavoriteStaff: !isPrivateBooking, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform }, slotsModified: areSlotsModified(), ratesModified: areRatesModified() });
 
     const handleSubmit = async () => {
@@ -1016,9 +1047,13 @@ export default function PostShiftScreen() {
                 setToast('Shift updated');
             } else {
                 await createOwnerShiftService(payload);
-                setToast('Shift posted');
                 resetForm();
+                setToast('Shift posted');
+                // The retained tab starts a fresh draft: the baseline follows the reset and its defaults again.
+                touchedRef.current = false;
             }
+            // Lets this save's own navigation pass the unsaved-changes guard.
+            unsaved.markClean();
             // Go back to the owner shift center (active tab is managed in-screen)
             router.back();
         } catch (e: any) {
@@ -1037,28 +1072,28 @@ export default function PostShiftScreen() {
             case 'details':
                 return (
                     <PostShiftDetailsStep
-                        hasTravel={hasTravel} setHasTravel={setHasTravel} hasAccommodation={hasAccommodation} setHasAccommodation={setHasAccommodation} isUrgent={isUrgent} setIsUrgent={setIsUrgent}
+                        hasTravel={hasTravel} setHasTravel={edited(setHasTravel)} hasAccommodation={hasAccommodation} setHasAccommodation={edited(setHasAccommodation)} isUrgent={isUrgent} setIsUrgent={edited(setIsUrgent)}
                         pharmacyMenuVisible={pharmacyMenuVisible}
                         setPharmacyMenuVisible={setPharmacyMenuVisible}
                         pharmacies={pharmacies}
                         pharmacyId={pharmacyId}
-                        setPharmacyId={setPharmacyId}
+                        setPharmacyId={edited(setPharmacyId)}
                         roleNeeded={roleNeeded}
-                        setRoleNeeded={setRoleNeeded}
+                        setRoleNeeded={edited(setRoleNeeded)}
                         employmentType={employmentType}
-                        setEmploymentType={setEmploymentType}
+                        setEmploymentType={edited(setEmploymentType)}
                         getEmploymentLabel={getEmploymentLabel}
                         descriptionTemplateLoading={descriptionTemplateLoading}
                         descriptionTemplate={descriptionTemplate}
                         descriptionTemplateSaving={descriptionTemplateSaving}
-                        handleUseDescriptionTemplate={handleUseDescriptionTemplate}
+                        handleUseDescriptionTemplate={edited(handleUseDescriptionTemplate)}
                         handleSaveDescriptionTemplate={handleSaveDescriptionTemplate}
                         description={description}
-                        setDescription={setDescription}
+                        setDescription={edited(setDescription)}
                         workloadTags={workloadTags}
-                        setWorkloadTags={setWorkloadTags}
+                        setWorkloadTags={edited(setWorkloadTags)}
             supportOnShift={supportOnShift}
-            setSupportOnShift={setSupportOnShift}
+            setSupportOnShift={edited(setSupportOnShift)}
                     />
                 );
             case 'skills':
@@ -1067,9 +1102,9 @@ export default function PostShiftScreen() {
                         pharmacySoftware={pharmacySoftwareDefaults(skillsRegistry as any, roleNeeded as any, (selectedPharmacy as any)?.software || [])}
                         roleNeeded={roleNeeded}
                         mustHave={mustHave}
-                        setMustHave={setMustHave}
+                        setMustHave={edited(setMustHave)}
                         niceToHave={niceToHave}
-                        setNiceToHave={setNiceToHave}
+                        setNiceToHave={edited(setNiceToHave)}
                     />
                 );
             case 'visibility':
@@ -1077,37 +1112,37 @@ export default function PostShiftScreen() {
                     <PostShiftVisibilityStep
                         isEmbedded={isPrivateBooking}
                         escalationPlan={escalationPlan}
-                        setEscalationPlan={setEscalationPlan}
+                        setEscalationPlan={edited(setEscalationPlan)}
                         canPostAnonymously={canPostAnonymously}
                         hideName={hideName}
-                        setHideName={setHideName}
+                        setHideName={edited(setHideName)}
                         allowedVis={allowedVis}
                         initialAudience={initialAudience}
-                        setInitialAudience={setInitialAudience}
+                        setInitialAudience={edited(setInitialAudience)}
                         notifyPharmacyStaff={notifyPharmacyStaff}
-                        setNotifyPharmacyStaff={setNotifyPharmacyStaff}
+                        setNotifyPharmacyStaff={edited(setNotifyPharmacyStaff)}
                         notifyFavoriteStaff={notifyFavoriteStaff}
-                        setNotifyFavoriteStaff={setNotifyFavoriteStaff}
+                        setNotifyFavoriteStaff={edited(setNotifyFavoriteStaff)}
                         notifyChainMembers={notifyChainMembers}
                         showNotifyChainMembers={showNotifyChainMembers}
-                        setNotifyChainMembers={setNotifyChainMembers}
+                        setNotifyChainMembers={edited(setNotifyChainMembers)}
                         escalationDates={escalationDates}
-                        setEscalationDates={setEscalationDates}
+                        setEscalationDates={edited(setEscalationDates)}
                         setEscalationPicker={setEscalationPicker}
                     />
                 );
             case 'timetable':
                 return (
                     <PostShiftTimetableStep
-                        flexibleTiming={flexibleTiming} setFlexibleTiming={setFlexibleTiming}
+                        flexibleTiming={flexibleTiming} setFlexibleTiming={edited(setFlexibleTiming)}
                         selectedDates={selectedDates}
-                        setSelectedDates={setSelectedDates}
+                        setSelectedDates={edited(setSelectedDates)}
                         slotDate={slotDate}
-                        setSlotDate={setSlotDate}
+                        setSlotDate={edited(setSlotDate)}
                         slotStart={slotStart}
-                        setSlotStart={setSlotStart}
+                        setSlotStart={edited(setSlotStart)}
                         slotEnd={slotEnd}
-                        setSlotEnd={setSlotEnd}
+                        setSlotEnd={edited(setSlotEnd)}
                         setSlotDatePickerOpen={setSlotDatePickerOpen}
                         slotDateHours={slotDateHours}
                         calendarMonthAnchor={calendarMonthAnchor}
@@ -1118,22 +1153,22 @@ export default function PostShiftScreen() {
                         slotDateSet={slotDateSet}
                         getDefaultTimesForDate={getDefaultTimesForDate}
                         selectedDateTimes={selectedDateTimes}
-                        setSelectedDateTimes={setSelectedDateTimes}
+                        setSelectedDateTimes={edited(setSelectedDateTimes)}
                         slotRecurring={slotRecurring}
-                        setSlotRecurring={setSlotRecurring}
+                        setSlotRecurring={edited(setSlotRecurring)}
                         slotRecurringDays={slotRecurringDays}
-                        toggleRecurringDay={toggleRecurringDay}
+                        toggleRecurringDay={edited(toggleRecurringDay)}
                         slotRecurringEnd={slotRecurringEnd}
                         setRecurringEndPickerOpen={setRecurringEndPickerOpen}
                         singleUserOnly={singleUserOnly}
-                        setSingleUserOnly={setSingleUserOnly}
+                        setSingleUserOnly={edited(setSingleUserOnly)}
                         closedSelectedDates={closedSelectedDates}
-                        addAllSelectedSlots={addAllSelectedSlots}
-                        addSelectedDateSlot={addSelectedDateSlot}
+                        addAllSelectedSlots={edited(addAllSelectedSlots)}
+                        addSelectedDateSlot={edited(addSelectedDateSlot)}
                         slots={slots}
-                        addManualSlot={addManualSlot}
-                        editSlot={editSlot}
-                        removeSlot={removeSlot}
+                        addManualSlot={edited(addManualSlot)}
+                        editSlot={edited(editSlot)}
+                        removeSlot={edited(removeSlot)}
                     />
                 );
             case 'payrate':
@@ -1142,44 +1177,44 @@ export default function PostShiftScreen() {
                         isLocumLike={isLocumLike}
                         roleNeeded={roleNeeded}
                         ftptPayMode={ftptPayMode}
-                        setFtptPayMode={setFtptPayMode}
+                        setFtptPayMode={edited(setFtptPayMode)}
                         minHourly={minHourly}
-                        setMinHourly={setMinHourly}
+                        setMinHourly={edited(setMinHourly)}
                         maxHourly={maxHourly}
-                        setMaxHourly={setMaxHourly}
+                        setMaxHourly={edited(setMaxHourly)}
                         minAnnual={minAnnual}
-                        setMinAnnual={setMinAnnual}
+                        setMinAnnual={edited(setMinAnnual)}
                         maxAnnual={maxAnnual}
-                        setMaxAnnual={setMaxAnnual}
+                        setMaxAnnual={edited(setMaxAnnual)}
                         superPercent={superPercent}
-                        setSuperPercent={setSuperPercent}
+                        setSuperPercent={edited(setSuperPercent)}
                         rateType={rateType}
-                        setRateType={setRateType}
+                        setRateType={edited(setRateType)}
                         paymentPreference={paymentPreference}
-                        setPaymentPreference={setPaymentPreference}
+                        setPaymentPreference={edited(setPaymentPreference)}
                         locumSuperIncluded={locumSuperIncluded}
-                        setLocumSuperIncluded={setLocumSuperIncluded}
+                        setLocumSuperIncluded={edited(setLocumSuperIncluded)}
                         hasOutsidePharmacyMemberAudience={hasOutsidePharmacyMemberAudience}
                         rateWeekday={rateWeekday}
-                        setRateWeekday={setRateWeekday}
+                        setRateWeekday={edited(setRateWeekday)}
                         rateSaturday={rateSaturday}
-                        setRateSaturday={setRateSaturday}
+                        setRateSaturday={edited(setRateSaturday)}
                         rateSunday={rateSunday}
-                        setRateSunday={setRateSunday}
+                        setRateSunday={edited(setRateSunday)}
                         ratePublicHoliday={ratePublicHoliday}
-                        setRatePublicHoliday={setRatePublicHoliday}
+                        setRatePublicHoliday={edited(setRatePublicHoliday)}
                         rateEarlyMorning={rateEarlyMorning}
-                        setRateEarlyMorning={setRateEarlyMorning}
+                        setRateEarlyMorning={edited(setRateEarlyMorning)}
                         rateLateNight={rateLateNight}
-                        setRateLateNight={setRateLateNight}
+                        setRateLateNight={edited(setRateLateNight)}
                         handleSavePharmacyRateDefaults={handleSavePharmacyRateDefaults}
                         savingPharmacyRates={savingPharmacyRates}
                         pharmacyId={pharmacyId}
                         expandedSlots={expandedSlots}
                         slotRateRows={slotRateRows}
                         ownerBonus={ownerBonus}
-                        setOwnerBonus={setOwnerBonus}
-                        handleSlotRateChange={handleSlotRateChange}
+                        setOwnerBonus={edited(setOwnerBonus)}
+                        handleSlotRateChange={edited(handleSlotRateChange)}
                     />
                 );
             case 'review':
@@ -1204,7 +1239,7 @@ export default function PostShiftScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['left', 'right']}>
-            <ScrollView contentContainerStyle={[styles.content, isEmbedded && styles.contentEmbedded]} style={{ flex: 1 }}>
+            <ScrollView contentContainerStyle={[styles.content, isEmbedded && styles.contentEmbedded]} style={{ flex: 1 }} pointerEvents={hydrating ? 'none' : 'auto'}>
                 {!isEmbedded ? (
                     <>
                         <Text variant="headlineMedium" style={styles.title}>
@@ -1264,11 +1299,13 @@ export default function PostShiftScreen() {
                         : params?.date
                             ? [params.date]
                             : [];
-                    mergeSelectedDates(
-                        pickedDates
-                            .filter(Boolean)
-                            .map((d) => d.toISOString().split('T')[0])
-                    );
+                    const pickedIsos = pickedDates
+                        .filter(Boolean)
+                        .map((d) => d.toISOString().split('T')[0]);
+                    // mergeSelectedDates only adds today-or-later dates, so the draft changes only for a new one.
+                    const todayIso = new Date().toISOString().split('T')[0];
+                    if (pickedIsos.some((d) => d >= todayIso && !selectedDateSet.has(d))) markTouched();
+                    mergeSelectedDates(pickedIsos);
                     setSlotDatePickerOpen(false);
                 }}
             />
@@ -1279,7 +1316,11 @@ export default function PostShiftScreen() {
                 onDismiss={() => setRecurringEndPickerOpen(false)}
                 date={new Date(slotRecurringEnd)}
                 onConfirm={({ date }) => {
-                    if (date) setSlotRecurringEnd(date.toISOString().split('T')[0]);
+                    const iso = date?.toISOString().split('T')[0];
+                    if (iso && iso !== slotRecurringEnd) {
+                        markTouched();
+                        setSlotRecurringEnd(iso);
+                    }
                     setRecurringEndPickerOpen(false);
                 }}
             />
@@ -1290,8 +1331,10 @@ export default function PostShiftScreen() {
                 onDismiss={() => setEscalationPicker({ key: null, open: false })}
                 date={escalationPicker.key && escalationDates[escalationPicker.key] ? new Date(escalationDates[escalationPicker.key] as string) : new Date()}
                 onConfirm={({ date }) => {
-                    if (date && escalationPicker.key) {
-                        setEscalation(escalationPicker.key, date.toISOString().split('T')[0]);
+                    const iso = date?.toISOString().split('T')[0];
+                    if (iso && escalationPicker.key && iso !== escalationDates[escalationPicker.key]) {
+                        markTouched();
+                        setEscalation(escalationPicker.key, iso);
                     }
                     setEscalationPicker({ key: null, open: false });
                 }}

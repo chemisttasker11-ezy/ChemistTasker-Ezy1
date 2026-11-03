@@ -107,6 +107,7 @@ export default function PharmacistIdentityScreen() {
       } else {
         setError(err?.message || 'Failed to save identity.');
       }
+      return false;
     } finally {
       setSaving(false);
     }

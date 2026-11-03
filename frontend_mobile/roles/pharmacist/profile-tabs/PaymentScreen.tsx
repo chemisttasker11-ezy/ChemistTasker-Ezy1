@@ -112,6 +112,7 @@ export default function PharmacistPaymentScreen() {
       } else {
         setError(err?.message || 'Failed to save TFN details.');
       }
+      return false;
     } finally {
       setSaving(false);
     }
@@ -139,6 +140,7 @@ export default function PharmacistPaymentScreen() {
       } else {
         setError(err?.message || 'Failed to save ABN details.');
       }
+      return false;
     } finally {
       setSaving(false);
     }

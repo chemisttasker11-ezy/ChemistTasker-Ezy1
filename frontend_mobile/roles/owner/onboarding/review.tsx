@@ -1,240 +1,54 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Image } from 'react-native';
-import { Text, Button, Surface, Divider, List } from 'react-native-paper';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import ProgressStepper from '../../../components/ProgressStepper';
-import { useOnboarding } from './_context';
-import { updateOnboarding } from '@chemisttasker/shared-core';
+import React from 'react';
+import { StyleSheet, type Text, View } from 'react-native';
+import { SectionCard } from '@/components/ui';
+import { AuthLink, AuthNotice } from '@/components/AuthLayout';
+import { space } from '@/constants/tokens';
+import { GENDER_OPTIONS, ONBOARDING_STEPS, ROLE_OPTIONS, useOnboarding } from './_context';
+import { ReviewRow, StepIntro } from './parts';
 
-const ONBOARDING_STEPS = ['Basic Info', 'Role Details', 'Profile Photo', 'Review'];
+type ReviewProps = {
+  titleRef: React.Ref<Text>;
+  onEdit: (step: number) => void;
+};
 
-export default function OwnerOnboardingReview() {
-    const router = useRouter();
-    const { data } = useOnboarding();
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+/** Review: everything entered, grouped by step with an Edit link back to it; the footer saves. */
+export default function OwnerOnboardingReview({ titleRef, onEdit }: ReviewProps) {
+  const { form, showAhpra, photo, submitError } = useOnboarding();
+  const name = [form.first_name, form.last_name].filter(Boolean).join(' ');
+  const gender = GENDER_OPTIONS.find((option) => option.value === form.gender)?.label ?? 'Not set';
+  const role = ROLE_OPTIONS.find((option) => option.value === form.role)?.label ?? form.role;
+  const pharmacies = form.chain_pharmacy ? `${Math.max(1, form.number_of_pharmacies)} pharmacies` : 'One pharmacy';
 
-    const handleSubmit = async () => {
-        setLoading(true);
-        setError('');
+  const edit = (step: number) => (
+    <AuthLink label="Edit" accessibilityLabel={`Edit ${ONBOARDING_STEPS[step]}`} onPress={() => onEdit(step)} />
+  );
 
-        try {
-            const submitData = new FormData();
-            submitData.append('phone_number', data.phone_number);
-            submitData.append('role', data.role);
-            submitData.append('chain_pharmacy', String(data.chain_pharmacy));
+  return (
+    <View style={styles.stack}>
+      <StepIntro titleRef={titleRef} title="Check your details" subtitle="You can change these later in your profile." />
 
-            if (data.ahpra_number) {
-                submitData.append('ahpra_number', data.ahpra_number);
-            }
+      {submitError ? <AuthNotice tone="error" message={submitError} /> : null}
 
-            if (data.profile_photo) {
-                const filename = data.profile_photo.split('/').pop();
-                const match = /\.(\w+)$/.exec(filename as string);
-                const type = match ? `image/${match[1]}` : 'image/jpeg';
+      <SectionCard title={ONBOARDING_STEPS[0]} action={edit(0)} dense>
+        <ReviewRow label="Name" value={name || 'Not set'} />
+        <ReviewRow label="Username" value={form.username || 'Not set'} />
+        <ReviewRow label="Phone number" value={form.phone_number || 'Not set'} />
+        <ReviewRow label="Gender" value={gender} />
+        <ReviewRow label="Profile photo" value={photo.preview ? 'Added' : 'None'} />
+      </SectionCard>
 
-                submitData.append('profile_photo', {
-                    uri: data.profile_photo,
-                    name: filename,
-                    type,
-                } as any);
-            }
+      <SectionCard title={ONBOARDING_STEPS[1]} action={edit(1)} dense>
+        <ReviewRow label="Role" value={role} />
+        {showAhpra ? <ReviewRow label="AHPRA number" value={form.ahpra_number || 'Not set'} /> : null}
+      </SectionCard>
 
-            await updateOnboarding('owner', submitData);
-
-            // Navigate to dashboard on success
-            router.replace('/owner/dashboard');
-        } catch (err: any) {
-            console.error(err);
-            setError(err.response?.data?.detail || 'Failed to submit onboarding. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <SafeAreaView style={styles.container} edges={['left', 'right']}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-                <ProgressStepper
-                    currentStep={4}
-                    totalSteps={4}
-                    steps={ONBOARDING_STEPS}
-                />
-
-                <Surface style={styles.content} elevation={1}>
-                    <Text variant="headlineSmall" style={styles.title}>
-                        Review & Submit
-                    </Text>
-                    <Text variant="bodyMedium" style={styles.subtitle}>
-                        Please review your information before submitting
-                    </Text>
-
-                    {error ? (
-                        <Surface style={styles.errorContainer} elevation={0}>
-                            <Text style={styles.errorText}>{error}</Text>
-                        </Surface>
-                    ) : null}
-
-                    {/* Profile Photo */}
-                    {data.profile_photo && (
-                        <>
-                            <View style={styles.photoSection}>
-                                <Image
-                                    source={{ uri: data.profile_photo }}
-                                    style={styles.profilePhoto}
-                                />
-                            </View>
-                            <Divider style={styles.divider} />
-                        </>
-                    )}
-
-                    {/* Basic Info */}
-                    <List.Section>
-                        <List.Subheader>Basic Information</List.Subheader>
-
-                        <List.Item
-                            title="Phone Number"
-                            description={data.phone_number}
-                            left={props => <List.Icon {...props} icon="phone" />}
-                            right={props => (
-                                <Button onPress={() => router.push('/owner/onboarding/step1')}>
-                                    Edit
-                                </Button>
-                            )}
-                        />
-                    </List.Section>
-
-                    <Divider style={styles.divider} />
-
-                    {/* Role Details */}
-                    <List.Section>
-                        <List.Subheader>Role & Registration</List.Subheader>
-
-                        <List.Item
-                            title="Role"
-                            description={data.role === 'MANAGER' ? 'Pharmacy Manager' : 'Pharmacist'}
-                            left={props => <List.Icon {...props} icon="briefcase" />}
-                        />
-
-                        {data.role === 'PHARMACIST' && data.ahpra_number && (
-                            <List.Item
-                                title="AHPRA Number"
-                                description={data.ahpra_number}
-                                left={props => <List.Icon {...props} icon="certificate" />}
-                            />
-                        )}
-
-                        <List.Item
-                            title="Pharmacy Type"
-                            description={data.chain_pharmacy ? 'Part of Chain/Group' : 'Independent Pharmacy'}
-                            left={props => <List.Icon {...props} icon="store" />}
-                            right={props => (
-                                <Button onPress={() => router.push('/owner/onboarding/step2')}>
-                                    Edit
-                                </Button>
-                            )}
-                        />
-                    </List.Section>
-
-                    <Surface style={styles.infoBox} elevation={0}>
-                        <Text variant="bodySmall" style={styles.infoText}>
-                            ℹ️ After submitting, you can add your pharmacy details and start posting shifts!
-                        </Text>
-                    </Surface>
-                </Surface>
-
-                <View style={styles.buttonContainer}>
-                    <Button
-                        mode="outlined"
-                        onPress={() => router.back()}
-                        disabled={loading}
-                        style={styles.button}
-                    >
-                        Back
-                    </Button>
-
-                    <Button
-                        mode="contained"
-                        onPress={handleSubmit}
-                        loading={loading}
-                        disabled={loading}
-                        style={[styles.button, styles.submitButton]}
-                    >
-                        Submit & Continue
-                    </Button>
-                </View>
-            </ScrollView>
-        </SafeAreaView>
-    );
+      <SectionCard title={ONBOARDING_STEPS[2]} action={edit(2)} dense>
+        <ReviewRow label="Pharmacies" value={pharmacies} />
+      </SectionCard>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
-        padding: 16,
-    },
-    content: {
-        padding: 20,
-        borderRadius: 8,
-        backgroundColor: '#fff',
-        marginBottom: 16,
-    },
-    title: {
-        fontWeight: 'bold',
-        marginBottom: 8,
-    },
-    subtitle: {
-        color: '#666',
-        marginBottom: 24,
-    },
-    errorContainer: {
-        backgroundColor: '#ffebee',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 16,
-    },
-    errorText: {
-        color: '#c62828',
-    },
-    photoSection: {
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    profilePhoto: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        backgroundColor: '#f0f0f0',
-    },
-    divider: {
-        marginVertical: 16,
-    },
-    infoBox: {
-        backgroundColor: '#e3f2fd',
-        padding: 16,
-        borderRadius: 8,
-        marginTop: 16,
-    },
-    infoText: {
-        color: '#1976d2',
-        lineHeight: 20,
-    },
-    buttonContainer: {
-        flexDirection: 'row',
-        gap: 12,
-        marginTop: 8,
-    },
-    button: {
-        flex: 1,
-    },
-    submitButton: {
-        flex: 2,
-    },
+  stack: { gap: space.lg },
 });

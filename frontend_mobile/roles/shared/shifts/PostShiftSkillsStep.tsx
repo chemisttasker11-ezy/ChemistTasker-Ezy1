@@ -84,7 +84,7 @@ export default function PostShiftSkillsStep({ roleNeeded, mustHave, setMustHave,
                 <IconButton icon="close" size={18} accessibilityLabel={`Remove ${skillLabel(reg, code)}`} onPress={() => set(code, null)} />
               </View>
               {unavailable ? <Text style={s.warn}>Not available for this role; remove before saving.</Text> : (
-                <SegmentedButtons value={level} onValueChange={value => set(code, value as 'required' | 'preferred')} density="small"
+                <SegmentedButtons value={level} onValueChange={value => { if (value !== level) set(code, value as 'required' | 'preferred'); }} density="small"
                   buttons={[{ value: 'required', label: 'Required' }, { value: 'preferred', label: 'Preferred' }]} />
               )}
             </View>

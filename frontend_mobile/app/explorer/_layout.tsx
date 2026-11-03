@@ -1,139 +1,65 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Tabs, usePathname, useRouter } from 'expo-router';
-import { Avatar, Button, Divider, Icon, IconButton, List, Modal, Portal, Text } from 'react-native-paper';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { usePathname, useRouter } from 'expo-router';
+import { useGuardedNavigation, useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
 import * as Notifications from 'expo-notifications';
-import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
+import { Briefcase, CalendarCheck, CalendarDays, Compass, Heart, MessageSquare, Sparkles, UserRound } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { resolveChatNotificationRoomId } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { colors } from '@/constants/tokens';
+import { type MoreGroup, type MoreItem, PersonaShell, type ShellTab } from '@/components/shell';
 
-const tabTitles: Record<string, string> = {
+const titles: Record<string, string> = {
   dashboard: 'Home',
+  shifts: 'Shifts',
+  'shifts/[id]': 'Shift',
   chat: 'Chat',
+  'messages/[id]': 'Chat',
   profile: 'Profile',
   'talent-board': 'Talent Board',
   calendar: 'Calendar',
+  availability: 'Availability',
+  notifications: 'Notifications',
   'profile-basic-info': 'Profile',
   'profile-identity': 'Profile',
   'profile-interests': 'Profile',
   'profile-referees': 'Profile',
   'profile-bio': 'Profile',
+  more: 'More',
 };
 
-const sidebarItems = [
-  { label: 'Home', icon: 'home', route: '/explorer/dashboard' },
-  { label: 'Chat', icon: 'message', route: '/explorer/chat' },
-  { label: 'Profile', icon: 'account-circle', route: '/explorer/profile' },
-  { label: 'Talent Board', icon: 'account-search', route: '/explorer/talent-board' },
-  { label: 'Calendar', icon: 'calendar', route: '/explorer/calendar' },
+const more: MoreGroup[] = [
+  {
+    title: 'Workspace',
+    tone: 'violet',
+    items: [
+      { label: 'Availability', icon: CalendarCheck, route: '/explorer/availability' },
+      { label: 'Calendar', icon: CalendarDays, route: '/explorer/calendar' },
+    ],
+  },
+  { title: 'Work & platform tools', tone: 'blue', tools: true },
 ];
 
-function ExplorerSidebar({
-  visible,
-  onDismiss,
-}: {
-  visible: boolean;
-  onDismiss: () => void;
-}) {
-  const router = useRouter();
-  const { logout } = useAuth();
+const account: MoreItem[] = [
+  { label: 'Profile', icon: UserRound, route: '/explorer/profile' },
+  { label: 'Interests', icon: Heart, route: '/explorer/profile-interests' },
+];
 
-  const handleNav = (route: string) => {
-    onDismiss();
-    router.push(route as any);
-  };
-
-  const handleLogout = async () => {
-    onDismiss();
-    await logout();
-    router.replace('/login' as any);
-  };
-
-  return (
-    <Portal>
-      <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.sidebar}>
-        <Text variant="titleMedium" style={styles.sidebarTitle}>New to pharmacy menu</Text>
-        <Divider />
-        {sidebarItems.map((item) => (
-          <List.Item
-            key={`${item.route}-${item.label}`}
-            title={item.label}
-            left={(props) => <List.Icon {...props} icon={item.icon} />}
-            onPress={() => handleNav(item.route)}
-          />
-        ))}
-        <Divider />
-        <Button icon="logout" textColor="#DC2626" onPress={handleLogout}>
-          Logout
-        </Button>
-      </Modal>
-    </Portal>
-  );
-}
+// "Talent" fits a fifth of a 360pt phone at one line; screen readers still hear "Talent Board".
+const tabs: ShellTab[] = [
+  { name: 'dashboard', label: 'Home', icon: Compass, accessibilityLabel: 'Home tab' },
+  { name: 'shifts', label: 'Shifts', icon: Briefcase, accessibilityLabel: 'Shifts tab' },
+  { name: 'talent-board', label: 'Talent', icon: Sparkles, accessibilityLabel: 'Talent Board tab' },
+  { name: 'chat', label: 'Chat', icon: MessageSquare, match: ['messages/'], accessibilityLabel: 'Chat tab' },
+];
 
 export default function ExplorerTabs() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const unsavedRegistry = useUnsavedChangesRegistry();
+  const guardedNavigation = useGuardedNavigation();
   const pathname = usePathname();
-  const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Do not update the photo based on an intermediate or loading user object.
-    // This prevents the avatar from flickering during navigation.
-    if (isLoading) {
-      return;
-    }
-    if (!user) {
-      setPhotoUrl(null);
-      return;
-    }
-    const newPhoto =
-      (user as any)?.profile_photo ||
-      (user as any)?.profile_photo_url ||
-      (user as any)?.profilePhoto ||
-      null;
-    setPhotoUrl(newPhoto);
-  }, [user, isLoading]);
-
-  const loadUnread = useCallback(async () => {
-    try {
-      const res: any = await getNotifications();
-      if (typeof res?.unread_count === 'number') {
-        setUnreadCount(res.unread_count);
-        return;
-      }
-      if (typeof res?.unreadCount === 'number') {
-        setUnreadCount(res.unreadCount);
-        return;
-      }
-      const list = Array.isArray(res?.results) ? res.results : Array.isArray(res) ? res : [];
-      const unread = list.filter((n: any) => !(n.read_at || n.readAt)).length;
-      setUnreadCount(unread);
-    } catch {
-      // best-effort badge
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadUnread();
-  }, [loadUnread]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      void loadUnread();
-    }, [loadUnread])
-  );
-
-  useEffect(() => {
-    const sub = Notifications.addNotificationReceivedListener(() => {
-      void loadUnread();
-    });
-    return () => sub.remove();
-  }, [loadUnread]);
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -143,28 +69,12 @@ export default function ExplorerTabs() {
         payload: data,
       });
       if (roomId) {
-        router.push(getMessageDetailRoute(user?.role, roomId) as any);
+        guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId) as any));
         return;
       }
     });
     return () => sub.remove();
-  }, [router, user?.role]);
-
-  const openNotifications = useCallback(async () => {
-    try {
-      const res: any = await getNotifications();
-      const list = Array.isArray(res?.results) ? res.results : Array.isArray(res) ? res : [];
-      const unreadIds = list.filter((n: any) => !(n.read_at || n.readAt)).map((n: any) => n.id);
-      if (unreadIds.length) {
-        await markNotificationsAsRead(unreadIds);
-      }
-      setUnreadCount(0);
-    } catch {
-      // ignore errors; navigate anyway
-    } finally {
-      router.push('/explorer/notifications' as any);
-    }
-  }, [router]);
+  }, [guardedNavigation, router, user?.role]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -192,189 +102,57 @@ export default function ExplorerTabs() {
     }
   }, [user, isLoading, router]);
 
-  const { isDashboard, backTarget } = useMemo(() => {
-    if (!pathname) return { isDashboard: true, backTarget: null };
+  const backTarget = useMemo(() => {
+    if (!pathname) return null;
     const segments = pathname.split('/').filter(Boolean);
-    const isDash = segments[0] === 'explorer' && (segments[1] ?? 'dashboard') === 'dashboard';
     const isProfileSubPage =
       segments[0] === 'explorer' &&
       ['profile-basic-info', 'profile-identity', 'profile-interests', 'profile-referees', 'profile-bio'].includes(segments[1] ?? '');
-    let parent: string | null = null;
-    if (isProfileSubPage) {
-      parent = '/explorer/profile';
-    } else if (segments.length > 2) {
-      parent = `/${segments.slice(0, -1).join('/')}`;
-    }
-    return { isDashboard: isDash, backTarget: parent };
+    if (segments[1] === 'messages') return '/explorer/chat';
+    if (isProfileSubPage) return '/explorer/profile';
+    if (segments.length > 2) return `/${segments.slice(0, -1).join('/')}`;
+    return null;
   }, [pathname]);
+
+  const navigate = useCallback(
+    (route: string) => {
+      const go = () => router.push(route as any);
+      if (unsavedRegistry) void unsavedRegistry.requestNavigation(go);
+      else go();
+    },
+    [router, unsavedRegistry]
+  );
+
+  const onBack = useCallback(() => {
+    const go = () => {
+      if (backTarget) router.push(backTarget as any);
+      else if (router.canGoBack()) router.back();
+      else router.push('/explorer/dashboard' as any);
+    };
+    if (unsavedRegistry) void unsavedRegistry.requestNavigation(go);
+    else go();
+  }, [backTarget, router, unsavedRegistry]);
 
   if (isLoading || !user || user.role !== 'EXPLORER') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#6366F1" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <>
-      <ExplorerSidebar visible={sidebarVisible} onDismiss={() => setSidebarVisible(false)} />
-      <Tabs
-        screenOptions={({ route }) => ({
-          tabBarActiveTintColor: '#6366F1',
-          tabBarInactiveTintColor: '#9CA3AF',
-          tabBarStyle: {
-            backgroundColor: '#FFFFFF',
-            borderTopWidth: 1,
-            borderTopColor: '#E5E7EB',
-          },
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: '600',
-          },
-          headerShown: true,
-          headerTitle: tabTitles[route.name] || 'New to pharmacy',
-          headerRightContainerStyle: { paddingRight: 10 },
-          headerLeft: () => <IconButton icon="menu" accessibilityLabel="Open explorer menu" onPress={() => setSidebarVisible(true)} />,
-          headerRight: () => {
-            const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false;
-            const showBack = !isDashboard;
-            return showBack ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <IconButton
-                  icon="arrow-left"
-                  onPress={() => {
-                    if (backTarget === '/explorer/profile') {
-                      router.push('/explorer/profile' as any);
-                    } else if (canGoBack) {
-                      router.back();
-                    } else if (backTarget) {
-                      router.push(backTarget as any);
-                    } else {
-                      router.push('/explorer/dashboard' as any);
-                    }
-                  }}
-                />
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
-                  <View style={styles.bellWrapper}>
-                    <Icon source="bell-outline" size={24} />
-                    {unreadCount > 0 && <View style={styles.badgeDot} />}
-                  </View>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => router.push('/explorer/profile' as any)}>
-                  {photoUrl ? (
-                    <Avatar.Image size={32} source={{ uri: photoUrl }} />
-                  ) : (
-                    <Avatar.Text
-                      size={32}
-                      label={(user?.username || user?.email || 'U').charAt(0).toUpperCase()}
-                      style={styles.avatar}
-                      labelStyle={styles.avatarLabel}
-                    />
-                  )}
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" onPress={openNotifications} style={{ marginHorizontal: 4 }}>
-                  <View style={styles.bellWrapper}>
-                    <Icon source="bell-outline" size={24} />
-                    {unreadCount > 0 && <View style={styles.badgeDot} />}
-                  </View>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => router.push('/explorer/profile' as any)}>
-                  {photoUrl ? (
-                    <Avatar.Image size={32} source={{ uri: photoUrl }} />
-                  ) : (
-                    <Avatar.Text
-                      size={32}
-                      label={(user?.username || user?.email || 'U').charAt(0).toUpperCase()}
-                      style={styles.avatar}
-                      labelStyle={styles.avatarLabel}
-                    />
-                  )}
-                </TouchableOpacity>
-              </View>
-            );
-          },
-        })}
-      >
-        <Tabs.Screen
-          name="dashboard"
-          options={{
-            title: 'Home',
-            tabBarAccessibilityLabel: 'Home tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="home" iconColor={color} size={size} />,
-          }}
-        />
-        <Tabs.Screen
-          name="chat"
-          options={{
-            title: 'Chat',
-            tabBarAccessibilityLabel: 'Chat tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="message" iconColor={color} size={size} />,
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            tabBarAccessibilityLabel: 'Profile tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="account-circle" iconColor={color} size={size} />,
-          }}
-        />
-        <Tabs.Screen
-          name="talent-board"
-          options={{
-            title: 'Talent Board',
-            tabBarAccessibilityLabel: 'Talent Board tab',
-            tabBarIcon: ({ color, size }) => <IconButton icon="account-search" iconColor={color} size={size} />,
-          }}
-        />
-
-        <Tabs.Screen name="profile-basic-info" options={{ href: null }} />
-        <Tabs.Screen name="profile-identity" options={{ href: null }} />
-        <Tabs.Screen name="profile-interests" options={{ href: null }} />
-        <Tabs.Screen name="profile-referees" options={{ href: null }} />
-        <Tabs.Screen name="profile-bio" options={{ href: null }} />
-        <Tabs.Screen name="shifts" options={{ href: null }} />
-        <Tabs.Screen name="availability" options={{ href: null }} />
-        <Tabs.Screen name="notifications" options={{ href: null }} />
-        <Tabs.Screen name="messages/[id]" options={{ href: null }} />
-        <Tabs.Screen name="calendar" options={{ href: null }} />
-        <Tabs.Screen name="shifts/[id]" options={{ href: null }} />
-      </Tabs>
-    </>
+    <PersonaShell
+      tabs={tabs}
+      titles={titles}
+      fallbackTitle="New to pharmacy"
+      more={more}
+      account={account}
+      navigate={navigate}
+      onBack={onBack}
+      profileRoute="/explorer/profile"
+      notificationsRoute="/explorer/notifications"
+      workspace={{ kind: 'role', personaRole: 'EXPLORER' }}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  sidebar: {
-    backgroundColor: '#FFFFFF',
-    margin: 16,
-    padding: 8,
-    borderRadius: 12,
-  },
-  sidebarTitle: {
-    marginBottom: 8,
-    fontWeight: '600',
-  },
-  badgeDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#EF4444',
-  },
-  bellWrapper: {
-    position: 'relative',
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatar: { backgroundColor: '#6366F1' },
-  avatarLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
-});

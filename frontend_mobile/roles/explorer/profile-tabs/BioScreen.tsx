@@ -86,6 +86,7 @@ export default function PharmacistBioScreen() {
       } else {
         setError(err?.message || 'Failed to save profile.');
       }
+      return false;
     } finally {
       setSaving(false);
     }

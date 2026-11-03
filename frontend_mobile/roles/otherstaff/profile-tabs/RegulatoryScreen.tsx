@@ -120,6 +120,7 @@ export default function OtherStaffRegulatoryScreen() {
       } else {
         setError(body?.detail || "We couldn't save your role details. Your changes are still here; try again.");
       }
+      return false;
     } finally {
       setSaving(false);
     }

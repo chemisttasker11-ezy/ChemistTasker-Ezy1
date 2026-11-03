@@ -13,7 +13,6 @@ import {
   DashboardErrorState,
   DashboardLoadingState,
   DashboardPersonaSwitcher,
-  DashboardScopeSwitcher,
   DashboardStatsOverview,
   type DashboardPayload,
   useScopedDashboard,
@@ -229,15 +228,6 @@ export default function OtherStaffOverviewScreen() {
         showsVerticalScrollIndicator={false}
       >
         <DashboardPersonaSwitcher role="OTHER_STAFF" />
-        <DashboardScopeSwitcher
-          pharmacies={scope.pharmacies}
-          scopeLabel={scope.scopeLabel}
-          workspace={scope.workspace}
-          selectedPharmacyId={scope.selectedPharmacyId}
-          canSelectPlatform={scope.canSelectPlatform}
-          onSelectPlatform={scope.selectPlatform}
-          onSelectPharmacy={scope.selectPharmacy}
-        />
         {errorMessage ? <DashboardErrorState message={errorMessage} onRetry={loadDashboard} /> : null}
         <LinearGradient colors={['#267DB8', '#433894', '#9A087D']} locations={[0, 0.58, 1]} start={{ x: 0, y: 0.1 }} end={{ x: 1, y: 1 }} style={styles.shiftHero}>
           <View pointerEvents="none" style={styles.heroAngleOne} />
