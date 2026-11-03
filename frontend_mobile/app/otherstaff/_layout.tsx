@@ -3,32 +3,17 @@ import { usePathname, useRouter } from 'expo-router';
 import { useGuardedNavigation, useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
 import { ActivityIndicator, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import {
-  Briefcase,
-  CalendarCheck,
-  CalendarDays,
-  CalendarPlus,
-  Clock,
-  GraduationCap,
-  Heart,
-  LayoutDashboard,
-  MessageSquare,
-  ReceiptText,
-  Search,
-  Store,
-  UserRound,
-  Users,
-} from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { colors } from '@/constants/tokens';
-import { type MoreGroup, type MoreItem, PersonaShell, type ShellTab } from '@/components/shell';
+import { PersonaShell, useWorkerShell } from '@/components/shell';
 
 const titles: Record<string, string> = {
   dashboard: 'Home',
   'shifts/index': 'Shifts',
   'shifts/[id]': 'Shift',
+  roster: 'My roster',
   chat: 'Chat',
   'messages/[id]': 'Chat',
   hub: 'Hub',
@@ -55,48 +40,13 @@ const titles: Record<string, string> = {
   more: 'More',
 };
 
-const more: MoreGroup[] = [
-  {
-    title: 'Workspace',
-    tone: 'violet',
-    items: [
-      { label: 'Publish availability', icon: CalendarPlus, route: '/otherstaff/publish-availability' },
-      { label: 'Availability', icon: CalendarCheck, route: '/otherstaff/availability' },
-      { label: 'Calendar', icon: CalendarDays, route: '/otherstaff/calendar' },
-      { label: 'My hours', icon: Clock, route: '/my-hours' },
-      { label: 'Memberships', icon: Store, route: '/otherstaff/memberships' },
-    ],
-  },
-  {
-    title: 'Discover',
-    tone: 'magenta',
-    items: [
-      { label: 'Hub', icon: Users, route: '/otherstaff/hub' },
-      { label: 'Talent Board', icon: Search, route: '/otherstaff/talent-board' },
-      { label: 'Learning', icon: GraduationCap, route: '/otherstaff/learning' },
-    ],
-  },
-  { title: 'Work & platform tools', tone: 'blue', tools: true },
-];
-
-const account: MoreItem[] = [
-  { label: 'Profile', icon: UserRound, route: '/otherstaff/profile' },
-  { label: 'Interests', icon: Heart, route: '/otherstaff/interests' },
-];
-
-const tabs: ShellTab[] = [
-  { name: 'dashboard', label: 'Home', icon: LayoutDashboard, accessibilityLabel: 'Home tab' },
-  { name: 'shifts/index', label: 'Shifts', icon: Briefcase, accessibilityLabel: 'Shifts tab' },
-  { name: 'invoice', label: 'Invoices', icon: ReceiptText, match: ['invoices'], accessibilityLabel: 'Invoices tab' },
-  { name: 'chat', label: 'Chat', icon: MessageSquare, match: ['messages/'], accessibilityLabel: 'Chat tab' },
-];
-
 export default function OtherStaffTabs() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const unsavedRegistry = useUnsavedChangesRegistry();
   const guardedNavigation = useGuardedNavigation();
   const pathname = usePathname();
+  const { tabs, more, account } = useWorkerShell('otherstaff');
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {

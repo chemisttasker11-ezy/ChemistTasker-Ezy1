@@ -3,7 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { useGuardedNavigation, useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
 import * as Notifications from 'expo-notifications';
-import { Briefcase, CalendarCheck, CalendarDays, Compass, Heart, MessageSquare, Sparkles, UserRound } from 'lucide-react-native';
+import { Briefcase, CalendarCheck, CalendarDays, Compass, Gift, Heart, LifeBuoy, MessageSquare, ShoppingBag, Sparkles, Star, UserRound } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { resolveChatNotificationRoomId } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
@@ -29,21 +29,29 @@ const titles: Record<string, string> = {
   more: 'More',
 };
 
+// Explorer tools carry no capability guards on web or mobile (the old tools group listed exactly these three).
 const more: MoreGroup[] = [
   {
-    title: 'Workspace',
+    title: 'Plan',
     tone: 'violet',
     items: [
       { label: 'Availability', icon: CalendarCheck, route: '/explorer/availability' },
       { label: 'Calendar', icon: CalendarDays, route: '/explorer/calendar' },
     ],
   },
-  { title: 'Work & platform tools', tone: 'blue', tools: true },
+  {
+    title: 'Grow',
+    tone: 'blue',
+    items: [{ label: 'Marketplace', icon: ShoppingBag, route: '/marketplace' }],
+  },
 ];
 
 const account: MoreItem[] = [
   { label: 'Profile', icon: UserRound, route: '/explorer/profile' },
   { label: 'Interests', icon: Heart, route: '/explorer/profile-interests' },
+  { label: 'My ratings', icon: Star, route: '/profile/ratings' },
+  { label: 'Pill rewards', icon: Gift, route: '/rewards/pills' },
+  { label: 'Help & support', icon: LifeBuoy, route: '/contact' },
 ];
 
 // "Talent" fits a fifth of a 360pt phone at one line; screen readers still hear "Talent Board".

@@ -51,6 +51,8 @@ export type NextStep = {
   action: string;
   icon?: ReactNode;
   onPress: () => void;
+  /** A second, quieter action on the card (e.g. Directions beside Clock in). */
+  secondary?: { label: string; icon?: ReactNode; onPress: () => void };
 };
 
 /** Home scroll with pull-to-refresh; the page gutter and the gap between blocks. */
@@ -83,6 +85,7 @@ export function NextStepCard({ step, loading }: { step: NextStep | null; loading
       title={step.title}
       subtitle={step.body}
       primary={{ label: step.action, icon: step.icon, onPress: step.onPress }}
+      secondary={step.secondary}
     />
   );
 }

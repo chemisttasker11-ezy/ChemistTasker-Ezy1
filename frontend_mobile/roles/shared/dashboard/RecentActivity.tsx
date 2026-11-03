@@ -30,7 +30,7 @@ export function RecentActivity({
   load: () => Promise<DashboardPayload | null>;
   ready?: boolean;
   scopeKey: string;
-  persona: 'owner' | 'organization' | 'admin';
+  persona: 'owner' | 'organization' | 'admin' | 'pharmacist' | 'otherstaff';
   canRoster?: boolean;
   canComms?: boolean;
 }) {

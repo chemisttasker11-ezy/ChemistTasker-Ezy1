@@ -1,277 +1,213 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, Card, Divider, IconButton, Surface, Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../../context/AuthContext';
-import HomeNavigationGrid from '@/components/HomeNavigationGrid';
-import ParityToolsCard from '@/components/ParityToolsCard';
-import { DashboardPersonaSwitcher } from '@/roles/shared/dashboard/dashboardScope';
+import { Heart, Megaphone, Search, Sparkles, Store, UserRound } from 'lucide-react-native';
+import { fetchCommunityShifts, fetchPublicShifts, getExplorerPosts, getOnboardingDetail } from '@chemisttasker/shared-core';
+import { ContentState, SectionCard, ViewAllLink } from '@/components/ui';
+import getShiftPharmacyName from '@/roles/shared/shifts/utils/getShiftPharmacyName';
+import { BlockLoading, BlockNote, HomeScroll, ItemRow, type NextStep, NextStepCard, Rows } from '@/roles/shared/dashboard/ManagerHome';
+import { formatDay, roleWord, slotStart, timeRange } from '@/roles/shared/dashboard/managerHomeLogic';
+import { explorerStep, type ExplorerStepKey } from '@/roles/shared/dashboard/workerHomeLogic';
 
+type ShiftRow = {
+  id: number;
+  roleNeeded?: string | null;
+  slots?: Array<{ date?: string | null; startTime?: string | null; endTime?: string | null }> | null;
+};
+type Post = { id: number; headline?: string | null; roleTitle?: string | null; role_title?: string | null };
+type HomeData = {
+  progress: number | null;
+  interests: number | null;
+  /** Public and community shifts, null when both boards failed. */
+  shifts: ShiftRow[] | null;
+  shiftsPartial: boolean;
+  posts: Post[] | null;
+};
+
+const valueOf = <T,>(result: PromiseSettledResult<T>): T | null => (result.status === 'fulfilled' ? result.value : null);
+const asList = <T,>(value: unknown): T[] =>
+  Array.isArray(value) ? value : Array.isArray((value as any)?.results) ? (value as any).results : [];
+const ROWS = 4;
+
+/** The shift's next slot that has not started, so a board row says when, not just where. */
+function nextSlot(shift: ShiftRow, now: Date) {
+  return (shift.slots ?? [])
+    .map((slot) => ({ slot, start: slotStart(slot.date, slot.startTime) }))
+    .filter((row): row is { slot: NonNullable<ShiftRow['slots']>[number]; start: Date } => row.start != null && row.start > now)
+    .sort((a, b) => a.start.getTime() - b.start.getTime())[0] ?? null;
+}
+
+/** Explorer Home: finish the profile and pick interests, then shifts open to explorers and their Talent Board posts. */
 export default function ExplorerOverviewScreen() {
-  const { access, user, logout, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const normalizedRole = String(user?.role || '').toUpperCase();
-
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<HomeData | null>(null);
+  const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [slideAnim] = useState(new Animated.Value(50));
+  const [now, setNow] = useState(() => new Date());
+  const generation = useRef(0);
+  const go = useCallback((route: string) => router.push(route as any), [router]);
 
-  const loadDashboard = useCallback(async () => {
-    if (normalizedRole !== 'EXPLORER' || !access) return;
-    if (!refreshing) setLoading(true);
-    try {
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.spring(slideAnim, { toValue: 0, tension: 50, friction: 8, useNativeDriver: true }),
-      ]).start();
-    } catch (err: any) {
-      console.error('Unable to load explorer dashboard', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [normalizedRole, access, refreshing, fadeAnim, slideAnim]);
+  const load = useCallback(async () => {
+    const id = ++generation.current;
+    const [onboarding, publicShifts, communityShifts, posts] = await Promise.allSettled([
+      getOnboardingDetail('explorer'),
+      fetchPublicShifts({}),
+      fetchCommunityShifts({}),
+      getExplorerPosts({ mine: true }),
+    ]);
+    if (id !== generation.current) return;
+    const profile = valueOf(onboarding) as any;
+    const boards = [publicShifts, communityShifts].filter((result) => result.status === 'fulfilled');
+    setNow(new Date());
+    setFailed([onboarding, publicShifts, communityShifts, posts].every((result) => result.status === 'rejected'));
+    setData({
+      progress: profile?.progress_percent ?? null,
+      interests: profile ? (Array.isArray(profile.interests) ? profile.interests.length : 0) : null,
+      // A shift on both boards shows once.
+      shifts: boards.length
+        ? [...new Map(boards.flatMap((result) => asList<ShiftRow>((valueOf(result) as any)?.results)).map((shift) => [shift.id, shift])).values()]
+        : null,
+      shiftsPartial: boards.length === 1,
+      posts: posts.status === 'fulfilled' ? asList<Post>(posts.value) : null,
+    });
+  }, []);
 
   useEffect(() => {
-    if (authLoading) {
-      return;
-    }
-    if (normalizedRole !== 'EXPLORER') {
-      setLoading(false);
-      return;
-    }
-    if (!access) {
-      setLoading(true);
-      return;
-    }
-    void loadDashboard();
-  }, [loadDashboard, normalizedRole, access, authLoading]);
+    void load();
+    return () => { generation.current += 1; };
+  }, [load]);
 
-  const onRefresh = useCallback(async () => {
+  const refresh = useCallback(async () => {
     setRefreshing(true);
-    await loadDashboard();
-  }, [loadDashboard]);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
-  const quickActions = useMemo(
-    () => [
-      {
-        title: 'Shifts',
-        description: 'Browse roles',
-        icon: 'calendar-search',
-        route: '/explorer/shifts',
-      },
-      {
-        title: 'Availability',
-        description: 'Set schedule',
-        icon: 'calendar-clock-outline',
-        route: '/explorer/availability',
-      },
-      {
-        title: 'Talent Board',
-        description: 'Browse candidates',
-        icon: 'account-search-outline',
-        route: '/explorer/talent-board',
-      },
-      {
-        title: 'Calendar',
-        description: 'View calendar',
-        icon: 'calendar-outline',
-        route: '/explorer/calendar',
-      },
-      {
-        title: 'Chat',
-        description: 'Open messages',
-        icon: 'message-text-outline',
-        route: '/explorer/chat',
-      },
-      {
-        title: 'Interests',
-        description: 'Preferences',
-        icon: 'heart-outline',
-        route: '/explorer/profile-interests',
-      },
-      {
-        title: 'Notifications',
-        description: 'Alerts',
-        icon: 'bell-outline',
-        route: '/explorer/notifications',
-      },
-      {
-        title: 'Profile',
-        description: 'Edit details',
-        icon: 'account-circle-outline',
-        route: '/explorer/profile',
-      },
-    ],
-    []
+  const upcoming = useMemo(
+    () =>
+      (data?.shifts ?? [])
+        .map((shift) => ({ shift, next: nextSlot(shift, now) }))
+        .filter((row) => row.next != null)
+        .sort((a, b) => a.next!.start.getTime() - b.next!.start.getTime()),
+    [data?.shifts, now],
   );
 
-  if (loading && !refreshing) {
+  const step = useMemo<NextStep | null>(() => {
+    if (!data) return null;
+    const key = explorerStep({
+      onboardingFailed: data.progress == null || data.interests == null,
+      postsFailed: data.posts == null,
+      profile: data.progress != null && data.progress < 100,
+      interests: data.interests === 0,
+      noPost: data.posts != null && data.posts.length === 0,
+    });
+    const steps: Record<ExplorerStepKey, () => NextStep> = {
+      retry: () => ({
+        key: 'retry',
+        title: 'Your next step could not load',
+        body: 'Check your connection, then try again.',
+        action: 'Try again',
+        icon: <UserRound />,
+        onPress: refresh,
+      }),
+      profile: () => ({
+        key: 'profile',
+        title: 'Finish your profile',
+        body: `It is ${data.progress}% complete. Pharmacies look at your profile before they reply.`,
+        action: 'Finish profile',
+        icon: <UserRound />,
+        onPress: () => go('/explorer/profile'),
+      }),
+      interests: () => ({
+        key: 'interests',
+        title: 'What are you looking for?',
+        body: 'Pick shadowing, placements, volunteering or junior roles, so pharmacies know what to offer you.',
+        action: 'Pick interests',
+        icon: <Heart />,
+        onPress: () => go('/explorer/profile-interests'),
+      }),
+      talent: () => ({
+        key: 'talent',
+        title: 'Get seen by pharmacies',
+        body: 'Pharmacies browse the Talent Board for new people. Post what you are looking for.',
+        action: 'Post on the Talent Board',
+        icon: <Megaphone />,
+        onPress: () => go('/explorer/talent-board'),
+      }),
+      shifts: () => ({
+        key: 'shifts',
+        title: 'Find your next shift',
+        body: 'Shifts open to explorers from pharmacies on ChemistTasker and your community.',
+        action: 'Browse shifts',
+        icon: <Search />,
+        onPress: () => go('/explorer/shifts'),
+      }),
+    };
+    return steps[key]();
+  }, [data, go, refresh]);
+
+  if (failed && data) {
     return (
-      <SafeAreaView style={styles.container} edges={['left', 'right']}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading your dashboard...</Text>
-        </View>
-      </SafeAreaView>
+      <HomeScroll refreshing={refreshing} onRefresh={refresh}>
+        <ContentState kind="error" title="Home could not load" description="Check your connection, then try again." onAction={refresh} />
+      </HomeScroll>
     );
   }
 
+  const loading = !data;
+
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right']}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366F1" />}
-        showsVerticalScrollIndicator={false}
-      >
-        <DashboardPersonaSwitcher role="EXPLORER" />
-        <HomeNavigationGrid items={quickActions} onNavigate={(route) => router.push(route as any)} />
+    <HomeScroll refreshing={refreshing} onRefresh={refresh}>
+      <NextStepCard step={step} loading={loading} />
 
-        <ParityToolsCard />
+      <SectionCard title="Shifts for you" icon={<Search />} flush action={<ViewAllLink onPress={() => go('/explorer/shifts')}>All shifts</ViewAllLink>}>
+        {loading ? (
+          <BlockLoading rows={3} />
+        ) : data?.shifts == null ? (
+          <BlockNote text="Shifts could not load." action="Try again" onAction={refresh} />
+        ) : upcoming.length === 0 && !data.shiftsPartial ? (
+          <BlockNote text="No open shifts right now. New ones show up here first." action="Set availability" onAction={() => go('/explorer/availability')} />
+        ) : (
+          <Rows>
+            {data.shiftsPartial ? <BlockNote text="Some shifts could not load. Showing shifts from the board that loaded." action="Try again" onAction={refresh} /> : null}
+            {upcoming.slice(0, ROWS).map(({ shift, next }) => (
+              <ItemRow
+                key={shift.id}
+                icon={<Store />}
+                tone="blue"
+                label={getShiftPharmacyName(shift)}
+                detail={[roleWord(shift.roleNeeded), `${formatDay(next!.start, now)} ${timeRange(next!.slot.startTime, next!.slot.endTime)}`.trim()].filter(Boolean).join(', ')}
+                onPress={() => go(`/explorer/shifts/${shift.id}`)}
+              />
+            ))}
+          </Rows>
+        )}
+      </SectionCard>
 
-        <Surface style={styles.bottomSection}>
-          <TouchableOpacity style={styles.bottomMenuItem} onPress={() => router.push('/explorer/profile' as any)}>
-            <View style={styles.bottomMenuIcon}>
-              <IconButton icon="account-cog" size={24} iconColor="#6366F1" />
-            </View>
-            <View style={styles.bottomMenuContent}>
-              <Text variant="labelLarge" style={styles.bottomMenuTitle}>
-                Account Settings
-              </Text>
-              <Text variant="bodySmall" style={styles.bottomMenuDesc}>
-                Manage your profile and preferences
-              </Text>
-            </View>
-            <IconButton icon="chevron-right" size={20} iconColor="#9CA3AF" />
-          </TouchableOpacity>
-
-          <Divider />
-
-          <TouchableOpacity style={styles.bottomMenuItem} onPress={() => router.push('/contact' as any)}>
-            <View style={styles.bottomMenuIcon}>
-              <IconButton icon="help-circle" size={24} iconColor="#10B981" />
-            </View>
-            <View style={styles.bottomMenuContent}>
-              <Text variant="labelLarge" style={styles.bottomMenuTitle}>
-                Help & Support
-              </Text>
-              <Text variant="bodySmall" style={styles.bottomMenuDesc}>
-                Get assistance and view FAQs
-              </Text>
-            </View>
-            <IconButton icon="chevron-right" size={20} iconColor="#9CA3AF" />
-          </TouchableOpacity>
-
-          <Divider />
-
-          <TouchableOpacity
-            style={styles.bottomMenuItem}
-            onPress={async () => {
-              await logout();
-              router.replace('/login' as any);
-            }}
-          >
-            <View style={[styles.bottomMenuIcon, { backgroundColor: '#FEE2E2' }]}>
-              <IconButton icon="logout" size={24} iconColor="#DC2626" />
-            </View>
-            <View style={styles.bottomMenuContent}>
-              <Text variant="labelLarge" style={[styles.bottomMenuTitle, { color: '#DC2626' }]}>
-                Sign Out
-              </Text>
-              <Text variant="bodySmall" style={styles.bottomMenuDesc}>
-                Logout from your account
-              </Text>
-            </View>
-            <IconButton icon="chevron-right" size={20} iconColor="#9CA3AF" />
-          </TouchableOpacity>
-        </Surface>
-      </ScrollView>
-    </SafeAreaView>
+      <SectionCard title="Your Talent Board posts" icon={<Sparkles />} flush action={<ViewAllLink onPress={() => go('/explorer/talent-board')}>Talent Board</ViewAllLink>}>
+        {loading ? (
+          <BlockLoading rows={1} />
+        ) : data?.posts == null ? (
+          <BlockNote text="Your posts could not load." action="Try again" onAction={refresh} />
+        ) : data.posts.length === 0 ? (
+          <BlockNote text="You have not posted yet. A short post tells pharmacies what you want to learn." action="Write a post" onAction={() => go('/explorer/talent-board')} />
+        ) : (
+          <Rows>
+            {data.posts.slice(0, ROWS).map((post) => (
+              <ItemRow
+                key={post.id}
+                icon={<Megaphone />}
+                tone="violet"
+                label={post.headline || 'Talent Board post'}
+                detail={post.roleTitle || post.role_title || undefined}
+                onPress={() => go('/explorer/talent-board')}
+              />
+            ))}
+          </Rows>
+        )}
+      </SectionCard>
+    </HomeScroll>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  loadingText: { color: '#6B7280', fontSize: 16 },
-  scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 24 },
-  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  greetingText: { color: '#6B7280', marginBottom: 4, fontSize: 14 },
-  nameText: { fontWeight: 'bold', color: '#111827', fontSize: 28 },
-  heroCard: {
-    marginHorizontal: 20,
-    marginBottom: 24,
-    borderRadius: 20,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-  },
-  gradientCard: { padding: 24 },
-  heroContent: { gap: 20 },
-  heroStats: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
-  heroStatItem: { alignItems: 'center', flex: 1 },
-  heroStatValue: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 44, lineHeight: 52 },
-  heroStatLabel: { color: 'rgba(255, 255, 255, 0.9)', marginTop: 4, fontSize: 13 },
-  heroDivider: { width: 1, height: 40, backgroundColor: 'rgba(255, 255, 255, 0.3)' },
-  heroButton: { borderRadius: 12, overflow: 'hidden' },
-  heroButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  heroButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 16, marginLeft: -8 },
-  section: { marginBottom: 24, paddingHorizontal: 20 },
-  sectionHeaderText: { fontWeight: '700', color: '#111827', marginBottom: 16, fontSize: 18 },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 16,
-  },
-  quickActionCard: { width: '48%', alignItems: 'center', paddingVertical: 6 },
-  quickActionGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  quickActionTitle: { color: '#111827', fontWeight: '700', marginBottom: 2 },
-  quickActionDesc: { color: '#6B7280', fontSize: 12, textAlign: 'center' },
-  bottomSection: {
-    marginHorizontal: 20,
-    marginBottom: 8,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    overflow: 'hidden',
-  },
-  bottomMenuItem: { flexDirection: 'row', alignItems: 'center', padding: 16 },
-  bottomMenuIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  bottomMenuContent: { flex: 1 },
-  bottomMenuTitle: { color: '#111827', fontWeight: '600' },
-  bottomMenuDesc: { color: '#6B7280', marginTop: 2 },
-});
-

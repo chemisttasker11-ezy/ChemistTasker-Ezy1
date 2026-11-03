@@ -26,6 +26,7 @@ import {
 import { colors, font, radius, space, touch, type } from '@/constants/tokens';
 import { ContentState, PageHeader, Pill, ScalePressable, SectionCard } from '@/components/ui';
 import { alpha } from '@/components/ui/tone';
+import { ShellContext } from '@/components/shell/ShellContext';
 import { statusToneFor } from './statusTone';
 
 export const palette = {
@@ -83,9 +84,12 @@ export function ParityPage({
     opacity: interpolate(scrollY.value, [0, space.lg], [0, 1], Extrapolation.CLAMP),
   }));
 
+  // Inside a persona shell (e.g. the worker Roster tab) the shell owns the header, Back and the bottom inset.
+  const inShell = useContext(ShellContext) != null;
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safe} edges={inShell ? ['left', 'right'] : ['top', 'left', 'right', 'bottom']}>
+      {inShell ? null : <View style={styles.header}>
         <ScalePressable
           pressBg
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
@@ -104,7 +108,7 @@ export function ParityPage({
         </Animated.Text>
         {right ?? <View style={styles.headerRightSpacer} />}
         <Animated.View style={[styles.headerRule, barRuleStyle]} />
-      </View>
+      </View>}
       <Animated.ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -117,7 +121,7 @@ export function ParityPage({
           ) : undefined
         }
       >
-        <PageHeader title={title} subtitle={subtitle} style={styles.headerCopy} />
+        <PageHeader title={title} subtitle={subtitle} actions={inShell ? right : undefined} style={styles.headerCopy} />
         {error ? (
           <ContentState kind="error" compact title="Unable to load" description={error} onAction={onRetry} style={styles.errorCard} />
         ) : null}
