@@ -82,6 +82,7 @@ export default function OwnerOnboardingStep1({ titleRef, attempt, onContinue }: 
       <View style={styles.fields}>
         <TextField
           label="First name"
+          required
           autoComplete="given-name"
           textContentType="givenName"
           autoCapitalize="words"
@@ -90,6 +91,7 @@ export default function OwnerOnboardingStep1({ titleRef, attempt, onContinue }: 
         />
         <TextField
           label="Last name"
+          required
           autoComplete="family-name"
           textContentType="familyName"
           autoCapitalize="words"
@@ -98,6 +100,7 @@ export default function OwnerOnboardingStep1({ titleRef, attempt, onContinue }: 
         />
         <TextField
           label="Username"
+          required
           autoComplete="username-new"
           textContentType="username"
           autoCapitalize="none"
@@ -107,6 +110,7 @@ export default function OwnerOnboardingStep1({ titleRef, attempt, onContinue }: 
         <View style={styles.phone}>
           <TextField
             label="Phone number"
+            required
             keyboardType="phone-pad"
             autoComplete="tel"
             textContentType="telephoneNumber"

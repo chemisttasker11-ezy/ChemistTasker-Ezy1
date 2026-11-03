@@ -17,6 +17,8 @@ export type TextFieldProps = Omit<TextInputProps, 'style'> & {
   /** Shown under the field in red and read with the label; replaces `hint` while present. */
   error?: string;
   hint?: string;
+  /** Adds " *" after the label (as web marks required fields) and "required" to the spoken label. */
+  required?: boolean;
   /** Password field: hides the text and adds a labelled Show / Hide toggle (`secureTextEntry` does the same). */
   secure?: boolean;
   disabled?: boolean;
@@ -32,6 +34,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
     label,
     error,
     hint,
+    required = false,
     secure = false,
     secureTextEntry = false,
     disabled = false,
@@ -56,7 +59,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   return (
     <View style={[styles.wrap, style]}>
       <Text style={styles.label} importantForAccessibility="no" accessibilityElementsHidden>
-        {label}
+        {required ? `${label} *` : label}
       </Text>
       <View
         style={[
@@ -74,7 +77,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           {...input}
           editable={!locked}
           secureTextEntry={hidable && !revealed}
-          accessibilityLabel={accessibilityLabel ?? label}
+          accessibilityLabel={accessibilityLabel ?? (required ? `${label}, required` : label)}
           // The error is read once, by its own live-region line below.
           accessibilityHint={accessibilityHint ?? hint}
           accessibilityState={{ ...accessibilityState, disabled: locked }}
