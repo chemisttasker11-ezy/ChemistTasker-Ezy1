@@ -1,24 +1,36 @@
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Text, TextInput, Button, Surface } from 'react-native-paper';
+import React, { useRef, useState } from 'react';
+import { type TextInput } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { passwordResetConfirm } from '@chemisttasker/shared-core';
-import AuthLayout from '../components/AuthLayout';
+import AuthLayout, { AuthLink, AuthNotice } from '../components/AuthLayout';
+import { Button, TextField } from '@/components/ui';
 import { useAuth } from '../context/AuthContext';
 
 export default function ResetPasswordScreen() {
     const router = useRouter();
     const { logout } = useAuth();
-    const { uid, token } = useLocalSearchParams<{ uid: string; token: string }>();
+    const params = useLocalSearchParams<{ uid?: string | string[]; token?: string | string[] }>();
+    // A repeated query key arrives as an array; only a non-empty string is a usable link part.
+    const uid = typeof params.uid === 'string' && params.uid ? params.uid : '';
+    const token = typeof params.token === 'string' && params.token ? params.token : '';
 
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const confirmRef = useRef<TextInput>(null);
 
     const handleSubmit = async () => {
+        if (loading) return;
+        // The keyboard's Go key submits too, so the handler checks what the button alone cannot.
+        if (!uid || !token) {
+            setError('This reset link is incomplete. Request a new one from Forgot password.');
+            return;
+        }
+        if (!newPassword || !confirmPassword) {
+            setError('Please fill in all fields');
+            return;
+        }
         if (newPassword !== confirmPassword) {
             setError('Passwords do not match');
             return;
@@ -27,13 +39,13 @@ export default function ResetPasswordScreen() {
         setError('');
         try {
             await passwordResetConfirm({
-                uid: uid ?? '',
-                token: token ?? '',
+                uid,
+                token,
                 new_password1: newPassword,
                 new_password2: confirmPassword,
             });
             await logout();
-            router.replace('/login');
+            router.replace({ pathname: '/login', params: { reset: '1' } } as any);
         } catch {
             setError('Failed to reset password. The link may be invalid or expired.');
         } finally {
@@ -42,86 +54,52 @@ export default function ResetPasswordScreen() {
     };
 
     return (
-        <AuthLayout title="Set a New Password">
-            {error ? (
-                <Surface style={styles.errorContainer} elevation={1}>
-                    <Text style={styles.errorText}>{error}</Text>
-                </Surface>
-            ) : null}
+        <AuthLayout
+            title="Set a new password"
+            subtitle="Choose a new password for your account. You'll sign in with it next."
+            onBack={router.canGoBack() ? () => router.back() : undefined}
+            backDisabled={loading}
+            footer={<AuthLink label="Back to login" onPress={() => router.replace('/login')} disabled={loading} />}
+        >
+            {error ? <AuthNotice tone="error" message={error} /> : null}
 
-            <TextInput
-                label="New Password"
+            <TextField
+                label="New password"
                 value={newPassword}
                 onChangeText={setNewPassword}
-                mode="outlined"
-                style={styles.input}
-                secureTextEntry={!showPassword}
-                right={
-                    <TextInput.Icon
-                        icon={showPassword ? 'eye-off' : 'eye'}
-                        onPress={() => setShowPassword((v) => !v)}
-                    />
-                }
+                secure
+                textContentType="newPassword"
+                autoComplete="new-password"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => confirmRef.current?.focus()}
+                disabled={loading}
             />
 
-            <TextInput
-                label="Confirm New Password"
+            <TextField
+                ref={confirmRef}
+                label="Confirm new password"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
-                mode="outlined"
-                style={styles.input}
-                secureTextEntry={!showConfirmPassword}
-                right={
-                    <TextInput.Icon
-                        icon={showConfirmPassword ? 'eye-off' : 'eye'}
-                        onPress={() => setShowConfirmPassword((v) => !v)}
-                    />
-                }
+                secure
+                textContentType="newPassword"
+                autoComplete="new-password"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="go"
+                onSubmitEditing={() => void handleSubmit()}
+                disabled={loading}
             />
 
             <Button
-                mode="contained"
-                onPress={handleSubmit}
-                loading={loading}
-                disabled={loading}
-                style={styles.button}
-                contentStyle={styles.buttonContent}
-            >
-                Reset Password
-            </Button>
-
-            <View style={styles.backRow}>
-                <Button mode="text" onPress={() => router.replace('/login')} style={styles.backButton}>
-                    Back to login
-                </Button>
-            </View>
+                label="Reset password"
+                busyLabel="Saving"
+                onPress={() => void handleSubmit()}
+                busy={loading}
+                haptic="light"
+            />
         </AuthLayout>
     );
 }
-
-const styles = StyleSheet.create({
-    input: {
-        backgroundColor: '#fff',
-    },
-    button: {
-        marginTop: 8,
-        borderRadius: 8,
-    },
-    buttonContent: {
-        paddingVertical: 8,
-    },
-    backRow: {
-        alignItems: 'center',
-    },
-    backButton: {
-        marginTop: 4,
-    },
-    errorContainer: {
-        backgroundColor: '#ffebee',
-        padding: 12,
-        borderRadius: 8,
-    },
-    errorText: {
-        color: '#c62828',
-    },
-});

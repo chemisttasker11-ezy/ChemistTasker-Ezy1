@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, Image, StyleSheet, View } from 'react-native';
-import { Button, Surface, Text, TextInput } from 'react-native-paper';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Linking, StyleSheet, Text, type TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Fingerprint } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
-import AuthLayout from '../components/AuthLayout';
+import AuthLayout, { AuthLink, AuthNotice, AuthPrompt } from '../components/AuthLayout';
+import { Button, TextField } from '@/components/ui';
+import { colors, font, space, type } from '@/constants/tokens';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
 import { hasOrganizationAccess, resolveInitialWorkspace, selectRolePersona } from '../utils/mobilePersona';
 import {
@@ -17,7 +19,7 @@ import {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ email?: string }>();
+  const params = useLocalSearchParams<{ email?: string; reset?: string }>();
   const { loginWithCredentials, loginWithStoredSession } = useAuth();
 
   const [email, setEmail] = useState(typeof params.email === 'string' ? params.email : '');
@@ -25,7 +27,6 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [biometricLabel, setBiometricLabel] = useState('biometrics');
   const [biometricUser, setBiometricUser] = useState<BiometricUser | null>(null);
 
@@ -102,10 +103,12 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
+    // The keyboard's Go key can fire while a sign-in is already running.
+    if (loading || biometricLoading) return;
     setError('');
 
     if (!email || !password) {
-      setError('Please enter email and password');
+      setError('Please enter both email and password');
       return;
     }
 
@@ -120,6 +123,11 @@ export default function LoginScreen() {
       await routeAfterLogin(userData);
     } catch (err: any) {
       setError(err.message);
+      // Web parity (login.tsx): an unverified email goes to the code screen. AuthContext keeps only the
+      // detail text, so match backend login_security.py's "email address is not verified" as well.
+      if (/verify your email|email address is not verified/i.test(String(err?.message || ''))) {
+        router.push({ pathname: '/verify-otp', params: { email: email.toLowerCase() } } as never);
+      }
     } finally {
       setLoading(false);
     }
@@ -144,166 +152,118 @@ export default function LoginScreen() {
     }
   };
 
+  const passwordRef = useRef<TextInput>(null);
+  const busy = loading || biometricLoading;
+
   return (
-    <AuthLayout title="Welcome back" showTitle={false}>
-      <View style={styles.logoRow}>
-        <Image
-          source={require('../assets/images/clipsnap-edit-6-1-2026.png')}
-          style={styles.logoImage}
-          resizeMode="contain"
-        />
-      </View>
-
-      <Text variant="headlineMedium" style={styles.formTitle}>
-        Welcome back
-      </Text>
-      <Text variant="bodyMedium" style={styles.formSubtitle}>
-        Sign in to access your hub.
-      </Text>
-
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Sign in to access your hub."
+      onBack={router.canGoBack() ? () => router.back() : undefined}
+      backDisabled={busy}
+      footer={
+        <>
+          <AuthPrompt
+            text="Don't have an account?"
+            action={<AuthLink label="Create account" onPress={() => router.push('/register')} disabled={busy} />}
+          />
+          <Text style={styles.terms}>
+            By using ChemistTasker, you agree to the{' '}
+            <Text style={styles.termsLink} accessibilityRole="link" onPress={busy ? undefined : () => void Linking.openURL(TERMS_URL).catch(() => {})}>
+              Terms of Service
+            </Text>{' '}
+            and{' '}
+            <Text style={styles.termsLink} accessibilityRole="link" onPress={busy ? undefined : () => void Linking.openURL(PRIVACY_URL).catch(() => {})}>
+              Privacy Policy
+            </Text>
+            .
+          </Text>
+        </>
+      }
+    >
       {error ? (
-        <Surface style={styles.errorContainer} elevation={1}>
-          <Text style={styles.errorText}>{error}</Text>
-        </Surface>
+        <AuthNotice tone="error" message={error} />
+      ) : params.reset === '1' ? (
+        <AuthNotice tone="success" message="Password updated. Sign in with your new password." />
       ) : null}
 
-      <View style={styles.form}>
-        <TextInput
-          label="Work email"
-          value={email}
-          onChangeText={(value) => setEmail(value.toLowerCase())}
-          mode="outlined"
-          style={styles.input}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoComplete="email"
-        />
+      <TextField
+        label="Email"
+        value={email}
+        onChangeText={(value) => setEmail(value.toLowerCase())}
+        keyboardType="email-address"
+        textContentType="username"
+        autoComplete="email"
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        disabled={busy}
+      />
 
-        <TextInput
+      <View style={styles.passwordBlock}>
+        <TextField
+          ref={passwordRef}
           label="Password"
           value={password}
           onChangeText={setPassword}
-          mode="outlined"
-          style={styles.input}
-          secureTextEntry={!showPassword}
-          right={
-            <TextInput.Icon
-              icon={showPassword ? 'eye-off' : 'eye'}
-              onPress={() => setShowPassword(!showPassword)}
-            />
-          }
+          secure
+          textContentType="password"
+          autoComplete="current-password"
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="go"
+          onSubmitEditing={() => void handleLogin()}
+          disabled={busy}
         />
-
-        <Button
-          mode="text"
-          onPress={() => router.push('/forgot-password')}
-          style={styles.forgotButton}
-          labelStyle={styles.linkLabel}
-        >
-          Forgot password?
-        </Button>
-
-        <Button
-          mode="contained"
-          onPress={handleLogin}
-          loading={loading}
-          disabled={loading || biometricLoading}
-          style={styles.button}
-          contentStyle={styles.buttonContent}
-        >
-          Sign in
-        </Button>
-
-        {biometricUser ? (
-          <Button
-            mode="outlined"
-            icon="fingerprint"
-            onPress={handleBiometricLogin}
-            loading={biometricLoading}
-            disabled={loading || biometricLoading}
-            style={styles.biometricButton}
-            contentStyle={styles.buttonContent}
-          >
-            Sign in with {biometricLabel}
-          </Button>
-        ) : null}
-
-        <View style={styles.signupRow}>
-          <Text style={styles.signupText}>Don&apos;t have an account?</Text>
-          <Button
-            mode="text"
-            onPress={() => router.push('/register')}
-            labelStyle={styles.linkLabel}
-            compact
-          >
-            Create account
-          </Button>
-        </View>
+        <AuthLink label="Forgot password?" onPress={() => router.push('/forgot-password')} disabled={busy} style={styles.forgot} />
       </View>
+
+      <Button
+        label="Sign in"
+        busyLabel="Signing in"
+        onPress={() => void handleLogin()}
+        busy={loading}
+        disabled={biometricLoading}
+        haptic="light"
+      />
+
+      {biometricUser ? (
+        <Button
+          variant="outlined"
+          icon={<Fingerprint />}
+          label={`Sign in with ${biometricLabel}`}
+          busyLabel="Checking"
+          onPress={() => void handleBiometricLogin()}
+          busy={biometricLoading}
+          disabled={loading}
+        />
+      ) : null}
     </AuthLayout>
   );
 }
 
+const TERMS_URL = 'https://www.chemisttasker.com.au/terms-of-service';
+const PRIVACY_URL = 'https://www.chemisttasker.com.au/privacy-policy';
+
 const styles = StyleSheet.create({
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    gap: 12,
+  passwordBlock: {
+    gap: space.xxs,
   },
-  logoImage: {
-    width: 160,
-    height: 48,
-  },
-  formTitle: {
-    marginTop: 8,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  formSubtitle: {
-    color: '#4b5563',
-    marginBottom: 12,
-  },
-  errorContainer: {
-    backgroundColor: '#ffebee',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#c62828',
-  },
-  form: {
-    gap: 16,
-  },
-  input: {
-    backgroundColor: '#fff',
-  },
-  forgotButton: {
+  forgot: {
     alignSelf: 'flex-end',
   },
-  button: {
-    marginTop: 8,
-    borderRadius: 8,
+  terms: {
+    color: colors.textSecondary,
+    fontFamily: font.inter.regular,
+    fontSize: type.bodySmall.fontSize,
+    lineHeight: type.bodySmall.lineHeight,
+    textAlign: 'center',
   },
-  biometricButton: {
-    borderRadius: 8,
-  },
-  buttonContent: {
-    paddingVertical: 8,
-  },
-  linkLabel: {
-    textTransform: 'none',
-  },
-  signupRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  signupText: {
-    color: '#4b5563',
+  termsLink: {
+    color: colors.accentStrong,
+    fontFamily: font.inter.medium,
+    textDecorationLine: 'underline',
   },
 });

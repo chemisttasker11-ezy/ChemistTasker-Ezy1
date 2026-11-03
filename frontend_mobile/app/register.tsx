@@ -1,38 +1,93 @@
-import React, { useMemo, useState } from 'react';
+import React, { type ReactElement, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   View,
   StyleSheet,
-  TouchableOpacity,
-  Image,
+  Text,
+  type TextInput,
   Linking,
   Modal,
 } from 'react-native';
 import {
-  Text,
-  TextInput,
-  Button,
-  Checkbox,
-  Surface,
-  Divider,
-} from 'react-native-paper';
-import { MaterialIcons } from '@expo/vector-icons';
+  Calendar,
+  Check,
+  ChevronRight,
+  Circle,
+  CircleCheck,
+  Compass,
+  Pill,
+  Shield,
+  ShieldCheck,
+  Store,
+  Users,
+  X,
+} from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { DatePickerModal } from 'react-native-paper-dates';
 import { NEWCOMER_MINIMUM_AGE, NEWCOMER_TYPES, ageFromBirthDate } from '@chemisttasker/shared-core';
 import { useAuth } from '../context/AuthContext';
-import AuthLayout from '../components/AuthLayout';
+import AuthLayout, { AuthLink, AuthNotice, AuthPrompt } from '../components/AuthLayout';
+import { Button, ScalePressable, TextField } from '@/components/ui';
+import { sizeIcon } from '@/components/ui/icon';
+import { colors, font, radius, space, touch, type } from '@/constants/tokens';
 
 const ROLE_OPTIONS = [
-  { label: 'Pharmacy owner', description: 'Post shifts, run rosters and manage your team.', value: 'OWNER', icon: 'storefront' },
-  { label: 'Pharmacist', description: 'Find locum, casual and permanent work.', value: 'PHARMACIST', icon: 'local-pharmacy' },
-  { label: 'Pharmacy team', description: 'Assistant · Technician · Intern · Student', value: 'OTHER_STAFF', icon: 'groups' },
+  { label: 'Pharmacy owner', description: 'Post shifts, run rosters and manage your team.', value: 'OWNER', icon: <Store /> },
+  { label: 'Pharmacist', description: 'Find locum, casual and permanent work.', value: 'PHARMACIST', icon: <Pill /> },
+  { label: 'Pharmacy team', description: 'Assistant · Technician · Intern · Student', value: 'OTHER_STAFF', icon: <Users /> },
 ];
-const BRAND = '#5222B8';
 
 const TERMS_URL = 'https://www.chemisttasker.com.au/terms-of-service';
 const PRIVACY_URL = 'https://www.chemisttasker.com.au/privacy-policy';
+// AuthContext.register throws exactly this for a taken email; web then offers Log in / Reset password.
+const DUPLICATE_EMAIL_MESSAGE =
+  'There is already an account registered with this email. Please log in or reset your password.';
+const CAPTCHA_MISSING_MESSAGE = 'Registration is temporarily unavailable. Missing reCAPTCHA configuration.';
+
+/** One radio card: Lucide tile, title, one line, and an empty ring that fills with a check once chosen. */
+function Choice({
+  selected,
+  onPress,
+  title,
+  body,
+  icon,
+  accessibilityLabel,
+}: {
+  selected: boolean;
+  onPress: () => void;
+  title: string;
+  body: string;
+  icon?: ReactElement;
+  accessibilityLabel?: string;
+}) {
+  return (
+    <ScalePressable
+      pressBg
+      haptic="selection"
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={accessibilityLabel ?? `${title}. ${body}`}
+      style={[styles.choice, selected ? styles.choiceSelected : null]}
+    >
+      {icon ? (
+        <View style={[styles.choiceIcon, selected ? styles.choiceIconSelected : null]}>
+          {sizeIcon(icon, 20, selected ? colors.surfaceBg : colors.accentStrong, 1.75)}
+        </View>
+      ) : null}
+      <View style={styles.choiceText}>
+        <Text style={styles.choiceTitle}>{title}</Text>
+        <Text style={styles.choiceBody}>{body}</Text>
+      </View>
+      {selected ? (
+        <CircleCheck size={22} color={colors.primary} strokeWidth={2} />
+      ) : (
+        <Circle size={22} color={colors.textSecondary} strokeWidth={1.75} />
+      )}
+    </ScalePressable>
+  );
+}
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -55,13 +110,15 @@ export default function RegisterScreen() {
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [dobPickerOpen, setDobPickerOpen] = useState(false);
   const newcomerAge = ageFromBirthDate(dateOfBirth);
+  const tooYoung = newcomerAge != null && newcomerAge < NEWCOMER_MINIMUM_AGE;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaModalVisible, setCaptchaModalVisible] = useState(false);
   const [captchaLoading, setCaptchaLoading] = useState(true);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
   const referralCode = Array.isArray(params.referral_code)
     ? params.referral_code[0]
     : params.referral_code;
@@ -92,7 +149,7 @@ export default function RegisterScreen() {
               display: flex;
               align-items: center;
               justify-content: center;
-              background: #f8fafc;
+              background: ${colors.subtleBg};
               font-family: Arial, sans-serif;
             }
           </style>
@@ -122,9 +179,11 @@ export default function RegisterScreen() {
   };
 
   const handleRegister = async () => {
+    if (loading) return;
     setError('');
 
-    if (!formData.email || !formData.password) {
+    // Web parity: all three account fields are required before the match check.
+    if (!formData.email || !formData.password || !formData.confirm_password) {
       setError('Please fill in all fields');
       return;
     }
@@ -155,17 +214,15 @@ export default function RegisterScreen() {
     }
 
     if (!formData.accepted_terms) {
-      setError('Please accept the terms and conditions');
+      setError('You must accept the Terms of Service to register.');
       return;
     }
 
-    if (!recaptchaSiteKey) {
-      setError('CAPTCHA is not configured for this build');
-      return;
-    }
+    // The notice in place of the CAPTCHA row already says why registration cannot go ahead.
+    if (!recaptchaSiteKey) return;
 
     if (!captchaToken) {
-      setError('Please complete the CAPTCHA verification');
+      setError('Please complete the CAPTCHA to register.');
       return;
     }
 
@@ -190,241 +247,262 @@ export default function RegisterScreen() {
       router.replace({ pathname: '/verify-otp', params: { email: formData.email } } as any);
     } catch (err: any) {
       setError(err.message);
+      // A reCAPTCHA token is single-use; the next attempt needs a fresh check.
+      setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
   };
 
+  const toggleTerms = () => setFormData({ ...formData, accepted_terms: !formData.accepted_terms });
+  const dobLabel = dateOfBirth ? dateOfBirth.split('-').reverse().join('/') : '';
+
   return (
-    <AuthLayout title="Create Account">
-      <View style={styles.logoRow}>
-        <Image
-          source={require('../assets/images/clipsnap-edit-6-1-2026.png')}
-          style={styles.logoImage}
-          resizeMode="contain"
-          
+    <AuthLayout
+      title="Create account"
+      onBack={router.canGoBack() ? () => router.back() : undefined}
+      backDisabled={loading}
+      footer={
+        <AuthPrompt
+          text="Already have an account?"
+          action={<AuthLink label="Sign in" onPress={() => router.replace('/login')} disabled={loading} />}
         />
+      }
+    >
+      <TextField
+        label="Email"
+        value={formData.email}
+        onChangeText={(text) => setFormData({ ...formData, email: text.toLowerCase() })}
+        keyboardType="email-address"
+        textContentType="username"
+        autoComplete="email"
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        disabled={loading}
+      />
+
+      <TextField
+        ref={passwordRef}
+        label="Password"
+        value={formData.password}
+        onChangeText={(text) => setFormData({ ...formData, password: text })}
+        secure
+        textContentType="newPassword"
+        autoComplete="new-password"
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => confirmRef.current?.focus()}
+        disabled={loading}
+      />
+
+      <TextField
+        ref={confirmRef}
+        label="Confirm password"
+        value={formData.confirm_password}
+        onChangeText={(text) => setFormData({ ...formData, confirm_password: text })}
+        secure
+        textContentType="newPassword"
+        autoComplete="new-password"
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="done"
+        disabled={loading}
+      />
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle} accessibilityRole="header">{"I'm joining as"}</Text>
+        <View style={styles.choiceList} accessibilityRole="radiogroup" accessibilityLabel="Account type">
+          {ROLE_OPTIONS.map((option) => (
+            <Choice
+              key={option.value}
+              selected={formData.role === option.value}
+              onPress={() => setFormData({ ...formData, role: option.value })}
+              title={option.label}
+              body={option.description}
+              icon={option.icon}
+            />
+          ))}
+          <View style={styles.orRow} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>or</Text>
+            <View style={styles.orLine} />
+          </View>
+          <Choice
+            selected={formData.role === 'EXPLORER'}
+            onPress={() => setFormData({ ...formData, role: 'EXPLORER' })}
+            title="New to pharmacy in Australia? Start here"
+            body="Overseas-qualified, school students, placement seekers and anyone curious about pharmacy."
+            icon={<Compass />}
+          />
+        </View>
       </View>
 
-      {error ? (
-        <Surface style={styles.errorContainer} elevation={1}>
-          <Text style={styles.errorText}>{error}</Text>
-        </Surface>
-      ) : null}
-
-      <View style={styles.form}>
-        <TextInput
-          label="Email"
-          value={formData.email}
-          onChangeText={(text) => setFormData({ ...formData, email: text })}
-          mode="outlined"
-          style={styles.input}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-
-        <TextInput
-          label="Password"
-          value={formData.password}
-          onChangeText={(text) => setFormData({ ...formData, password: text })}
-          mode="outlined"
-          style={styles.input}
-          secureTextEntry={!showPassword}
-          right={
-            <TextInput.Icon
-              icon={showPassword ? 'eye-off' : 'eye'}
-              onPress={() => setShowPassword(!showPassword)}
-            />
-          }
-        />
-
-        <TextInput
-          label="Confirm Password"
-          value={formData.confirm_password}
-          onChangeText={(text) => setFormData({ ...formData, confirm_password: text })}
-          mode="outlined"
-          style={styles.input}
-          secureTextEntry={!showPassword}
-          right={
-            <TextInput.Icon
-              icon={showPassword ? 'eye-off' : 'eye'}
-              onPress={() => setShowPassword(!showPassword)}
-            />
-          }
-        />
-
-        <Divider style={styles.divider} />
-
-        <Text variant="titleSmall" style={styles.sectionTitle} accessibilityRole="header">{"I'm joining as"}</Text>
-        <View style={styles.roleList} accessibilityRole="radiogroup">
-          {ROLE_OPTIONS.map((option) => {
-            const isSelected = formData.role === option.value;
-            return (
-              <TouchableOpacity key={option.value} accessibilityRole="radio" accessibilityState={{ checked: isSelected }}
-                accessibilityLabel={`${option.label}. ${option.description}`} activeOpacity={0.85}
-                style={[styles.roleCard, isSelected && styles.roleCardSelected]}
-                onPress={() => setFormData({ ...formData, role: option.value })}>
-                <View style={[styles.roleIconWrap, isSelected && { backgroundColor: BRAND }]}>
-                  <MaterialIcons name={option.icon as any} size={22} color={isSelected ? '#FFFFFF' : '#4A1FA8'} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.radioLabel}>{option.label}</Text>
-                  <Text style={styles.roleDescription}>{option.description}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-          <View style={styles.orRow} importantForAccessibility="no-hide-descendants">
-            <View style={styles.orLine} /><Text style={styles.orText}>or</Text><View style={styles.orLine} />
+      {formData.role === 'EXPLORER' ? (
+        <View style={styles.newcomerPanel}>
+          <Text style={styles.newcomerTitle} accessibilityRole="header">Which describes you best?</Text>
+          <View style={styles.choiceList} accessibilityRole="radiogroup" accessibilityLabel="Which describes you best">
+            {NEWCOMER_TYPES.map((item) => (
+              <Choice
+                key={item.value}
+                selected={newcomerType === item.value}
+                onPress={() => setNewcomerType(item.value)}
+                title={item.label}
+                body={item.description}
+              />
+            ))}
           </View>
-          <TouchableOpacity accessibilityRole="radio" accessibilityState={{ checked: formData.role === 'EXPLORER' }}
-            accessibilityLabel="New to pharmacy in Australia? Start here. Overseas-qualified, school students, placement seekers and anyone curious about pharmacy."
-            activeOpacity={0.85} style={[styles.roleCard, formData.role === 'EXPLORER' && styles.roleCardSelected]}
-            onPress={() => setFormData({ ...formData, role: 'EXPLORER' })}>
-            <View style={[styles.roleIconWrap, formData.role === 'EXPLORER' && { backgroundColor: BRAND }]}>
-              <MaterialIcons name="explore" size={22} color={formData.role === 'EXPLORER' ? '#FFFFFF' : '#4A1FA8'} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.radioLabel}>New to pharmacy in Australia? Start here</Text>
-              <Text style={styles.roleDescription}>Overseas-qualified, school students, placement seekers and anyone curious about pharmacy.</Text>
-            </View>
-            <MaterialIcons name="arrow-forward" size={20} color={BRAND} />
-          </TouchableOpacity>
-        </View>
 
-        {formData.role === 'EXPLORER' ? (
-          <View style={styles.newcomerPanel}>
-            <Text style={styles.newcomerTitle} accessibilityRole="header">Which describes you best?</Text>
-            <View style={styles.roleList} accessibilityRole="radiogroup">
-              {NEWCOMER_TYPES.map(item => {
-                const checked = newcomerType === item.value;
-                return (
-                  <TouchableOpacity key={item.value} accessibilityRole="radio" accessibilityState={{ checked }} accessibilityLabel={`${item.label}. ${item.description}`}
-                    activeOpacity={0.85} style={[styles.roleCard, checked && styles.roleCardSelected]} onPress={() => setNewcomerType(item.value)}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.radioLabel}>{item.label}</Text>
-                      <Text style={styles.roleDescription}>{item.description}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <Button mode="outlined" icon="calendar" onPress={() => setDobPickerOpen(true)} contentStyle={{ justifyContent: 'flex-start', minHeight: 44 }}>
-              {dateOfBirth ? `Date of birth: ${dateOfBirth.split('-').reverse().join('/')}` : 'Date of birth'}
-            </Button>
-            <Text style={[styles.roleDescription, newcomerAge != null && newcomerAge < NEWCOMER_MINIMUM_AGE && { color: '#B42318' }]}>
-              {newcomerAge != null && newcomerAge < NEWCOMER_MINIMUM_AGE
+          <View style={styles.dobBlock}>
+            <Text style={styles.fieldLabel} importantForAccessibility="no" accessibilityElementsHidden>
+              Date of birth
+            </Text>
+            <ScalePressable
+              pressBg
+              onPress={() => setDobPickerOpen(true)}
+              accessibilityLabel={dobLabel ? `Date of birth, ${dobLabel}` : 'Date of birth, not set'}
+              accessibilityHint="Opens a date picker"
+              style={[styles.dobField, tooYoung ? styles.dobFieldError : null]}
+            >
+              <Text style={[styles.dobValue, !dobLabel ? styles.dobPlaceholder : null]}>{dobLabel || 'DD/MM/YYYY'}</Text>
+              <Calendar size={20} color={colors.textSecondary} strokeWidth={1.75} />
+            </ScalePressable>
+            <Text
+              style={[styles.choiceBody, tooYoung ? styles.errorText : null]}
+              accessibilityLiveRegion={tooYoung ? 'polite' : 'none'}
+            >
+              {tooYoung
                 ? `You need to be at least ${NEWCOMER_MINIMUM_AGE} to join ChemistTasker.`
                 : `You need to be at least ${NEWCOMER_MINIMUM_AGE}. If you're under 18, only your first name is shown.`}
             </Text>
-            <DatePickerModal locale="en" mode="single" visible={dobPickerOpen} onDismiss={() => setDobPickerOpen(false)}
-              date={dateOfBirth ? new Date(`${dateOfBirth}T00:00:00`) : new Date(new Date().getFullYear() - 18, 0, 1)}
-              validRange={{ endDate: new Date() }} label="Date of birth"
-              onConfirm={({ date }) => { setDobPickerOpen(false); if (date) setDateOfBirth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`); }} />
           </View>
-        ) : null}
-
-        <Divider style={styles.divider} />
-
-        <View style={styles.checkboxContainer}>
-          <Checkbox
-            status={formData.accepted_terms ? 'checked' : 'unchecked'}
-            onPress={() => setFormData({ ...formData, accepted_terms: !formData.accepted_terms })}
-          />
-          <Text style={styles.checkboxLabel}>
-            I accept the{' '}
-            <Text
-              style={styles.linkText}
-              onPress={() => void openLink(TERMS_URL)}
-              accessibilityRole="link"
-            >
-              Terms of Service
-            </Text>{' '}
-            and{' '}
-            <Text
-              style={styles.linkText}
-              onPress={() => void openLink(PRIVACY_URL)}
-              accessibilityRole="link"
-            >
-              Privacy Policy
-            </Text>
-          </Text>
+          <DatePickerModal locale="en" mode="single" visible={dobPickerOpen} onDismiss={() => setDobPickerOpen(false)}
+            date={dateOfBirth ? new Date(`${dateOfBirth}T00:00:00`) : new Date(new Date().getFullYear() - 18, 0, 1)}
+            validRange={{ endDate: new Date() }} label="Date of birth"
+            onConfirm={({ date }) => { setDobPickerOpen(false); if (date) setDateOfBirth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`); }} />
         </View>
+      ) : null}
 
-        <TouchableOpacity
-          style={[
-            styles.captchaButton,
-            captchaToken ? styles.captchaButtonVerified : null,
-          ]}
-          activeOpacity={0.85}
+      <View style={styles.divider} />
+
+      <View style={styles.termsRow}>
+        <ScalePressable
+          static
+          onPress={toggleTerms}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: formData.accepted_terms }}
+          accessibilityLabel="I accept the Terms of Service and Privacy Policy"
+          style={styles.checkHit}
+        >
+          <View style={[styles.checkBox, formData.accepted_terms ? styles.checkBoxOn : null]}>
+            {formData.accepted_terms ? <Check size={16} color={colors.surfaceBg} strokeWidth={3} /> : null}
+          </View>
+        </ScalePressable>
+        <Text style={styles.termsText} onPress={toggleTerms}>
+          I accept the{' '}
+          <Text style={styles.linkText} onPress={loading ? undefined : () => void openLink(TERMS_URL)} accessibilityRole="link">
+            Terms of Service
+          </Text>{' '}
+          and{' '}
+          <Text style={styles.linkText} onPress={loading ? undefined : () => void openLink(PRIVACY_URL)} accessibilityRole="link">
+            Privacy Policy
+          </Text>
+        </Text>
+      </View>
+
+      {!recaptchaSiteKey ? (
+        <AuthNotice tone="error" message={CAPTCHA_MISSING_MESSAGE} />
+      ) : (
+        <ScalePressable
+          pressBg
           onPress={() => {
             setError('');
             setCaptchaLoading(true);
             setCaptchaModalVisible(true);
           }}
+          accessibilityLabel={captchaToken ? 'CAPTCHA verified' : 'Complete CAPTCHA verification'}
+          accessibilityHint={captchaToken ? undefined : 'Opens the CAPTCHA check'}
+          style={[styles.captchaRow, captchaToken ? styles.captchaRowVerified : null]}
         >
-          <View style={styles.captchaButtonContent}>
-            <MaterialIcons
-              name={captchaToken ? 'verified-user' : 'security'}
-              size={20}
-              color={captchaToken ? '#166534' : '#1d4ed8'}
-            />
-            <Text style={[
-              styles.captchaButtonText,
-              captchaToken ? styles.captchaButtonTextVerified : null,
-            ]}>
-              {captchaToken ? 'CAPTCHA verified' : 'Complete CAPTCHA verification'}
-            </Text>
-          </View>
-        </TouchableOpacity>
+          {captchaToken ? (
+            <ShieldCheck size={22} color={colors.status.green.fg} strokeWidth={1.75} />
+          ) : (
+            <Shield size={22} color={colors.accentStrong} strokeWidth={1.75} />
+          )}
+          <Text style={[styles.captchaText, captchaToken ? styles.captchaTextVerified : null]}>
+            {captchaToken ? 'CAPTCHA verified' : 'Complete CAPTCHA verification'}
+          </Text>
+          {captchaToken ? null : <ChevronRight size={20} color={colors.textSecondary} strokeWidth={1.75} />}
+        </ScalePressable>
+      )}
 
-        <Button
-          mode="contained"
-          onPress={handleRegister}
-          loading={loading}
-          disabled={loading || !captchaToken}
-          style={styles.button}
-          contentStyle={styles.buttonContent}
-        >
-          Create Account
-        </Button>
+      {error ? (
+        <AuthNotice tone="error" message={error}>
+          {error === DUPLICATE_EMAIL_MESSAGE ? (
+            <View style={styles.noticeActions}>
+              <Button
+                variant="outlined"
+                label="Sign in"
+                disabled={loading}
+                onPress={() => router.replace({ pathname: '/login', params: { email: formData.email } } as any)}
+                style={styles.noticeButton}
+              />
+              <Button
+                variant="outlined"
+                label="Reset password"
+                disabled={loading}
+                onPress={() => router.push('/forgot-password')}
+                style={styles.noticeButton}
+              />
+            </View>
+          ) : null}
+        </AuthNotice>
+      ) : null}
 
-        <Button
-          mode="text"
-          onPress={() => router.replace('/login')}
-          style={styles.backButton}
-          labelStyle={styles.linkLabel}
-        >
-          Already have an account? Login
-        </Button>
-      </View>
+      <Button
+        label="Create account"
+        busyLabel="Creating account"
+        onPress={() => void handleRegister()}
+        busy={loading}
+        disabled={!recaptchaSiteKey}
+        haptic="medium"
+      />
 
       <Modal
         visible={captchaModalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent
+        statusBarTranslucent
         onRequestClose={() => setCaptchaModalVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+          <View style={styles.modalCard} accessibilityViewIsModal>
             <View style={styles.modalHeader}>
-              <Text variant="titleMedium" style={styles.modalTitle}>Verify you are human</Text>
-              <TouchableOpacity onPress={() => setCaptchaModalVisible(false)}>
-                <MaterialIcons name="close" size={22} color="#475569" />
-              </TouchableOpacity>
+              <Text style={styles.modalTitle} accessibilityRole="header">Verify you are human</Text>
+              <ScalePressable
+                static
+                pressBg
+                onPress={() => setCaptchaModalVisible(false)}
+                accessibilityLabel="Close"
+                style={styles.modalClose}
+              >
+                <X size={22} color={colors.textSecondary} strokeWidth={2} />
+              </ScalePressable>
             </View>
             <Text style={styles.modalDescription}>
               Complete the CAPTCHA challenge to continue account creation.
             </Text>
             {!recaptchaSiteKey ? (
-              <Surface style={styles.errorContainer} elevation={1}>
-                <Text style={styles.errorText}>Missing `EXPO_PUBLIC_RECAPTCHA_SITE_KEY`.</Text>
-              </Surface>
+              <AuthNotice tone="error" message={CAPTCHA_MISSING_MESSAGE} />
             ) : (
               <View style={styles.webviewWrap}>
                 {captchaLoading ? (
                   <View style={styles.webviewLoader}>
-                    <ActivityIndicator size="small" color="#2563EB" />
+                    <ActivityIndicator size="small" color={colors.primary} />
                     <Text style={styles.webviewLoaderText}>Loading CAPTCHA...</Text>
                   </View>
                 ) : null}
@@ -454,188 +532,205 @@ export default function RegisterScreen() {
   );
 }
 
+const bodySmall = {
+  fontFamily: font.inter.regular,
+  fontSize: type.bodySmall.fontSize,
+  lineHeight: type.bodySmall.lineHeight,
+};
+
 const styles = StyleSheet.create({
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  logoImage: {
-    width: 160,
-    height: 48,
-  },
-  title: {
-    fontWeight: '700',
-    marginBottom: 4,
-    color: '#0f172a',
-  },
-  subtitle: {
-    color: '#4b5563',
-  },
-  errorContainer: {
-    backgroundColor: '#ffebee',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#c62828',
-  },
-  form: {
-    gap: 12,
-  },
-  input: {
-    backgroundColor: '#fff',
-  },
-  divider: {
-    marginVertical: 8,
-  },
+  section: { gap: space.md, marginTop: space.sm },
   sectionTitle: {
-    marginTop: 8,
-    marginBottom: 4,
-    fontWeight: '600',
+    color: colors.textPrimary,
+    fontFamily: font.outfit.medium,
+    fontSize: type.titleSmall.fontSize,
+    lineHeight: type.titleSmall.lineHeight,
+    letterSpacing: type.titleSmall.letterSpacing,
   },
-  radioItem: {
+  choiceList: { gap: space.sm },
+  choice: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-  },
-  radioLabel: {
-    marginTop: 6,
-    color: '#111827',
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  checkboxLabel: {
-    marginLeft: 8,
-    flex: 1,
-  },
-  captchaButton: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginTop: 4,
-  },
-  captchaButtonVerified: {
-    borderColor: '#bbf7d0',
-    backgroundColor: '#f0fdf4',
-  },
-  captchaButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  captchaButtonText: {
-    color: '#1d4ed8',
-    fontWeight: '600',
-  },
-  captchaButtonTextVerified: {
-    color: '#166534',
-  },
-  linkText: {
-    color: '#2563EB',
-    textDecorationLine: 'underline',
-  },
-  button: {
-    marginTop: 16,
-    borderRadius: 8,
-  },
-  buttonContent: {
-    paddingVertical: 8,
-  },
-  backButton: {
-    marginTop: 8,
-  },
-  linkLabel: {
-    textTransform: 'none',
-  },
-  roleList: { gap: 10 },
-  roleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    gap: space.md,
     minHeight: 64,
+    padding: space.md,
     borderWidth: 1.5,
-    borderColor: '#D5DCE8',
-    borderRadius: 14,
-    padding: 12,
-    backgroundColor: '#fff',
+    borderColor: colors.inputBorder,
+    borderRadius: radius.control,
+    backgroundColor: colors.surfaceBg,
   },
-  roleCardSelected: { borderColor: '#3C18A8', backgroundColor: '#EEEAF9' },
-  roleIconWrap: {
+  choiceSelected: { borderColor: colors.accentStrong, backgroundColor: colors.tone.violet.bg },
+  choiceIcon: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: radius.tileSm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EEEAF9',
+    backgroundColor: colors.tone.violet.bg,
   },
-  orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
-  orLine: { flex: 1, height: 1, backgroundColor: '#D5DCE8' },
-  orText: { fontSize: 12.5, color: '#445474' },
-  newcomerPanel: { marginTop: 12, gap: 10, padding: 12, borderRadius: 16, backgroundColor: '#F5F8FC' },
-  newcomerTitle: { fontSize: 14.5, fontWeight: '600', color: '#06214A' },
-  roleDescription: {
-    color: '#64748B',
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 4,
+  choiceIconSelected: { backgroundColor: colors.primary },
+  choiceText: { flex: 1, gap: 2 },
+  choiceTitle: {
+    color: colors.textPrimary,
+    fontFamily: font.inter.semiBold,
+    fontSize: 15,
+    lineHeight: 20,
   },
+  choiceBody: { ...bodySmall, color: colors.textSecondary },
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: space.xxs },
+  orLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.inputBorder },
+  orText: { ...bodySmall, color: colors.textSecondary },
+  // Concentric: 24pt panel = 12pt choice radius + 12pt padding.
+  newcomerPanel: { gap: space.md, padding: space.md, borderRadius: radius.sheet, backgroundColor: colors.subtleBg },
+  newcomerTitle: {
+    color: colors.textPrimary,
+    fontFamily: font.inter.semiBold,
+    fontSize: type.labelLarge.fontSize,
+    lineHeight: type.labelLarge.lineHeight,
+  },
+  dobBlock: { gap: 6 },
+  fieldLabel: {
+    color: colors.textPrimary,
+    fontFamily: font.inter.medium,
+    fontSize: type.labelLarge.fontSize,
+    lineHeight: type.labelLarge.lineHeight,
+  },
+  dobField: {
+    minHeight: touch.min,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: radius.control,
+    backgroundColor: colors.inputBg,
+  },
+  dobFieldError: { borderColor: colors.status.red.solid },
+  dobValue: { color: colors.textPrimary, fontFamily: font.inter.regular, fontSize: 16, lineHeight: 22 },
+  dobPlaceholder: { color: colors.textMuted },
+  errorText: { color: colors.status.red.fg },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  // Top-aligned so wrapped terms at large text keep the box beside the first line.
+  termsRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  // The 22pt box sits in a full touch-sized target; -11pt lines the box up with the fields' left edge.
+  checkHit: {
+    width: touch.min,
+    height: touch.min,
+    marginLeft: -(touch.min - 22) / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: colors.textSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceBg,
+  },
+  checkBoxOn: { borderColor: colors.primary, backgroundColor: colors.primary },
+  termsText: {
+    flex: 1,
+    paddingTop: (touch.min - type.bodyMedium.lineHeight) / 2,
+    color: colors.textPrimary,
+    fontFamily: font.inter.regular,
+    fontSize: type.bodyMedium.fontSize,
+    lineHeight: type.bodyMedium.lineHeight,
+  },
+  linkText: {
+    color: colors.accentStrong,
+    fontFamily: font.inter.medium,
+    textDecorationLine: 'underline',
+  },
+  captchaRow: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingHorizontal: 14,
+    paddingVertical: space.md,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: radius.nested,
+    backgroundColor: colors.surfaceBg,
+  },
+  captchaRowVerified: { borderColor: colors.status.green.bg, backgroundColor: colors.status.green.bg },
+  captchaText: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontFamily: font.inter.semiBold,
+    fontSize: type.labelLarge.fontSize,
+    lineHeight: type.labelLarge.lineHeight,
+  },
+  captchaTextVerified: { color: colors.status.green.fg },
+  noticeActions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  noticeButton: { flexGrow: 1 },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    backgroundColor: colors.scrim,
     justifyContent: 'center',
-    padding: 20,
+    padding: space.xl,
   },
   modalCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 18,
-    maxHeight: '78%',
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    backgroundColor: colors.surfaceBg,
+    borderRadius: radius.sheet,
+    padding: space.xl,
+    maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: space.sm,
   },
   modalTitle: {
-    color: '#0f172a',
-    fontWeight: '700',
+    flex: 1,
+    color: colors.textPrimary,
+    fontFamily: font.outfit.medium,
+    fontSize: type.titleLarge.fontSize,
+    lineHeight: type.titleLarge.lineHeight,
+    letterSpacing: type.titleLarge.letterSpacing,
+  },
+  modalClose: {
+    width: touch.min,
+    height: touch.min,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalDescription: {
-    marginTop: 8,
-    marginBottom: 14,
-    color: '#475569',
+    marginTop: space.xs,
+    marginBottom: space.lg,
+    color: colors.textSecondary,
+    fontFamily: font.inter.regular,
+    fontSize: type.bodyMedium.fontSize,
+    lineHeight: type.bodyMedium.lineHeight,
   },
   webviewWrap: {
     height: 280,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: radius.control,
     overflow: 'hidden',
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.subtleBg,
   },
   webviewLoader: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#f8fafc',
+    gap: space.sm,
+    backgroundColor: colors.subtleBg,
     zIndex: 1,
   },
   webviewLoaderText: {
-    color: '#475569',
+    color: colors.textSecondary,
+    fontFamily: font.inter.regular,
+    fontSize: type.bodyMedium.fontSize,
   },
 });

@@ -1,46 +1,29 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { BackHandler, Pressable, StyleSheet, TextInput as RNTextInput, View } from 'react-native';
-import { Text, Button, Surface } from 'react-native-paper';
-import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, Text, type TextInput, View } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
-import AuthLayout from '../components/AuthLayout';
+import AuthLayout, { AuthLink, AuthNotice, AuthPrompt, OtpCodeInput } from '../components/AuthLayout';
+import { Button, TextField } from '@/components/ui';
+import { colors, font, space, type } from '@/constants/tokens';
 
 export default function VerifyOTPScreen() {
     const router = useRouter();
     const params = useLocalSearchParams<{ email?: string }>();
     const { verifyOTP, resendOTP, user } = useAuth();
-    const email = typeof params.email === 'string' ? params.email : (user?.email || '');
+    const initialEmail = typeof params.email === 'string' ? params.email : (user?.email || '');
+    // Web parity: opened without an email (cold deep link), the screen asks for it instead of sending ''.
+    const [askEmail] = useState(!initialEmail);
+    const [email, setEmail] = useState(initialEmail);
 
     const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [status, setStatus] = useState('');
     const [resending, setResending] = useState(false);
-    const [resendCooldown, setResendCooldown] = useState(0);
+    // One request at a time: a resend during verify would invalidate the code being checked.
+    const busy = loading || resending;
 
-    const inputRef = useRef<RNTextInput | null>(null);
-
-    // Android hardware back: go back in navigation stack when possible
-    useFocusEffect(
-        useCallback(() => {
-            const onBackPress = () => {
-                if (router.canGoBack()) {
-                    router.back();
-                    return true; // we handled it
-                }
-                return false; // allow default (exit) when no history
-            };
-            const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-            return () => sub.remove();
-        }, [router])
-    );
-
-    // Cooldown timer for resend
-    useEffect(() => {
-        if (resendCooldown > 0) {
-            const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
-            return () => clearTimeout(timer);
-        }
-    }, [resendCooldown]);
+    const inputRef = useRef<TextInput | null>(null);
 
     const handleOTPChange = (value: string) => {
         const digits = value.replace(/\D/g, '').slice(0, 6);
@@ -48,8 +31,14 @@ export default function VerifyOTPScreen() {
     };
 
     const handleVerify = async () => {
+        if (busy) return;
         const code = otp;
+        setStatus('');
 
+        if (!email) {
+            setError('Please enter your email');
+            return;
+        }
         if (code.length !== 6) {
             setError('Please enter the complete 6-digit code');
             return;
@@ -73,13 +62,20 @@ export default function VerifyOTPScreen() {
         }
     };
 
+    // No client cooldown (web parity): the server throttles resends and its refusal shows as the error.
     const handleResend = async () => {
-        setResending(true);
+        if (busy) return;
         setError('');
+        setStatus('');
+        if (!email) {
+            setError('Please enter your email');
+            return;
+        }
+        setResending(true);
 
         try {
             await resendOTP(email);
-            setResendCooldown(60); // 60 second cooldown
+            setStatus('A new code has been sent to your email.');
             setOtp('');
             inputRef.current?.focus();
         } catch (err: any) {
@@ -90,143 +86,104 @@ export default function VerifyOTPScreen() {
     };
 
     return (
-        <AuthLayout title="Verify Your Email" showTitle={false}>
-            <View>
-                <Surface style={styles.header} elevation={0}>
-                    <Text variant="headlineMedium" style={styles.title}>
-                        Verify Your Email
-                    </Text>
-                    <Text variant="bodyMedium" style={styles.subtitle}>
-                        This is the email verification step. We ask for it after registration, or when you try to log in before your email has been verified. We&apos;ve sent a 6-digit code to {email}.
-                    </Text>
-                </Surface>
-
-                {error ? (
-                    <Surface style={styles.errorContainer} elevation={1}>
-                        <Text style={styles.errorText}>{error}</Text>
-                    </Surface>
-                ) : null}
-
-                <RNTextInput
-                    ref={inputRef}
-                    value={otp}
-                    onChangeText={handleOTPChange}
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    textContentType="oneTimeCode"
-                    autoComplete="sms-otp"
-                    style={styles.hiddenInput}
+        <AuthLayout
+            title="Verify your email"
+            subtitle={
+                <>
+                    Enter the 6-digit code we sent to{' '}
+                    <Text style={styles.email}>{askEmail ? 'your email' : email}</Text>.
+                </>
+            }
+            onBack={router.canGoBack() ? () => router.back() : undefined}
+            backDisabled={busy}
+            footer={
+                <AuthPrompt
+                    text="Wrong account?"
+                    action={<AuthLink label="Back to sign in" onPress={() => router.replace('/login')} disabled={busy} />}
                 />
+            }
+        >
+            {error ? <AuthNotice tone="error" message={error} /> : null}
+            {status ? <AuthNotice tone="success" message={status} /> : null}
 
-                <Pressable style={styles.otpContainer} onPress={() => inputRef.current?.focus()}>
-                    {Array.from({ length: 6 }, (_, index) => {
-                        const digit = otp[index] ?? '';
-                        const isActive = index === otp.length && otp.length < 6;
-                        return (
-                            <View key={index} style={[styles.otpBox, isActive ? styles.otpBoxActive : null]}>
-                                <Text style={styles.otpDigit}>{digit}</Text>
-                            </View>
-                        );
-                    })}
-                </Pressable>
+            {askEmail ? (
+                <TextField
+                    label="Email"
+                    value={email}
+                    onChangeText={(value) => setEmail(value.trim().toLowerCase())}
+                    keyboardType="email-address"
+                    textContentType="emailAddress"
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoFocus
+                    returnKeyType="next"
+                    submitBehavior="submit"
+                    onSubmitEditing={() => inputRef.current?.focus()}
+                    disabled={busy}
+                />
+            ) : null}
 
-                <Button
-                    mode="contained"
-                    onPress={handleVerify}
-                    loading={loading}
-                    disabled={loading || otp.length !== 6}
-                    style={styles.button}
-                    contentStyle={styles.buttonContent}
-                >
-                    Verify
-                </Button>
+            <OtpCodeInput
+                inputRef={inputRef}
+                value={otp}
+                onChangeText={handleOTPChange}
+                invalid={Boolean(error) && !otp}
+                disabled={busy}
+                autoFocus={!askEmail}
+                autoComplete="one-time-code"
+                accessibilityHint={askEmail ? undefined : `Sent to ${email}`}
+                onSubmitEditing={() => void handleVerify()}
+            />
 
-                <View style={styles.resendContainer}>
-                    <Text variant="bodyMedium">Didn&apos;t receive the code?</Text>
-                    {resendCooldown > 0 ? (
-                        <Text variant="bodySmall" style={styles.cooldownText}>
-                            Resend in {resendCooldown}s
-                        </Text>
-                    ) : (
-                        <Button
-                            mode="text"
-                            onPress={handleResend}
-                            loading={resending}
-                            disabled={resending}
-                            compact
-                        >
-                            Resend Code
-                        </Button>
-                    )}
-                </View>
+            <Button
+                label="Verify"
+                busyLabel="Verifying"
+                onPress={() => void handleVerify()}
+                busy={loading}
+                disabled={resending || otp.length !== 6}
+                haptic="light"
+            />
+
+            <View style={styles.resend}>
+                <Text style={styles.resendText}>Didn&apos;t receive the code?</Text>
+                <AuthLink
+                    label={resending ? 'Sending…' : 'Resend code'}
+                    onPress={() => void handleResend()}
+                    disabled={busy}
+                />
             </View>
+
+            <Text style={styles.why}>
+                We ask for this after you register, or when you sign in before your email is verified.
+            </Text>
         </AuthLayout>
     );
 }
 
 const styles = StyleSheet.create({
-    header: {
-        marginBottom: 32,
-        backgroundColor: 'transparent',
+    email: {
+        color: colors.textPrimary,
+        fontFamily: font.inter.semiBold,
     },
-    title: {
-        fontWeight: 'bold',
-        marginBottom: 8,
-    },
-    subtitle: {
-        color: '#666',
-    },
-    errorContainer: {
-        backgroundColor: '#ffebee',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 16,
-    },
-    errorText: {
-        color: '#c62828',
-    },
-    otpContainer: {
+    resend: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 32,
-        gap: 8,
-    },
-    hiddenInput: {
-        position: 'absolute',
-        opacity: 0,
-        width: 1,
-        height: 1,
-    },
-    otpBox: {
-        flex: 1,
-        minHeight: 56,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#d0d7de',
-        backgroundColor: '#fff',
+        flexWrap: 'wrap',
         alignItems: 'center',
         justifyContent: 'center',
+        columnGap: space.xs,
     },
-    otpBoxActive: {
-        borderColor: '#7c3aed',
+    resendText: {
+        color: colors.textSecondary,
+        fontFamily: font.inter.regular,
+        fontSize: type.bodyMedium.fontSize,
+        lineHeight: type.bodyMedium.lineHeight,
     },
-    otpDigit: {
-        fontSize: 24,
-        fontWeight: 'bold',
-    },
-    button: {
-        borderRadius: 8,
-        marginBottom: 24,
-    },
-    buttonContent: {
-        paddingVertical: 8,
-    },
-    resendContainer: {
-        alignItems: 'center',
-        gap: 4,
-    },
-    cooldownText: {
-        color: '#999',
-        marginTop: 4,
+    why: {
+        color: colors.textSecondary,
+        fontFamily: font.inter.regular,
+        fontSize: type.bodySmall.fontSize,
+        lineHeight: type.bodySmall.lineHeight,
+        textAlign: 'center',
     },
 });

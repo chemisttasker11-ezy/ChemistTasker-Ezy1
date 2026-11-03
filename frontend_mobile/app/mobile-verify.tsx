@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, TextInput as RNTextInput, View } from 'react-native';
-import { Text, TextInput, Button, Surface } from 'react-native-paper';
+import { StyleSheet, Text, type TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Globe } from 'lucide-react-native';
 import {
     mobileRequestOtp,
     mobileVerifyOtp,
@@ -10,7 +10,11 @@ import {
     canSkipOverseasMobileCheck,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '../context/AuthContext';
-import AuthLayout from '../components/AuthLayout';
+import AuthLayout, { AuthLink, AuthNotice, OtpCodeInput } from '../components/AuthLayout';
+import { Button, IconTile, TextField } from '@/components/ui';
+import { colors, font, radius, space, type } from '@/constants/tokens';
+
+type PendingAction = 'send' | 'verify' | 'resend' | 'skip';
 
 export default function MobileVerifyScreen() {
     const router = useRouter();
@@ -26,7 +30,19 @@ export default function MobileVerifyScreen() {
     const [status, setStatus] = useState('');
     const [error, setError] = useState('');
     const [identityLocked, setIdentityLocked] = useState(false);
-    const otpInputRef = useRef<RNTextInput | null>(null);
+    // The code step appears once a code is on its way, so only one step leads at a time.
+    const [codeSent, setCodeSent] = useState(false);
+    const otpInputRef = useRef<TextInput | null>(null);
+    const lastNameRef = useRef<TextInput | null>(null);
+    const usernameRef = useRef<TextInput | null>(null);
+    const mobileRef = useRef<TextInput | null>(null);
+    // Which button shows the spinner; `loading` still locks every action as before.
+    const [pending, setPending] = useState<PendingAction | null>(null);
+    const run = (action: PendingAction, handler: () => Promise<void>) => {
+        if (loading) return;
+        setPending(action);
+        void handler();
+    };
 
     useEffect(() => {
         if (!user) return;
@@ -64,6 +80,7 @@ export default function MobileVerifyScreen() {
                 mobile_number: mobile,
             });
             if (sent?.debug_otp) setOtp(sent.debug_otp);
+            setCodeSent(true);
             setStatus(sent?.debug_otp ? `Test mode: no SMS sent. Your code is ${sent.debug_otp}.` : 'We sent a code to your mobile.');
         } catch (err: any) {
             setError(err?.message || 'Failed to send code.');
@@ -75,20 +92,21 @@ export default function MobileVerifyScreen() {
     const handleVerify = async () => {
         setError('');
         setStatus('');
-        if (!otp) {
-            setError('Please enter the OTP code.');
+        // The keyboard's Done key bypasses the button's disabled state.
+        if (otp.length !== 6) {
+            setError('Please enter the complete 6-digit code.');
             return;
         }
         setLoading(true);
         try {
             await mobileVerifyOtp({ otp });
-            setIdentityLocked(true);
             await markMobileVerified({
                 first_name: firstName,
                 last_name: lastName,
                 username,
                 mobile_number: mobile,
             });
+            setIdentityLocked(true);
             setStatus('Mobile verified! Redirecting...');
             setTimeout(() => router.replace(getRoleHome(user?.role) as any), 800);
         } catch (err: any) {
@@ -110,6 +128,7 @@ export default function MobileVerifyScreen() {
         try {
             await skipMobileOverseas({ first_name: firstName, last_name: lastName, username });
             await markMobileCheckSkipped({ first_name: firstName, last_name: lastName, username });
+            setIdentityLocked(true);
             setStatus('Done. Next, upload photo ID to verify your profile.');
             setTimeout(() => router.replace('/explorer/profile-identity' as any), 800);
         } catch (err: any) {
@@ -140,231 +159,216 @@ export default function MobileVerifyScreen() {
     };
 
     const handleBackToLogin = async () => {
-        await logout();
-        router.replace('/login' as any);
+        if (locked) return;
+        setLoading(true);
+        try {
+            await logout();
+            router.replace('/login' as any);
+        } catch (err: any) {
+            setError(err?.message || 'Could not log out.');
+            setLoading(false);
+        }
     };
 
+    const locked = identityLocked || loading;
+    const busy = (action: PendingAction) => loading && pending === action;
+    const notices = (
+        <>
+            {error ? <AuthNotice tone="error" message={error} /> : null}
+            {status ? <AuthNotice tone="success" message={status} /> : null}
+        </>
+    );
+
     return (
-        <AuthLayout title="Mobile Verification">
-            <Surface style={styles.infoContainer} elevation={0}>
-                <Text variant="titleMedium" style={styles.infoTitle}>
-                    Why mobile verification is required
-                </Text>
-                <Text variant="bodyMedium" style={styles.infoText}>
-                    Your email is verified, but this account still needs a verified mobile number. We use this step after login to confirm your legal name, username, and mobile number before opening your workspace.
-                </Text>
-            </Surface>
+        <AuthLayout
+            title="Verify your mobile"
+            backDisabled={locked}
+            subtitle="Your email is verified. Confirm your legal name, username and mobile number to open your workspace."
+            footer={<AuthLink label="Back to login" onPress={() => void handleBackToLogin()} disabled={locked} />}
+        >
+            <Text style={styles.sectionTitle} accessibilityRole="header">Your details</Text>
 
-            {error ? (
-                <Surface style={styles.errorContainer} elevation={1}>
-                    <Text style={styles.errorText}>{error}</Text>
-                </Surface>
-            ) : null}
-
-            {status ? (
-                <Surface style={styles.successContainer} elevation={1}>
-                    <Text style={styles.successText}>{status}</Text>
-                </Surface>
-            ) : null}
-
-            <TextInput
-                label="First Legal Name"
+            <TextField
+                label="First legal name"
                 value={firstName}
                 onChangeText={setFirstName}
-                mode="outlined"
-                style={styles.input}
-                disabled={identityLocked || loading}
+                textContentType="givenName"
+                autoComplete="name-given"
+                autoCapitalize="words"
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => lastNameRef.current?.focus()}
+                disabled={locked}
             />
 
-            <TextInput
-                label="Last Legal Name"
+            <TextField
+                ref={lastNameRef}
+                label="Last legal name"
                 value={lastName}
                 onChangeText={setLastName}
-                mode="outlined"
-                style={styles.input}
-                disabled={identityLocked || loading}
+                textContentType="familyName"
+                autoComplete="name-family"
+                autoCapitalize="words"
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => usernameRef.current?.focus()}
+                disabled={locked}
             />
 
-            <TextInput
+            <TextField
+                ref={usernameRef}
                 label="Username"
                 value={username}
                 onChangeText={setUsername}
-                mode="outlined"
-                style={styles.input}
-                disabled={identityLocked || loading}
+                textContentType="username"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => mobileRef.current?.focus()}
+                disabled={locked}
             />
 
-            <TextInput
-                label="Mobile Number"
+            <TextField
+                ref={mobileRef}
+                label="Mobile number"
                 value={mobile}
                 onChangeText={setMobile}
-                mode="outlined"
-                style={styles.input}
                 keyboardType="phone-pad"
+                textContentType="telephoneNumber"
+                autoComplete="tel"
                 placeholder="e.g. 041x xxx xxx"
-                disabled={identityLocked || loading}
+                returnKeyType="send"
+                onSubmitEditing={() => run('send', requestCode)}
+                disabled={locked}
             />
 
             <Button
-                mode="outlined"
-                onPress={requestCode}
-                loading={loading}
-                disabled={loading || !mobile}
-                style={styles.outlinedButton}
-                contentStyle={styles.buttonContent}
-            >
-                Send Code
-            </Button>
-
-            <RNTextInput
-                ref={otpInputRef}
-                value={otp}
-                onChangeText={handleOtpChange}
-                keyboardType="number-pad"
-                maxLength={6}
-                textContentType="oneTimeCode"
-                autoComplete="sms-otp"
-                style={styles.hiddenInput}
+                variant={codeSent ? 'outlined' : 'primary'}
+                label="Send code"
+                busyLabel="Sending code"
+                onPress={() => run('send', requestCode)}
+                busy={busy('send')}
+                disabled={locked || !mobile}
+                haptic={codeSent ? undefined : 'light'}
             />
 
-            <Pressable style={styles.otpContainer} onPress={() => otpInputRef.current?.focus()}>
-                {Array.from({ length: 6 }, (_, index) => {
-                    const digit = otp[index] ?? '';
-                    const isActive = index === otp.length && otp.length < 6;
-                    return (
-                        <View key={index} style={[styles.otpBox, isActive ? styles.otpBoxActive : null]}>
-                            <Text style={styles.otpDigit}>{digit}</Text>
-                        </View>
-                    );
-                })}
-            </Pressable>
+            {codeSent ? null : notices}
 
-            <Button
-                mode="contained"
-                onPress={handleVerify}
-                loading={loading}
-                disabled={loading || otp.length !== 6}
-                style={styles.button}
-                contentStyle={styles.buttonContent}
-            >
-                Verify
-            </Button>
+            {codeSent ? (
+                <>
+                    <View style={styles.divider} />
 
-            <View style={styles.resendRow}>
-                <Button
-                    mode="text"
-                    onPress={handleResend}
-                    disabled={loading}
-                    compact
-                >
-                    Resend Code
-                </Button>
-            </View>
+                    <Text style={styles.sectionTitle} accessibilityRole="header">Verification code</Text>
+
+                    <OtpCodeInput
+                        inputRef={otpInputRef}
+                        value={otp}
+                        onChangeText={handleOtpChange}
+                        invalid={Boolean(error) && otp.length < 6}
+                        disabled={locked}
+                        autoFocus
+                        accessibilityHint={`The code we sent to ${mobile}`}
+                        onSubmitEditing={() => run('verify', handleVerify)}
+                    />
+
+                    {notices}
+
+                    <Button
+                        label="Verify"
+                        busyLabel="Verifying"
+                        onPress={() => run('verify', handleVerify)}
+                        busy={busy('verify')}
+                        disabled={locked || otp.length !== 6}
+                        haptic="light"
+                    />
+
+                    {/* No client cooldown (web parity): the server throttles resends and its refusal shows as the error. */}
+                    <View style={styles.resendRow}>
+                        <Text style={styles.resendText}>Didn&apos;t get it?</Text>
+                        <AuthLink
+                            label={busy('resend') ? 'Sending…' : 'Resend code'}
+                            onPress={() => run('resend', handleResend)}
+                            disabled={locked}
+                        />
+                    </View>
+                </>
+            ) : null}
 
             {canSkipOverseas ? (
-                <Surface style={styles.overseas} elevation={0}>
-                    <Text style={styles.overseasTitle}>Joining from overseas?</Text>
+                <View style={styles.overseas}>
+                    <View style={styles.overseasHead}>
+                        <IconTile icon={<Globe />} tone="blue" size={36} />
+                        <Text style={styles.overseasTitle} accessibilityRole="header">Joining from overseas?</Text>
+                    </View>
                     <Text style={styles.overseasBody}>
                         No Australian mobile yet? Fill in your legal name and username above, then skip this step. You will verify with photo ID instead, and your profile shows an Overseas label.
                     </Text>
-                    <Button mode="outlined" onPress={handleSkipOverseas} disabled={loading}>Skip and verify with photo ID</Button>
-                </Surface>
+                    <Button
+                        variant="outlined"
+                        label="Skip and verify with photo ID"
+                        busyLabel="Skipping"
+                        onPress={() => run('skip', handleSkipOverseas)}
+                        busy={busy('skip')}
+                        disabled={locked}
+                    />
+                </View>
             ) : null}
-
-            <View style={styles.backRow}>
-                <Button mode="text" onPress={handleBackToLogin} style={styles.backButton}>
-                    Back to login
-                </Button>
-            </View>
         </AuthLayout>
     );
 }
 
 const styles = StyleSheet.create({
-    input: {
-        backgroundColor: '#fff',
+    sectionTitle: {
+        color: colors.textPrimary,
+        fontFamily: font.outfit.medium,
+        fontSize: type.titleSmall.fontSize,
+        lineHeight: type.titleSmall.lineHeight,
+        letterSpacing: type.titleSmall.letterSpacing,
     },
-    infoContainer: {
-        backgroundColor: '#EEF8F7',
-        borderRadius: 12,
-        padding: 14,
-        marginBottom: 12,
-    },
-    infoTitle: {
-        color: '#0F766E',
-        fontWeight: '700',
-        marginBottom: 4,
-    },
-    infoText: {
-        color: '#334155',
-    },
-    hiddenInput: {
-        position: 'absolute',
-        opacity: 0,
-        width: 1,
-        height: 1,
-    },
-    otpContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginVertical: 16,
-        gap: 8,
-    },
-    otpBox: {
-        flex: 1,
-        minHeight: 56,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#d0d7de',
-        backgroundColor: '#fff',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    otpBoxActive: {
-        borderColor: '#7c3aed',
-    },
-    otpDigit: {
-        fontSize: 24,
-        fontWeight: 'bold',
-    },
-    button: {
-        marginTop: 4,
-        borderRadius: 8,
-    },
-    outlinedButton: {
-        borderRadius: 8,
-        borderColor: '#00a99d',
-    },
-    buttonContent: {
-        paddingVertical: 8,
+    divider: {
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: colors.border,
+        marginVertical: space.xs,
     },
     resendRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
         alignItems: 'center',
-        marginTop: 4,
+        justifyContent: 'center',
+        columnGap: space.xs,
     },
-    backRow: {
+    resendText: {
+        color: colors.textSecondary,
+        fontFamily: font.inter.regular,
+        fontSize: type.bodyMedium.fontSize,
+        lineHeight: type.bodyMedium.lineHeight,
+    },
+    overseas: {
+        gap: space.md,
+        padding: space.lg,
+        borderRadius: radius.nested,
+        backgroundColor: colors.subtleBg,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    overseasHead: {
+        flexDirection: 'row',
         alignItems: 'center',
+        gap: space.md,
     },
-    backButton: {
-        marginTop: 4,
+    overseasTitle: {
+        flex: 1,
+        color: colors.textPrimary,
+        fontFamily: font.inter.semiBold,
+        fontSize: 15,
+        lineHeight: 20,
     },
-    errorContainer: {
-        backgroundColor: '#ffebee',
-        padding: 12,
-        borderRadius: 8,
+    overseasBody: {
+        color: colors.textSecondary,
+        fontFamily: font.inter.regular,
+        fontSize: type.bodySmall.fontSize,
+        lineHeight: type.bodySmall.lineHeight,
     },
-    errorText: {
-        color: '#c62828',
-    },
-    successContainer: {
-        backgroundColor: '#ecfdf3',
-        padding: 12,
-        borderRadius: 8,
-    },
-    successText: {
-        color: '#166534',
-    },
-    overseas: { marginTop: 20, padding: 14, gap: 8, borderRadius: 14, borderWidth: 1, borderColor: '#D5DCE8', backgroundColor: '#FFFFFF' },
-    overseasTitle: { fontSize: 15, fontWeight: '600', color: '#06214A' },
-    overseasBody: { fontSize: 13, lineHeight: 19, color: '#445474' },
 });
