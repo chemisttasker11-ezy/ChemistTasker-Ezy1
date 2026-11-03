@@ -93,7 +93,7 @@ The follow-up commit fixes the two small leftovers and one test-harness defect:
   - this file
 - Check that the refresh EXIT trap cannot hide the script's failure exit status, and that it cannot remove a published rollback dump.
 - Check that the patch scope covers only the consumer call, not the assertions on the REST path.
-- Not covered: `attendance_tests/` is run by CI with plain `unittest`, not the Django PostgreSQL runner. iOS commits `655f2d9c` and `c3b5f250` were not re-read; iOS acceptance is deferred by the owner.
+- Not covered: `attendance_tests/` is run by CI with plain `unittest`, not the Django PostgreSQL runner. iOS commits `655f2d9c` and `c3b5f250` were not re-read; iOS acceptance was not waived in this chat. The newer full macOS [run41559907948](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/actions/runs/41559907948) passed at `3048ded7`, including the mobile attendance changes and actual PDF system sharing; its mobile/native source is unchanged by these follow-ups. Final-head native acceptance remains a verification gate.
 
 ### Deployer checklist (after the owner merges)
 
@@ -103,4 +103,10 @@ The follow-up commit fixes the two small leftovers and one test-harness defect:
 4. Confirm no `chemisttasker_staging_migrate` container exists in any state (`docker ps -a`). If one does, inspect its logs before removing it.
 5. Run inside `tmux new-session -A -s chemisttasker-staging-release`, then `bash scripts/deploy-staging.sh --expected-sha "$REVIEWED_SHA"`.
 6. On failure, read the private record under `/opt/apps/chemisttasker-staging-ops/release-*/` (`phase`, `failed.exit`, `migration.log`). No database restore is automatic. Writers stay paused until an inspected recovery.
-7. After success, check `deployed.commit` matches `REVIEWED_SHA`, then check the public smoke, login, websockets (chat) and that worker queues drain.
+7. After success, check `deployed.commit` matches `REVIEWED_SHA`, then check the public smoke, login, websockets (chat) and worker queue health. Preserve normal worker behaviour; do not force outbound queues to drain or send test email/SMS/payments during deployment checks.
+
+### Follow-up cleanup-failure check
+
+The reviewing agent reproduced a further edge case in the refresh EXIT trap: if removal of the rollback partial itself failed, `set -e` skipped the staged-input cleanup and replaced the original failure code. The trap now captures the original status, disables fail-fast only during cleanup, attempts both removals and exits with that original status. A regression injects unlink failure and requires the staged-input removal attempt and original archive-validation code. Successful refresh coverage also requires the validated rollback dump and host input to survive. Cleanup remains best effort if storage or Docker is unavailable, and SIGKILL cannot execute a shell trap.
+
+This does not change the production consumer, payment, migration or attendance paths. Exact-source verification and the independent rereview are recorded in the PR checks/description before marking ready.

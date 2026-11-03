@@ -454,9 +454,20 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         self.assertEqual(list((self.root/'backups').glob('*.partial')),[])
         self.assertEqual(list((self.root/'backups').glob('staging-before-production-refresh-*.dump')),[])
 
+    def test_refresh_cleanup_attempts_both_targets_and_preserves_original_failure(self):
+        unlink=self.root/'bin/rm'
+        unlink.write_text('#!/bin/sh\ncase "$*" in *.partial) exit 73 ;; esac\nexec /bin/rm "$@"\n')
+        unlink.chmod(0o755)
+        result,calls=self.refresh(FAIL_ROLLBACK_CHECK='1')
+        self.assertEqual(result.returncode,12,result.stderr)
+        staged=next(x for x in calls if x[:2]==['docker','cp'])[-1].split(':',1)[1]
+        self.assertIn(['docker','exec','chemisttasker_postgres_staging','rm','-f',staged],calls)
+
     def test_refresh_input_is_copied_and_decoded_before_quiesce(self):
         result,calls=self.refresh()
         self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(len(list((self.root/'backups').glob('staging-before-production-refresh-*.dump'))),1)
+        self.assertTrue((self.root/'backups/synthetic.dump').is_file())
         copies=[i for i,x in enumerate(calls) if x[:2]==['docker','cp']]
         self.assertEqual(len(copies),1, 'Refresh must stage exactly one input, never copy after DROP')
         staged=copies[0]

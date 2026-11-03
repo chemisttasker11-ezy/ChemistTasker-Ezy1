@@ -110,9 +110,13 @@ rollback_dir="/opt/backups/chemisttasker"
 restore_input="/tmp/production-refresh-${timestamp}-$$.dump"
 partial=''; input_staged=0
 cleanup_refresh() {
-  # Never leave an unvalidated rollback archive or a staged production copy behind.
+  local code=$?
+  trap - EXIT
+  set +e
+  # Attempt both cleanups even if one fails, retaining the original release result.
   if [[ -n "$partial" ]]; then rm -f "$partial"; fi
   if ((input_staged)); then docker exec chemisttasker_postgres_staging rm -f "$restore_input" >/dev/null 2>&1 || true; fi
+  exit "$code"
 }
 trap cleanup_refresh EXIT
 
