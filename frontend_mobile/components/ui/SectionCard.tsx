@@ -78,13 +78,13 @@ export function SectionCard({
         <View
           style={[
             styles.header,
-            { marginBottom: subtitle ? space.lg : space.md },
+            { marginBottom: subtitle ? space.lg : action ? space.xs : space.md },
             flush ? { paddingHorizontal: pad, paddingTop: pad } : null,
           ]}
         >
           <View style={styles.heading}>
             {title ? (
-              <View style={[styles.titleRow, action ? styles.titleRowAction : null]}>
+              <View style={styles.titleRow}>
                 {icon ? (
                   <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
                     {sizeIcon(icon, 20, colors.accentStrong)}
@@ -114,12 +114,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   flush: { overflow: 'hidden' },
-  // Web layout: title and subtitle stacked on the left, the action on the title line at the right.
-  header: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
+  // Title and subtitle stay together on the left, centred as one block against the action's touch box.
+  header: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   heading: { flex: 1, minWidth: 0 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  // Same height as the action's touch box, so the title and the link stay on one centred line.
-  titleRowAction: { minHeight: touch.min },
   title: {
     flex: 1,
     minWidth: 0,
@@ -136,8 +134,8 @@ const styles = StyleSheet.create({
     lineHeight: type.bodySmall.lineHeight,
   },
   subtitleUnder: { marginTop: space.xs },
-  // Reserves the full touch.min line, so the link's target is laid out (never overlaps or clips) and
-  // smaller actions (CountBadge 24pt) centre on the title line.
+  // Reserves the full touch.min box, so the link's target is laid out (never overlaps or clips); the
+  // box already adds air under a centred title, so an action-only header keeps just 4pt below it.
   action: { flexShrink: 0, minHeight: touch.min, justifyContent: 'center' },
   link: {
     alignSelf: 'flex-start',
