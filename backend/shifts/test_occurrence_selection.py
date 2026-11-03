@@ -1,5 +1,5 @@
 """Characterize shared selection while keeping each caller's fallback policy."""
-from datetime import date
+from datetime import date, time, timedelta
 from types import SimpleNamespace
 from unittest import mock
 
@@ -64,3 +64,25 @@ class OfferOccurrenceSelectionTests(SimpleTestCase):
                          (earlier, self.first, self.second))
         self.assertEqual(self.selected(assignments=assignments, include_pending=False)[1],
                          (earlier, self.first))
+
+    def test_assignment_dates_match_ordinary_overnight_boundaries(self):
+        for day, start, end, overnight in (
+            (self.first, time(9), time(17), False),
+            (self.first, time(22), time(6), True),
+            (self.first, time(22), time(0), True),
+            (date(2026, 11, 30), time(22), time(6), True),
+            (date(2026, 12, 31), time(22), time(6), True),
+        ):
+            with self.subTest(day=day, start=start, end=end):
+                self.slot.start_time, self.slot.end_time = start, end
+                assignment = SimpleNamespace(slot_date=day, slot=self.slot)
+                dates = activation_work_dates(self.offer, [assignment], include_pending=False)
+                expected = (day, day + timedelta(days=1)) if overnight else (day,)
+                self.assertEqual(dates, expected)
+
+    def test_selected_overnight_pending_dates_do_not_include_unselected_recurrence(self):
+        self.slot.start_time, self.slot.end_time = time(22), time(6)
+        self.offer.engagement_terms_snapshot = {'occurrences': [
+            {'slot_id': '11', 'date': str(self.second)},
+        ]}
+        self.assertEqual(self.selected()[1], (self.second, self.second + timedelta(days=1)))

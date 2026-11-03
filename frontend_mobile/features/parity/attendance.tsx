@@ -4,7 +4,7 @@ import { Button, Chip, Icon, Text } from 'react-native-paper';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { attendance, canManageKioskDevices, workforce } from '@chemisttasker/shared-core';
-import type { ShiftOffer, WorkerCoverTerms } from '@chemisttasker/shared-core';
+import type { AttendanceClockOptions, ShiftOffer, WorkerCoverTerms } from '@chemisttasker/shared-core';
 import ShiftEngagementTermsDialog from '../../roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useAuth } from '@/context/AuthContext';
@@ -181,7 +181,14 @@ function CoverTerms() {
       await attendance.acceptWorkerCoverTerms(selectedId,{...payload,termsVersion:selected?.engagement_terms_preview.terms_version});
       setSelectedId(null);
       await loadCovers();
-    }catch(e:any){setAcceptError(errorMessage(e,'Could not accept the terms. Try again.'));}
+    }catch(e:any){
+      if(e?.status===409&&e?.payload?.code==='TERMS_CHANGED'){
+        // Discard the rejected preview before fetching a new version and consents.
+        setCovers((current)=>current.filter((cover)=>cover.assignment_id!==selectedId));
+        setAcceptError('These terms have changed. Review the updated terms and confirm both agreements again.');
+        await loadCovers();
+      }else setAcceptError(errorMessage(e,'Could not accept the terms. Try again.'));
+    }
     finally{acceptingRef.current=false;setAccepting(false);}
   };
 
@@ -223,12 +230,12 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
   const [scanLocked,setScanLocked]=useState(false);
   const [permission,requestPermission]=useCameraPermissions();
   const active=Boolean(status?.has_active_session);
-  const run=async(kind:'in'|'out'|'break-start'|'break-end',scannedToken?:string,confirmOpposite?:boolean)=>{
+  const run=async(kind:'in'|'out'|'break-start'|'break-end',scannedToken?:string,confirmation?:AttendanceClockOptions)=>{
     const token=(scannedToken??qrToken).trim();
     setBusy(true);setLocalError('');
     try{
-      if(kind==='in') await attendance.clockIn(token, confirmOpposite ? { confirm_opposite: true } : undefined);
-      if(kind==='out') await attendance.clockOut(token, confirmOpposite ? { confirm_opposite: true } : undefined);
+      if(kind==='in') await attendance.clockIn(token, confirmation);
+      if(kind==='out') await attendance.clockOut(token, confirmation);
       if(kind==='break-start') await attendance.breakStart();
       if(kind==='break-end') await attendance.breakEnd();
       setQrToken('');
@@ -248,14 +255,19 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
             {
               text: 'Confirm',
               onPress: () => {
-                void run(kind, token, true);
+                void run(kind, token, { confirm_opposite: true, expected_action: errData.pending_action, observed_session_id: errData.observed_session_id });
               },
             },
           ]
         );
         return;
       }
-      setLocalError(errorMessage(e,'Attendance action failed.'));
+      if (e?.status === 409 && errData?.code === 'STALE_CONFIRMATION') {
+        setScannerOpen(false);
+        setQrToken('');
+        await onReload();
+        setLocalError(errData.error || errData.message || 'Your attendance changed. Review the current status and try again.');
+      } else setLocalError(errorMessage(e,'Attendance action failed.'));
     }
     finally{setBusy(false);setScanLocked(false);}
   };

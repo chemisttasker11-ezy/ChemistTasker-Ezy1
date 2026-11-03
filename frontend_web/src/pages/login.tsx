@@ -153,6 +153,7 @@ export default function Login() {
             endAdornment: (
               <InputAdornment position="end">
                 <IconButton
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   onClick={() => setShowPassword((show) => !show)}
                   edge="end"
                 >
@@ -169,8 +170,8 @@ export default function Login() {
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
               sx={{
-                color: '#00a99d',
-                '&.Mui-checked': { color: '#00a99d' },
+                color: '#007f77',
+                '&.Mui-checked': { color: '#007f77' },
               }}
             />
           }
@@ -186,9 +187,9 @@ export default function Login() {
             disabled={loading}
             sx={{ 
               py: 1.5,
-              backgroundColor: '#00a99d', // Themed button color
+              backgroundColor: '#007f77', // Themed button color
               '&:hover': {
-                  backgroundColor: '#00877d'
+                  backgroundColor: '#006b64'
               }
             }}
           >
@@ -198,25 +199,25 @@ export default function Login() {
         </form>
 
         <Box mt={2} textAlign="center">
-          <Link component={RouterLink} to="/password-reset" color="#00a99d">
+          <Link component={RouterLink} to="/password-reset" color="#007f77">
             Forgot Password?
           </Link>
         </Box>
 
         <Typography variant="body2" mt={3} textAlign="center">
           Don&apos;t have an account?{' '}
-          <Link component={RouterLink} to="/register" fontWeight="bold" color="#00a99d">
+          <Link component={RouterLink} to="/register" fontWeight="bold" color="#007f77">
             Register
           </Link>
         </Typography>
 
         <Typography variant="caption" mt={2} display="block" textAlign="center" color="text.secondary">
           By using ChemistTasker, you agree to the{" "}
-          <Link component={RouterLink} to="/terms-of-service" color="#00a99d">
+          <Link component={RouterLink} to="/terms-of-service" color="#007f77">
             Terms of Service
           </Link>{" "}
           and{" "}
-          <Link component={RouterLink} to="/privacy-policy" color="#00a99d">
+          <Link component={RouterLink} to="/privacy-policy" color="#007f77">
             Privacy Policy
           </Link>
           .

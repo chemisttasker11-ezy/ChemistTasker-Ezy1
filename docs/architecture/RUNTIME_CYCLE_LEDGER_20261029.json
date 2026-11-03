@@ -189,7 +189,7 @@
         },
         {
           "path": "billing/shift_payments.py",
-          "line": 66,
+          "line": 67,
           "import": "shifts.emails",
           "kind": "delayed"
         },

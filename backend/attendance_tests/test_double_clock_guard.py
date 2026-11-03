@@ -255,7 +255,9 @@ class KioskDoubleClockGuardTests(OppositeActionContracts, DoubleClockFixture):
             self.assertTrue(WorkerPIN.objects.get(membership=self.membership).check_pin("1357"))
             self.assertEqual(self.attendance_snapshot(), before)
             with self.captureOnCommitCallbacks(execute=True):
-                confirmed = self.post_kiosk({**body, "confirm_opposite": True}, view=KioskWorkerSetupPinView)
+                confirmed = self.post_kiosk({**body, "confirm_opposite": True,
+                    "expected_action": prompt.data["pending_action"],
+                    "observed_session_id": prompt.data["observed_session_id"]}, view=KioskWorkerSetupPinView)
             self.assertEqual(confirmed.status_code, 201, confirmed.data)
             self.assertEqual(confirmed.data["action"], "CLOCKED_IN")
             self.assertIsNone(cache.get(cache_key))
@@ -280,6 +282,57 @@ class KioskDoubleClockGuardTests(OppositeActionContracts, DoubleClockFixture):
 
 class MobileQRDoubleClockGuardTests(OppositeActionContracts, DoubleClockFixture):
     channel = "qr"
+
+    def test_confirmed_qr_actions_reject_missing_wrong_and_changed_session_context(self):
+        self.establish_last_action("in")
+        self.now += timedelta(seconds=30)
+        prompt = self.action("out")
+        self.assert_confirmation(prompt, "in", self.now-timedelta(seconds=30))
+        observed = prompt.data["observed_session_id"]
+        for context in ({}, {"expected_action":"CLOCK_IN","observed_session_id":observed},
+                        {"expected_action":"CLOCK_OUT","observed_session_id":True},
+                        {"expected_action":"CLOCK_OUT","observed_session_id":observed+1}):
+            before = self.attendance_snapshot()
+            response = self.action("out", confirm_opposite=True, **context)
+            self.assertEqual(response.status_code,409,response.data)
+            self.assertEqual(response.data["code"],"STALE_CONFIRMATION")
+            self.assertEqual(self.attendance_snapshot(),before)
+        self.now += timedelta(seconds=61)
+        self.assert_action(self.action("out"),"out")
+        closed = self.action("in")
+        self.assertEqual(closed.status_code,409,closed.data)
+        old_closed = closed.data["observed_session_id"]
+        self.now += timedelta(seconds=61)
+        self.assert_action(self.action("in"),"in")
+        before = self.attendance_snapshot()
+        for kind, action, session_id in (("out","CLOCK_OUT",observed),("in","CLOCK_IN",old_closed)):
+            response=self.action(kind,confirm_opposite=True,expected_action=action,observed_session_id=session_id)
+            self.assertEqual(response.status_code,409,response.data)
+            self.assertEqual(response.data["code"],"STALE_CONFIRMATION")
+            self.assertEqual(self.attendance_snapshot(),before)
+
+    def test_stale_pin_setup_confirmation_preserves_pin_otp_and_attendance(self):
+        self.establish_last_action("out")
+        original=AttendanceSession.objects.get(user=self.worker)
+        self.now += timedelta(seconds=30)
+        cache=LocMemCache("setup-stale-intent",{})
+        key=f"{credentials.WORKER_PIN_OTP_CACHE_PREFIX}{self.worker.pk}"
+        otp={"otp":"123456","membership_id":self.membership.pk,"pharmacy_id":self.pharmacy.pk}
+        cache.set(key,otp)
+        body={"identifier":self.worker.email,"verification_code":"123456","new_pin":"2468"}
+        # A verified device can change attendance while the operator has a prompt open.
+        AttendanceSession.objects.create(user=self.worker,pharmacy=self.pharmacy,
+            started_at=self.now-timedelta(seconds=10),ended_at=self.now)
+        before=self.attendance_snapshot()
+        with patch.object(credentials,"security_cache",cache), patch("users.tasks.send_async_email") as email:
+            response=self.post_kiosk({**body,"confirm_opposite":True,"expected_action":"CLOCK_IN",
+                "observed_session_id":original.pk},view=KioskWorkerSetupPinView)
+        self.assertEqual(response.status_code,409,response.data)
+        self.assertEqual(response.data["code"],"STALE_CONFIRMATION")
+        self.assertEqual(cache.get(key),otp)
+        self.assertTrue(WorkerPIN.objects.get(membership=self.membership).check_pin("1357"))
+        self.assertEqual(self.attendance_snapshot(),before)
+        email.assert_not_called()
 
 
 class OfflineDoubleClockExemptionTests(DoubleClockFixture):

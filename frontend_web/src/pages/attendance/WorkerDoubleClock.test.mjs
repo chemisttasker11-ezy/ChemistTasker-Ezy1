@@ -19,7 +19,7 @@ function text(node) {
   return text(node.props?.children);
 }
 
-async function worker({ active = true, reject = true } = {}) {
+async function worker({ active = true, reject = true, stale = false } = {}) {
   const state = [], deps = [];
   let cursor = 0, dirty = true, effects = [], tree, reloads = 0;
   const calls = [];
@@ -59,11 +59,12 @@ async function worker({ active = true, reject = true } = {}) {
       // Return the shared-core transport shape, with no Axios response/data aliases.
       if (reject && calls.length === 1) {
         throw { status: 409, payload: {
-          code: 'CONFIRM_OPPOSITE_ACTION', last_action: active ? 'CLOCK_IN' : 'CLOCK_OUT',
+          code: 'CONFIRM_OPPOSITE_ACTION', observed_session_id: 41, last_action: active ? 'CLOCK_IN' : 'CLOCK_OUT',
           pending_action: active ? 'CLOCK_OUT' : 'CLOCK_IN', last_action_at: '2026-10-28T00:00:00Z',
           message: active ? 'You just clocked in. Clock out now?' : 'You just clocked out. Clock in now?',
         } };
       }
+      if (stale && options.body.confirm_opposite === true) throw { status: 409, payload: { code: 'STALE_CONFIRMATION', error: 'Your attendance changed. Review the current status.' } };
       return { status: active ? 'CLOCKED_OUT' : 'CLOCKED_IN', session_id: 8, pharmacy_name: 'CLOCK Pharmacy' };
     } },
   });
@@ -110,7 +111,7 @@ async function worker({ active = true, reject = true } = {}) {
   }
   await flush();
   return {
-    calls, prompt, get reloads() { return reloads; },
+    calls, prompt, get visibleText() { return text(tree); }, get reloads() { return reloads; },
     async submit() {
       await click(active ? /^Clock out$/i : /^Scan pharmacy QR$/i);
       const field = nodes(tree, 'TextField').find((props) => props.label === 'QR code');
@@ -146,6 +147,8 @@ for (const active of [true, false]) {
     assert.equal(ui.calls[1].url, ui.calls[0].url);
     assert.equal(ui.calls[1].body.qr_token, ui.calls[0].body.qr_token);
     assert.equal(ui.calls[1].body.confirm_opposite, true);
+    assert.equal(ui.calls[1].body.observed_session_id, 41);
+    assert.equal(ui.calls[1].body.expected_action, kind === 'out' ? 'CLOCK_OUT' : 'CLOCK_IN');
     assert.equal(ui.reloads, 2);
   });
 
@@ -156,3 +159,12 @@ for (const active of [true, false]) {
     assert.equal(ui.reloads, 1);
   });
 }
+
+for (const active of [true, false]) test(`web stale clock ${active ? 'out' : 'in'} refreshes status without replaying the action`, async () => {
+  const ui=await worker({active,stale:true});
+  await ui.submit();await ui.confirm();
+  assert.equal(ui.calls.length,2);
+  assert.equal(ui.reloads,2);
+  assert.match(ui.visibleText,/Your attendance changed/);
+  assert.throws(()=>ui.prompt(),/409 must open confirmation/);
+});

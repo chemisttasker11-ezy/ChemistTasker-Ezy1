@@ -70,6 +70,7 @@ export default function KioskActivationView({
 }: Props) {
   return (
     <Box
+      component="main"
       sx={{
         minHeight: "100vh",
         display: "flex",
@@ -79,7 +80,7 @@ export default function KioskActivationView({
         p: 3,
       }}
     >
-      <Card sx={{ maxWidth: 520, width: "100%", borderRadius: 4, boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", bgcolor: "#1e293b", border: "1px solid rgba(255,255,255,0.08)", p: 2 }}>
+      <Card sx={{ maxWidth: 520, width: "100%", borderRadius: 4, boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", bgcolor: "#1e293b", "& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline": { borderColor: "#94a3b8" }, "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#38bdf8" }, "& .MuiInputLabel-root": { color: "#cbd5e1" }, "& .MuiInputLabel-root.Mui-focused": { color: "#7dd3fc" }, "& .MuiInputBase-input": { color: "#f8fafc" }, "& .MuiInputBase-input::placeholder": { color: "#cbd5e1", opacity: 1 }, border: "1px solid rgba(255,255,255,0.08)", p: 2 }}>
         <CardContent>
           <Stack spacing={3} alignItems="center" textAlign="center">
             <Box
@@ -102,7 +103,7 @@ export default function KioskActivationView({
             </Box>
 
             <Box>
-              <Typography variant="h5" fontWeight={700} sx={{ color: "white" }}>
+              <Typography component="h1" variant="h5" fontWeight={700} sx={{ color: "white" }}>
                 {pairingMode === "CODE" ? "Pair Kiosk Terminal" : "Activate with Pharmacy ID"}
               </Typography>
               <Typography variant="body2" sx={{ color: "#94a3b8", mt: 0.5 }}>
@@ -282,7 +283,7 @@ export default function KioskActivationView({
                       setPairingMode("LEGACY");
                       setActivationError(null);
                     }}
-                    sx={{ color: "#64748b", textTransform: "none", fontSize: 13 }}
+                    sx={{ color: "#cbd5e1", textTransform: "none", fontSize: 13 }}
                   >
                     Advanced: Set up with Pharmacy ID & Login
                   </Button>

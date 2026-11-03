@@ -223,6 +223,7 @@ export default function Login() {
             endAdornment: (
               <InputAdornment position="end">
                 <IconButton
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   onClick={() => setShowPassword((show) => !show)}
                   edge="end"
                 >

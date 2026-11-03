@@ -615,7 +615,7 @@ export default function KioskPage() {
           identifier: identifier.trim(),
           verification_code: setupOtp.trim(),
           new_pin: setupNewPin.trim(),
-          ...(confirmOpposite ? { confirm_opposite: true } : {}),
+          ...(confirmOpposite ? { confirm_opposite: true, expected_action: doubleClockDialog?.expectedAction, observed_session_id: doubleClockDialog?.observedSessionId } : {}),
         },
         { headers: { "X-Device-Token": deviceToken } }
       );
@@ -642,6 +642,8 @@ export default function KioskPage() {
           message: err.response.data.message,
           isDesktop: false,
           setup: true,
+          expectedAction: err.response.data.pending_action,
+          observedSessionId: err.response.data.observed_session_id,
           identifier: identifier.trim(),
           pin: "",
         });

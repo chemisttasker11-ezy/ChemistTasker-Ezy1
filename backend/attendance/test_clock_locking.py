@@ -438,11 +438,11 @@ connection.close()
         self.assertTrue(all(kind == "ok" for kind, _ in outcomes), outcomes)
         return [value for _, value in outcomes]
 
-    def post_pin_setup(self, worker, *, confirm=False):
+    def post_pin_setup(self, worker, *, confirm=False, context=None):
         request = APIRequestFactory().post(
             "/api/v1/attendance/kiosk/worker-pin/setup/",
             {"identifier": worker.email, "verification_code": "123456", "new_pin": "2468",
-             "confirm_opposite": confirm},
+             "confirm_opposite": confirm, **(context or {})},
             format="json", HTTP_X_DEVICE_TOKEN=self.device.device_token,
         )
         return KioskWorkerSetupPinView.as_view()(request)
@@ -977,7 +977,9 @@ connection.close()
             self.assertEqual(session.events.get(event_type="CLOCK_OUT").source, "OFFLINE_KIOSK")
             self.assertEqual(AttendanceSession.objects.filter(user=worker).count(), 1)
             # Prove usable, rather than merely present in the cache, with the same code and explicit confirmation.
-            retry = self.post_pin_setup(worker, confirm=True)
+            retry = self.post_pin_setup(worker, confirm=True, context={
+                "expected_action": response.data["pending_action"],
+                "observed_session_id": response.data["observed_session_id"]})
             self.assertEqual(retry.status_code, 201, retry.data)
             self.assertEqual(retry.data["action"], "CLOCKED_IN")
             confirmation.assert_called_once()

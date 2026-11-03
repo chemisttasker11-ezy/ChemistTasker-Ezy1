@@ -39,7 +39,7 @@ before you continue.
 - Checkout: `/opt/apps/chemisttasker-staging`. Env files:
   `/opt/apps/chemisttasker-staging/env/` (directory `0700`, files `0600`).
 - Run every command below from `/opt/apps/chemisttasker-staging`.
-- Deploy only with `bash scripts/deploy-staging.sh` (workers start by default).
+- Deploy only with `bash scripts/deploy-staging.sh --expected-sha "$REVIEWED_SHA"` (workers start by default).
   Never use `--frontend-only` for this release: it has backend code and
   migrations.
 - The deploy script backs up the database first, to
@@ -110,8 +110,9 @@ You see `has AHPRA release` and the five files `0081_ahpra_check.py`,
 
 ### If `STAGING_RUN_MIGRATIONS` is `1` (or unset)
 
-Do nothing here. The web container runs `migrate` on start, and the deploy
-script backs up the database first. Go to step 7.
+Do nothing here. The deploy script drains writers and backs up the database,
+then runs the one-shot `migration` release service before starting web.
+Web does not run migrations. Go to step 7.
 
 ### If `STAGING_RUN_MIGRATIONS` is `0`
 
@@ -181,10 +182,15 @@ stat -c '%a %n' env/*.env
 
 You see `hash ok`, and every file is `600`.
 
+Before running the deploy command below, set `REVIEWED_SHA` to the full commit
+approved in the release review, and independently verify `git rev-parse HEAD`
+matches it. Reuse that reviewed value for every deploy command in this runbook;
+do not derive approval from the current checkout automatically.
+
 ## 8. Deploy and smoke
 
 ```bash
-bash scripts/deploy-staging.sh
+bash scripts/deploy-staging.sh --expected-sha "$REVIEWED_SHA"
 bash scripts/smoke-staging.sh https://staging.chemisttasker.com.au
 ```
 
@@ -336,7 +342,7 @@ the queue after 5 minutes.
 3. Redeploy web, worker and beat, then smoke:
 
    ```bash
-   bash scripts/deploy-staging.sh
+   bash scripts/deploy-staging.sh --expected-sha "$REVIEWED_SHA"
    bash scripts/smoke-staging.sh https://staging.chemisttasker.com.au
    ```
 
@@ -363,7 +369,7 @@ after the web restart).
 - Secret URL for the owner (no login, max 30 lookups an hour, same setting):
   1. On the server: `python3 -c "import secrets;print(secrets.token_urlsafe(32))"`.
   2. Put `AHPRA_TEST_LOOKUP_KEY=<key>` in `env/staging.secrets.env`.
-  3. Redeploy web: `bash scripts/deploy-staging.sh`.
+  3. Redeploy web: `bash scripts/deploy-staging.sh --expected-sha "$REVIEWED_SHA"`.
   4. Give the owner `https://staging.chemisttasker.com.au/api/v1/ahpra-test/<key>/`.
   A missing, short (under 32 characters) or wrong key returns 404.
 - Turn it off: set `STAGING_AHPRA_TEST_LOOKUP_ENABLED=0` in
@@ -386,7 +392,7 @@ after the web restart).
 
 **Kill switch:** set `STAGING_AHPRA_ENFORCEMENT_ENABLED=0` in
 `env/staging.runtime.env` and redeploy web/worker/beat with
-`bash scripts/deploy-staging.sh`. Freezes lift immediately on the redeployed
+`bash scripts/deploy-staging.sh --expected-sha "$REVIEWED_SHA"`. Freezes lift immediately on the redeployed
 services; public AHPRA gates, cancellations and owner role switches stop while
 checks and results keep recording. Set it back to `1` and redeploy
 web/worker/beat after the incident. Existing cancellations are not reversed.
@@ -396,7 +402,7 @@ Remove the `STAGING_AHPRA_SOURCE=desktop` line from
 then:
 
 ```bash
-bash scripts/deploy-staging.sh
+bash scripts/deploy-staging.sh --expected-sha "$REVIEWED_SHA"
 bash scripts/smoke-staging.sh https://staging.chemisttasker.com.au
 ```
 

@@ -1,0 +1,49 @@
+# Apply only after measured acceptance: STAGING_RESOURCE_BUDGET_APPROVED=1
+services:
+  postgres:
+    mem_limit: "${STAGING_POSTGRES_MEMORY_LIMIT:-1024m}"
+    cpus: "${STAGING_POSTGRES_CPUS:-0.75}"
+    pids_limit: ${STAGING_POSTGRES_PIDS_LIMIT:-128}
+  redis:
+    mem_limit: "${STAGING_REDIS_MEMORY_LIMIT:-768m}"
+    cpus: "${STAGING_REDIS_CPUS:-0.25}"
+    pids_limit: ${STAGING_REDIS_PIDS_LIMIT:-64}
+  redis_cache:
+    mem_limit: "${STAGING_REDIS_CACHE_MEMORY_LIMIT:-160m}"
+    cpus: "${STAGING_REDIS_CACHE_CPUS:-0.25}"
+    pids_limit: ${STAGING_REDIS_CACHE_PIDS_LIMIT:-64}
+  web:
+    mem_limit: "${STAGING_WEB_MEMORY_LIMIT:-1024m}"
+    cpus: "${STAGING_WEB_CPUS:-1.0}"
+    pids_limit: ${STAGING_WEB_PIDS_LIMIT:-128}
+    stop_grace_period: 120s
+  migration:
+    mem_limit: "${STAGING_MIGRATION_MEMORY_LIMIT:-1024m}"
+    cpus: "${STAGING_MIGRATION_CPUS:-1.0}"
+    pids_limit: ${STAGING_MIGRATION_PIDS_LIMIT:-128}
+  celery_worker:
+    mem_limit: "${STAGING_CELERY_WORKER_MEMORY_LIMIT:-1536m}"
+    cpus: "${STAGING_CELERY_WORKER_CPUS:-1.0}"
+    pids_limit: ${STAGING_CELERY_WORKER_PIDS_LIMIT:-128}
+    stop_grace_period: 120s
+  celery_beat:
+    mem_limit: "${STAGING_CELERY_BEAT_MEMORY_LIMIT:-384m}"
+    cpus: "${STAGING_CELERY_BEAT_CPUS:-0.25}"
+    pids_limit: ${STAGING_CELERY_BEAT_PIDS_LIMIT:-64}
+  frontend:
+    mem_limit: "${STAGING_FRONTEND_MEMORY_LIMIT:-128m}"
+    cpus: "${STAGING_FRONTEND_CPUS:-0.25}"
+    pids_limit: ${STAGING_FRONTEND_PIDS_LIMIT:-64}
+  landing:
+    mem_limit: "${STAGING_LANDING_MEMORY_LIMIT:-768m}"
+    cpus: "${STAGING_LANDING_CPUS:-0.75}"
+    pids_limit: ${STAGING_LANDING_PIDS_LIMIT:-128}
+  gateway:
+    mem_limit: "${STAGING_GATEWAY_MEMORY_LIMIT:-128m}"
+    cpus: "${STAGING_GATEWAY_CPUS:-0.25}"
+    pids_limit: ${STAGING_GATEWAY_PIDS_LIMIT:-64}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

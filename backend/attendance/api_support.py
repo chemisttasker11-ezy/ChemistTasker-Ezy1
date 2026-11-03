@@ -24,6 +24,25 @@ def _confirm_opposite(request):
     return value is True or value == "true"
 
 
+def _confirmation_session_id(request, action):
+    """Parse explicit intent; transitions compare this id under their existing locks."""
+    if not _confirm_opposite(request):
+        return None
+    from attendance.transitions import StaleConfirmation
+    observed = request.data.get("observed_session_id")
+    if (request.data.get("expected_action") != action or isinstance(observed, bool)
+            or not isinstance(observed, (str, int)) or not str(observed).isascii()
+            or not str(observed).isdigit() or int(observed) <= 0):
+        raise StaleConfirmation()
+    return int(observed)
+
+
+STALE_CONFIRMATION_RESPONSE = {
+    "code": "STALE_CONFIRMATION",
+    "error": "Attendance changed since the prompt. Start the clock action again.",
+}
+
+
 def _get_kiosk_device_from_request(request, *, allow_revoked=False):
     """
     Extracts and authenticates a KioskDevice from request headers, META, or body.

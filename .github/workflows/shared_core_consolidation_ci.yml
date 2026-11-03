@@ -224,8 +224,12 @@ jobs:
         run: python backend/manage.py check --settings=core.contract_test_settings
       - name: Staging deployment safety contracts
         run: python -m unittest discover -s scripts -p test_deploy_staging.py -v
+      - name: Staging runtime resource and log contracts
+        run: python scripts/test_staging_resources.py
       - name: Staging asset proxy compression
         run: python scripts/test_staging_assets.py
+      - name: Staging refresh gateway preflight contracts
+        run: python -m unittest discover -s scripts -p test_refresh_gateway.py -v
       - name: Migration drift check
         run: python backend/manage.py makemigrations --check --dry-run --settings=core.contract_test_settings
       - name: Auth and account contracts

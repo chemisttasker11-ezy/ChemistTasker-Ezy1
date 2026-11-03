@@ -16,6 +16,7 @@ from .stripe_support import stripe
 from .subscriptions import get_subscription_for_account as _get_subscription_for_account
 from .utils import BILLING_STATE_FREE_TRIAL, BILLING_STATE_PRE_LIVE
 from .checkout_reservations import prepare_checkout, open_checkout
+from .release_guards import assert_can_create_shift_charge
 from rest_framework.exceptions import APIException
 
 
@@ -99,6 +100,8 @@ def charge_shift_fulfillment(user, shift, shift_id, account, billing_state, data
             {'error': 'Select a pending offer or slot before checkout.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    assert_can_create_shift_charge("fulfillment")
 
     # Price Logic
     # We could also use `shared-core` logic if we had a node backend,
@@ -216,6 +219,8 @@ def charge_penalty(user, shift, shift_id, account, sub, data):
 
     if penalty_percentage == 0:
         return Response({'message': 'No penalty required, cancelled > 72 hours in advance.'})
+
+    assert_can_create_shift_charge("cancellation")
 
     penalty_amount_aud = total_wage * penalty_percentage
     # Round once at the Stripe boundary so half cents are not truncated.

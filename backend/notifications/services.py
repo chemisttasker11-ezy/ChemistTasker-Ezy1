@@ -32,13 +32,17 @@ def _serialize_notification(notification: Notification) -> dict:
 
 
 def _broadcast(user_id: int, event_type: str, payload: dict):
-    layer = get_channel_layer()
-    if not layer:
-        return
-    async_to_sync(layer.group_send)(
-        USER_GROUP_FMT.format(user_id=user_id),
-        {"type": event_type, **payload},
-    )
+    try:
+        layer = get_channel_layer()
+        if layer:
+            async_to_sync(layer.group_send)(
+                USER_GROUP_FMT.format(user_id=user_id),
+                {"type": event_type, **payload},
+            )
+    except Exception:
+        # Socket delivery is disposable; durable writes and counters are not.
+        logger.exception("WebSocket event %s unavailable for user %s", event_type, user_id)
+
 
 
 def _send_expo_push(tokens: Sequence[str], title: str, body: str, data: Optional[dict] = None) -> None:

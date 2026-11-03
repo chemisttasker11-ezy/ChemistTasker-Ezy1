@@ -94,7 +94,7 @@ export default function WorkerAttendancePage() {
   const [scanModalOpen, setScanModalOpen] = useState(false);
   const [scanAction, setScanAction] = useState<"CLOCK_IN" | "CLOCK_OUT">("CLOCK_IN");
   const [qrInputToken, setQrInputToken] = useState("");
-  const [confirmDialog, setConfirmDialog] = useState<{ message: string; action: "CLOCK_IN" | "CLOCK_OUT"; token: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; action: "CLOCK_IN" | "CLOCK_OUT"; token: string; observedSessionId: number } | null>(null);
   const [submittingAction, setSubmittingAction] = useState(false);
 
   // Kiosk PIN self-service state
@@ -222,7 +222,14 @@ export default function WorkerAttendancePage() {
       setSuccessMsg("Engagement terms accepted for your approved cover.");
       await fetchCovers();
     } catch (err: any) {
-      setCoverError(err?.message || "Could not accept the terms. Try again.");
+      if (err?.status === 409 && err?.payload?.code === "TERMS_CHANGED") {
+        // Discard the rejected preview before fetching a new version and consents.
+        setCovers((current) => current.filter((cover) => cover.assignment_id !== coverDialogId));
+        setCoverError("These terms have changed. Review the updated terms and confirm both agreements again.");
+        await fetchCovers();
+      } else {
+        setCoverError(err?.message || "Could not accept the terms. Try again.");
+      }
     } finally {
       setAcceptingCover(false);
     }
@@ -323,14 +330,14 @@ export default function WorkerAttendancePage() {
 
     try {
       if (action === "CLOCK_IN") {
-        const data = await attendance.clockIn(token, confirmOpposite ? { confirm_opposite: true } : undefined) as any;
+        const data = await attendance.clockIn(token, confirmOpposite ? { confirm_opposite: true, expected_action: action, observed_session_id: confirmDialog?.observedSessionId } : undefined) as any;
         setSuccessMsg(
           data.is_provisional
             ? `Clocked in provisionally at ${data.pharmacy_name}. Pending manager review.`
             : `Clocked in successfully at ${data.pharmacy_name}.`
         );
       } else {
-        const data = await attendance.clockOut(token, confirmOpposite ? { confirm_opposite: true } : undefined) as any;
+        const data = await attendance.clockOut(token, confirmOpposite ? { confirm_opposite: true, expected_action: action, observed_session_id: confirmDialog?.observedSessionId } : undefined) as any;
         setSuccessMsg(`Clocked out successfully from ${data.pharmacy_name}.`);
       }
       setScanModalOpen(false);
@@ -345,10 +352,17 @@ export default function WorkerAttendancePage() {
           message: errData?.message || (action === "CLOCK_IN" ? "You just clocked out. Clock in now?" : "You just clocked in. Clock out now?"),
           action,
           token,
+          observedSessionId: errData.observed_session_id,
         });
         return;
       }
-      setErrorMsg(err?.message || "QR verification or clock transition failed.");
+      setConfirmDialog(null);
+      if (err?.status === 409 && errData?.code === 'STALE_CONFIRMATION') {
+        setScanModalOpen(false);
+        setQrInputToken("");
+        await fetchStatus();
+      }
+      setErrorMsg(err?.payload?.error || err?.message || "QR verification or clock transition failed.");
     } finally {
       setSubmittingAction(false);
     }

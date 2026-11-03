@@ -1,3 +1,4 @@
+import RouteLoadingState from '../components/ui/RouteLoadingState';
 import { AhpraProvider } from './AhpraContext';
 import { Box, Button, Stack } from '@mui/material';
 import DashboardContentState from '../components/dashboard/DashboardContentState';
@@ -500,7 +501,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setActivePersona,
       }}
     >
-      {sessionError?<Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 640, mx: 'auto' }}><Stack spacing={2}><DashboardContentState kind="error" title={sessionError} actionLabel="Reconnect" onAction={()=>window.location.reload()} /><Button variant="outlined" sx={{ minHeight: 44 }} onClick={()=>{setSessionError('');void logout();}}>Retry logout</Button></Stack></Box>:<div style={{display:identityPending?'none':'contents'}}><AhpraProvider key={`${user?.id}:${user?.role}`} user={user}>{children}</AhpraProvider></div>}
+      {sessionError?<Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 640, mx: 'auto' }}><Stack spacing={2}><DashboardContentState kind="error" title={sessionError} actionLabel="Reconnect" onAction={()=>window.location.reload()} /><Button variant="outlined" sx={{ minHeight: 44 }} onClick={()=>{setSessionError('');void logout();}}>Retry logout</Button></Stack></Box>:<>{identityPending && <RouteLoadingState label="Checking your session…" />}<div style={{display:identityPending?'none':'contents'}}><AhpraProvider key={`${user?.id}:${user?.role}`} user={user}>{children}</AhpraProvider></div></>}
     </AuthContext.Provider>
   );
 }

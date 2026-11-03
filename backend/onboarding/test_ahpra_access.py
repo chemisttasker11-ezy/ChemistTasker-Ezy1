@@ -29,6 +29,7 @@ from shifts.models import ShiftOffer, ShiftSlotAssignment
 class AhpraAccessTests(TestCase):
     def setUp(self):
         caches['ahpra'].clear()
+        caches['verifier_presence'].clear()
         self.profile = profile_fixture()
         self.user = self.profile.user
         self.user.is_otp_verified = self.user.is_mobile_verified = True
@@ -255,7 +256,9 @@ class AhpraAccessTests(TestCase):
         from onboarding.verification.state import ahpra_frozen, require_ahpra_application
         from shifts.access import ShiftActionRefused, _user_can_perform_shift_role
         self.assertFalse(ahpra_frozen(owner))
-        self.assertFalse(async_to_sync(RoomConsumer()._ahpra_suspended)(owner))
+        # Channels closes the DB connection around consumer queries, which breaks TestCase's transaction on PostgreSQL.
+        with patch('channels.db.close_old_connections'):
+            self.assertFalse(async_to_sync(RoomConsumer()._ahpra_suspended)(owner))
         self.assertFalse(_user_can_perform_shift_role(owner, 'PHARMACIST'))
         with self.assertRaises(ShiftActionRefused):
             require_ahpra_application(owner)
@@ -419,7 +422,8 @@ class AhpraAccessTests(TestCase):
         from asgiref.sync import async_to_sync
         from chat.consumers import RoomConsumer
         self.finish(outcome='rejected', status='Suspended')
-        self.assertTrue(async_to_sync(RoomConsumer()._ahpra_suspended)(self.user))
+        with patch('channels.db.close_old_connections'):
+            self.assertTrue(async_to_sync(RoomConsumer()._ahpra_suspended)(self.user))
 
     def test_number_typo_submit_queues_current_number(self):
         self.finish(outcome='not_found', status=None)

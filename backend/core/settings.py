@@ -188,6 +188,9 @@ INSTALLED_APPS = [
 #   Azure Cache for Redis (TLS): rediss://:<PASSWORD>@<NAME>.redis.cache.windows.net:6380/0
 REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")
 CHANNEL_REDIS_URL = env("CHANNEL_REDIS_URL", default=REDIS_URL)
+# AHPRA counters/coordination stay protected when Channels moves to ephemeral Redis.
+AHPRA_STATE_REDIS_URL = env("AHPRA_STATE_REDIS_URL", default=REDIS_URL)
+VERIFIER_PRESENCE_REDIS_URL = env("VERIFIER_PRESENCE_REDIS_URL", default=CHANNEL_REDIS_URL)
 
 # Security attempt counters must be shared by every web worker. Keep the
 # application's existing default cache unchanged to avoid altering other flows.
@@ -198,7 +201,12 @@ CACHES = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
     "ahpra": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": CHANNEL_REDIS_URL,
+        "LOCATION": AHPRA_STATE_REDIS_URL,
+    },
+    "verifier_presence": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": VERIFIER_PRESENCE_REDIS_URL,
+        "OPTIONS": {"socket_connect_timeout": 1, "socket_timeout": 1},
     },
     "security": (
         {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": _security_cache_url}
@@ -662,6 +670,9 @@ MOBILE_IOS_STORE_URL = env(
 
 # Stripe Settings
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
+# New live collection is enabled per accepted capability; test-mode staging stays usable.
+BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED = env.bool("BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED", default=False)
+BILLING_LIVE_SHIFT_PENALTY_ENABLED = env.bool("BILLING_LIVE_SHIFT_PENALTY_ENABLED", default=False)
 STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
 
 # Billing Honeymoon & Free Trial
@@ -676,12 +687,12 @@ FREE_TRIAL_DAYS   = 0                   # New users get this many days free afte
 # ---------------------------------------------------------------------
 ASGI_APPLICATION = "core.asgi.application"
 
-CHANNEL_LAYERS = {
+_REDIS_CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
             # channels_redis accepts URLs with redis:// or rediss:// (TLS)
-            "hosts": [CHANNEL_REDIS_URL],
+            "hosts": [{"address": CHANNEL_REDIS_URL, "socket_connect_timeout": 1, "socket_timeout": 10}],
             # Increase TTLs so room membership doesn’t expire while users sit in a chat
             "capacity": 100,
             "channel_capacity": {"*": 50},
@@ -694,6 +705,8 @@ CHANNEL_LAYERS = {
 }
 
 # Local/dev fallback: if Redis is not available, websocket connections fail.
+CHANNEL_LAYERS = _REDIS_CHANNEL_LAYERS
+
 # Defaults:
 # - DEBUG=True  -> in-memory layer (no Redis dependency)
 # - DEBUG=False -> Redis layer

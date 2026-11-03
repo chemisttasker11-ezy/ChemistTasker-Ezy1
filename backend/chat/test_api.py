@@ -1,6 +1,7 @@
 """Characterization of the chat REST API (/rooms/, /messages/, /messages/<id>/react/, /chat-participants/)."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -111,7 +112,9 @@ class DirectMessageTests(ChatBase):
         Participant.objects.create(conversation_id=room, membership=self.bob_m)
         self.assertEqual(authorized_participant(room, self.alice.pk).membership_id, valid.pk)
         consumer = RoomConsumer()
-        self.assertEqual(async_to_sync(consumer._get_membership)(room, self.alice.pk).pk, valid.pk)
+        # Channels closes the DB connection around consumer queries, which breaks TestCase's transaction on PostgreSQL.
+        with patch("channels.db.close_old_connections"):
+            self.assertEqual(async_to_sync(consumer._get_membership)(room, self.alice.pk).pk, valid.pk)
         sent = client_for(self.alice).post(MESSAGES, {"conversation": room, "body": "Still authorized"}, format="json")
         self.assertEqual(sent.status_code, 201, sent.data)
         self.assertEqual(Message.objects.get(pk=sent.data["id"]).sender_id, valid.pk)
@@ -383,6 +386,38 @@ class MessageEndpointTests(ChatBase):
     def test_message_list_is_limited_to_own_conversations(self):
         self.assertEqual(len(self.rows(client_for(self.bob).get(MESSAGES))), 1)
         self.assertEqual(self.rows(client_for(self.no_role).get(MESSAGES)), [])
+
+
+    def test_channel_outage_does_not_skip_durable_chat_notification_and_push(self):
+        from unittest.mock import AsyncMock, patch
+        from channels.layers import get_channel_layer
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        from notifications.models import Notification
+        from users.models import DeviceToken
+        DeviceToken.objects.create(user=self.bob,platform='android',token='ExponentPushToken[offline-chat]')
+        with patch.object(get_channel_layer(),'group_send',new=AsyncMock(side_effect=RedisConnectionError('cache unavailable'))), patch('notifications.services._send_expo_push') as push:
+            with self.captureOnCommitCallbacks(execute=True):
+                response=client_for(self.alice).post(MESSAGES,{'conversation':self.room,'body':'persisted notification'},format='json')
+        self.assertEqual(response.status_code,201)
+        self.assertTrue(Notification.objects.filter(user=self.bob,payload__message_id=response.json()['id']).exists())
+        push.assert_called_once()
+
+    def test_committed_edits_reactions_and_delete_survive_channel_outage(self):
+        from unittest.mock import AsyncMock, patch
+        from channels.layers import get_channel_layer
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        api=client_for(self.alice)
+        with patch.object(get_channel_layer(), 'group_send', new=AsyncMock(side_effect=RedisConnectionError('cache unavailable'))):
+            edited=api.patch(f"{MESSAGES}{self.msg_id}/", {"body":"saved while offline"}, format="json")
+            self.assertEqual(edited.status_code,200)
+            self.assertEqual(Message.objects.get(pk=self.msg_id).body,"saved while offline")
+            reacted=api.post(f"{MESSAGES}{self.msg_id}/react/", {"reaction":MessageReaction.REACTION_CHOICES[0][0]}, format="json")
+            self.assertEqual(reacted.status_code,201)
+            self.assertTrue(MessageReaction.objects.filter(message_id=self.msg_id,user=self.alice).exists())
+            deleted=api.delete(f"{MESSAGES}{self.msg_id}/")
+            self.assertEqual(deleted.status_code,204)
+            self.assertTrue(Message.objects.get(pk=self.msg_id).is_deleted)
+
 
 
 class CommunityGroupTests(ChatBase):

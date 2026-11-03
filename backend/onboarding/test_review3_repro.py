@@ -25,6 +25,7 @@ from shifts.models import ShiftSlotAssignment
 class Review3ReproTests(TestCase):
     def setUp(self):
         caches['ahpra'].clear()
+        caches['verifier_presence'].clear()
         self.profile = profile_fixture()  # Jane Doe
         self.user = self.profile.user
         self.user.is_otp_verified = self.user.is_mobile_verified = True

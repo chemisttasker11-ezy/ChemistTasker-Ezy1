@@ -11,13 +11,15 @@ from attendance.credentials import pin_eligible_memberships, verify_signed_pharm
 from attendance.throttles import WorkerClockInThrottle, WorkerClockOutThrottle
 from attendance.transitions import (
     ConfirmOppositeActionRequired,
+    StaleConfirmation,
     clock_in,
     clock_out,
     end_break,
     get_active_session_status,
     start_break,
 )
-from attendance.api_support import _confirm_opposite, _unexpected_error_response
+from attendance.api_support import (_confirm_opposite, _confirmation_session_id,
+                                    STALE_CONFIRMATION_RESPONSE, _unexpected_error_response)
 
 
 class WorkerAttendanceStatusView(APIView):
@@ -82,6 +84,7 @@ class WorkerClockInView(APIView):
                 signed_qr_token=qr_token,
                 request_id=request_id,
                 confirm_opposite=confirm_opposite,
+                expected_closed_session_id=_confirmation_session_id(request, "CLOCK_IN"),
             )
             return Response({
                 "session_id": session.id,
@@ -91,6 +94,8 @@ class WorkerClockInView(APIView):
                 "is_provisional": session.is_provisional,
                 "status": "CLOCKED_IN",
             }, status=status.HTTP_201_CREATED)
+        except StaleConfirmation:
+            return Response(STALE_CONFIRMATION_RESPONSE, status=status.HTTP_409_CONFLICT)
         except ConfirmOppositeActionRequired as e:
             return Response(e.to_dict(), status=status.HTTP_409_CONFLICT)
         except (DjangoValidationError, PermissionDenied) as e:
@@ -160,6 +165,7 @@ class WorkerClockOutView(APIView):
                 signed_qr_token=qr_token,
                 request_id=request_id,
                 confirm_opposite=confirm_opposite,
+                expected_session_id=_confirmation_session_id(request, "CLOCK_OUT"),
             )
             return Response({
                 "session_id": session.id,
@@ -169,6 +175,8 @@ class WorkerClockOutView(APIView):
                 "ended_at": session.ended_at.isoformat() if session.ended_at else None,
                 "status": "CLOCKED_OUT",
             })
+        except StaleConfirmation:
+            return Response(STALE_CONFIRMATION_RESPONSE, status=status.HTTP_409_CONFLICT)
         except ConfirmOppositeActionRequired as e:
             return Response(e.to_dict(), status=status.HTTP_409_CONFLICT)
         except (DjangoValidationError, PermissionDenied) as e:

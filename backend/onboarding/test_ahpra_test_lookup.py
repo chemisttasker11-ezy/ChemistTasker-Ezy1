@@ -29,6 +29,7 @@ urlpatterns = [path('hidden-staff/', otp_admin_site.urls)]
 class AhpraTestLookupTests(TestCase):
     def setUp(self):
         caches['ahpra'].clear()
+        caches['verifier_presence'].clear()
         self.user = make_user('PHARMACIST', is_staff=True, first_name='Jane', last_name='Doe')
         self.profile = PharmacistOnboarding.objects.create(user=self.user, ahpra_number=NUMBER)
         self.url = reverse('otpadmin:ahpra_test_lookup')
@@ -158,6 +159,7 @@ KEY = 'k' * 32
 class AhpraKeyLookupTests(TestCase):
     def setUp(self):
         caches['ahpra'].clear()
+        caches['verifier_presence'].clear()
         self.url = reverse('api_v1:ahpra-test-key-lookup', args=[KEY])
         self.data = {'registration_number': NUMBER, 'first_name': 'Jane', 'last_name': 'Doe', 'role': 'pharmacist'}
 

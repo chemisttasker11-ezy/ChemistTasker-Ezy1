@@ -4,7 +4,7 @@ test('real Next login hands off to Vite and preserves the canonical Django sessi
   await page.goto('/login');
 
   const email = page.getByLabel('Email');
-  const password = page.getByLabel('Password');
+  const password = page.getByLabel('Password', { exact: true });
   await expect(email).toBeVisible();
   await expect(password).toBeVisible();
   await email.fill('f07-web@example.test');

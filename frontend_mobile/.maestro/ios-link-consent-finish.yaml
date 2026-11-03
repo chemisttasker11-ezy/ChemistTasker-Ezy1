@@ -1,0 +1,11 @@
+appId: com.chemisttasker.app
+---
+# The first session may close before iOS presents its custom-scheme dialog.
+# Accept it in another session, then disconnect before the account/invoice flow.
+- launchApp:
+    stopApp: true
+    permissions:
+      all: allow
+- tapOn:
+    text: "Open"
+    optional: true

@@ -328,7 +328,7 @@ test.describe('public/auth wiring', () => {
 
     await page.goto('/login');
     await page.getByLabel('Email').fill('SMOKE@EXAMPLE.TEST');
-    await page.getByLabel('Password').fill('wrong-password');
+    await page.getByLabel('Password', { exact: true }).fill('wrong-password');
     await page.getByRole('button', { name: 'Login' }).click();
 
     await expect(loginAlert(page)).toContainText('Invalid credentials');
@@ -357,7 +357,7 @@ test.describe('public/auth wiring', () => {
 
       await page.goto('/login');
       await page.getByLabel('Email').fill('smoke@example.test');
-      await page.getByLabel('Password').fill('wrong-password');
+      await page.getByLabel('Password', { exact: true }).fill('wrong-password');
       await page.getByRole('button', { name: 'Login' }).click();
       if (status >= 500) {
         await expect(loginAlert(page)).toContainText('Service is temporarily unavailable. Please try again shortly.');
@@ -389,7 +389,7 @@ test.describe('public/auth wiring', () => {
     await page.goto('/login');
     await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
     await page.getByLabel('Email').fill('smoke@example.test');
-    await page.getByLabel('Password').fill('wrong-password');
+    await page.getByLabel('Password', { exact: true }).fill('wrong-password');
     simulateCsrfOutage = true;
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(loginAlert(page)).toContainText('Service is temporarily unavailable. Please try again shortly.');
@@ -442,7 +442,7 @@ test.describe('public/auth wiring', () => {
 
     await page.goto('/login');
     await page.getByLabel('Email').fill('smoke@example.test');
-    await page.getByLabel('Password').fill('wrong-password');
+    await page.getByLabel('Password', { exact: true }).fill('wrong-password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(loginAlert(page)).toContainText('Service is temporarily unavailable. Please try again shortly.');
     await expect(page.locator('body')).not.toContainText('Traceback');
@@ -464,7 +464,7 @@ test.describe('public/auth wiring', () => {
 
     await page.goto('/login');
     await page.getByLabel('Email').fill('unverified@example.test');
-    await page.getByLabel('Password').fill('password123');
+    await page.getByLabel('Password', { exact: true }).fill('password123');
     await page.getByRole('button', { name: 'Login' }).click();
     await page.waitForURL('**/otp-verify');
     expect(new URL(page.url()).pathname).toBe('/otp-verify');
@@ -482,7 +482,7 @@ test.describe('public/auth wiring', () => {
 
     await page.goto('/login');
     await page.getByLabel('Email').fill('smoke@example.test');
-    await page.getByLabel('Password').fill('wrong-password');
+    await page.getByLabel('Password', { exact: true }).fill('wrong-password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(loginAlert(page)).toContainText('Login failed. Please check your credentials.');
     await expect(page.getByRole('button', { name: 'Login' })).toBeEnabled();
@@ -510,7 +510,7 @@ test.describe('public/auth wiring', () => {
 
     await page.goto('/login');
     await page.getByLabel('Email').fill('smoke@example.test');
-    await page.getByLabel('Password').fill('wrong-password');
+    await page.getByLabel('Password', { exact: true }).fill('wrong-password');
     const button = page.locator('form button[type="submit"]');
     await expect(button).toHaveText('Login');
     await button.click();
@@ -559,7 +559,7 @@ test.describe('public/auth wiring', () => {
       }, { personal, device, previousOwner });
 
       await page.getByLabel('Email').fill(userB.email);
-      await page.getByLabel('Password').fill('test-password');
+      await page.getByLabel('Password', { exact: true }).fill('test-password');
       await page.locator('form button[type="submit"]').click();
       await expect.poll(() => new URL(page.url()).pathname).not.toBe('/login');
       await page.waitForLoadState('networkidle');
@@ -639,7 +639,7 @@ test.describe('login keeps hub drafts per account', () => {
     const login = async (user) => {
       await page.goto('/login');
       await page.getByLabel('Email').fill(user.email);
-      await page.getByLabel('Password').fill('test-password');
+      await page.getByLabel('Password', { exact: true }).fill('test-password');
       await page.locator('form button[type="submit"]').click();
       await expect.poll(() => new URL(page.url()).pathname).not.toBe('/login');
     };
@@ -749,7 +749,7 @@ test.describe('cross-tab sign-in', () => {
       return json(route, current);
     });
     await second.getByLabel('Email').fill(userB.email);
-    await second.getByLabel('Password').fill('test-password');
+    await second.getByLabel('Password', { exact: true }).fill('test-password');
     await second.getByRole('button', { name: 'Login', exact: true }).click();
     await rechecking;
     await expect.poll(() => first.evaluate(() => window.ctLoginEvents)).toBe(1);
@@ -1368,3 +1368,23 @@ test.describe('owner/admin persona routing hardening', () => {
     expect(url.searchParams.get('pharmacy_id')).toBe('101');
   });
 });
+
+for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 }]) {
+  test(`failed route chunk offers reload recovery at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.route('**/api/**', async (route) => {
+      if (await installLoggedOutBootstrap(route)) return;
+      return json(route,[]);
+    });
+    const chunk=/\/js\/KioskPage\.[^/]+\.js(?:\?|$)/;
+    await page.route(chunk,(route)=>route.abort('failed'));
+    await page.goto('/kiosk');
+    await expect(page.getByRole('heading',{name:'This page couldn’t load'})).toBeVisible();
+    await expect(page.getByRole('alert')).toContainText('Unsaved edits may be lost');
+    await expect(page.getByText(/TypeError|Failed to fetch dynamically imported module/)).toHaveCount(0);
+    await page.unroute(chunk);
+    await page.getByRole('button',{name:'Reload page',exact:true}).click();
+    await expect(page.getByLabel('6-Digit Pairing Code')).toBeVisible();
+    await expect(page.getByRole('heading',{name:'This page couldn’t load'})).toHaveCount(0);
+  });
+}

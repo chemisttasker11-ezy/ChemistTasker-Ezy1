@@ -33,6 +33,7 @@ DIGEST = hashlib.sha256(TOKEN.encode()).hexdigest()
 TEST_CACHES = {
     'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'},
     'security': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', 'LOCATION': 'security-tests'},
+    'verifier_presence': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', 'LOCATION': 'presence-tests'},
     'ahpra': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', 'LOCATION': 'ahpra-tests'},
 }
 
@@ -60,7 +61,7 @@ def result(check_id, outcome='found', **record):
                    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', ADMINS=[('Admin', 'admin@example.test')])
 class DesktopTests(TestCase):
     def setUp(self):
-        caches['ahpra'].delete_many(['ahpra_verifier_presence_extension', 'ahpra_verifier_presence_bridge'])
+        caches['verifier_presence'].delete_many(['ahpra_verifier_presence_extension', 'ahpra_verifier_presence_bridge'])
         self.profile = profile_fixture()
 
     def test_found_outcomes_and_duplicate_result(self):
@@ -193,9 +194,20 @@ class DesktopTests(TestCase):
                     f'ahpra_verifiers_{stage}', {'type': 'ahpra.check', 'check_id': check.pk},
                 )
                 check.delete()
-        with patch.object(caches['ahpra'], 'set') as set_presence:
+        with patch.object(caches['verifier_presence'], 'set') as set_presence:
             verifier_seen('bridge')
         set_presence.assert_called_once_with('ahpra_verifier_presence_bridge', True, timeout=120)
+
+    def test_queued_check_survives_channel_notification_outage(self):
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        with patch('onboarding.verification.desktop.get_channel_layer') as layer:
+            layer.return_value.group_send=AsyncMock(side_effect=RedisConnectionError)
+            with self.assertLogs('onboarding.verification.desktop',level='WARNING'), self.captureOnCommitCallbacks(execute=True):
+                check=enqueue_check(self.profile,NUMBER,'recheck')
+        check.refresh_from_db()
+        self.assertEqual(check.status,'pending')
+        self.assertEqual(check.stage,'bridge')
+        layer.return_value.group_send.assert_awaited_once()
 
     def test_extension_error_hands_off_once_without_applying(self):
         check = check_fixture(self.profile, status='sent', sent_at=timezone.now())
@@ -249,6 +261,29 @@ class DesktopTests(TestCase):
             self.assertIn(text, mail.outbox[0].body)
         for text in ['Jane', 'Doe', self.profile.user.email]:
             self.assertNotIn(text, mail.outbox[0].body)
+
+    def test_extension_handoff_survives_post_commit_channel_outage(self):
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        check=check_fixture(self.profile,stage='extension')
+        with patch('onboarding.verification.desktop.get_channel_layer') as layer:
+            layer.return_value.group_send=AsyncMock(side_effect=RedisConnectionError('cache unavailable'))
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertTrue(handle_verifier_result(result(check.pk,'error'),'extension'))
+        check.refresh_from_db()
+        self.assertEqual((check.stage,check.status),('bridge','pending'))
+        self.assertEqual(claim_checks(check_id=check.pk,stage='bridge')[0]['check_id'],check.pk)
+
+    def test_bridge_repair_email_survives_post_commit_channel_outage(self):
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        check=check_fixture(self.profile,stage='bridge')
+        with patch('onboarding.verification.desktop.get_channel_layer') as layer:
+            layer.return_value.group_send=AsyncMock(side_effect=RedisConnectionError('cache unavailable'))
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertTrue(handle_verifier_result(result(check.pk,'error'),'bridge'))
+        check.refresh_from_db()
+        self.assertEqual((check.status,check.needs_attention),('done',True))
+        self.assertEqual(len(mail.outbox),1)
+        self.assertIn('needs your input',mail.outbox[0].subject)
 
     def test_repair_report_stores_caps_and_emails_once(self):
         check = check_fixture(self.profile, stage='bridge', status='done', needs_attention=True)
@@ -331,7 +366,7 @@ class DesktopTests(TestCase):
         for present in (False, True):
             for status, age in [('pending', None), ('sent', 1), ('sent', 5), ('sent', 6), ('done', 6)]:
                 with self.subTest(present=present, status=status, age=age):
-                    caches['ahpra'].set('ahpra_verifier_presence_extension', present)
+                    caches['verifier_presence'].set('ahpra_verifier_presence_extension', present)
                     check = check_fixture(self.profile, stage='extension', status=status,
                                           sent_at=now - timedelta(minutes=age) if age else None)
                     expected = status != 'done' and not present
@@ -427,7 +462,7 @@ class DesktopTests(TestCase):
                    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', ADMINS=[('Admin', 'admin@example.test')])
 class VerifierSocketTests(TransactionTestCase):
     def setUp(self):
-        caches['ahpra'].delete_many(['ahpra_verifier_presence_extension', 'ahpra_verifier_presence_bridge'])
+        caches['verifier_presence'].delete_many(['ahpra_verifier_presence_extension', 'ahpra_verifier_presence_bridge'])
         self.profile = profile_fixture()
         self.check = check_fixture(self.profile, stage='bridge')
 
@@ -448,11 +483,11 @@ class VerifierSocketTests(TransactionTestCase):
                     'type': 'check', 'check_id': expected.pk, 'registration_number': NUMBER,
                 })
                 self.assertTrue(await socket.receive_nothing())
-                self.assertTrue(await database_sync_to_async(caches['ahpra'].get)(f'ahpra_verifier_presence_{kind}'))
-                await database_sync_to_async(caches['ahpra'].delete)(f'ahpra_verifier_presence_{kind}')
+                self.assertTrue(await database_sync_to_async(caches['verifier_presence'].get)(f'ahpra_verifier_presence_{kind}'))
+                await database_sync_to_async(caches['verifier_presence'].delete)(f'ahpra_verifier_presence_{kind}')
                 await socket.send_json_to({'type': 'pong'})
                 self.assertTrue(await socket.receive_nothing())
-                self.assertTrue(await database_sync_to_async(caches['ahpra'].get)(f'ahpra_verifier_presence_{kind}'))
+                self.assertTrue(await database_sync_to_async(caches['verifier_presence'].get)(f'ahpra_verifier_presence_{kind}'))
             finally:
                 await socket.disconnect()
 
@@ -463,8 +498,8 @@ class VerifierSocketTests(TransactionTestCase):
             await socket.send_json_to({'type': 'hello', 'agent': 'old bridge', 'token': TOKEN})
             self.assertEqual(await socket.receive_json_from(), {'type': 'ready'})
             self.assertEqual((await socket.receive_json_from())['check_id'], self.check.pk)
-            self.assertTrue(await database_sync_to_async(caches['ahpra'].get)('ahpra_verifier_presence_bridge'))
-            self.assertIsNone(await database_sync_to_async(caches['ahpra'].get)('ahpra_verifier_presence_extension'))
+            self.assertTrue(await database_sync_to_async(caches['verifier_presence'].get)('ahpra_verifier_presence_bridge'))
+            self.assertIsNone(await database_sync_to_async(caches['verifier_presence'].get)('ahpra_verifier_presence_extension'))
         finally:
             await socket.disconnect()
 
