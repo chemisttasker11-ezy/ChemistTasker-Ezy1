@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Linking, StyleSheet, Text, type TextInput, View } from 'react-native';
+import { Alert, Linking, StyleSheet, Text, type TextInputInstance, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Fingerprint } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
@@ -152,7 +152,7 @@ export default function LoginScreen() {
     }
   };
 
-  const passwordRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
   const busy = loading || biometricLoading;
 
   return (

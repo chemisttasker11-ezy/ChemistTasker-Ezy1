@@ -1,5 +1,5 @@
 import React, { type ReactNode, type Ref } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, type TextInstance, View } from 'react-native';
 import { ScalePressable } from '@/components/ui';
 import { colors, font, radius, space, type } from '@/constants/tokens';
 
@@ -8,14 +8,14 @@ export const SUBMIT_LABEL = 'Save and continue';
 
 /** What the flow host passes every step body. */
 export type StepProps = {
-  titleRef: Ref<Text>;
+  titleRef: Ref<TextInstance>;
   /** Bumps each time Continue finds an error on this step, so the step focuses its first invalid field. */
   attempt: number;
   onContinue: () => void;
 };
 
 /** Step title and one supporting line; the title is the screen's header (and focus target) for screen readers. */
-export function StepIntro({ title, subtitle, titleRef }: { title: string; subtitle?: string; titleRef?: Ref<Text> }) {
+export function StepIntro({ title, subtitle, titleRef }: { title: string; subtitle?: string; titleRef?: Ref<TextInstance> }) {
   return (
     <View style={styles.intro}>
       <Text ref={titleRef} accessibilityRole="header" style={styles.title} maxFontSizeMultiplier={1.5}>

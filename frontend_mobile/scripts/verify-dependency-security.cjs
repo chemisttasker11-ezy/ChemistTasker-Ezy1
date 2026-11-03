@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
-const { readFileSync } = require('node:fs');
+const { existsSync, readdirSync, readFileSync } = require('node:fs');
 const path = require('node:path');
 const { createRequire } = require('node:module');
 const { spawnSync } = require('node:child_process');
@@ -17,15 +17,13 @@ function verifyInstalled() {
     assert.equal(actual, expected, `Missing or modified security patch: ${relative}`);
   }
   assert.equal(mobileRequire('@grpc/grpc-js/package.json').version, '1.13.6');
-  const metroRequire = createRequire(mobileRequire.resolve('metro/package.json'));
-  assert.equal(typeof metroRequire('image-size').imageSize, 'function');
-  const yamlRequire = createRequire(mobileRequire.resolve('@istanbuljs/load-nyc-config/package.json'));
+  // Metro 0.87 (root 0.87.2, Expo's bundler @expo/metro 0.87.1) reads image bytes with its own fingerprinted dimension parser.
+  // SDK 56: @expo/xcpretty (Podfile.lock parser) is the js-yaml consumer; every locked copy stays on 4.3.2.
+  const yamlRequire = createRequire(mobileRequire.resolve('@expo/xcpretty/package.json'));
   assert.equal(yamlRequire('js-yaml/package.json').version, '4.3.2');
   const lock = JSON.parse(readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
-  const decoderPackage = path.join(path.dirname(mobileRequire.resolve('decode-uri-component')), 'package.json');
-  assert.equal(JSON.parse(readFileSync(decoderPackage, 'utf8')).version, '0.5.1');
-  assert.equal(lock.packages['node_modules/decode-uri-component'].version, '0.5.1');
-  assert.equal(lock.packages['node_modules/image-size'].version, '2.0.4');
+  const yamlCopies = Object.entries(lock.packages).filter(([entry]) => entry.endsWith('node_modules/js-yaml'));
+  assert.deepEqual(yamlCopies.map(([entry, meta]) => [entry, meta.version]), [['node_modules/js-yaml', '4.3.2']]);
   // New GHSA-q3jh-wrc6-jgq8 security release: reject stale redirect clients.
   assert.equal(mobileRequire('follow-redirects/package.json').version, '1.16.2');
   assert.equal(lock.packages['node_modules/follow-redirects'].version, '1.16.2');
@@ -34,24 +32,31 @@ function verifyInstalled() {
   assert.equal(lock.packages['node_modules/node-forge'].version, '1.4.1');
   assert.equal(lock.packages['node_modules/glob'].version, '14.0.2');
   assert.equal(lock.packages['node_modules/path-scurry'].version, '3.0.0');
-  assert.equal(lock.packages['node_modules/@expo/cli/node_modules/minimatch'].version, '11.0.1');
+  // @expo/cli 55 matches with picomatch; a returning minimatch copy must be re-pinned to 11.0.1.
+  assert.equal('minimatch' in mobileRequire('@expo/cli/package.json').dependencies, false);
+  assert.equal(lock.packages['node_modules/@expo/cli/node_modules/minimatch'], undefined);
+  assertNoStaleCopies();
   assert.equal(lock.packages['node_modules/@expo/fingerprint/node_modules/minimatch'].version, '11.0.1');
   assert.equal(lock.packages['node_modules/glob/node_modules/minimatch'].version, '11.0.1');
   assert.equal(lock.packages['node_modules/minimatch'].version, '3.1.5');
   assert.equal(mobileRequire('minimatch/package.json').version, '3.1.5');
   assert.equal(lock.packages['node_modules/@isaacs/nonrecursive-glob-match'].version, '1.0.1');
-  assert.equal(lock.packages['node_modules/fast-uri'].version, '3.1.9');
-  assert.equal(mobileRequire('fast-uri/package.json').version, '3.1.9');
-  assert.equal(lock.packages['node_modules/undici'].version, '6.29.1');
-  assert.equal(mobileRequire('undici/package.json').version, '6.29.1');
   assert.equal(lock.packages['node_modules/qs'].version, '6.16.1');
   assert.equal(mobileRequire('qs/package.json').version, '6.16.1');
   const placesRequire = createRequire(mobileRequire.resolve('react-native-google-places-autocomplete/package.json'));
   assert.equal(placesRequire.resolve('qs'), mobileRequire.resolve('qs'));
-  assert.equal(lock.packages['node_modules/deepmerge'].version, '4.3.1');
+  // SDK 58 @expo/config dropped deepmerge; formik (2.2.1) and Paper's theme provider (3.3.0) are forced onto
+  // the single patched root 4.3.1 by the package.json override.
+  const expoConfigs = Object.keys(lock.packages).filter(entry => entry.endsWith('node_modules/@expo/config'));
+  assert.ok(expoConfigs.length, '@expo/config is missing');
+  for (const entry of expoConfigs) assert.equal(lock.packages[entry].dependencies?.deepmerge, undefined, entry);
+  const deepmergeCopies = Object.entries(lock.packages).filter(([entry]) => entry.endsWith('node_modules/deepmerge'));
+  assert.deepEqual(deepmergeCopies.map(([entry, meta]) => [entry, meta.version]), [['node_modules/deepmerge', '4.3.1']]);
   assert.equal(mobileRequire('deepmerge/package.json').version, '4.3.1');
-  const expoConfigRequire = createRequire(mobileRequire.resolve('@expo/config/package.json'));
-  assert.equal(expoConfigRequire.resolve('deepmerge'), mobileRequire.resolve('deepmerge'));
+  for (const consumer of ['formik', '@callstack/react-theme-provider']) {
+    const consumerRequire = createRequire(mobileRequire.resolve(`${consumer}/package.json`));
+    assert.equal(consumerRequire.resolve('deepmerge'), mobileRequire.resolve('deepmerge'), consumer);
+  }
 
   // CVE-2026-93753 has no fixed upstream deepmerge release. The local patch
   // drops __proto__ in both mergeObject write loops, matching the upstream
@@ -67,8 +72,56 @@ function verifyInstalled() {
   assert.equal(merged.debug, false);
   assert.equal({}.isAdmin, undefined);
 
-  assert.equal(Object.keys(lock.packages).some(name => name.endsWith('node_modules/sprintf-js')), false);
+  // SDK 55 dropped image-size (Metro parses dimensions itself), fast-uri and undici: any returning
+  // copy fails here until its pin (package.json overrides) and checks are reviewed again. SDK 56 dropped
+  // @istanbuljs/load-nyc-config, whose js-yaml 3 range the 4.3.2 override forced across a major. SDK 58
+  // expo-router parses queries with URLSearchParams, dropping query-string and its decode-uri-component.
+  const gone = [
+    'sprintf-js', 'image-size', 'fast-uri', 'undici', '@istanbuljs/load-nyc-config', 'query-string', 'decode-uri-component',
+  ];
+  for (const name of gone) {
+    assert.equal(Object.keys(lock.packages).some(entry => entry.endsWith(`node_modules/${name}`)), false, `${name} is back`);
+  }
+  assertNotInstalled(gone);
   return lock;
+}
+
+// A stale copy left in node_modules (top level or nested) must fail even when the lockfile is clean.
+function assertNotInstalled(names, dir = root) {
+  const appRequire = createRequire(path.join(dir, 'package.json'));
+  for (const name of names) {
+    assert.throws(() => appRequire.resolve(`${name}/package.json`), { code: 'MODULE_NOT_FOUND' }, `${name} is installed`);
+  }
+  assert.deepEqual(findInstalledCopies(names, dir), [], 'Removed packages are installed');
+}
+
+function findInstalledCopies(names, dir) {
+  const found = [];
+  (function walk(packageDir) {
+    const modules = path.join(packageDir, 'node_modules');
+    if (!existsSync(modules)) return;
+    for (const name of names) if (existsSync(path.join(modules, name))) found.push(path.join(modules, name));
+    for (const entry of readdirSync(modules, { withFileTypes: true })) {
+      // Real directories only: workspace symlinks would loop back into the tree.
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      const entryDir = path.join(modules, entry.name);
+      if (!entry.name.startsWith('@')) { walk(entryDir); continue; }
+      for (const scoped of readdirSync(entryDir, { withFileTypes: true })) {
+        if (scoped.isDirectory()) walk(path.join(entryDir, scoped.name));
+      }
+    }
+  })(dir);
+  return found;
+}
+
+// Nested copies the lockfile dropped but an old install can leave behind; other copies of the name stay allowed.
+const staleCopies = ['node_modules/@expo/cli/node_modules/minimatch'];
+function assertNoStaleCopies(dir = root) {
+  const found = [
+    ...staleCopies.filter(relative => existsSync(path.join(dir, relative))),
+    ...findInstalledCopies(['deepmerge'], dir).filter(entry => entry !== path.join(dir, 'node_modules/deepmerge')),
+  ];
+  assert.deepEqual(found, [], `Stale nested copies are installed:\n${found.join('\n')}`);
 }
 
 function verifyAudit(report) {
@@ -131,4 +184,4 @@ if (require.main === module) {
   console.log('Mobile installed dependency security verification passed.');
 }
 
-module.exports = { verifyAudit, verifyInstalled };
+module.exports = { assertNoStaleCopies, assertNotInstalled, verifyAudit, verifyInstalled };

@@ -111,7 +111,7 @@ export default function AdminHomeScreen() {
     }
   }, [load]);
 
-  const open = useMemo(() => (data?.active ? openSlots(data.active, now, pharmacyId) : []), [data?.active, now, pharmacyId]);
+  const open = useMemo(() => (data?.active ? openSlots(data.active, now, pharmacyId) : []), [data, now, pharmacyId]);
   const today = useMemo(
     () =>
       (data?.roster ?? [])

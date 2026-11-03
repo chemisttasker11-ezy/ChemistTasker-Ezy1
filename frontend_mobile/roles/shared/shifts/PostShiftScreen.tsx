@@ -13,9 +13,8 @@ import {
     Snackbar,
 } from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
 import {
     fetchPharmaciesService,
     fetchWorkerShiftDetailService,

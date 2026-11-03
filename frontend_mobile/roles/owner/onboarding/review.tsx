@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, type Text, View } from 'react-native';
+import { StyleSheet, type TextInstance, View } from 'react-native';
 import { SectionCard } from '@/components/ui';
 import { AuthLink, AuthNotice } from '@/components/AuthLayout';
 import { space } from '@/constants/tokens';
@@ -7,7 +7,7 @@ import { GENDER_OPTIONS, ONBOARDING_STEPS, ROLE_OPTIONS, useOnboarding } from '.
 import { ReviewRow, StepIntro } from './parts';
 
 type ReviewProps = {
-  titleRef: React.Ref<Text>;
+  titleRef: React.Ref<TextInstance>;
   onEdit: (step: number) => void;
 };
 

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { type TextInput } from 'react-native';
+import { type TextInputInstance } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { passwordResetConfirm } from '@chemisttasker/shared-core';
 import AuthLayout, { AuthLink, AuthNotice } from '../components/AuthLayout';
@@ -18,7 +18,7 @@ export default function ResetPasswordScreen() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const confirmRef = useRef<TextInput>(null);
+    const confirmRef = useRef<TextInputInstance>(null);
 
     const handleSubmit = async () => {
         if (loading) return;

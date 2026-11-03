@@ -7,7 +7,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  type Text,
+  type TextInstance,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,7 +46,7 @@ function OwnerOnboardingFlow() {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);
   const [attempt, setAttempt] = useState(0);
-  const titleRef = useRef<Text>(null);
+  const titleRef = useRef<TextInstance>(null);
   const firstRender = useRef(true);
   const insets = useSafeAreaInsets();
   const registry = useUnsavedChangesRegistry();

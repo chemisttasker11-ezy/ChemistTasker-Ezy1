@@ -1,7 +1,7 @@
 import React, { type ReactNode, useEffect, useMemo } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
 import { Stack, Tabs, useRouter, useSegments } from 'expo-router';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { Menu } from 'lucide-react-native';
 import { colors } from '@/constants/tokens';
 import { useUnsavedChangesRegistry } from '@/roles/shared/forms/UnsavedChangesRegistryProvider';
@@ -39,8 +39,10 @@ export type PersonaShellProps = {
 };
 
 /** Tabs mode: the tab bar, guarded tab switches, and hardware Back on inner screens through the layout's onBack. */
-function TabsBar({ state, navigation, tabs }: BottomTabBarProps & { tabs: ShellTab[] }) {
+function TabsBar({ state, descriptors, navigateToTab, tabs }: BottomTabBarProps & { tabs: ShellTab[] }) {
   const { onBack } = useShell();
+  // Since expo-router 58 the tab bar gets no navigation prop; the focused screen's navigation goes back through the tab history.
+  const navigation = descriptors[state.routes[state.index]?.key ?? '']?.navigation;
   const registry = useUnsavedChangesRegistry();
   const currentName = state.routes[state.index]?.name ?? '';
   const inner = !isRootRoute(tabs, currentName);
@@ -55,7 +57,7 @@ function TabsBar({ state, navigation, tabs }: BottomTabBarProps & { tabs: ShellT
       // A root tab's Back only switches tabs or exits, so removal guards never fire: ask a dirty or saving form first.
       if (!registry?.isBlocking()) return false;
       void registry.requestNavigation(() => {
-        if (navigation.canGoBack()) navigation.goBack();
+        if (navigation?.canGoBack()) navigation.goBack();
         else BackHandler.exitApp();
       });
       return true;
@@ -67,7 +69,7 @@ function TabsBar({ state, navigation, tabs }: BottomTabBarProps & { tabs: ShellT
     const route = state.routes.find((candidate) => candidate.name === tab.name);
     if (!route) return;
     // A tab switch only blurs the screen, so removal guards never fire: ask the dirty form first.
-    const go = () => navigation.navigate(route.name, route.params);
+    const go = () => navigateToTab(route.key);
     if (registry) void registry.requestNavigation(go);
     else go();
   };

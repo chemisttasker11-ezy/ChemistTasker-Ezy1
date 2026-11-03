@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  type TextInputInstance,
   type TextInputProps,
   useWindowDimensions,
   View,
@@ -177,7 +178,7 @@ export function AuthPrompt({ text, action }: { text: string; action: ReactNode }
 type OtpCodeInputProps = {
   value: string;
   onChangeText: (value: string) => void;
-  inputRef?: Ref<TextInput>;
+  inputRef?: Ref<TextInputInstance>;
   invalid?: boolean;
   disabled?: boolean;
   /** Read after the label, e.g. where the code was sent. */
@@ -351,7 +352,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   otpInput: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     color: 'transparent',
     backgroundColor: 'transparent',
     fontSize: 1,

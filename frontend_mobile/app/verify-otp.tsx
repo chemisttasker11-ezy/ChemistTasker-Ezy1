@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, type TextInput, View } from 'react-native';
+import { StyleSheet, Text, type TextInputInstance, View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout, { AuthLink, AuthNotice, AuthPrompt, OtpCodeInput } from '../components/AuthLayout';
@@ -23,7 +23,7 @@ export default function VerifyOTPScreen() {
     // One request at a time: a resend during verify would invalidate the code being checked.
     const busy = loading || resending;
 
-    const inputRef = useRef<TextInput | null>(null);
+    const inputRef = useRef<TextInputInstance | null>(null);
 
     const handleOTPChange = (value: string) => {
         const digits = value.replace(/\D/g, '').slice(0, 6);

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity, Linking } from 'react-native';
 import { Text, TextInput, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar, Avatar, Icon } from 'react-native-paper';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -20,7 +20,6 @@ import {
 import { useAuth } from '../../../context/AuthContext';
 import { useLiveMessages } from './useLiveMessages';
 import debounce from 'lodash.debounce';
-import { useFocusEffect } from '@react-navigation/native';
 import { triggerUnreadBump } from '@/utils/pushNotifications';
 import { setActiveRoomId } from '../chat/activeRoomState';
 import { displayNameFromUser } from '../chat/displayName';
