@@ -105,6 +105,9 @@
       ],
       "expo-notifications",
       "expo-web-browser",
+      "expo-image",
+      "expo-secure-store",
+      "expo-sharing",
       [
         "expo-local-authentication",
         {

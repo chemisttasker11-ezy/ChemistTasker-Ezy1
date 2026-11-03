@@ -1,10 +1,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
-const { mkdtempSync, writeFileSync, rmSync } = require('node:fs');
+const { mkdirSync, mkdtempSync, writeFileSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
-const { verifyAudit, verifyInstalled } = require('./verify-dependency-security.cjs');
+const { assertNoStaleCopies, assertNotInstalled, verifyAudit, verifyInstalled } = require('./verify-dependency-security.cjs');
 
 const root = path.resolve(__dirname, '..');
 function isolated(source) {
@@ -172,20 +172,23 @@ test('patched deepmerge rejects returned-object prototype poisoning and preserve
   );
 });
 
-test('patched image parsers reject zero-size entries and Metro keeps valid dimensions', () => {
+test('Metro image parsers reject zero-size entries and keep valid dimensions', () => {
   isolated(`
-    const assert=require('node:assert/strict'), size=require('image-size').imageSize;
+    const assert=require('node:assert/strict'), assets=require('metro/private/Assets');
     const icns=Buffer.alloc(16);icns.write('icns');icns.writeUInt32BE(16,4);icns.write('ic07',8);
-    assert.throws(()=>size(icns));
     const jxl=Buffer.from('0000000c4a584c200d0a870a000000006a786c7000000000','hex');
-    assert.throws(()=>size(jxl));
+    for (const bytes of [icns, jxl, Buffer.alloc(0)]) {
+      assert.throws(()=>assets.getAssetSize('png',bytes,'invalid.png'));
+    }
     const png=Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489','hex');
-    assert.deepEqual(require('metro/private/Assets').getAssetSize('png',png,'valid.png'),{width:1,height:1});
-    assert.throws(()=>require('metro/private/Assets').getAssetSize('png',icns,'renamed.png'));
+    assert.deepEqual(assets.getAssetSize('png',png,'valid.png'),{width:1,height:1});
+    assert.throws(()=>assets.getAssetSize('png',png.subarray(0,16),'truncated.png'));
+    const zero=Buffer.from(png);zero.writeUInt32BE(0,16);
+    assert.throws(()=>assets.getAssetSize('png',zero,'zero.png'));
   `);
 });
 
-test('Metro reads filesystem images as bytes for image-size v2', () => {
+test('Metro reads filesystem images as bytes for dimension parsing', () => {
   isolated(`
     const assert = require('node:assert/strict');
     const path = require('node:path');
@@ -270,8 +273,51 @@ test('security gate reports every new advisory and only accepts the fingerprinte
   });
 });
 
-test('patched fast-uri rejects percent-encoded dangerous URI schemes', () => {
-  const uri = require('fast-uri');
+test('a stale removed package left in node_modules fails even with a clean lockfile', () => {
+  const folder = mkdtempSync(path.join(process.env.SECURITY_TEST_TMP || tmpdir(), 'mobile-security-stale-'));
+  const plant = (...parts) => {
+    mkdirSync(path.join(folder, ...parts), { recursive: true });
+    writeFileSync(path.join(folder, ...parts, 'package.json'), '{"name":"fixture","version":"1.0.0"}');
+  };
+  try {
+    plant();
+    plant('node_modules', '@scope', 'tool');
+    plant('node_modules', 'ajv');
+    assertNotInstalled(['fast-uri', 'undici', 'image-size', 'sprintf-js'], folder);
+    plant('node_modules', '@scope', 'tool', 'node_modules', 'undici');
+    assert.throws(() => assertNotInstalled(['undici'], folder), /Removed packages are installed/);
+    plant('node_modules', 'fast-uri');
+    assert.throws(() => assertNotInstalled(['fast-uri'], folder), /fast-uri is installed/);
+  } finally {
+    assert.equal(path.dirname(folder), path.resolve(process.env.SECURITY_TEST_TMP || tmpdir()));
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('a stale @expo/cli minimatch copy fails while the allowed minimatch copies stay installed', () => {
+  const folder = mkdtempSync(path.join(process.env.SECURITY_TEST_TMP || tmpdir(), 'mobile-security-cli-'));
+  const plant = (...parts) => {
+    mkdirSync(path.join(folder, ...parts), { recursive: true });
+    writeFileSync(path.join(folder, ...parts, 'package.json'), '{"name":"fixture","version":"1.0.0"}');
+  };
+  try {
+    plant();
+    for (const parent of [[], ['@expo', 'fingerprint'], ['glob'], ['@expo', 'cli']]) {
+      plant('node_modules', ...parent, ...(parent.length ? ['node_modules'] : []), 'minimatch');
+    }
+    assert.throws(() => assertNoStaleCopies(folder), /Stale nested copies[\s\S]*@expo[\\/]cli[\\/]node_modules[\\/]minimatch/);
+    rmSync(path.join(folder, 'node_modules', '@expo', 'cli'), { recursive: true });
+    assertNoStaleCopies(folder);
+  } finally {
+    assert.equal(path.dirname(folder), path.resolve(process.env.SECURITY_TEST_TMP || tmpdir()));
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('no fast-uri copy can normalize percent-encoded dangerous URI schemes', () => {
+  // SDK 55 removed fast-uri; if a copy returns, this falls back to the 3.1.9 behaviour check.
+  let uri;
+  try { uri = require('fast-uri'); } catch { return assert.throws(() => require.resolve('fast-uri/package.json')); }
   for (const value of ['%6Aavascript:alert(1)', '%u006Aavascript:alert(1)']) {
     let normalized;
     try { normalized = uri.normalize(value); }
@@ -380,9 +426,10 @@ test('upgraded security dependencies preserve supported APIs and reject invalid 
   assert.equal(typeof globSync, 'function');
   assert.equal(typeof globStream, 'function');
   const { createRequire } = require('node:module');
-  const cliRequire = createRequire(path.join(root, 'node_modules/@expo/cli/package.json'));
+  // @expo/cli 55 no longer depends on minimatch (it uses picomatch).
+  assert.equal('minimatch' in require('@expo/cli/package.json').dependencies, false);
   const fingerprintRequire = createRequire(path.join(root, 'node_modules/@expo/fingerprint/package.json'));
-  for (const dependent of [cliRequire, fingerprintRequire]) {
+  for (const dependent of [fingerprintRequire]) {
     const matcher = dependent('minimatch');
     assert.equal(typeof matcher.minimatch, 'function');
     assert.equal(matcher.minimatch('app/screens/index.tsx', 'app/**/*.tsx'), true);
