@@ -34,7 +34,7 @@ function load(relativePath, imports, globals = {}, append = '') {
   return exports;
 }
 
-async function clock({ active = true, reject = true } = {}) {
+async function clock({ active = true, reject = true, stale = false } = {}) {
   const state = [];
   let cursor = 0, dirty = true, tree, alert = null, reloads = 0;
   const calls = [];
@@ -69,6 +69,7 @@ async function clock({ active = true, reject = true } = {}) {
           message: active ? 'You just clocked in. Clock out now?' : 'You just clocked out. Clock in now?',
         } };
       }
+      if (stale && options.body.confirm_opposite === true) throw { status: 409, payload: { code: 'STALE_CONFIRMATION', error: 'Your attendance changed. Review the current status.' } };
       return { status: active ? 'CLOCKED_OUT' : 'CLOCKED_IN', session_id: 8 };
     } },
   });
@@ -131,7 +132,7 @@ async function clock({ active = true, reject = true } = {}) {
     }
   }
   const ui = {
-    calls, prompt, flush,
+    calls, prompt, flush, get visibleText() { return text(tree); }, get error() { return nodes(tree, 'ParityPage')[0]?.error; },
     get reloads() { return reloads; },
     async token(value = 'signed-qr-token') {
       const field = nodes(tree, 'Field').find((props) => props.label === 'Kiosk QR token');
@@ -202,4 +203,12 @@ test('mobile breaks keep their existing confirmation-free route', async () => {
   const ui = await clock(); await ui.breakStart();
   assert.equal(ui.calls.length, 1); assert.equal(ui.calls[0].url, '/break-start/');
   assert.equal(ui.reloads, 1);
+});
+
+for (const active of [true,false]) test(`mobile stale clock ${active ? 'out' : 'in'} refreshes without replaying`,async()=>{
+  const ui=await clock({active,stale:true});
+  await ui.token();await ui.submit();await ui.confirm();
+  assert.equal(ui.calls.length,2);
+  assert.equal(ui.reloads,1);
+  assert.match(ui.error,/Your attendance changed/);
 });

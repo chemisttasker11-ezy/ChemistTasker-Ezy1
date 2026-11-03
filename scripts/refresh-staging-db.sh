@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
+trap 'exit 129' HUP
 
 if [[ "${1:-}" != "--confirm-production-data" || -z "${2:-}" ]]; then
   echo "Usage: $0 --confirm-production-data /opt/backups/chemisttasker/<backup>.dump" >&2
@@ -86,13 +88,13 @@ set_runtime_value() {
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 rollback_dir="/opt/backups/chemisttasker"
-rollback_path="$rollback_dir/staging-before-production-refresh-${timestamp}.dump"
+restore_input="/tmp/production-refresh-${timestamp}-$$.dump"
 
 mkdir -p "$rollback_dir"
 chmod 700 "$rollback_dir"
 
-if active_migration="$(docker inspect -f '{{.State.Running}}' chemisttasker_staging_migrate 2>/dev/null)" && [[ "$active_migration" == true ]]; then
-  echo 'A prior migration/static owner is still running; reconcile it before refreshing data.' >&2; exit 1
+if docker inspect -f '{{.Id}}' chemisttasker_staging_migrate >/dev/null 2>&1; then
+  echo 'A prior migration/static container exists (running or stopped); inspect and reconcile it before refreshing data.' >&2; exit 1
 fi
 gateway_id="$(compose ps --all -q gateway)"
 [[ -n "$gateway_id" ]] || { echo "DB refresh requires the existing staging gateway; install it in a separate maintenance step." >&2; exit 1; }
@@ -103,9 +105,15 @@ gateway_networks="$(docker inspect -f '{{range $name, $network := .NetworkSettin
 compose up -d --no-recreate --wait postgres redis redis_cache
 # Queue/security state must be protected before changing application topology.
 policy="$(docker exec chemisttasker_redis_staging redis-cli --raw CONFIG GET maxmemory-policy | tail -n 1)"
-[[ "$policy" == noeviction ]] || { echo 'Protected Redis must use noeviction; complete the reviewed Redis maintenance first.' >&2; exit 1; }
-# Refuse an unreadable input archive before pausing any application writer.
-docker exec -i chemisttasker_postgres_staging pg_restore --list < "$backup_path" >/dev/null
+[[ "$policy" == noeviction ]] || { echo 'Protected Redis must use noeviction; complete docs/ops/REDIS_ROLE_ISOLATION.md before retrying.' >&2; exit 1; }
+# Build and stage the complete input before pausing writers or destroying schema.
+compose build web frontend landing
+policy="$(docker exec chemisttasker_redis_staging redis-cli --raw CONFIG GET maxmemory-policy | tail -n 1)"
+[[ "$policy" == noeviction ]] || { echo 'Protected Redis policy changed during build; see docs/ops/REDIS_ROLE_ISOLATION.md.' >&2; exit 1; }
+python3 scripts/staging_backup_preflight.py "$rollback_dir" "$backup_path"
+docker cp "$backup_path" "chemisttasker_postgres_staging:$restore_input"
+docker exec chemisttasker_postgres_staging pg_restore --list "$restore_input" >/dev/null
+docker exec chemisttasker_postgres_staging pg_restore --file=/dev/null "$restore_input"
 # Drain writers without force-killing a task or an in-flight request before backup.
 grace="${STAGING_STOP_TIMEOUT:-120}"
 [[ "$grace" =~ ^[1-9][0-9]*$ && "$grace" -le 3600 ]] || { echo 'Invalid writer grace period.' >&2; exit 1; }
@@ -127,13 +135,16 @@ for service in celery_beat celery_worker web; do
 done
 compose stop gateway landing frontend
 
+partial="$(mktemp "$rollback_dir/staging-before-production-refresh-${timestamp}-XXXXXX.dump.partial")"
 docker exec chemisttasker_postgres_staging \
   pg_dump --format=custom --compress=9 --no-owner --no-acl \
   --username=chemisttasker_staging --dbname=chemisttasker_staging \
-  > "$rollback_path"
-chmod 600 "$rollback_path"
+  > "$partial"
 # Confirm the rollback archive is readable before destroying the staging schema.
-docker exec -i chemisttasker_postgres_staging pg_restore --list < "$rollback_path" >/dev/null
+docker exec -i chemisttasker_postgres_staging pg_restore --list < "$partial" >/dev/null
+docker exec -i chemisttasker_postgres_staging pg_restore --file=/dev/null < "$partial"
+rollback_path="${partial%.partial}"
+mv "$partial" "$rollback_path"
 echo "Rollback backup: $rollback_path"
 
 docker exec chemisttasker_postgres_staging \
@@ -141,12 +152,11 @@ docker exec chemisttasker_postgres_staging \
   --set ON_ERROR_STOP=1 \
   --command="DROP SCHEMA IF EXISTS public CASCADE;"
 
-docker cp "$backup_path" chemisttasker_postgres_staging:/tmp/production-refresh.dump
 docker exec chemisttasker_postgres_staging \
   pg_restore --exit-on-error --no-owner --no-acl \
   --username=chemisttasker_staging --dbname=chemisttasker_staging \
-  /tmp/production-refresh.dump
-docker exec chemisttasker_postgres_staging rm /tmp/production-refresh.dump
+  "$restore_input"
+docker exec chemisttasker_postgres_staging rm "$restore_input"
 
 bash scripts/reconcile-staging-migration-history.sh
 
@@ -159,7 +169,6 @@ docker exec chemisttasker_postgres_staging \
              UNION ALL SELECT 'pharmacies=' || count(*) FROM client_profile_pharmacy
              UNION ALL SELECT 'memberships=' || count(*) FROM client_profile_membership;"
 
-compose build web frontend landing
 # Prepare current static assets without applying schema changes to restored data.
 compose --profile release run -T --rm --no-deps --name chemisttasker_staging_migrate -e RUN_MIGRATIONS=0 migration < /dev/null
 compose up -d --no-deps --wait --wait-timeout 300 web frontend landing

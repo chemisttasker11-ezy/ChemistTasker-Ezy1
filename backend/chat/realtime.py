@@ -1,4 +1,7 @@
 """Chat realtime helpers: unread-message badges, read receipts and who may receive chat updates."""
+import logging
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from typing import Optional
 from django.db.models import Q
 from chat.models import Conversation
@@ -8,6 +11,19 @@ from notifications.services import _broadcast
 
 ROOM_GROUP_FMT = "room.{room_id}"   # channel-layer group of one chat room
 from infrastructure.channel_groups import USER_GROUP_FMT
+
+
+log = logging.getLogger(__name__)
+
+
+def broadcast_room_event(room_id, event):
+    """Keep a channel outage separate from the already-saved message/reaction."""
+    try:
+        layer = get_channel_layer()
+        if layer:
+            async_to_sync(layer.group_send)(ROOM_GROUP_FMT.format(room_id=room_id), event)
+    except Exception:
+        log.exception("Chat event %s unavailable for room %s", event.get("type"), room_id)
 
 
 def broadcast_message_badge(

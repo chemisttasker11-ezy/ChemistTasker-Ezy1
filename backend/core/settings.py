@@ -189,7 +189,7 @@ INSTALLED_APPS = [
 REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")
 CHANNEL_REDIS_URL = env("CHANNEL_REDIS_URL", default=REDIS_URL)
 # AHPRA counters/coordination stay protected when Channels moves to ephemeral Redis.
-AHPRA_STATE_REDIS_URL = env("AHPRA_STATE_REDIS_URL", default=CHANNEL_REDIS_URL)
+AHPRA_STATE_REDIS_URL = env("AHPRA_STATE_REDIS_URL", default=REDIS_URL)
 VERIFIER_PRESENCE_REDIS_URL = env("VERIFIER_PRESENCE_REDIS_URL", default=CHANNEL_REDIS_URL)
 
 # Security attempt counters must be shared by every web worker. Keep the

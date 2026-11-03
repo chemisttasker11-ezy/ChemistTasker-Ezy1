@@ -19,7 +19,7 @@ function text(node) {
   return text(node.props?.children);
 }
 
-async function worker({ active = true, reject = true } = {}) {
+async function worker({ active = true, reject = true, stale = false } = {}) {
   const state = [], deps = [];
   let cursor = 0, dirty = true, effects = [], tree, reloads = 0;
   const calls = [];
@@ -64,6 +64,7 @@ async function worker({ active = true, reject = true } = {}) {
           message: active ? 'You just clocked in. Clock out now?' : 'You just clocked out. Clock in now?',
         } };
       }
+      if (stale && options.body.confirm_opposite === true) throw { status: 409, payload: { code: 'STALE_CONFIRMATION', error: 'Your attendance changed. Review the current status.' } };
       return { status: active ? 'CLOCKED_OUT' : 'CLOCKED_IN', session_id: 8, pharmacy_name: 'CLOCK Pharmacy' };
     } },
   });
@@ -110,7 +111,7 @@ async function worker({ active = true, reject = true } = {}) {
   }
   await flush();
   return {
-    calls, prompt, get reloads() { return reloads; },
+    calls, prompt, get visibleText() { return text(tree); }, get reloads() { return reloads; },
     async submit() {
       await click(active ? /^Clock out$/i : /^Scan pharmacy QR$/i);
       const field = nodes(tree, 'TextField').find((props) => props.label === 'QR code');
@@ -158,3 +159,12 @@ for (const active of [true, false]) {
     assert.equal(ui.reloads, 1);
   });
 }
+
+for (const active of [true, false]) test(`web stale clock ${active ? 'out' : 'in'} refreshes status without replaying the action`, async () => {
+  const ui=await worker({active,stale:true});
+  await ui.submit();await ui.confirm();
+  assert.equal(ui.calls.length,2);
+  assert.equal(ui.reloads,2);
+  assert.match(ui.visibleText,/Your attendance changed/);
+  assert.throws(()=>ui.prompt(),/409 must open confirmation/);
+});

@@ -1,14 +1,13 @@
 """Signal receivers of the chat app: realtime delivery of new messages and community-chat membership sync."""
 import logging
 
-from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from chat.models import Conversation, Message, Participant
-from chat.realtime import ROOM_GROUP_FMT, broadcast_message_badge, participant_can_receive_chat_updates
+from chat.realtime import broadcast_room_event, broadcast_message_badge, participant_can_receive_chat_updates
 from chat.serializers import MessageSerializer
 from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from notifications.models import Notification
@@ -59,14 +58,9 @@ def broadcast_new_message(sender, instance, created, **kwargs):
             # 🔄 Build payload exactly like REST does
             payload = MessageSerializer(msg).data  # matches fields: id, conversation, sender{ id, user_details{...} }, body, attachment, attachment_url, created_at
 
-            group_name = ROOM_GROUP_FMT.format(room_id=msg.conversation_id)
-            async_to_sync(layer.group_send)(
-                group_name,
-                {
-                    "type": "message.created",   # consumer.message_created
-                    "message": payload,          # keep nested "message" as before
-                },
-            )
+            broadcast_room_event(msg.conversation_id, {
+                "type": "message.created", "message": payload,
+            })
             sender_user = getattr(msg.sender, "user", None)
             sender_user_id = getattr(sender_user, "id", None)
             sender_name = (sender_user.get_full_name() or sender_user.email) if sender_user else ""

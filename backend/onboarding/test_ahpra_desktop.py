@@ -262,6 +262,29 @@ class DesktopTests(TestCase):
         for text in ['Jane', 'Doe', self.profile.user.email]:
             self.assertNotIn(text, mail.outbox[0].body)
 
+    def test_extension_handoff_survives_post_commit_channel_outage(self):
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        check=check_fixture(self.profile,stage='extension')
+        with patch('onboarding.verification.desktop.get_channel_layer') as layer:
+            layer.return_value.group_send=AsyncMock(side_effect=RedisConnectionError('cache unavailable'))
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertTrue(handle_verifier_result(result(check.pk,'error'),'extension'))
+        check.refresh_from_db()
+        self.assertEqual((check.stage,check.status),('bridge','pending'))
+        self.assertEqual(claim_checks(check_id=check.pk,stage='bridge')[0]['check_id'],check.pk)
+
+    def test_bridge_repair_email_survives_post_commit_channel_outage(self):
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        check=check_fixture(self.profile,stage='bridge')
+        with patch('onboarding.verification.desktop.get_channel_layer') as layer:
+            layer.return_value.group_send=AsyncMock(side_effect=RedisConnectionError('cache unavailable'))
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertTrue(handle_verifier_result(result(check.pk,'error'),'bridge'))
+        check.refresh_from_db()
+        self.assertEqual((check.status,check.needs_attention),('done',True))
+        self.assertEqual(len(mail.outbox),1)
+        self.assertIn('needs your input',mail.outbox[0].subject)
+
     def test_repair_report_stores_caps_and_emails_once(self):
         check = check_fixture(self.profile, stage='bridge', status='done', needs_attention=True)
         report = {'check_id': check.pk, 'summary': 's' * 4001, 'branch': 'repair/' + 'b' * 300}

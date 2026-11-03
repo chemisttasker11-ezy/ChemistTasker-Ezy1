@@ -262,7 +262,12 @@ function ClockScreen({status,loading,error,onReload}:{status:any;loading:boolean
         );
         return;
       }
-      setLocalError(errorMessage(e,'Attendance action failed.'));
+      if (e?.status === 409 && errData?.code === 'STALE_CONFIRMATION') {
+        setScannerOpen(false);
+        setQrToken('');
+        await onReload();
+        setLocalError(errData.error || errData.message || 'Your attendance changed. Review the current status and try again.');
+      } else setLocalError(errorMessage(e,'Attendance action failed.'));
     }
     finally{setBusy(false);setScanLocked(false);}
   };

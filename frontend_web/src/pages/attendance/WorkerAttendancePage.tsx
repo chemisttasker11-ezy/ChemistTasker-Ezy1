@@ -357,6 +357,11 @@ export default function WorkerAttendancePage() {
         return;
       }
       setConfirmDialog(null);
+      if (err?.status === 409 && errData?.code === 'STALE_CONFIRMATION') {
+        setScanModalOpen(false);
+        setQrInputToken("");
+        await fetchStatus();
+      }
       setErrorMsg(err?.payload?.error || err?.message || "QR verification or clock transition failed.");
     } finally {
       setSubmittingAction(false);

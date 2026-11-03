@@ -20,7 +20,7 @@ from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from chat.text import sanitize_chat_text
 from chat.realtime import (
-    broadcast_message_badge, broadcast_message_read,
+    broadcast_message_badge, broadcast_message_read, broadcast_room_event,
     accessible_conversations_queryset, authorized_participant,
 )
 from infrastructure.file_validation import ATTACHMENT_UPLOAD_POLICY, validate_uploaded_file
@@ -717,11 +717,8 @@ class MessageViewSet(viewsets.ModelViewSet):
         message.is_edited = True
         message.save()
         
-        layer = get_channel_layer()
-        # --- FIX: Changed "chat_" back to "room." to match your consumers.py ---
-        group_name = f"room.{message.conversation_id}"
-        async_to_sync(layer.group_send)(
-            group_name,
+        broadcast_room_event(
+            message.conversation_id,
             {
                 "type": "message.updated",
                 "message": self.get_serializer(message).data,
@@ -754,11 +751,8 @@ class MessageViewSet(viewsets.ModelViewSet):
                     lambda: attachment_storage.delete(attachment_name), robust=True
                 )
         
-        layer = get_channel_layer()
-        # --- FIX: Changed "chat_" back to "room." to match your consumers.py ---
-        group_name = f"room.{message.conversation_id}"
-        async_to_sync(layer.group_send)(
-            group_name,
+        broadcast_room_event(
+            message.conversation_id,
             {
                 "type": "message.deleted",
                 "message_id": message.id,
@@ -812,10 +806,8 @@ class MessageReactionView(APIView):
         reactions = MessageReaction.objects.filter(message=message)
         reactions_data = [{'reaction': r.reaction, 'user_id': r.user_id} for r in reactions]
         
-        layer = get_channel_layer()
-        group_name = f"room.{message.conversation_id}"
-        async_to_sync(layer.group_send)(
-            group_name,
+        broadcast_room_event(
+            message.conversation_id,
             {
                 "type": "reaction.updated",
                 "message_id": message.id,

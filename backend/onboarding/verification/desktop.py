@@ -257,7 +257,7 @@ def handle_verifier_result(payload, kind):
         check.save(update_fields=['stage', 'status', 'extension_error', 'sent_at'])
         transaction.on_commit(lambda: async_to_sync(get_channel_layer().group_send)(
             'ahpra_verifiers_bridge', {'type': 'ahpra.check', 'check_id': check.pk},
-        ))
+        ), robust=True)
         return True
     if not apply_ahpra_result(check, payload):
         return False
@@ -271,7 +271,7 @@ def handle_verifier_result(payload, kind):
         }
         transaction.on_commit(lambda: async_to_sync(get_channel_layer().group_send)(
             'ahpra_verifiers_bridge', {'type': 'ahpra.repair', 'message': message},
-        ))
+        ), robust=True)
         transaction.on_commit(lambda: mail_admins('AHPRA check needs your input',
                     f'Check {check.pk} ({check.registration_number})\n'
                     f'Extension error: {check.extension_error}\nBridge error: {payload["error"]}\n'

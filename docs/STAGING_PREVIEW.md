@@ -66,9 +66,37 @@ STAGING_PUBLIC_URL=https://staging.chemisttasker.com.au
 STAGING_ALLOWED_HOSTS=staging.chemisttasker.com.au
 ```
 
+## Release prerequisites and SSH safety
+
+Before the first backend deploy, follow [Redis role maintenance](ops/REDIS_ROLE_ISOLATION.md).
+The existing protected Redis must report `noeviction`, and `STAGING_RUN_MIGRATIONS` must be `1`.
+The deploy refuses before downtime when either prerequisite is unmet. `CONFIG SET` alone does not
+change an old container’s startup command: verify/reapply after a restart until the separately
+reviewed recreation adopts the persistent command. Schedule that maintenance before relying on host reboots.
+Routine deployment deliberately preserves existing PostgreSQL, Redis and gateway identities.
+
+Run deployment and database refresh inside a persistent SSH session:
+
+```bash
+tmux new-session -A -s chemisttasker-staging-release
+# Reconnect after an SSH drop with: tmux attach -t chemisttasker-staging-release
+```
+
+An existing `chemisttasker_staging_migrate` container in any state blocks deployment and refresh.
+Inspect its state, logs and actual migration effects; remove it only as an explicit operator action
+once no migration/static owner remains active and its effects are reconciled. Never automatically
+remove or force-kill it to bypass the check. A HUP delivered to deploy records exit `129` as a failure.
+
+Both paths measure free space before pausing writers: the backup filesystem needs twice the current
+database size plus 1 GiB reserve, plus refresh-input size when applicable. Refresh also checks the
+container input filesystem for the archive plus 1 GiB. These conservative checks cannot reserve disk
+against concurrent use or bound every compressed-row expansion; monitor free space during maintenance.
+Dumps remain private `*.dump.partial` files until both TOC and full data-block decoding succeed,
+then are atomically renamed. Full decoding is still not an isolated restore rehearsal.
+
 ## Deployment
 
-From `/opt/apps/chemisttasker-staging`, set `REVIEWED_SHA` to the full SHA
+From a clean `/opt/apps/chemisttasker-staging` checkout, set `REVIEWED_SHA` to the full SHA
 approved in the release review, independently verify `git rev-parse HEAD` matches, then run:
 
 ```bash
@@ -128,8 +156,9 @@ bash scripts/refresh-staging-db.sh \
   /opt/backups/chemisttasker/legacy-production-public-YYYYMMDDTHHMMSSZ.dump
 ```
 
-The refresh script creates a rollback dump of the current staging database,
-stops the application containers, restores the production data, and prints
+The refresh script builds the application images and copies/fully decodes the input archive before
+pausing writers. It creates and validates a rollback dump of the current staging database before
+dropping its schema, restores the already-staged input, and prints
 row counts for users, pharmacies and memberships. It also removes the verified
 legacy `pharmacy_hub.0001_initial` history collision while the hub tables still
 have their legacy `client_profile_*` names. It sets
@@ -243,3 +272,19 @@ retrying. Select a rehearsed compatible-image rollback or explicit data recovery
 decision; never start an incompatible old binary or discard post-backup writes.
 Retain old images by usable ID/tag until acceptance. No live rollout is established
 by the local fake-Docker safety tests.
+
+## Failed release recovery
+
+Read the private attempt’s `phase`, `failed.exit`, `previous-images` and `migration.log` under
+`/opt/apps/chemisttasker-staging-ops/`. A smoke or `seed` failure deliberately requests a graceful
+stop of the newly started web; workers stay paused. A 502 at this point is a failed release, not success.
+Inspect actual processes and reconcile ambiguous migrations/provider effects before retrying.
+
+After resolving the cause, rerun the reviewed release with the same verified SHA and unchanged
+operator configuration, or explicitly recover a previously recorded image only after verifying it
+is compatible with the current schema. Smoke the recovered web before resuming worker and beat.
+Do not blindly restore the database, replay provider operations or force-kill an in-flight writer.
+
+Failed backups remain `.partial` and are never advertised as valid dumps. An interrupted refresh may
+also leave `/tmp/production-refresh-*.dump` in the staging PostgreSQL container. Inspect its owning
+process and reconcile the refresh before deleting leftovers; never prune unrelated data or volumes.

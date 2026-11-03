@@ -51,6 +51,7 @@ finish() {
 trap finish EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+trap 'exit 129' HUP
 
 SECRETS_FILE=env/staging.secrets.env
 RUNTIME_FILE=env/staging.runtime.env
@@ -126,8 +127,8 @@ docker run --rm --network none --memory 128m --cpus 0.5 --pids-limit 64 \
 if ((!frontend_only)); then
   run_migrations="$(compose --profile release config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["migration"]["environment"].get("RUN_MIGRATIONS", ""))')"
   [[ "$run_migrations" == 1 ]] || { echo 'Migration execution is disabled; explicitly resolve the refreshed database state before backend release.' >&2; exit 1; }
-  if active_migration="$(docker inspect -f '{{.State.Running}}' chemisttasker_staging_migrate 2>/dev/null)" && [[ "$active_migration" == true ]]; then
-    echo 'A prior migration is still running; reconcile it before another release.' >&2; exit 1
+  if docker inspect -f '{{.Id}}' chemisttasker_staging_migrate >/dev/null 2>&1; then
+    echo 'A prior migration container exists (running or stopped); inspect and reconcile it before another release.' >&2; exit 1
   fi
 fi
 
@@ -140,7 +141,7 @@ fi
 
 check_protected_policy() {
   policy="$(docker exec chemisttasker_redis_staging redis-cli --raw CONFIG GET maxmemory-policy | tail -n 1)"
-  [[ "$policy" == noeviction ]] || { echo 'Protected Redis must use noeviction; complete the reviewed Redis maintenance first.' >&2; exit 1; }
+  [[ "$policy" == noeviction ]] || { echo 'Protected Redis must use noeviction; complete docs/ops/REDIS_ROLE_ISOLATION.md before retrying.' >&2; exit 1; }
 }
 if ((!frontend_only)); then check_protected_policy; fi
 
@@ -150,6 +151,9 @@ if ((frontend_only)); then compose build frontend landing; else compose build we
 if ((!frontend_only)); then
   docker ps --format '{{.Names}}' | grep -qx chemisttasker_postgres_staging || { echo 'A running staging database is required before backend release.' >&2; exit 1; }
   check_protected_policy
+  BACKUP_DIR="${STAGING_BACKUP_DIR:-/opt/backups/chemisttasker}"
+  mkdir -p "$BACKUP_DIR"
+  python3 scripts/staging_backup_preflight.py "$BACKUP_DIR"
   phase=quiesce
   grace="${STAGING_STOP_TIMEOUT:-120}"
   [[ "$grace" =~ ^[1-9][0-9]*$ && "$grace" -le 3600 ]] || { echo 'Invalid writer grace period.' >&2; exit 1; }
@@ -170,11 +174,12 @@ if ((!frontend_only)); then
     fi
   done
   phase=backup
-  BACKUP_DIR="${STAGING_BACKUP_DIR:-/opt/backups/chemisttasker}"
-  mkdir -p "$BACKUP_DIR"
-  backup="$BACKUP_DIR/staging-predeploy-$(date -u +%Y%m%dT%H%M%SZ).dump"
-  docker exec chemisttasker_postgres_staging pg_dump -U chemisttasker_staging -d chemisttasker_staging -Fc > "$backup"
-  docker exec -i chemisttasker_postgres_staging pg_restore --list < "$backup" >/dev/null
+  partial="$(mktemp "$BACKUP_DIR/staging-predeploy-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX.dump.partial")"
+  docker exec chemisttasker_postgres_staging pg_dump -U chemisttasker_staging -d chemisttasker_staging -Fc > "$partial"
+  docker exec -i chemisttasker_postgres_staging pg_restore --list < "$partial" >/dev/null
+  docker exec -i chemisttasker_postgres_staging pg_restore --file=/dev/null < "$partial"
+  backup="${partial%.partial}"
+  mv "$partial" "$backup"
   printf 'DB_BACKUP=%s\n' "$backup"
   python3 - "$BACKUP_DIR" <<'PY'
 from pathlib import Path
@@ -224,6 +229,7 @@ staging_url=https://staging.chemisttasker.com.au
 bash scripts/smoke-staging.sh "$staging_url"
 # Frontend-only releases must not reseed accounts or update backend data.
 if [[ "$frontend_only" == "0" ]]; then
+phase=seed
 # Keep credentials exclusively in the staging server's ignored env directory.
 TEST_USERS_FILE="env/staging.test-users.json"
 if [[ -L "$TEST_USERS_FILE" ]]; then

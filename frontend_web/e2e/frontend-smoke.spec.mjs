@@ -1368,3 +1368,23 @@ test.describe('owner/admin persona routing hardening', () => {
     expect(url.searchParams.get('pharmacy_id')).toBe('101');
   });
 });
+
+for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 }]) {
+  test(`failed route chunk offers reload recovery at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.route('**/api/**', async (route) => {
+      if (await installLoggedOutBootstrap(route)) return;
+      return json(route,[]);
+    });
+    const chunk=/\/js\/KioskPage\.[^/]+\.js(?:\?|$)/;
+    await page.route(chunk,(route)=>route.abort('failed'));
+    await page.goto('/kiosk');
+    await expect(page.getByRole('heading',{name:'This page couldn’t load'})).toBeVisible();
+    await expect(page.getByRole('alert')).toContainText('Unsaved edits may be lost');
+    await expect(page.getByText(/TypeError|Failed to fetch dynamically imported module/)).toHaveCount(0);
+    await page.unroute(chunk);
+    await page.getByRole('button',{name:'Reload page',exact:true}).click();
+    await expect(page.getByLabel('6-Digit Pairing Code')).toBeVisible();
+    await expect(page.getByRole('heading',{name:'This page couldn’t load'})).toHaveCount(0);
+  });
+}

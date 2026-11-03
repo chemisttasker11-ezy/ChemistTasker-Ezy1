@@ -385,6 +385,38 @@ class MessageEndpointTests(ChatBase):
         self.assertEqual(self.rows(client_for(self.no_role).get(MESSAGES)), [])
 
 
+    def test_channel_outage_does_not_skip_durable_chat_notification_and_push(self):
+        from unittest.mock import AsyncMock, patch
+        from channels.layers import get_channel_layer
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        from notifications.models import Notification
+        from users.models import DeviceToken
+        DeviceToken.objects.create(user=self.bob,platform='android',token='ExponentPushToken[offline-chat]')
+        with patch.object(get_channel_layer(),'group_send',new=AsyncMock(side_effect=RedisConnectionError('cache unavailable'))), patch('notifications.services._send_expo_push') as push:
+            with self.captureOnCommitCallbacks(execute=True):
+                response=client_for(self.alice).post(MESSAGES,{'conversation':self.room,'body':'persisted notification'},format='json')
+        self.assertEqual(response.status_code,201)
+        self.assertTrue(Notification.objects.filter(user=self.bob,payload__message_id=response.json()['id']).exists())
+        push.assert_called_once()
+
+    def test_committed_edits_reactions_and_delete_survive_channel_outage(self):
+        from unittest.mock import AsyncMock, patch
+        from channels.layers import get_channel_layer
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        api=client_for(self.alice)
+        with patch.object(get_channel_layer(), 'group_send', new=AsyncMock(side_effect=RedisConnectionError('cache unavailable'))):
+            edited=api.patch(f"{MESSAGES}{self.msg_id}/", {"body":"saved while offline"}, format="json")
+            self.assertEqual(edited.status_code,200)
+            self.assertEqual(Message.objects.get(pk=self.msg_id).body,"saved while offline")
+            reacted=api.post(f"{MESSAGES}{self.msg_id}/react/", {"reaction":MessageReaction.REACTION_CHOICES[0][0]}, format="json")
+            self.assertEqual(reacted.status_code,201)
+            self.assertTrue(MessageReaction.objects.filter(message_id=self.msg_id,user=self.alice).exists())
+            deleted=api.delete(f"{MESSAGES}{self.msg_id}/")
+            self.assertEqual(deleted.status_code,204)
+            self.assertTrue(Message.objects.get(pk=self.msg_id).is_deleted)
+
+
+
 class CommunityGroupTests(ChatBase):
     def test_custom_group_participants_must_be_visible_on_create_and_update(self):
         _, foreign_pharmacy = make_owner_with_pharmacy("Foreign")

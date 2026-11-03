@@ -42,9 +42,13 @@ if args[0]=='compose':
             services['redis_cache']['command']=['redis-server','--maxmemory','96mb']
             if os.environ.get('STAGING_WEB_MEMORY_LIMIT')=='9g': services['web']['mem_limit']=str(9*1024**3)
         print(json.dumps({'services':services}))
+    if operation=='build' and os.environ.get('HUP_DURING_BUILD'):
+        import signal
+        os.kill(os.getppid(), signal.SIGHUP)
     if operation=='build' and os.environ.get('FAIL_BUILD'): sys.exit(10)
     if operation=='build' and os.environ.get('POLICY_CHANGED_DURING_BUILD'): (root/'policy-changed').touch()
     if operation=='run' and os.environ.get('FAIL_MIGRATION'): sys.exit(15)
+    if operation=='exec' and os.environ.get('FAIL_SEED'): sys.exit(16)
     if operation=='up' and 'web' in args:
         (root/'web-started').touch()
         if os.environ.get('FAIL_WEB'): sys.exit(13)
@@ -59,8 +63,9 @@ elif args[0]=='ps':
     if not os.environ.get('MISSING_DB'): print('chemisttasker_postgres_staging')
 elif args[0]=='inspect':
     if args[-1]=='chemisttasker_staging_migrate':
-        if os.environ.get('MIGRATION_RUNNING'): print('true')
-        else: sys.exit(1)
+        state=os.environ.get('MIGRATION_STATE') or ('running' if os.environ.get('MIGRATION_RUNNING') else '')
+        if not state: sys.exit(1)
+        print('true' if state=='running' else 'false')
     elif 'HostConfig.Memory' in args[2]: print('1073741824 0 0' if os.environ.get('EXISTING_RESOURCE_CAPS') else '0 0 0')
     elif 'State.ExitCode' in args[2]:
         print('137' if os.environ.get('FORCED_STOP') else '0')
@@ -76,11 +81,16 @@ elif args[0]=='inspect':
 elif args[0]=='exec' and 'CONFIG' in args:
     print('maxmemory-policy')
     print('allkeys-lru' if os.environ.get('EVICTING_STATE') or (root/'policy-changed').exists() else 'noeviction')
+elif args[0]=='exec' and 'pg_database_size(current_database())' in ' '.join(args):
+    print('1048576')
+elif args[0]=='exec' and 'df' in args:
+    print('Filesystem 1024-blocks Used Available Capacity Mounted on\nfixture 33554432 1048576 32505856 4% /')
 elif args[0]=='exec' and 'pg_dump' in args:
     if os.environ.get('FAIL_BACKUP'): sys.exit(11)
     print('fake-custom-format-archive')
 elif args[0]=='exec' and 'pg_restore' in args:
     sys.stdin.read()
+    if '--file=/dev/null' in args and os.environ.get('FAIL_ARCHIVE_DATA'): sys.exit(12)
     if '--list' in args:
         count=root/'archive-checks'
         number=int(count.read_text())+1 if count.exists() else 1
@@ -96,7 +106,7 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root/'scripts').mkdir()
         source_root=Path(__file__).resolve().parent.parent
-        for name in ('scripts/staging_resource_budget.py','scripts/staging_provider_preflight.py','docker-compose.staging.resources.yml'):
+        for name in ('scripts/staging_resource_budget.py','scripts/staging_provider_preflight.py','scripts/staging_backup_preflight.py','docker-compose.staging.resources.yml'):
             shutil.copyfile(source_root/name,self.root/name)
         shutil.copyfile(Path(__file__).with_name('deploy-staging.sh'), self.root/'scripts/deploy-staging.sh')
         (self.root/'scripts/smoke-staging.sh').write_text('#!/bin/sh\n[ -z \"${FAIL_SMOKE:-}\" ] || exit 14\ncurl --fail https://example.test/health/\n')
@@ -262,10 +272,43 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         self.assertIn('Existing staging limits',result.stderr)
         self.assertFalse(any('up' in x or 'pg_dump' in x or x[:2]==['docker','kill'] for x in calls))
 
+    def test_any_leftover_migration_refuses_before_writer_pause(self):
+        for state in ('created', 'exited', 'running'):
+            with self.subTest(state=state):
+                (self.root/'calls.jsonl').unlink(missing_ok=True)
+                result=self.release(MIGRATION_STATE=state)
+                self.assertNotEqual(result.returncode,0,result.stdout)
+                self.assertFalse(self.operations('build'))
+                self.assertFalse(any(x[:2]==['docker','kill'] or 'pg_dump' in x for x in self.calls))
+                result,calls=self.refresh(MIGRATION_STATE=state)
+                self.assertNotEqual(result.returncode,0,result.stdout)
+                self.assertFalse(any('up' in x or x[:2]==['docker','kill'] or 'pg_dump' in x for x in calls))
+
+    def test_ssh_hangup_records_failure_with_signal_exit(self):
+        script=self.root/'scripts/deploy-staging.sh'
+        script.write_text(script.read_text().replace('phase=build\n', 'phase=build\nkill -HUP \"$$\"\n'))
+        result=self.release()
+        failures=list((self.root/'ops').glob('release-*/failed.exit'))
+        self.assertEqual(len(failures),1,result.stderr)
+        self.assertEqual(failures[0].read_text().strip(),'129')
+        self.assertEqual(result.returncode,129,result.stderr)
+        self.assertFalse((self.root/'ops/deployed.commit').exists())
+
+    def test_hangup_during_foreground_build_records_failure(self):
+        result=self.release(HUP_DURING_BUILD='1')
+        self.assertEqual(result.returncode,129,result.stderr)
+        self.assertEqual(next((self.root/'ops').glob('release-*/failed.exit')).read_text().strip(),'129')
+
+    def test_seed_failure_is_distinguished_from_smoke(self):
+        result=self.release(FAIL_SEED='1')
+        self.assertEqual(result.returncode,16,result.stderr)
+        self.assertEqual(next((self.root/'ops').glob('release-*/phase')).read_text().strip(),'seed')
+        self.assertFalse((self.root/'ops/deployed.commit').exists())
+
     def test_refresh_refuses_prior_running_migration_before_service_changes(self):
         result,calls=self.refresh(MIGRATION_RUNNING='1')
         self.assertNotEqual(result.returncode,0)
-        self.assertIn('still running',result.stderr)
+        self.assertIn('container exists',result.stderr)
         self.assertFalse(any('up' in x or 'pg_dump' in x or x[:2]==['docker','kill'] for x in calls))
 
     def test_invalid_resource_acknowledgement_refuses_before_docker(self):
@@ -348,6 +391,34 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         calls=[json.loads(x) for x in (self.root/'calls.jsonl').read_text().splitlines()]
         return result,calls
 
+    def test_refresh_build_failure_preserves_writers_and_schema(self):
+        result,calls=self.refresh(FAIL_BUILD='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse(any(x[:2]==['docker','kill'] or 'pg_dump' in x or 'DROP SCHEMA' in ' '.join(x) for x in calls))
+
+    def test_full_archive_decode_failure_never_publishes_backup_or_destroys_schema(self):
+        result=self.release(FAIL_ARCHIVE_DATA='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertEqual(list((self.root/'backups').glob('*.dump')),[])
+        self.assertTrue(list((self.root/'backups').glob('*.partial')))
+        (self.root/'calls.jsonl').unlink()
+        result,calls=self.refresh(FAIL_ARCHIVE_DATA='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse(any(x[:2]==['docker','kill'] or 'DROP SCHEMA' in ' '.join(x) for x in calls))
+
+    def test_refresh_input_is_copied_and_decoded_before_quiesce(self):
+        result,calls=self.refresh()
+        self.assertEqual(result.returncode,0,result.stderr)
+        copies=[i for i,x in enumerate(calls) if x[:2]==['docker','cp']]
+        self.assertEqual(len(copies),1, 'Refresh must stage exactly one input, never copy after DROP')
+        staged=copies[0]
+        decoded=next(i for i,x in enumerate(calls) if '--file=/dev/null' in x)
+        pause=next(i for i,x in enumerate(calls) if x[:2]==['docker','kill'])
+        build=next(i for i,x in enumerate(calls) if x[:2]==['docker','compose'] and 'build' in x)
+        self.assertLess(build,staged)
+        self.assertLess(staged,decoded)
+        self.assertLess(decoded,pause)
+
     def test_refresh_bad_input_archive_refuses_before_writer_pause_or_dump(self):
         result,calls=self.refresh(FAIL_RESTORE_CHECK='1')
         self.assertNotEqual(result.returncode,0)
@@ -357,7 +428,7 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         result,calls=self.refresh(FAIL_ROLLBACK_CHECK='1')
         self.assertNotEqual(result.returncode,0)
         self.assertTrue(any('pg_dump' in x for x in calls))
-        self.assertFalse(any('DROP SCHEMA' in ' '.join(x) or 'cp' in x for x in calls))
+        self.assertFalse(any('DROP SCHEMA' in ' '.join(x) for x in calls))
 
     def test_refresh_stuck_writer_refuses_without_force_kill_or_dump(self):
         result,calls=self.refresh(STUCK_WRITER='1')

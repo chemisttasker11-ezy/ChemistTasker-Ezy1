@@ -23,7 +23,7 @@ class RefreshGatewayPreflightTests(unittest.TestCase):
                     (root/f'env/staging.{name}.env').write_text('DISPOSABLE=1\n')
                 (root/'bin').mkdir()
                 docker=root/'bin/docker'
-                docker.write_text("#!/usr/bin/env python3\nimport json,os,pathlib,sys\na=sys.argv[1:]\np=pathlib.Path(os.environ['FAKE_ROOT'])/'calls.jsonl'\nwith p.open('a') as f:f.write(json.dumps(a)+'\\n')\nif 'config' in a and '--format' in a:print(json.dumps({'services':{owner:{'environment':{}} for owner in ('web','migration')}}))\nelif 'ps' in a and '-q' in a:\n if not os.environ.get('MISSING_GATEWAY'):print('gateway-id')\nelif a and a[0]=='inspect':print('false')\n")
+                docker.write_text("#!/usr/bin/env python3\nimport json,os,pathlib,sys\na=sys.argv[1:]\np=pathlib.Path(os.environ['FAKE_ROOT'])/'calls.jsonl'\nwith p.open('a') as f:f.write(json.dumps(a)+'\\n')\nif 'config' in a and '--format' in a:print(json.dumps({'services':{owner:{'environment':{}} for owner in ('web','migration')}}))\nelif 'ps' in a and '-q' in a:\n if not os.environ.get('MISSING_GATEWAY'):print('gateway-id')\nelif a and a[0]=='inspect':\n if a[-1]=='chemisttasker_staging_migrate':sys.exit(1)\n print('false')\n")
                 docker.chmod(0o755)
                 backups=root/'backups'
                 backups.mkdir(parents=True,exist_ok=True)

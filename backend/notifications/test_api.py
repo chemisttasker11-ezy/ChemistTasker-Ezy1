@@ -43,6 +43,20 @@ class NotificationTests(TestCase):
         n = note(self.other, "theirs")
         self.assertEqual(client_for(self.user).get(f"{URL}{n.id}/").status_code, 404)
 
+    def test_mark_read_survives_channel_outage_without_touching_other_users(self):
+        from unittest.mock import AsyncMock, patch
+        from channels.layers import get_channel_layer
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        mine=note(self.user,"mine")
+        theirs=note(self.other,"theirs")
+        with patch.object(get_channel_layer(),'group_send',new=AsyncMock(side_effect=RedisConnectionError('cache unavailable'))):
+            res=client_for(self.user).post(URL+"mark-read/",{},format="json")
+        self.assertEqual(res.status_code,200)
+        self.assertEqual(res.json(),{"marked":1,"unread":0})
+        mine.refresh_from_db();theirs.refresh_from_db()
+        self.assertIsNotNone(mine.read_at)
+        self.assertIsNone(theirs.read_at)
+
     def test_mark_read_all_then_unread_count(self):
         note(self.user, "a")
         note(self.user, "b")

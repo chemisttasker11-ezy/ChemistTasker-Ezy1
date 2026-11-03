@@ -20,6 +20,7 @@ import App from './App';
 import PublicRouteBridge from './components/PublicRouteBridge';
 function WebRoot(){return <PublicRouteBridge><App/></PublicRouteBridge>;}
 import RouteLoadingState from './components/ui/RouteLoadingState';
+import RouteErrorState from './components/RouteErrorState';
 // Fetch home graphics alongside the session check, without loading them on app routes.
 const initialLanding = window.location.pathname === '/' ? import('./pages/LandingPage') : null;
 const LandingPage = React.lazy(() => initialLanding ?? import('./pages/LandingPage'));
@@ -134,6 +135,7 @@ const OwnerSetupPharmaciesPage = React.lazy(() => import('./pages/setup/OwnerSet
 const router = createBrowserRouter([
   {
     Component: WebRoot,
+    errorElement: <RouteErrorState />,
     children: [
       { index: true, element: <LandingPage /> },
       { path: 'pricing', element: <PricingPage /> },

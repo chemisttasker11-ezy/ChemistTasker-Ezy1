@@ -104,3 +104,15 @@ class VerifierPresenceOutageTests(SimpleTestCase):
             finally:
                 stop.set()
                 peer.join(timeout=3)
+
+
+class ProtectedRedisDefaultTests(SimpleTestCase):
+    def test_channels_override_does_not_move_protected_state(self):
+        import json, os, subprocess, sys
+        from pathlib import Path
+        environment={**os.environ,'REDIS_URL':'redis://protected.invalid:6379/1',
+                     'CHANNEL_REDIS_URL':'redis://cache.invalid:6379/0'}
+        environment.pop('AHPRA_STATE_REDIS_URL',None)
+        code='import json; from core import settings; print(json.dumps([settings.AHPRA_STATE_REDIS_URL, settings.VERIFIER_PRESENCE_REDIS_URL]))'
+        result=subprocess.check_output([sys.executable,'-c',code],env=environment,cwd=Path(__file__).resolve().parent.parent,text=True,timeout=15)
+        self.assertEqual(json.loads(result),['redis://protected.invalid:6379/1','redis://cache.invalid:6379/0'])
