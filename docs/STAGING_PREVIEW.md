@@ -291,3 +291,9 @@ Do not blindly restore the database, replay provider operations or force-kill an
 Failed backups remain `.partial` and are never advertised as valid dumps. An interrupted refresh may
 also leave `/tmp/production-refresh-*.dump` in the staging PostgreSQL container. Inspect its owning
 process and reconcile the refresh before deleting leftovers; never prune unrelated data or volumes.
+
+### Dashboard asset continuity
+
+Keep the dedicated frontend asset volume across deployments. Existing staging
+installations require the one-time archive seed before the first replacement;
+see [the incident, adoption and verification procedure](ops/FRONTEND_ASSET_CONTINUITY.md).
