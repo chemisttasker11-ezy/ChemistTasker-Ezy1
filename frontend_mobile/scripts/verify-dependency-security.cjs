@@ -17,10 +17,13 @@ function verifyInstalled() {
     assert.equal(actual, expected, `Missing or modified security patch: ${relative}`);
   }
   assert.equal(mobileRequire('@grpc/grpc-js/package.json').version, '1.13.6');
-  // Metro 0.83.8 reads image bytes with its own fingerprinted dimension parser.
-  const yamlRequire = createRequire(mobileRequire.resolve('@istanbuljs/load-nyc-config/package.json'));
+  // Metro 0.84 (root 0.84.6, Expo's bundler @expo/metro 0.84.5) reads image bytes with its own fingerprinted dimension parser.
+  // SDK 56: @expo/xcpretty (Podfile.lock parser) is the js-yaml consumer; every locked copy stays on 4.3.2.
+  const yamlRequire = createRequire(mobileRequire.resolve('@expo/xcpretty/package.json'));
   assert.equal(yamlRequire('js-yaml/package.json').version, '4.3.2');
   const lock = JSON.parse(readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
+  const yamlCopies = Object.entries(lock.packages).filter(([entry]) => entry.endsWith('node_modules/js-yaml'));
+  assert.deepEqual(yamlCopies.map(([entry, meta]) => [entry, meta.version]), [['node_modules/js-yaml', '4.3.2']]);
   const decoderPackage = path.join(path.dirname(mobileRequire.resolve('decode-uri-component')), 'package.json');
   assert.equal(JSON.parse(readFileSync(decoderPackage, 'utf8')).version, '0.5.1');
   assert.equal(lock.packages['node_modules/decode-uri-component'].version, '0.5.1');
@@ -47,8 +50,13 @@ function verifyInstalled() {
   assert.equal(placesRequire.resolve('qs'), mobileRequire.resolve('qs'));
   assert.equal(lock.packages['node_modules/deepmerge'].version, '4.3.1');
   assert.equal(mobileRequire('deepmerge/package.json').version, '4.3.1');
-  const expoConfigRequire = createRequire(mobileRequire.resolve('@expo/config/package.json'));
-  assert.equal(expoConfigRequire.resolve('deepmerge'), mobileRequire.resolve('deepmerge'));
+  // SDK 56 nests every @expo/config copy; each must still reach the patched root deepmerge.
+  const expoConfigs = Object.keys(lock.packages).filter(entry => entry.endsWith('node_modules/@expo/config'));
+  assert.ok(expoConfigs.length, '@expo/config is missing');
+  for (const entry of expoConfigs) {
+    const expoConfigRequire = createRequire(path.join(root, entry, 'package.json'));
+    assert.equal(expoConfigRequire.resolve('deepmerge'), mobileRequire.resolve('deepmerge'), entry);
+  }
 
   // CVE-2026-93753 has no fixed upstream deepmerge release. The local patch
   // drops __proto__ in both mergeObject write loops, matching the upstream
@@ -65,8 +73,9 @@ function verifyInstalled() {
   assert.equal({}.isAdmin, undefined);
 
   // SDK 55 dropped image-size (Metro parses dimensions itself), fast-uri and undici: any returning
-  // copy fails here until its pin (package.json overrides) and checks are reviewed again.
-  const gone = ['sprintf-js', 'image-size', 'fast-uri', 'undici'];
+  // copy fails here until its pin (package.json overrides) and checks are reviewed again. SDK 56 dropped
+  // @istanbuljs/load-nyc-config, whose js-yaml 3 range the 4.3.2 override forced across a major.
+  const gone = ['sprintf-js', 'image-size', 'fast-uri', 'undici', '@istanbuljs/load-nyc-config'];
   for (const name of gone) {
     assert.equal(Object.keys(lock.packages).some(entry => entry.endsWith(`node_modules/${name}`)), false, `${name} is back`);
   }

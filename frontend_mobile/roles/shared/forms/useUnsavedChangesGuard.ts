@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
-import { useIsFocused, useNavigation, usePreventRemove } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
 import { useUnsavedChangesDialog } from './UnsavedChangesDialogProvider';
 import { useUnsavedChangesRegistry } from './UnsavedChangesRegistryProvider';
 

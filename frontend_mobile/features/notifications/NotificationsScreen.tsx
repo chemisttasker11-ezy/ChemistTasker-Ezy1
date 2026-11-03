@@ -3,8 +3,7 @@ import { View, StyleSheet, FlatList, Pressable, RefreshControl, DeviceEventEmitt
 import { Text, Surface, Icon, IconButton, Badge, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
-import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import {
   resolveCalendarNotificationRoute,

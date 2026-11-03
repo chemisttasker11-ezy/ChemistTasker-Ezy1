@@ -207,18 +207,13 @@ test('Metro reads filesystem images as bytes for dimension parsing', () => {
   `);
 });
 
-test('NYC YAML loading and Firestore Node client retain their public APIs', async () => {
-  const folder = mkdtempSync(path.join(process.env.SECURITY_TEST_TMP || tmpdir(), 'mobile-security-yaml-'));
-  try {
-    writeFileSync(path.join(folder, 'package.json'), '{}');
-    writeFileSync(path.join(folder, '.nycrc.yml'), 'all: true\ninclude:\n  - src/**/*.ts\n');
-    const config = await require('@istanbuljs/load-nyc-config').loadNycConfig({ cwd: folder });
-    assert.equal(config.all, true);
-    assert.deepEqual(config.include, ['src/**/*.ts']);
-  } finally {
-    assert.equal(path.dirname(folder), path.resolve(process.env.SECURITY_TEST_TMP || tmpdir()));
-    rmSync(folder, { recursive: true, force: true });
-  }
+test('Podfile.lock YAML loading and Firestore Node client retain their public APIs', async () => {
+  // SDK 56: @expo/xcpretty replaced @istanbuljs/load-nyc-config as the pinned js-yaml 4.3.2 consumer.
+  const { loadPodfileLock } = require('@expo/xcpretty/build/utils/parsePodfileLock');
+  const lock = loadPodfileLock('PODS:\n  - React-Core (0.85.3)\nCOCOAPODS: 1.16.2\n');
+  assert.deepEqual(lock.PODS, ['React-Core (0.85.3)']);
+  assert.equal(lock.COCOAPODS, '1.16.2');
+  assert.throws(() => loadPodfileLock('x: !!js/function "function () {}"\n'), /unknown tag/);
   const app = require('firebase/app').initializeApp({ projectId: 'security-compatibility-test' }, 'security-compatibility-test');
   const firestore = require('firebase/firestore');
   assert.ok(firestore.getFirestore(app));
@@ -384,7 +379,9 @@ test('Expo config modifications preserve valid plugin merging without inherited 
   try {
     writeFileSync(path.join(folder, 'package.json'), '{"name":"security-fixture","version":"1.0.0"}');
     writeFileSync(configPath, initial);
-    const result = await require('@expo/config').modifyConfigAsync(folder, {
+    // SDK 56 nests @expo/config (no root copy); expo's own copy is the one app config loading runs.
+    const expoConfig = require('node:module').createRequire(require.resolve('expo/package.json'))('@expo/config');
+    const result = await expoConfig.modifyConfigAsync(folder, {
       extra: { session: JSON.parse('{"__proto__":{"mobilePrototypeInjected":true},"safe":"kept"}') },
       plugins: [['fixture-plugin', { settings: { two: 2 }, rows: [2] }]],
     }, { skipSDKVersionRequirement: true, skipPlugins: true }, { dryRun: true });

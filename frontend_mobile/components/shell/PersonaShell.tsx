@@ -1,7 +1,7 @@
 import React, { type ReactNode, useEffect, useMemo } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
 import { Stack, Tabs, useRouter, useSegments } from 'expo-router';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { Menu } from 'lucide-react-native';
 import { colors } from '@/constants/tokens';
 import { useUnsavedChangesRegistry } from '@/roles/shared/forms/UnsavedChangesRegistryProvider';

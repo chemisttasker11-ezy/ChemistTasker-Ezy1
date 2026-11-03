@@ -721,7 +721,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.subtleBg,
   },
   webviewLoader: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.sm,

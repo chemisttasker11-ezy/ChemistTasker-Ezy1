@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, AppState, type AppStateStatus } from 'react-native';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused } from 'expo-router';
 
 /**
  * Allows decorative motion only while its route is visible, the app is active,

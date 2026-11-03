@@ -15,6 +15,10 @@
     "node_modules/deepmerge/dist/umd.js": "88e2fb95a180eaa6d0e739d051a2faf9e2d9c7a1111022a4709d56d7da53dfe0",
     "node_modules/expo-router/node_modules/query-string/index.js": "2add7bc9d1f6d15f869c05207b53ded3c2ff0b7c0b8424becb0023890cc4314b",
     "node_modules/metro/src/lib/imageSize.js": "0d730a1748d389687e7d05768a91475510aec7a2427eafc8c345bbc1d3fa45eb",
-    "node_modules/metro/src/lib/imageSize.js.flow": "7d815e7d47986c9a8b34610080e6495a2ce254712c85d385836f395a31119461"
+    "node_modules/metro/src/lib/imageSize.js.flow": "7d815e7d47986c9a8b34610080e6495a2ce254712c85d385836f395a31119461",
+    "node_modules/@expo/metro/node_modules/metro/src/Assets.js": "9f7631691c4d2ed69915dba7d64d710d0d9ac4989dfc0483044a13b135a9e289",
+    "node_modules/@expo/metro/node_modules/metro/src/Assets.js.flow": "93793c3d376891b0246f52b4b8ecedcccaa035c9d2e3dc27deb26c3ad4fd5f74",
+    "node_modules/@expo/metro/node_modules/metro/src/lib/imageSize.js": "0d730a1748d389687e7d05768a91475510aec7a2427eafc8c345bbc1d3fa45eb",
+    "node_modules/@expo/metro/node_modules/metro/src/lib/imageSize.js.flow": "7d815e7d47986c9a8b34610080e6495a2ce254712c85d385836f395a31119461"
   }
 }

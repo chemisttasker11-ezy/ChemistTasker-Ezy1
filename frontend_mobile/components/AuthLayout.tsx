@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   otpInput: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     color: 'transparent',
     backgroundColor: 'transparent',
     fontSize: 1,

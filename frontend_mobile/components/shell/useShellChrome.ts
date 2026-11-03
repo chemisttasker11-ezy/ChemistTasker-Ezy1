@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DeviceEventEmitter } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import { usePathname } from 'expo-router';
+import { useFocusEffect, usePathname } from 'expo-router';
 import { getNotifications } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { NOTIFICATIONS_READ_EVENT } from '@/features/notifications/events';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { BottomTabHeaderProps } from '@react-navigation/bottom-tabs';
+import type { BottomTabHeaderProps } from 'expo-router/js-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';

@@ -7,7 +7,6 @@
     "icon": "./assets/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png",
     "scheme": "frontendmobile",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "runtimeVersion": "1.1.0",
     "updates": {
       "url": "https://u.expo.dev/75fa2fa5-e9ed-47af-a012-86967b951c5b",
@@ -61,7 +60,6 @@
         "foregroundImage": "./assets/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": false,
       "package": "com.chemisttasker.app",
       "versionCode": 2
     },
@@ -125,7 +123,7 @@
             "buildReactNativeFromSource": true,
             "extraPods": [],
             "flipper": false,
-            "deploymentTarget": "15.1"
+            "deploymentTarget": "16.4"
           }
         }
       ],
