@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { useWorkspace } from './WorkspaceContext';
 import {
@@ -7,6 +7,7 @@ import {
   getAssignmentPharmacyId,
   getAssignmentPharmacyName,
   getSelectedAdminAssignment,
+  readPersonaSelection,
   selectAdminPersona,
   type MobileAdminAssignment,
 } from '@/utils/mobilePersona';
@@ -28,12 +29,27 @@ export function AdminWorkspaceProvider({ children }: { children: React.ReactNode
   const assignments = useMemo(() => getAdminAssignments(user), [user]);
   const [activeAssignmentId, setActiveAssignmentId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hydratedScope = useRef<{ identity: string; key: string } | null>(null);
+  const identityKey = JSON.stringify([
+    user?.id ?? user?.email ?? user?.username ?? null,
+    user?.role ?? null,
+  ]);
+  const scopeKey = JSON.stringify([identityKey, assignments]);
 
   useEffect(() => {
+    // A profile refresh must not re-enter Admin while the user is leaving it.
+    if (hydratedScope.current?.key === scopeKey) {
+      setIsLoading(false);
+      return;
+    }
     let active = true;
+    if (hydratedScope.current) hydratedScope.current.key = "";
     setIsLoading(true);
     void getSelectedAdminAssignment(user)
       .then(async (storedAssignment) => {
+        if (!active) return;
+        if (hydratedScope.current?.identity === identityKey &&
+            (await readPersonaSelection(user))?.startsWith('ROLE:')) return;
         if (!active) return;
         const assignment = await selectAdminPersona(user, getAssignmentId(storedAssignment));
         if (!active) return;
@@ -44,6 +60,7 @@ export function AdminWorkspaceProvider({ children }: { children: React.ReactNode
         const pharmacyName = assignment ? getAssignmentPharmacyName(assignment) : null;
         await setSelectedPharmacyId(pharmacyId);
         await setSelectedPharmacyName(pharmacyName);
+        if (active) hydratedScope.current = { identity: identityKey, key: scopeKey };
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -51,7 +68,7 @@ export function AdminWorkspaceProvider({ children }: { children: React.ReactNode
     return () => {
       active = false;
     };
-  }, [assignments, reloadWorkspace, setSelectedPharmacyId, setSelectedPharmacyName, user]);
+  }, [identityKey, scopeKey, assignments, reloadWorkspace, setSelectedPharmacyId, setSelectedPharmacyName, user]);
 
   const activeAssignment = useMemo(
     () => activeAssignmentId == null
