@@ -256,5 +256,5 @@ const styles = StyleSheet.create({
     lineHeight: type.bodySmall.lineHeight,
     textAlign: 'center',
   },
-  legalLinks: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+  legalLinks: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space.lg, justifyContent: 'center' },
 });

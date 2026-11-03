@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         paddingHorizontal: space.sm,
     },
-    legalLinks: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: -space.sm },
+    legalLinks: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space.lg, justifyContent: 'center', marginTop: -space.sm },
     bar: {
         paddingHorizontal: space.xl,
         paddingTop: space.md,

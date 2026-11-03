@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
     fontSize: type.bodyMedium.fontSize,
     lineHeight: type.bodyMedium.lineHeight,
   },
-  legalLinks: { flexDirection: 'row', flexWrap: 'wrap', marginLeft: touch.min, marginTop: -space.sm },
+  legalLinks: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space.lg, marginLeft: touch.min, marginTop: -space.sm },
   captchaRow: {
     minHeight: 56,
     flexDirection: 'row',
