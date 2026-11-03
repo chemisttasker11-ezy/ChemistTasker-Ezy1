@@ -4,22 +4,24 @@ import { ActivityIndicator, Button, Card, Chip, Divider, Icon, IconButton, Surfa
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
+import { tokens } from '../../constants/tokens';
+
 export const palette = {
-  primary: '#6366F1',
-  primarySoft: '#EEF2FF',
-  background: '#F9FAFB',
-  surface: '#FFFFFF',
-  border: '#E5E7EB',
-  text: '#111827',
-  muted: '#6B7280',
-  success: '#10B981',
-  successSoft: '#ECFDF5',
-  warning: '#F59E0B',
-  warningSoft: '#FFF7ED',
-  danger: '#EF4444',
-  dangerSoft: '#FEF2F2',
-  info: '#0369A1',
-  infoSoft: '#EFF6FF',
+  primary: tokens.light.primary,
+  primarySoft: tokens.light.primarySoft,
+  background: tokens.light.pageBg,
+  surface: tokens.light.surfaceBg,
+  border: tokens.light.border,
+  text: tokens.light.textPrimary,
+  muted: tokens.light.textMuted,
+  success: tokens.light.status.green.solid,
+  successSoft: tokens.light.status.green.bg,
+  warning: tokens.light.status.amber.solid,
+  warningSoft: tokens.light.status.amber.bg,
+  danger: tokens.light.status.red.solid,
+  dangerSoft: tokens.light.status.red.bg,
+  info: tokens.light.tone.blue.fg,
+  infoSoft: tokens.light.tone.blue.bg,
 };
 
 export function ParityPage({
@@ -111,11 +113,12 @@ export function MetricGrid({ items, minItemWidth = 100 }: {
       {items.map((item) => {
         const tone = item.tone ?? 'primary';
         const backgroundColor = tone === 'success' ? palette.successSoft : tone === 'warning' ? palette.warningSoft : tone === 'danger' ? palette.dangerSoft : palette.primarySoft;
-        const color = tone === 'success' ? '#047857' : tone === 'warning' ? '#B45309' : tone === 'danger' ? '#B91C1C' : palette.primary;
+        const color = tone === 'success' ? tokens.light.status.green.fg : tone === 'warning' ? tokens.light.status.amber.fg : tone === 'danger' ? tokens.light.status.red.fg : palette.primary;
+        const labelColor = tone === 'success' ? tokens.light.status.green.fg : tone === 'warning' ? tokens.light.status.amber.fg : tone === 'danger' ? tokens.light.status.red.fg : tokens.light.accentStrong;
         return (
           <Card key={item.label} mode="contained" style={[styles.metric, { backgroundColor, flexBasis: minItemWidth, minWidth: minItemWidth }]}>
             <Card.Content style={styles.metricContent}>
-              <Text variant="labelSmall" style={styles.muted}>{item.label}</Text>
+              <Text variant="labelSmall" style={{ color: labelColor }}>{item.label}</Text>
               <Text variant="titleLarge" style={{ color, fontWeight: '800' }}>{item.value}</Text>
             </Card.Content>
           </Card>
@@ -155,7 +158,7 @@ export function DataRow({
 
 export function InfoNote({ title, children, tone = 'info' }: { title: string; children: ReactNode; tone?: 'info' | 'warning' | 'success' }) {
   const backgroundColor = tone === 'warning' ? palette.warningSoft : tone === 'success' ? palette.successSoft : palette.infoSoft;
-  const color = tone === 'warning' ? '#9A3412' : tone === 'success' ? '#047857' : palette.info;
+  const color = tone === 'warning' ? tokens.light.status.amber.fg : tone === 'success' ? tokens.light.status.green.fg : palette.info;
   return (
     <View style={[styles.note, { backgroundColor }]}>
       <Text variant="labelLarge" style={{ color, fontWeight: '700' }}>{title}</Text>
@@ -280,5 +283,5 @@ export const styles = StyleSheet.create({
   linkCard: { borderRadius: 12, backgroundColor: palette.surface },
   gap8: { gap: 8 },
   loading: { paddingVertical: 56, alignItems: 'center', gap: 12 },
-  errorCard: { borderColor: '#FCA5A5', backgroundColor: palette.dangerSoft },
+  errorCard: { borderColor: palette.danger, backgroundColor: palette.dangerSoft },
 });

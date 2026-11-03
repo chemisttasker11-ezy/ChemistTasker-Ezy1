@@ -2,13 +2,13 @@
   "expo": {
     "name": "ChemistTasker",
     "slug": "chemisttasker",
-    "version": "1.0.11",
+    "version": "1.1.0",
     "orientation": "default",
     "icon": "./assets/images/ChatGPT Image Jan 18, 2026, 08_14_43 PM.png",
     "scheme": "frontendmobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "runtimeVersion": "1.0.11",
+    "runtimeVersion": "1.1.0",
     "updates": {
       "url": "https://u.expo.dev/75fa2fa5-e9ed-47af-a012-86967b951c5b",
       "checkAutomatically": "ON_LOAD",
@@ -72,6 +72,18 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "node_modules/@expo-google-fonts/outfit/500Medium/Outfit_500Medium.ttf",
+            "node_modules/@expo-google-fonts/outfit/600SemiBold/Outfit_600SemiBold.ttf",
+            "node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf",
+            "node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf",
+            "node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf"
+          ]
+        }
+      ],
       [
         "expo-camera",
         {
