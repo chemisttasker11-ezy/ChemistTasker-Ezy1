@@ -31,3 +31,5 @@ FROM nginx:1.30.6-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6
 
 COPY --from=build /workspace/frontend_web/dist /usr/share/nginx/html
 COPY frontend_web/nginx-spa.conf /etc/nginx/conf.d/default.conf
+
+COPY --chmod=755 frontend_web/40-retain-assets.sh /docker-entrypoint.d/40-retain-assets.sh

@@ -234,6 +234,10 @@ services:
         VITE_Maps_API_KEY: "${VITE_Maps_API_KEY:?VITE_Maps_API_KEY is required}"
         VITE_RECAPTCHA_SITE_KEY: "${VITE_RECAPTCHA_SITE_KEY:?VITE_RECAPTCHA_SITE_KEY is required}"
     container_name: chemisttasker_frontend_staging
+    environment:
+      STAGING_ALLOW_EMPTY_FRONTEND_ARCHIVE: "${STAGING_ALLOW_EMPTY_FRONTEND_ARCHIVE:-0}"
+    volumes:
+      - staging_frontend_assets:/var/cache/chemisttasker-assets
     logging: *default-logging
     restart: unless-stopped
     networks:
@@ -314,6 +318,7 @@ volumes:
   staging_postgres_data:
   staging_redis_data:
   staging_static_data:
+  staging_frontend_assets:
   staging_media_data:
   staging_verification_data:
 
