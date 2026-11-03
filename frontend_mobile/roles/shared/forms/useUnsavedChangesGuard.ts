@@ -49,7 +49,7 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
     message = defaultMessage,
     onDiscard,
     onSave,
-    saveLabel = 'Save Changes',
+    saveLabel = 'Save changes',
   } = options;
   const navigation = useNavigation();
   const isFocused = useIsFocused();
