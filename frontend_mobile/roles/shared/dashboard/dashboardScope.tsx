@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Divider, Icon, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
 import { usePathname, useRouter } from 'expo-router';
@@ -114,6 +114,23 @@ export function dashboardEndpointForRole(role?: string | null) {
   return null;
 }
 
+type DashboardRequest = { scopeKey: string; generation: number };
+
+export function isCurrentDashboardRequest(request: DashboardRequest, current: DashboardRequest) {
+  return request.scopeKey === current.scopeKey && request.generation === current.generation;
+}
+
+export function singlePharmacyDefault(
+  pharmacies: PharmacyOption[],
+  selectedPharmacyId: number | null,
+  workspace: string,
+  isOrganizationDashboard: boolean,
+) {
+  return workspace === 'internal' && !isOrganizationDashboard && selectedPharmacyId == null && pharmacies.length === 1
+    ? pharmacies[0]
+    : null;
+}
+
 export function useScopedDashboard(roleOverride?: string | null) {
   const { user } = useAuth();
   const {
@@ -130,17 +147,24 @@ export function useScopedDashboard(roleOverride?: string | null) {
   const isOrganizationDashboard = ORG_ROLES.has(String(role || '').toUpperCase());
   const scopedWorkspace = isOrganizationDashboard ? 'internal' : workspace;
   const organizationId = getOrganizationMembership(user)?.organization_id;
+  const scopeKey = `${user?.id}:${role}:${organizationId}:${scopedWorkspace}:${selectedPharmacyId}:${workspaceLoading}`;
+  const dashboardRequest = useRef<DashboardRequest>({ scopeKey, generation: 0 });
+  // The shell picker uses another hook instance; invalidate on render, before any new load/effect runs.
+  if (dashboardRequest.current.scopeKey !== scopeKey) {
+    dashboardRequest.current = { scopeKey, generation: dashboardRequest.current.generation + 1 };
+  }
+  useEffect(() => () => { dashboardRequest.current.generation += 1; }, []);
   const [organizationPharmacies, setOrganizationPharmacies] = useState<PharmacyOption[]>([]);
   useEffect(() => {
     if (!organizationId) {
-      setOrganizationPharmacies([]);
+      setOrganizationPharmacies((previous) => (previous.length ? [] : previous));
       return;
     }
     let active = true;
-    setOrganizationPharmacies([]);
+    setOrganizationPharmacies((previous) => (previous.length ? [] : previous));
     fetchAccessibleOrganizationPharmacies(organizationId)
-      .then((items) => { if (active) setOrganizationPharmacies(items); })
-      .catch(() => { if (active) setOrganizationPharmacies([]); });
+      .then((items) => { if (active) setOrganizationPharmacies((previous) => (!previous.length && !items.length ? previous : items)); })
+      .catch(() => { if (active) setOrganizationPharmacies((previous) => (previous.length ? [] : previous)); });
     return () => { active = false; };
   }, [organizationId]);
   const pharmacies = useMemo(() => {
@@ -152,6 +176,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
 
   const selectPlatform = useCallback(() => {
     if (!canSelectPlatform) return;
+    dashboardRequest.current.generation += 1;
     setWorkspace('platform');
     setSelectedPharmacyId(null);
     setSelectedPharmacyName(null);
@@ -159,6 +184,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
 
   const selectPharmacy = useCallback(
     (pharmacy: PharmacyOption) => {
+      dashboardRequest.current.generation += 1;
       setWorkspace('internal');
       setSelectedPharmacyId(pharmacy.id);
       setSelectedPharmacyName(pharmacy.name);
@@ -166,6 +192,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
     [setSelectedPharmacyId, setSelectedPharmacyName, setWorkspace]
   );
   const selectAllOrganizationPharmacies = useCallback(() => {
+    dashboardRequest.current.generation += 1;
     setWorkspace('internal');
     setSelectedPharmacyId(null);
     setSelectedPharmacyName(null);
@@ -175,6 +202,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
     if (workspaceLoading) return null;
     const endpoint = isOrganizationDashboard ? null : dashboardEndpointForRole(role);
     if (!isOrganizationDashboard && !endpoint) return null;
+    const request = { scopeKey, generation: ++dashboardRequest.current.generation };
     const params =
       scopedWorkspace === 'platform'
         ? { workspace: 'platform' }
@@ -194,14 +222,16 @@ export function useScopedDashboard(roleOverride?: string | null) {
           : normalizedRole === 'PHARMACIST'
             ? await getPharmacistDashboard(params)
             : await getOtherStaffDashboard(params)) as DashboardPayload;
-      const selected = payload?.selected_pharmacy;
-      if (selected?.id != null) {
+      const selected = payload?.selected_pharmacy?.id != null
+        ? payload.selected_pharmacy
+        : singlePharmacyDefault(pharmacies, selectedPharmacyId, scopedWorkspace, isOrganizationDashboard);
+      if (selected?.id != null && isCurrentDashboardRequest(request, dashboardRequest.current)) {
         setSelectedPharmacyId(Number(selected.id));
         setSelectedPharmacyName(selected?.name ?? selectedPharmacyName ?? null);
       }
       return payload as DashboardPayload;
     } catch (error: any) {
-      if ((error?.response?.status ?? error?.status) === 403) {
+      if ((error?.response?.status ?? error?.status) === 403 && isCurrentDashboardRequest(request, dashboardRequest.current)) {
         const firstPharmacy = pharmacies[0];
         if (firstPharmacy && scopedWorkspace === 'internal') {
           selectPharmacy(firstPharmacy);
@@ -224,6 +254,7 @@ export function useScopedDashboard(roleOverride?: string | null) {
     setSelectedPharmacyId,
     setSelectedPharmacyName,
     scopedWorkspace,
+    scopeKey,
     workspaceLoading,
   ]);
 
@@ -356,24 +387,31 @@ export function DashboardPersonaSwitcher(_props: { role?: string | null }) {
   );
 }
 
+/** The mobile route for a dashboard activity link (web /dashboard/<persona>/... paths), or null. */
+export function activityRoute(item: NonNullable<DashboardPayload['activity']>[number], persona?: string) {
+  const raw = item.actionUrl || item.action_url;
+  if (!raw) return null;
+  const path = raw.replace(/^https?:\/\/[^/]+/i, '');
+  const hubMatch = path.match(/^\/dashboard\/pharmacy-hub\/?([?#].*)?$/);
+  if (hubMatch) return persona ? `/${persona}/hub${hubMatch[1] || ''}` : null;
+  const adminMatch = path.match(/^\/dashboard\/admin\/[^/?#]+(\/[^?#]*)?([?#].*)?$/);
+  if (adminMatch) return `/admin${adminMatch[1] || ''}${adminMatch[2] || ''}`;
+  const roleMatch = path.match(/^\/dashboard\/(owner|organization|pharmacist|otherstaff|explorer)(?=\/|[?#]|$)/);
+  if (roleMatch) {
+    const role = persona === 'admin' && roleMatch[1] === 'owner' ? 'admin' : roleMatch[1];
+    return path.replace(roleMatch[0], `/${role}`);
+  }
+  return path.startsWith('/') ? path : null;
+}
+
 export function DashboardActivity({ data }: { data: DashboardPayload | null }) {
   const router = useRouter();
+  const persona = usePathname().split('/')[1];
   const [visible, setVisible] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
   const activity = Array.isArray(data?.activity) ? data.activity : [];
   if (activity.length === 0) return null;
-  const resolveActivityRoute = (item: NonNullable<DashboardPayload['activity']>[number]) => {
-    const raw = item.actionUrl || item.action_url;
-    if (!raw) return null;
-    const path = raw.replace(/^https?:\/\/[^/]+/i, '');
-    const adminInvoiceMatch = path.match(/^\/dashboard\/admin\/[^/]+\/invoice(\/.*)?$/);
-    if (adminInvoiceMatch) return `/admin/invoice${adminInvoiceMatch[1] || ''}`;
-    if (path.startsWith('/dashboard/owner/')) return path.replace('/dashboard/owner', '/owner');
-    if (path.startsWith('/dashboard/organization/')) return path.replace('/dashboard/organization', '/organization');
-    if (path.startsWith('/dashboard/pharmacist/')) return path.replace('/dashboard/pharmacist', '/pharmacist');
-    if (path.startsWith('/dashboard/otherstaff/')) return path.replace('/dashboard/otherstaff', '/otherstaff');
-    return path.startsWith('/') ? path : null;
-  };
+  const resolveActivityRoute = (item: NonNullable<DashboardPayload['activity']>[number]) => activityRoute(item, persona);
   const renderActivityItem = (item: NonNullable<DashboardPayload['activity']>[number], index: number) => (
     <View key={`${item.title ?? item.message ?? 'activity'}-${index}`}>
       <TouchableOpacity

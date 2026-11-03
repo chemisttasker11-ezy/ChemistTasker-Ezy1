@@ -28,6 +28,7 @@ import {
   updateOrganizationMembership,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
+import { orgCapabilities } from '@/roles/shared/dashboard/ManagerHome';
 import { surfaceTokens } from '@/roles/shared/pharmacies/types';
 
 type RoleDefinition = {
@@ -141,7 +142,7 @@ export default function OrganizationInviteScreen() {
     () => new Set<string>(Array.isArray(orgMembership?.capabilities) ? orgMembership.capabilities : []),
     [orgMembership]
   );
-  const canInvite = inviterCapabilities.has('invite_staff') || String(user?.role || '').toUpperCase() === 'ORGANIZATION';
+  const canInvite = orgCapabilities(user).invite;
 
   const eligibleRoles = useMemo(
     () =>
@@ -295,6 +296,7 @@ export default function OrganizationInviteScreen() {
   };
 
   const handleInvite = async () => {
+    if (!canInvite) return;
     const validation = validateInvite();
     if (validation) {
       setError(validation);
@@ -498,7 +500,7 @@ export default function OrganizationInviteScreen() {
             {warning ? <HelperText type="info">{warning}</HelperText> : null}
             {error ? <HelperText type="error">{error}</HelperText> : null}
 
-            <Card style={styles.card}>
+            {canInvite ? <Card style={styles.card}>
               <TouchableOpacity style={styles.cardTitleRow} onPress={() => setFormOpen((open) => !open)}>
                 <Text variant="titleMedium" style={styles.cardTitle}>Invite Organization Member</Text>
                 <IconButton icon={formOpen ? 'chevron-up' : 'chevron-down'} size={22} />
@@ -597,7 +599,7 @@ export default function OrganizationInviteScreen() {
                   )}
                 </Card.Content>
               ) : null}
-            </Card>
+            </Card> : null}
 
             <View style={styles.memberListHeader}>
               <Text variant="titleMedium" style={styles.cardTitle}>Organization Members</Text>

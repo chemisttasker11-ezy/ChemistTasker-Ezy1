@@ -2,15 +2,24 @@ import React, { useCallback, useEffect, useMemo } from 'react';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
+  CalendarCheck,
   CalendarClock,
   CalendarDays,
   ClipboardCheck,
+  Clock,
+  Gift,
+  HardHat,
+  Landmark,
   LayoutDashboard,
   MessageSquare,
   Pill,
   Plus,
+  ReceiptText,
   Search,
+  ShieldCheck,
+  ShoppingBag,
   Store,
+  UserCheck,
   UserPlus,
   UserRound,
   Users,
@@ -24,6 +33,7 @@ import {
   resolveShiftNotificationRoute,
 } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { orgCapabilities } from '@/roles/shared/dashboard/ManagerHome';
 import { useGuardedNavigation, useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
 import { type MoreGroup, type MoreItem, PersonaShell, type ShellTab } from '@/components/shell';
 
@@ -53,36 +63,6 @@ const titles: Record<string, string> = {
   chat: 'Chat',
   more: 'More',
 };
-
-const more: MoreGroup[] = [
-  {
-    title: 'Workspace',
-    tone: 'violet',
-    items: [
-      { label: 'Pharmacy Hub', icon: Users, route: '/organization/hub' },
-      { label: 'Calendar', icon: CalendarDays, route: '/organization/calendar' },
-    ],
-  },
-  {
-    title: 'Shifts & finance',
-    tone: 'blue',
-    items: [
-      { label: 'Timesheets', icon: ClipboardCheck, route: '/workforce-timesheets' },
-      { label: 'Pills', icon: Pill, route: '/organization/pills' },
-    ],
-  },
-  {
-    title: 'Pharmacy operations',
-    tone: 'cyan',
-    items: [
-      { label: 'Pharmacies', icon: Store, route: '/organization/pharmacies' },
-      { label: 'Invite staff', icon: UserPlus, route: '/organization/invite' },
-      { label: 'Workforce & Payroll', icon: Wallet, route: '/workforce-settings' },
-    ],
-  },
-  { title: 'Discover', tone: 'magenta', items: [{ label: 'Talent Hub', icon: Search, route: '/organization/talent-board' }] },
-  { title: 'Work & platform tools', tone: 'blue', tools: true },
-];
 
 const account: MoreItem[] = [{ label: 'Profile', icon: UserRound, route: '/organization/profile' }];
 
@@ -212,14 +192,67 @@ export default function OrganizationLayout() {
     }
   }, [backTarget, goBackWithGuard, isPharmacyDetail, pushWithGuard]);
 
+  // Web's organization nav guards decide which tabs and More rows show; the backend still enforces each screen.
+  const can = useMemo(() => orgCapabilities(user), [user]);
+
+  // Pharmacy admins post the shifts, so the hero is Pharmacies (owner decision D7); Post shift sits in More.
   const tabs = useMemo<ShellTab[]>(
+    () =>
+      [
+        { name: 'dashboard', label: 'Home', icon: LayoutDashboard, match: ['index'], accessibilityLabel: 'Home tab', onPress: () => replaceWithGuard('/organization/dashboard') },
+        can.roster && { name: 'shifts/index', label: 'Shifts', icon: CalendarClock, accessibilityLabel: 'Shifts tab', onPress: () => replaceWithGuard('/organization/shifts') },
+        can.pharmacies && { name: 'pharmacies/index', label: 'Pharmacies', icon: Store, hero: true, accessibilityLabel: 'Pharmacies tab', onPress: () => replaceWithGuard('/organization/pharmacies') },
+        can.comms && { name: 'chat', label: 'Chat', icon: MessageSquare, match: ['messages/'], accessibilityLabel: 'Chat tab', onPress: () => replaceWithGuard('/organization/chat') },
+      ].filter(Boolean) as ShellTab[],
+    [can, replaceWithGuard]
+  );
+
+  const more = useMemo<MoreGroup[]>(
     () => [
-      { name: 'dashboard', label: 'Home', icon: LayoutDashboard, match: ['index'], accessibilityLabel: 'Home tab', onPress: () => replaceWithGuard('/organization/dashboard') },
-      { name: 'shifts/index', label: 'Shifts', icon: CalendarClock, accessibilityLabel: 'Shifts tab', onPress: () => replaceWithGuard('/organization/shifts') },
-      { name: 'post-shift', label: 'Post shift', icon: Plus, hero: true, accessibilityLabel: 'Post a shift', onPress: () => replaceWithGuard('/organization/post-shift') },
-      { name: 'chat', label: 'Chat', icon: MessageSquare, match: ['messages/'], accessibilityLabel: 'Chat tab', onPress: () => replaceWithGuard('/organization/chat') },
+      {
+        title: 'This week',
+        tone: 'violet',
+        items: [
+          { label: 'Post shift', icon: Plus, route: '/organization/post-shift', hidden: !can.roster },
+          { label: 'Roster', icon: CalendarCheck, route: '/manager/roster', hidden: !can.rosterScreen },
+          { label: 'Timesheets', icon: ClipboardCheck, route: '/workforce-timesheets', hidden: !can.roster },
+          { label: 'Attendance approvals', icon: UserCheck, route: '/attendance/reviews', hidden: !can.attendance },
+          // Mobile-only clock and kiosk keep their earlier tools guard (roster rights) as well as web's attendance guard.
+          { label: 'Clock & kiosk', icon: Clock, route: '/attendance', hidden: !(can.attendance || can.roster) },
+          { label: 'Calendar', icon: CalendarDays, route: '/organization/calendar', hidden: !can.comms },
+        ],
+      },
+      {
+        title: 'Pharmacies & people',
+        tone: 'cyan',
+        items: [
+          { label: 'Invite staff', icon: UserPlus, route: '/organization/invite', hidden: !can.invite },
+          { label: 'Workforce & Payroll', icon: Wallet, route: '/workforce-settings', hidden: !can.staff },
+          { label: 'Employment terms', icon: HardHat, route: '/workforce/employment-engagements', hidden: !(can.staff || can.roster) },
+          { label: 'Pharmacy Hub', icon: Users, route: '/organization/hub', hidden: !can.comms },
+        ],
+      },
+      {
+        title: 'Money',
+        tone: 'magenta',
+        items: [
+          { label: 'Invoices', icon: ReceiptText, route: '/organization/invoice' },
+          { label: 'Finance & BAS', icon: Landmark, route: '/finance' },
+          { label: 'Pills', icon: Pill, route: '/organization/pills' },
+          { label: 'Pill rewards', icon: Gift, route: '/rewards/pills' },
+        ],
+      },
+      {
+        title: 'Discover',
+        tone: 'blue',
+        items: [
+          { label: 'Talent Hub', icon: Search, route: '/organization/talent-board' },
+          { label: 'Marketplace', icon: ShoppingBag, route: '/marketplace' },
+          { label: 'Ethical Marketplace', icon: ShieldCheck, route: '/marketplace/ethical/access' },
+        ],
+      },
     ],
-    [replaceWithGuard]
+    [can]
   );
 
   return (

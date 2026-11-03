@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import {
   ArrowLeftRight,
+  CalendarCheck,
   CalendarClock,
   CalendarDays,
   ClipboardCheck,
@@ -12,6 +13,7 @@ import {
   Pill,
   Plus,
   Store,
+  UserCheck,
   UserRound,
   Users,
   Wallet,
@@ -66,9 +68,11 @@ function AdminLayoutInner() {
   const { activePharmacyId: pharmacyId, isLoading: adminWorkspaceLoading } = useAdminWorkspace();
   const { roleLabel, openRoleWorkspace } = usePersonaSwitch(user?.role);
 
-  const canManageCommunications = Boolean(
-    pharmacyId && hasCapability('MANAGE_COMMUNICATIONS', pharmacyId),
-  );
+  // Web getAdminNav guards for the active pharmacy; the backend still enforces each screen.
+  const canManageStaff = Boolean(pharmacyId && hasCapability('MANAGE_STAFF', pharmacyId));
+  const canManageRoster = Boolean(pharmacyId && hasCapability('MANAGE_ROSTER', pharmacyId));
+  const canManageCommunications =
+    canManageStaff || canManageRoster || Boolean(pharmacyId && hasCapability('MANAGE_COMMUNICATIONS', pharmacyId));
 
   const adminPath = useCallback((route: string) => {
     if (route === '/admin/post-shift' && pharmacyId) return `/admin/${pharmacyId}/post-shift`;
@@ -101,52 +105,51 @@ function AdminLayoutInner() {
     });
   }, [guarded, pathname, router]);
 
+  // Shift Centre and Post shift need MANAGE_ROSTER, as on web; without it the bar is Home, Chat, More.
   const tabs = useMemo<ShellTab[]>(
-    () => [
-      { name: 'index', label: 'Home', icon: LayoutDashboard, accessibilityLabel: 'Home tab' },
-      { name: 'shifts/index', label: 'Shifts', icon: CalendarClock, accessibilityLabel: 'Shifts tab' },
-      {
-        name: 'post-shift',
-        label: 'Post shift',
-        icon: Plus,
-        hero: true,
-        match: ['[pharmacyId]/post-shift'],
-        accessibilityLabel: 'Post a shift',
-        onPress: () => navigateAdmin('/admin/post-shift'),
-      },
-      { name: 'chat', label: 'Chat', icon: MessageSquare, match: ['messages/'], accessibilityLabel: 'Chat tab' },
-    ],
-    [navigateAdmin]
+    () =>
+      [
+        { name: 'index', label: 'Home', icon: LayoutDashboard, accessibilityLabel: 'Home tab' },
+        canManageRoster && { name: 'shifts/index', label: 'Shifts', icon: CalendarClock, accessibilityLabel: 'Shifts tab' },
+        canManageRoster && {
+          name: 'post-shift',
+          label: 'Post shift',
+          icon: Plus,
+          hero: true,
+          match: ['[pharmacyId]/post-shift'],
+          accessibilityLabel: 'Post a shift',
+          onPress: () => navigateAdmin('/admin/post-shift'),
+        },
+        { name: 'chat', label: 'Chat', icon: MessageSquare, match: ['messages/'], accessibilityLabel: 'Chat tab' },
+      ].filter(Boolean) as ShellTab[],
+    [canManageRoster, navigateAdmin]
   );
 
+  // Explicit rows, not the shared tools group: those read the role workspace and worker roles, not this admin pharmacy.
   const more = useMemo<MoreGroup[]>(
     () => [
       {
-        title: 'Workspace',
+        title: 'This week',
         tone: 'violet',
         items: [
-          { label: 'Pharmacy Hub', icon: Users, route: '/admin/hub', hidden: !canManageCommunications },
+          { label: 'Attendance approvals', icon: UserCheck, route: '/attendance/reviews', hidden: !(canManageStaff && canManageRoster) },
+          { label: 'Roster', icon: CalendarCheck, route: '/manager/roster', hidden: !(canManageStaff && canManageRoster) },
+          { label: 'Timesheets', icon: ClipboardCheck, route: '/workforce-timesheets', hidden: !canManageRoster },
           { label: 'Calendar', icon: CalendarDays, route: '/admin/calendar', hidden: !canManageCommunications },
         ],
       },
       {
-        title: 'Shifts & finance',
-        tone: 'blue',
-        items: [
-          { label: 'Timesheets', icon: ClipboardCheck, route: '/workforce-timesheets' },
-          { label: 'Pills', icon: Pill, route: '/admin/pills' },
-        ],
-      },
-      {
-        title: 'Pharmacy operations',
+        title: 'Pharmacy',
         tone: 'cyan',
         items: [
-          { label: 'Pharmacies', icon: Store, route: '/admin/pharmacies' },
-          { label: 'Workforce & Payroll', icon: Wallet, route: '/workforce-settings' },
+          { label: 'Pharmacies', icon: Store, route: '/admin/pharmacies', hidden: !canManageStaff },
+          { label: 'Workforce & Payroll', icon: Wallet, route: '/workforce-settings', hidden: !canManageStaff },
+          { label: 'Pharmacy Hub', icon: Users, route: '/admin/hub', hidden: !canManageCommunications },
         ],
       },
+      { title: 'Money', tone: 'magenta', items: [{ label: 'Pills', icon: Pill, route: '/admin/pills' }] },
     ],
-    [canManageCommunications]
+    [canManageCommunications, canManageRoster, canManageStaff]
   );
 
   const profileRoute = profileRouteForRole(user?.role);

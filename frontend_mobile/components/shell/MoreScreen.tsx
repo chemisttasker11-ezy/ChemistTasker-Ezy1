@@ -1,4 +1,4 @@
-import React, { Fragment, useState } from 'react';
+import React, { Fragment, type ReactNode, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -75,8 +75,11 @@ function Rows({ items, tone, onItem }: { items: MoreItem[]; tone: Tone; onItem: 
   );
 }
 
-/** The More tab: every route the persona reaches outside the tab bar, by how often a phone user needs it. */
-export function MoreScreen() {
+/**
+ * The More tab: every route the persona reaches outside the tab bar, by how often a phone user needs it.
+ * `children` render after the groups, above Account (e.g. the manager activity feed).
+ */
+export function MoreScreen({ children }: { children?: ReactNode }) {
   const shell = useShell();
   const tools = usePlatformTools();
   const router = useRouter();
@@ -114,6 +117,7 @@ export function MoreScreen() {
           <Rows items={group.items} tone={group.tone} onItem={open} />
         </SectionCard>
       ))}
+      {children}
       <SectionCard title="Account" flush dense>
         <Rows items={account} tone="violet" onItem={open} />
         {account.length ? <View style={styles.divider} /> : null}

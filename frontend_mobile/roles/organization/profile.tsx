@@ -22,6 +22,7 @@ import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { deleteAccount } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
+import { orgCapabilities } from '@/roles/shared/dashboard/ManagerHome';
 import apiClient from '@/utils/apiClient';
 
 const webBaseUrl = 'https://www.chemisttasker.com.au';
@@ -42,6 +43,7 @@ const getOrganizationName = (user: any) => {
 export default function OrganizationProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const can = orgCapabilities(user);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteText, setDeleteText] = useState('');
@@ -105,20 +107,23 @@ export default function OrganizationProfileScreen() {
       description: 'Manage organization members, roles, and pharmacy access',
       icon: 'account-plus-outline',
       route: '/organization/invite',
+      visible: can.invite,
     },
     {
       title: 'Manage Pharmacies',
       description: 'Open organization pharmacies and store-level teams',
       icon: 'store-outline',
       route: '/organization/pharmacies',
+      visible: can.pharmacies,
     },
     {
       title: 'Pill Rewards',
       description: `${pillSummary.balance} pills available`,
       icon: 'pill',
       route: '/organization/pills',
+      visible: true,
     },
-  ];
+  ].filter((item) => item.visible);
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>

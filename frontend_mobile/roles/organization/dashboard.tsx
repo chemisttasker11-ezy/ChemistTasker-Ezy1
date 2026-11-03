@@ -1,356 +1,359 @@
-import { fetchPillBalanceService } from '@chemisttasker/shared-core';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Dimensions, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Chip, Divider, IconButton, Surface, Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
-import apiClient from '@/utils/apiClient';
-import getShiftPharmacyName from '@/roles/shared/shifts/utils/getShiftPharmacyName';
-import HomeNavigationGrid from '@/components/HomeNavigationGrid';
-import ParityToolsCard from '@/components/ParityToolsCard';
+import { CalendarDays, ClipboardCheck, Inbox, MailOpen, MessageSquare, Plus, Store, UserCheck, UserPlus, UserRound, Users } from 'lucide-react-native';
 import {
-  DashboardActivity,
-  DashboardErrorState,
-  DashboardLoadingState,
-  DashboardPersonaSwitcher,
-  DashboardStatsOverview,
-  useScopedDashboard,
-} from '@/roles/shared/dashboard/dashboardScope';
+  fetchShiftCounterOffersBatchService,
+  fetchShiftInterests,
+  getOrganizationMembership,
+  getOrganizationMemberships,
+  getPendingPharmacyAdminInvitations,
+  shiftsDomain,
+} from '@chemisttasker/shared-core';
+import { ContentState, SectionCard, ViewAllLink } from '@/components/ui';
+import { useAuth } from '@/context/AuthContext';
+import { useScopedDashboard } from '@/roles/shared/dashboard/dashboardScope';
+import {
+  BlockLoading,
+  BlockNote,
+  attendanceStep,
+  FAILED_INBOX,
+  HomeScroll,
+  INBOX_PHARMACY_LIMIT,
+  ItemRow,
+  loadManagerInbox,
+  type ManagerInbox,
+  namesLine,
+  type NextStep,
+  NextStepCard,
+  orgCapabilities,
+  PersonRow,
+  QueueNote,
+  Rows,
+  timesheetStep,
+} from '@/roles/shared/dashboard/ManagerHome';
+import {
+  applicantCount,
+  organizationStep,
+  type StepKey,
+  formatDay,
+  type Occurrence,
+  openSlots,
+  pharmacyGaps,
+  personName,
+  plural,
+  roleWord,
+  type ShiftLike,
+  timeRange,
+} from '@/roles/shared/dashboard/managerHomeLogic';
 
-const { width } = Dimensions.get('window');
-
-type ShiftSummary = {
-  id: number;
-  pharmacyName: string;
-  date: string;
-  status?: string;
-  role?: string;
+type Invitation = { id: number; pharmacy_name?: string };
+type Member = { id: number; role?: string; user?: { first_name?: string; last_name?: string; email?: string; profile_photo_url?: string | null; profile_photo?: string | null } };
+type HomeData = {
+  scopeKey: string;
+  invitations: Invitation[];
+  shifts: ShiftLike[] | null;
+  applicants: Array<{ at: Occurrence; count: number }>;
+  queuesFailed: boolean;
+  inbox: ManagerInbox;
+  members: Member[] | null;
+  memberCount: number;
 };
 
-type PillSummary = {
-  balance: number;
-  shift_post_cost: number;
-};
+const valueOf = <T,>(result: PromiseSettledResult<T>): T | null => (result.status === 'fulfilled' ? result.value : null);
+const asList = <T,>(value: unknown): T[] =>
+  Array.isArray(value) ? value : Array.isArray((value as any)?.results) ? (value as any).results : [];
+const GAP_ROWS = 5;
+const TEAM_ROWS = 4;
+const APPLICANT_SHIFTS = 5;
 
 export default function OrganizationDashboard() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const scope = useScopedDashboard('ORGANIZATION');
-  const [pillSummary, setPillSummary] = useState<PillSummary>({ balance: 0, shift_post_cost: 0 });
-  const [shifts, setShifts] = useState<ShiftSummary[]>([]);
-  const [dashboardData, setDashboardData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const can = useMemo(() => orgCapabilities(user), [user]);
+  const orgId = getOrganizationMembership(user)?.organization_id ?? null;
+  const pharmacyId = scope.selectedPharmacyId;
+  // Keyed by the ids: the org pharmacy list arrives after the user's own, and only a real change reloads Home.
+  const idsKey = scope.pharmacies.map((item) => item.id).join(',');
+  const pharmacyIds = useMemo(() => (idsKey ? idsKey.split(',').map(Number) : []), [idsKey]);
+  const scopeKey = `${orgId}:${pharmacyId}:${idsKey}:${can.roster}:${can.attendance}`;
+  const [snapshot, setData] = useState<HomeData | null>(null);
+  const data = !scope.isLoading && snapshot?.scopeKey === scopeKey ? snapshot : null;
+  const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
+  const generation = useRef(0);
+  const go = useCallback((route: string) => router.push(route as any), [router]);
+  const { fetchDashboard, isLoading: scopeLoading } = scope;
 
-  const loadData = useCallback(async () => {
-    if (scope.isLoading) return;
-    setRefreshing(true);
-    try {
-      const [dashboardPayload, pillRes] = await Promise.all([
-        scope.fetchDashboard(),
-        fetchPillBalanceService().catch(() => null),
+  const load = useCallback(async () => {
+    if (scopeLoading) return;
+    const id = ++generation.current;
+    const at = new Date();
+    const [invitations, dashboard, inbox, members] = await Promise.allSettled([
+      getPendingPharmacyAdminInvitations(),
+      fetchDashboard(),
+      loadManagerInbox(pharmacyId != null ? [pharmacyId] : pharmacyIds, { attendance: can.attendance, timesheets: can.roster }),
+      orgId != null ? getOrganizationMemberships({ organization: orgId, limit: TEAM_ROWS + 1 }) : Promise.resolve(null),
+    ]);
+    const payload = valueOf(dashboard) as { shifts?: unknown[] } | null;
+    const shifts = payload ? asList<any>(payload.shifts).map((shift) => shiftsDomain.mapShift(shift) as ShiftLike) : null;
+    const soonest = shifts && can.roster
+      ? [...new Map(openSlots(shifts, at).map((row) => [row.shiftId, row])).values()].slice(0, APPLICANT_SHIFTS)
+      : [];
+    let applicants: HomeData['applicants'] = [];
+    let applicantsFailed = can.roster && dashboard.status === 'rejected';
+    if (soonest.length) {
+      const ids = soonest.map((row) => row.shiftId);
+      const [interests, counters] = await Promise.allSettled([
+        Promise.allSettled(ids.map((shiftId) => fetchShiftInterests({ shiftId }))),
+        fetchShiftCounterOffersBatchService(ids),
       ]);
-
-      const list: any[] = Array.isArray(dashboardPayload?.shifts) ? dashboardPayload.shifts : [];
-      setDashboardData(dashboardPayload);
-      setErrorMessage(null);
-
-      setShifts(
-        list.slice(0, 5).map((shift: any) => ({
-          id: shift.id,
-          pharmacyName: getShiftPharmacyName(shift),
-          date: shift.date || shift.start_time || shift.start || '',
-          status: shift.status,
-          role: shift.role_needed || shift.role || 'Staff',
-        }))
-      );
-
-      if (pillRes) {
-        setPillSummary({
-          balance: Number(pillRes?.balance ?? 0),
-          shift_post_cost: Number(pillRes?.shift_post_cost ?? 0),
-        });
-      }
-    } catch (err: any) {
-      console.error('Unable to load organization dashboard', err);
-      setDashboardData(null);
-      setShifts([]);
-      setErrorMessage(
-        err?.response?.status === 403
-          ? 'You no longer have access to that pharmacy scope. The dashboard scope has been reset.'
-          : err?.response?.data?.detail || 'Unable to load dashboard analytics right now.'
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      const interestLists = valueOf(interests) ?? [];
+      applicantsFailed = counters.status === 'rejected' || interests.status === 'rejected' || interestLists.some((result) => result.status === 'rejected');
+      const counterMap = (valueOf(counters) ?? {}) as Record<number, Array<{ status?: string | null }>>;
+      applicants = soonest
+        .map((row, index) => ({ at: row, count: applicantCount(interestLists[index]?.status === 'fulfilled' ? interestLists[index].value : [], counterMap[row.shiftId] ?? []) }))
+        .filter((row) => row.count > 0);
     }
-  }, [scope.fetchDashboard, scope.isLoading]);
+    if (id !== generation.current) return;
+    const memberRows = valueOf(members);
+    setNow(at);
+    setFailed(dashboard.status === 'rejected' && invitations.status === 'rejected');
+    setData({
+      scopeKey,
+      invitations: asList<Invitation>(valueOf(invitations)),
+      shifts,
+      applicants,
+      queuesFailed: applicantsFailed,
+      inbox: valueOf(inbox) ?? FAILED_INBOX,
+      members: memberRows == null ? null : asList<Member>(memberRows),
+      memberCount: Number((memberRows as any)?.count ?? asList(memberRows).length),
+    });
+  }, [can.attendance, can.roster, fetchDashboard, orgId, pharmacyId, pharmacyIds, scopeLoading, scopeKey]);
 
   useEffect(() => {
-    if (scope.isLoading) return;
-    void loadData();
-  }, [loadData, scope.isLoading]);
+    void load();
+    return () => { generation.current += 1; };
+  }, [load]);
 
-  const quickActions = useMemo(
-    () => [
-      { title: 'Post Shift', description: 'Create coverage', icon: 'plus-circle-outline', route: '/organization/post-shift' },
-      { title: 'Invite Staff', description: 'Add members', icon: 'account-plus-outline', route: '/organization/invite' },
-      { title: 'Pharmacies', description: 'Manage stores', icon: 'store-outline', route: '/organization/pharmacies' },
-      { title: 'Shifts', description: 'Shift centre', icon: 'calendar-month-outline', route: '/organization/shifts' },
-      { title: 'Calendar', description: 'Schedule view', icon: 'calendar-outline', route: '/organization/calendar' },
-      { title: 'Hub', description: 'Community posts', icon: 'view-grid-outline', route: '/organization/hub' },
-      { title: 'Talent Hub', description: 'Find talent', icon: 'account-search-outline', route: '/organization/talent-board' },
-      { title: 'Messages', description: 'Open chat', icon: 'message-text-outline', route: '/organization/chat' },
-      { title: 'Shift Center', description: 'Manage shifts', icon: 'clipboard-text-clock-outline', route: '/organization/shifts' },
-      { title: 'Profile', description: 'Account details', icon: 'account-circle-outline', route: '/organization/profile' },
-      { title: 'Notifications', description: 'Alerts', icon: 'bell-outline', route: '/organization/notifications' },
-    ],
-    []
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
+
+  const open = useMemo(() => (data?.shifts ? openSlots(data.shifts, now) : []), [data?.shifts, now]);
+  const gaps = useMemo(() => {
+    const places = pharmacyId != null ? scope.pharmacies.filter((item) => item.id === pharmacyId) : scope.pharmacies;
+    return pharmacyGaps(places, open);
+  }, [open, pharmacyId, scope.pharmacies]);
+  const short = gaps.filter((row) => row.open > 0);
+  const shiftRoute = useCallback(
+    (shiftId: number) => (can.roster ? `/organization/shifts/${shiftId}` : '/organization/pharmacies'),
+    [can.roster],
   );
 
-  const formatShiftDate = (value?: string) => {
-    if (!value) return '';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString('en-GB', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
+  const step = useMemo<NextStep | null>(() => {
+    if (!data) return null;
+    const invite = data.invitations[0];
+    const gap = can.roster ? open[0] : null;
+    const applied = data.applicants[0];
+    const key = organizationStep({
+      invitations: Boolean(invite), applicants: Boolean(applied), gap: Boolean(gap),
+      attendance: Boolean(data.inbox.attendance?.count), timesheets: Boolean(data.inbox.timesheets?.count), can,
     });
-  };
+    const steps: Partial<Record<StepKey, () => NextStep | null>> = {
+      invitations: () => ({
+        key: 'invitations',
+        title: data.invitations.length > 1 ? `${data.invitations.length} admin invitations` : `${invite.pharmacy_name || 'A pharmacy'} invited you`,
+        body: data.invitations.length > 1 ? 'Pharmacies want you to help run them. Accept or decline each one.' : 'They want you as an admin. Accept or decline the invitation.',
+        action: 'Review invitations',
+        icon: <MailOpen />,
+        onPress: () => go('/admin-invitations'),
+      }),
+      applicants: () => ({
+        key: 'applicants',
+        title: `${plural(applied.count, 'applicant')} for ${formatDay(applied.at.start, now)}`,
+        body: `${applied.at.pharmacyName}, ${timeRange(applied.at.startTime, applied.at.endTime)}.`,
+        action: 'Review applicants',
+        icon: <UserCheck />,
+        onPress: () => go(`/organization/shifts/${applied.at.shiftId}`),
+      }),
+      gap: () => ({
+        key: 'gap',
+        title: `${gap!.pharmacyName} needs cover ${formatDay(gap!.start, now)}`,
+        body: `${[roleWord(gap!.role), timeRange(gap!.startTime, gap!.endTime)].filter(Boolean).join(', ')}. ${plural(open.length, 'open shift')} across your pharmacies.`,
+        action: 'Open shift',
+        icon: <CalendarDays />,
+        onPress: () => go(shiftRoute(gap!.shiftId)),
+      }),
+      attendance: () => attendanceStep(data.inbox.attendance, () => go('/attendance/reviews'), <Users />),
+      timesheets: () => timesheetStep(data.inbox.timesheets, () => go('/workforce-timesheets'), <ClipboardCheck />),
+      post: () => ({
+        key: 'post',
+        title: 'Post a shift for a pharmacy',
+        body: 'Pick the pharmacy, then choose who sees the shift first.',
+        action: 'Post a shift',
+        icon: <Plus />,
+        onPress: () => go('/organization/post-shift'),
+      }),
+      pharmacies: () => ({
+        key: 'pharmacies', title: 'Your pharmacies', body: 'Open a pharmacy to see its details and team.',
+        action: 'Open pharmacies', icon: <Store />, onPress: () => go('/organization/pharmacies'),
+      }),
+      invite: () => ({
+        key: 'invite', title: 'Bring your team together', body: 'Invite staff to your organization.',
+        action: 'Invite staff', icon: <UserPlus />, onPress: () => go('/organization/invite'),
+      }),
+      chat: () => ({
+        key: 'chat', title: 'Keep in touch with your team', body: 'Open your pharmacy conversations.',
+        action: 'Open chat', icon: <MessageSquare />, onPress: () => go('/organization/chat'),
+      }),
+      profile: () => ({
+        key: 'profile', title: 'Your organization workspace', body: 'Keep your contact details up to date.',
+        action: 'View profile', icon: <UserRound />, onPress: () => go('/organization/profile'),
+      }),
+    };
+    return steps[key]?.() ?? null;
+  }, [can, data, go, now, open, shiftRoute]);
 
-  if (loading) {
+  if (failed && data) {
     return (
-      <SafeAreaView style={styles.container} edges={['left', 'right']}>
-        <DashboardLoadingState label="Loading organization dashboard..." />
-      </SafeAreaView>
+      <HomeScroll refreshing={refreshing} onRefresh={refresh}>
+        <ContentState kind="error" title="Home could not load" description="Check your connection, then try again." onAction={refresh} />
+      </HomeScroll>
     );
   }
 
+  const loading = !data;
+  const inbox = data?.inbox;
+  const applicantTotal = data?.applicants.reduce((total, row) => total + row.count, 0) ?? 0;
+  const truncated = pharmacyId == null && pharmacyIds.length > INBOX_PHARMACY_LIMIT;
+  const showInbox = can.roster || can.attendance;
+
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right']}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadData} tintColor="#6366F1" />}
-        showsVerticalScrollIndicator={false}
+    <HomeScroll refreshing={refreshing} onRefresh={refresh}>
+      <NextStepCard step={step} loading={loading} />
+
+      {can.pharmacies || can.roster ? <SectionCard
+        title="Pharmacies needing cover"
+        icon={<Store />}
+        flush
+        action={can.pharmacies ? <ViewAllLink onPress={() => go('/organization/pharmacies')}>All</ViewAllLink> : undefined}
       >
-        <DashboardPersonaSwitcher role={user?.role} />
-        {errorMessage ? <DashboardErrorState message={errorMessage} onRetry={loadData} /> : null}
-        <TouchableOpacity
-          style={styles.pillHero}
-          onPress={() => router.push('/organization/pills' as any)}
-          activeOpacity={0.82}
-        >
-          <LinearGradient colors={['#267DB8', '#433894', '#9A087D']} locations={[0, 0.58, 1]} start={{ x: 0, y: 0.1 }} end={{ x: 1, y: 1 }} style={styles.pillHeroGradient}>
-            <View pointerEvents="none" style={styles.heroAngleOne} />
-            <View pointerEvents="none" style={styles.heroAngleTwo} />
-            <View style={styles.pillHeroCopy}>
-              <Text variant="labelMedium" style={styles.pillHeroEyebrow}>
-                Organization rewards
-              </Text>
-              <View style={styles.pillBalanceRow}>
-                <Text variant="displaySmall" style={styles.pillBalanceValue}>
-                  {pillSummary.balance}
-                </Text>
-                <Text variant="titleMedium" style={styles.pillBalanceLabel}>
-                  pills
-                </Text>
-              </View>
-              <Text variant="bodySmall" style={styles.pillHeroText}>
-                Use pills toward organization shift posting actions.
-              </Text>
-              <View style={styles.pillMetaRow}>
-                <Chip compact style={styles.pillMetaChip} textStyle={styles.pillMetaChipText}>
-                  {pillSummary.shift_post_cost} pills per shift post
-                </Chip>
-                <Chip compact style={styles.pillMetaChip} textStyle={styles.pillMetaChipText}>
-                  View activity
-                </Chip>
-              </View>
-            </View>
-            <Image source={require('@/assets/images/drugs.png')} style={styles.pillHeroImage} resizeMode="contain" />
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <DashboardStatsOverview data={dashboardData} />
-
-        <HomeNavigationGrid items={quickActions} onNavigate={(route) => router.push(route as any)} />
-
-        <ParityToolsCard />
-
-        <DashboardActivity data={dashboardData} />
-
-        {shifts.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                Active Shifts
-              </Text>
-              <TouchableOpacity onPress={() => router.push('/organization/shifts' as any)}>
-                <Text style={styles.seeAllText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            {shifts.slice(0, 3).map((shift) => (
-              <Surface key={shift.id} style={styles.shiftPreviewCard}>
-                <View style={styles.shiftPreviewContent}>
-                  <View style={styles.shiftPreviewLeft}>
-                    <View style={styles.shiftIconContainer}>
-                      <IconButton icon="calendar-clock" size={20} iconColor="#6366F1" />
-                    </View>
-                    <View style={styles.shiftTextColumn}>
-                      <Text variant="labelMedium" style={styles.shiftPharmacyName} numberOfLines={1}>
-                        {shift.pharmacyName}
-                      </Text>
-                      <Text variant="bodySmall" style={styles.shiftRole} numberOfLines={1}>
-                        {shift.role || 'Staff'}
-                        {formatShiftDate(shift.date) ? ` - ${formatShiftDate(shift.date)}` : ''}
-                      </Text>
-                    </View>
-                  </View>
-                  <Chip compact style={styles.shiftStatusChip}>
-                    {shift.status || 'Pending'}
-                  </Chip>
-                </View>
-              </Surface>
+        {loading ? (
+          <BlockLoading />
+        ) : data?.shifts == null ? (
+          <BlockNote text="Shifts could not load." action="Try again" onAction={refresh} />
+        ) : short.length === 0 ? (
+          <BlockNote
+            text={gaps.length ? 'Every pharmacy is covered for its posted shifts.' : 'No pharmacies in your scope yet.'}
+            action={can.roster ? 'Post a shift' : undefined}
+            onAction={() => go('/organization/post-shift')}
+          />
+        ) : (
+          <Rows>
+            {short.slice(0, GAP_ROWS).map((row) => (
+              <ItemRow
+                key={row.id}
+                icon={<Store />}
+                tone="blue"
+                label={row.name}
+                detail={row.next ? `Next gap ${formatDay(row.next.start, now)}, ${timeRange(row.next.startTime, row.next.endTime)}` : undefined}
+                pill={{ label: plural(row.open, 'open shift'), tone: 'amber' }}
+                onPress={() => go(can.pharmacies ? `/organization/pharmacies/${row.id}` : shiftRoute(row.next?.shiftId ?? 0))}
+              />
             ))}
-          </View>
+            {gaps.length > short.length ? (
+              <BlockNote text={`${plural(gaps.length - short.length, 'other pharmacy', 'other pharmacies')} have no open shifts.`} />
+            ) : null}
+          </Rows>
         )}
+      </SectionCard> : null}
 
-        <Surface style={styles.bottomSection}>
-          <TouchableOpacity style={styles.bottomMenuItem} onPress={() => router.push('/organization/profile' as any)}>
-            <View style={styles.bottomMenuIcon}>
-              <IconButton icon="account-cog" size={24} iconColor="#6366F1" />
-            </View>
-            <View style={styles.bottomMenuContent}>
-              <Text variant="labelLarge" style={styles.bottomMenuTitle}>
-                Account Settings
-              </Text>
-              <Text variant="bodySmall" style={styles.bottomMenuDesc}>
-                Manage organization profile and preferences
-              </Text>
-            </View>
-            <IconButton icon="chevron-right" size={20} iconColor="#9CA3AF" />
-          </TouchableOpacity>
+      {showInbox ? (
+        <SectionCard title="Needs you" icon={<Inbox />} flush>
+          {loading ? (
+            <BlockLoading />
+          ) : (
+            <Rows>
+              {can.roster && applicantTotal > 0 ? (
+                <ItemRow
+                  icon={<UserCheck />}
+                  tone="violet"
+                  label="Applicants"
+                  detail={data!.applicants.length === 1 ? `${formatDay(data!.applicants[0].at.start, now)} at ${data!.applicants[0].at.pharmacyName}` : `Across ${data!.applicants.length} shifts`}
+                  count={applicantTotal}
+                  countLabel={plural(applicantTotal, 'applicant')}
+                  onPress={() => go(data!.applicants.length === 1 ? shiftRoute(data!.applicants[0].at.shiftId) : '/organization/shifts')}
+                />
+              ) : null}
+              {can.attendance && inbox?.attendance?.count ? (
+                <ItemRow
+                  icon={<Users />}
+                  tone="cyan"
+                  label="Attendance to approve"
+                  detail={namesLine(inbox.attendance.names)}
+                  count={inbox.attendance.count}
+                  countLabel={plural(inbox.attendance.count, 'attendance record')}
+                  onPress={() => go('/attendance/reviews')}
+                />
+              ) : null}
+              {can.roster && inbox?.timesheets?.count ? (
+                <ItemRow
+                  icon={<ClipboardCheck />}
+                  tone="blue"
+                  label="Timesheets to review"
+                  detail={namesLine(inbox.timesheets.names)}
+                  count={inbox.timesheets.count}
+                  countLabel={plural(inbox.timesheets.count, 'timesheet')}
+                  onPress={() => go('/workforce-timesheets')}
+                />
+              ) : null}
+              <QueueNote
+                failed={Boolean(data?.queuesFailed || inbox?.failed)}
+                empty={!(can.roster && applicantTotal) && !(can.attendance && inbox?.attendance?.count) && !(can.roster && inbox?.timesheets?.count)}
+                onRetry={refresh}
+              />
+              {truncated ? (
+                <BlockNote text={`Counts cover your first ${INBOX_PHARMACY_LIMIT} of ${pharmacyIds.length} pharmacies. Pick one pharmacy at the top to see its own.`} />
+              ) : null}
+            </Rows>
+          )}
+        </SectionCard>
+      ) : null}
 
-          <Divider />
-
-          <TouchableOpacity
-            style={styles.bottomMenuItem}
-            onPress={async () => {
-              await logout();
-              router.replace('/login' as any);
-            }}
-          >
-            <View style={[styles.bottomMenuIcon, { backgroundColor: '#FEE2E2' }]}>
-              <IconButton icon="logout" size={24} iconColor="#DC2626" />
-            </View>
-            <View style={styles.bottomMenuContent}>
-              <Text variant="labelLarge" style={[styles.bottomMenuTitle, { color: '#DC2626' }]}>
-                Sign Out
-              </Text>
-              <Text variant="bodySmall" style={styles.bottomMenuDesc}>
-                Logout from your account
-              </Text>
-            </View>
-            <IconButton icon="chevron-right" size={20} iconColor="#9CA3AF" />
-          </TouchableOpacity>
-        </Surface>
-      </ScrollView>
-    </SafeAreaView>
+      <SectionCard
+        title="Team"
+        icon={<Users />}
+        flush
+        action={can.invite ? <ViewAllLink onPress={() => go('/organization/invite')}>Invite staff</ViewAllLink> : undefined}
+      >
+        {loading ? (
+          <BlockLoading />
+        ) : data?.members == null ? (
+          <BlockNote text="Your team could not load." action="Try again" onAction={refresh} />
+        ) : data.members.length === 0 ? (
+          <BlockNote text="No one has joined your organization yet." action={can.invite ? 'Invite staff' : undefined} onAction={() => go('/organization/invite')} />
+        ) : (
+          <Rows>
+            {data.members.slice(0, TEAM_ROWS).map((member) => (
+              <PersonRow
+                key={member.id}
+                photoUrl={member.user?.profile_photo_url ?? member.user?.profile_photo}
+                name={personName({ firstName: member.user?.first_name, lastName: member.user?.last_name, name: member.user?.email })}
+                detail={roleWord(member.role) || 'Member'}
+                onPress={can.invite ? () => go('/organization/invite') : undefined}
+              />
+            ))}
+            {data.memberCount > TEAM_ROWS ? <BlockNote text={`${plural(data.memberCount - TEAM_ROWS, 'more person', 'more people')} in your organization.`} /> : null}
+          </Rows>
+        )}
+      </SectionCard>
+    </HomeScroll>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 24 },
-  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
-  greetingText: { color: '#6B7280', marginBottom: 4, fontSize: 14 },
-  nameText: { fontWeight: 'bold', color: '#111827', fontSize: 28 },
-  pillHero: {
-    marginHorizontal: 20,
-    marginBottom: 24,
-    borderRadius: 22,
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-  },
-  pillHeroGradient: {
-    minHeight: 176,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    position: 'relative',
-  },
-  heroAngleOne: { position: 'absolute', top: -58, left: 158, width: 150, height: 310, backgroundColor: 'rgba(255,255,255,0.16)', transform: [{ rotate: '-28deg' }] },
-  heroAngleTwo: { position: 'absolute', right: -50, bottom: -70, width: 230, height: 300, backgroundColor: 'rgba(255,255,255,0.08)', transform: [{ rotate: '30deg' }] },
-  pillHeroCopy: { flex: 1, paddingRight: 8 },
-  pillHeroEyebrow: {
-    color: 'rgba(255, 255, 255, 0.78)',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  pillBalanceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  pillBalanceValue: { color: '#FFFFFF', fontWeight: '900', lineHeight: 48 },
-  pillBalanceLabel: { color: 'rgba(255, 255, 255, 0.9)', fontWeight: '700' },
-  pillHeroText: { color: 'rgba(255, 255, 255, 0.88)', marginTop: 6, maxWidth: 230 },
-  pillMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
-  pillMetaChip: { backgroundColor: 'rgba(255, 255, 255, 0.18)' },
-  pillMetaChipText: { color: '#FFFFFF', fontWeight: '700', fontSize: 11 },
-  pillHeroImage: { width: 126, height: 126, marginRight: -8 },
-  section: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionHeaderText: { fontWeight: '700', color: '#111827', marginBottom: 16, fontSize: 18 },
-  quickActionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'center' },
-  quickActionCard: { width: (width - 64) / 2, alignItems: 'center', gap: 8 },
-  quickActionGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  quickActionTitle: { fontWeight: '600', color: '#111827', textAlign: 'center', fontSize: 12 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontWeight: '700', color: '#111827', fontSize: 18 },
-  seeAllText: { color: '#6366F1', fontWeight: '600', fontSize: 14 },
-  shiftPreviewCard: { marginBottom: 12, borderRadius: 12, backgroundColor: '#FFFFFF', elevation: 1 },
-  shiftPreviewContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12 },
-  shiftPreviewLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  shiftIconContainer: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center' },
-  shiftTextColumn: { flex: 1, minWidth: 0 },
-  shiftPharmacyName: { color: '#111827', fontWeight: '600' },
-  shiftRole: { color: '#6B7280', fontSize: 12, marginTop: 2 },
-  shiftStatusChip: { alignSelf: 'center', marginLeft: 8, backgroundColor: '#FEF3C7' },
-  bottomSection: {
-    marginHorizontal: 20,
-    marginBottom: 24,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-    elevation: 2,
-  },
-  bottomMenuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 },
-  bottomMenuIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center' },
-  bottomMenuContent: { flex: 1, marginLeft: 12 },
-  bottomMenuTitle: { color: '#111827', fontWeight: '600' },
-  bottomMenuDesc: { color: '#6B7280', fontSize: 12, marginTop: 2 },
-});
-
-

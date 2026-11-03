@@ -1,13 +1,12 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Plus } from 'lucide-react-native';
 import { ScalePressable } from '@/components/ui';
 import { colors, font, radius, space } from '@/constants/tokens';
 import { isTabRoute, type ShellTab } from './ShellContext';
 
 const BAR = 60;
-/** Only personas with the centre Post shift hero get the taller bar (DD1). */
+/** Only personas with a centre hero tab (Post shift, or Pharmacies for organization) get the taller bar (DD1). */
 const HERO_BAR = 68;
 const HERO = 56;
 const LABEL_LINE = 14;
@@ -31,7 +30,8 @@ export function ShellTabBar({ tabs, currentName, onNavigate }: ShellTabBarProps)
   const insets = useSafeAreaInsets();
   // Routes outside every tab were opened from More, so More stays lit.
   const activeName = tabs.find((tab) => isTabRoute(tab, currentName))?.name ?? 'more';
-  const hasHero = tabs.some((tab) => tab.hero);
+  // The raised circle only reads as centred with five tabs; when guards drop tabs, the hero renders as a plain tab.
+  const hasHero = tabs.length === 5 && Boolean(tabs[2]?.hero);
   const lift = hasHero ? HERO_LIFT : 0;
   const itemPad = { paddingBottom: hasHero ? HERO_PAD : space.xs };
 
@@ -53,7 +53,7 @@ export function ShellTabBar({ tabs, currentName, onNavigate }: ShellTabBarProps)
           };
           const Icon = tab.icon;
 
-          if (tab.hero) {
+          if (tab.hero && hasHero) {
             return (
               <ScalePressable
                 key={tab.name}
@@ -65,7 +65,7 @@ export function ShellTabBar({ tabs, currentName, onNavigate }: ShellTabBarProps)
                 style={[styles.item, itemPad]}
               >
                 <View style={[styles.heroCircle, active ? styles.heroCircleActive : null]}>
-                  <Plus size={26} color={colors.surfaceBg} strokeWidth={2} />
+                  <Icon size={26} color={colors.surfaceBg} strokeWidth={2} />
                 </View>
                 <Text
                   numberOfLines={1}

@@ -8,7 +8,7 @@ export type ShellTab = {
   label: string;
   icon: LucideIcon;
   accessibilityLabel: string;
-  /** The centre Post shift action: 56pt brand circle, Medium haptic. */
+  /** The centre hero action (Post shift; Pharmacies for organization): 56pt brand circle with the tab icon, Medium haptic. */
   hero?: boolean;
   /** Other route-name prefixes that light this tab, e.g. `messages/` for Chat. */
   match?: string[];

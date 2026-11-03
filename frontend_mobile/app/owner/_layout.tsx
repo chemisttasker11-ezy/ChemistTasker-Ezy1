@@ -2,18 +2,26 @@ import React, { useCallback, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
+  CalendarCheck,
   CalendarClock,
   CalendarDays,
   ClipboardCheck,
+  Clock,
   CreditCard,
+  Gift,
+  HardHat,
   HeartHandshake,
+  Landmark,
   LayoutDashboard,
   MessageSquare,
   Pill,
   Plus,
   ReceiptText,
   Search,
+  ShieldCheck,
+  ShoppingBag,
   Store,
+  UserCheck,
   UserRound,
   Users,
   UsersRound,
@@ -57,42 +65,54 @@ const titles: Record<string, string> = {
   more: 'More',
 };
 
+// By how often an owner needs each (top-tasks map, owner); web's owner nav shows all of them without capability gates.
 const more: MoreGroup[] = [
   {
-    title: 'Workspace',
+    title: 'This week',
     tone: 'violet',
     items: [
-      { label: 'Pharmacy Hub', icon: Users, route: '/owner/hub' },
+      { label: 'Roster', icon: CalendarCheck, route: '/manager/roster' },
+      { label: 'Timesheets', icon: ClipboardCheck, route: '/workforce-timesheets' },
+      { label: 'Attendance approvals', icon: UserCheck, route: '/attendance/reviews' },
+      { label: 'Clock & kiosk', icon: Clock, route: '/attendance' },
       { label: 'Calendar', icon: CalendarDays, route: '/owner/calendar' },
     ],
   },
   {
-    title: 'Shifts & finance',
-    tone: 'blue',
-    items: [
-      { label: 'Timesheets', icon: ClipboardCheck, route: '/workforce-timesheets' },
-      { label: 'Invoices', icon: ReceiptText, route: '/owner/invoice' },
-      { label: 'Pills', icon: Pill, route: '/owner/pills' },
-    ],
-  },
-  {
-    title: 'Pharmacy operations',
+    title: 'Pharmacies & people',
     tone: 'cyan',
     items: [
       { label: 'Pharmacies', icon: Store, route: '/owner/pharmacies' },
       { label: 'Staff', icon: UsersRound, route: '/owner/staff' },
-      { label: 'Locums', icon: HeartHandshake, route: '/owner/locums' },
+      { label: 'Locums & favourites', icon: HeartHandshake, route: '/owner/locums' },
       { label: 'Workforce & Payroll', icon: Wallet, route: '/workforce-settings' },
+      { label: 'Employment terms', icon: HardHat, route: '/workforce/employment-engagements' },
+      { label: 'Pharmacy Hub', icon: Users, route: '/owner/hub' },
     ],
   },
-  { title: 'Discover', tone: 'magenta', items: [{ label: 'Talent Board', icon: Search, route: '/owner/talent-board' }] },
-  { title: 'Work & platform tools', tone: 'blue', tools: true },
+  {
+    title: 'Money',
+    tone: 'magenta',
+    items: [
+      { label: 'Invoices', icon: ReceiptText, route: '/owner/invoice' },
+      { label: 'Finance & BAS', icon: Landmark, route: '/finance' },
+      { label: 'Pills', icon: Pill, route: '/owner/pills' },
+      { label: 'Pill rewards', icon: Gift, route: '/rewards/pills' },
+      { label: 'Subscription', icon: CreditCard, route: '/owner/subscription-seats' },
+    ],
+  },
+  {
+    title: 'Discover',
+    tone: 'blue',
+    items: [
+      { label: 'Talent Board', icon: Search, route: '/owner/talent-board' },
+      { label: 'Marketplace', icon: ShoppingBag, route: '/marketplace' },
+      { label: 'Ethical Marketplace', icon: ShieldCheck, route: '/marketplace/ethical/access' },
+    ],
+  },
 ];
 
-const account: MoreItem[] = [
-  { label: 'Profile', icon: UserRound, route: '/owner/profile' },
-  { label: 'Subscription', icon: CreditCard, route: '/owner/subscription-seats' },
-];
+const account: MoreItem[] = [{ label: 'Profile', icon: UserRound, route: '/owner/profile' }];
 
 export default function OwnerLayout() {
   const router = useRouter();
