@@ -2,6 +2,10 @@
 
 New live fulfillment and cancellation collection are restricted by default. Test-mode
 staging remains available; APP_ENV=staging refuses live Stripe keys during startup.
+Test-prefixed keys may create new collection only with an explicit `APP_ENV` of `local`,
+`dev`, `development`, `test` or `staging`. Production, unset and unknown environments
+refuse test-mode collection even if the live capability flags are enabled. Set the
+local/test environment explicitly; a missing label is not evidence of a sandbox.
 The server checks mode and capability before durable checkout preparation, provider
 creation and resume. A malformed/blank key is not test mode. The checks classify
 configuration only; provider-account validity is verified separately during acceptance.

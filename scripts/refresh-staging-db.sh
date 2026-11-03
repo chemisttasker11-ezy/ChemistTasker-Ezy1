@@ -3,12 +3,24 @@ set -euo pipefail
 umask 077
 trap 'exit 129' HUP
 
-if [[ "${1:-}" != "--confirm-production-data" || -z "${2:-}" ]]; then
-  echo "Usage: $0 --confirm-production-data /opt/backups/chemisttasker/<backup>.dump" >&2
+usage() {
+  echo "Usage: $0 --expected-sha FULL_SHA --confirm-production-data /opt/backups/chemisttasker/<backup>.dump" >&2
   exit 2
-fi
-
-backup_path="$2"
+}
+expected_sha="${STAGING_EXPECTED_SHA:-}"
+backup_path=''
+while (($#)); do
+  case "$1" in
+    --expected-sha)
+      (($# >= 2)) || usage
+      expected_sha="$2"; shift 2 ;;
+    --confirm-production-data)
+      (($# >= 2)) || usage
+      backup_path="$2"; shift 2 ;;
+    *) usage ;;
+  esac
+done
+[[ -n "$backup_path" ]] || usage
 case "$backup_path" in
   /opt/backups/chemisttasker/*.dump) ;;
   *) echo "Backup must be under /opt/backups/chemisttasker and end in .dump" >&2; exit 2 ;;
@@ -18,6 +30,13 @@ test -s "$backup_path"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+
+[[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || { echo 'A full STAGING_EXPECTED_SHA or --expected-sha is required.' >&2; exit 2; }
+check_reviewed_source() {
+  [[ "$(git rev-parse HEAD)" == "$expected_sha" ]] || { echo 'Expected SHA does not match refresh checkout.' >&2; exit 1; }
+  [[ -z "$(git status --porcelain)" ]] || { echo 'Refusing a dirty refresh checkout.' >&2; exit 1; }
+}
+check_reviewed_source
 
 # Share the release lock: a destructive data refresh must never overlap deployment.
 OPS_DIR="${STAGING_OPS_DIR:-/opt/apps/chemisttasker-staging-ops}"
@@ -108,12 +127,14 @@ policy="$(docker exec chemisttasker_redis_staging redis-cli --raw CONFIG GET max
 [[ "$policy" == noeviction ]] || { echo 'Protected Redis must use noeviction; complete docs/ops/REDIS_ROLE_ISOLATION.md before retrying.' >&2; exit 1; }
 # Build and stage the complete input before pausing writers or destroying schema.
 compose build web frontend landing
+check_reviewed_source
 policy="$(docker exec chemisttasker_redis_staging redis-cli --raw CONFIG GET maxmemory-policy | tail -n 1)"
 [[ "$policy" == noeviction ]] || { echo 'Protected Redis policy changed during build; see docs/ops/REDIS_ROLE_ISOLATION.md.' >&2; exit 1; }
 python3 scripts/staging_backup_preflight.py "$rollback_dir" "$backup_path"
 docker cp "$backup_path" "chemisttasker_postgres_staging:$restore_input"
 docker exec chemisttasker_postgres_staging pg_restore --list "$restore_input" >/dev/null
 docker exec chemisttasker_postgres_staging pg_restore --file=/dev/null "$restore_input"
+check_reviewed_source
 # Drain writers without force-killing a task or an in-flight request before backup.
 grace="${STAGING_STOP_TIMEOUT:-120}"
 [[ "$grace" =~ ^[1-9][0-9]*$ && "$grace" -le 3600 ]] || { echo 'Invalid writer grace period.' >&2; exit 1; }
@@ -146,6 +167,7 @@ docker exec -i chemisttasker_postgres_staging pg_restore --file=/dev/null < "$pa
 rollback_path="${partial%.partial}"
 mv "$partial" "$rollback_path"
 echo "Rollback backup: $rollback_path"
+check_reviewed_source
 
 docker exec chemisttasker_postgres_staging \
   psql --username=chemisttasker_staging --dbname=chemisttasker_staging \
@@ -188,4 +210,5 @@ for _ in $(seq 1 30); do
 done
 [[ "$(docker inspect -f '{{.State.Health.Status}}' "$gateway_id")" == healthy ]] || { echo 'Staging gateway did not become healthy after refresh.' >&2; exit 1; }
 bash scripts/smoke-staging.sh https://staging.chemisttasker.com.au
+check_reviewed_source
 compose ps

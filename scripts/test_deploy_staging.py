@@ -20,7 +20,7 @@ with (root/'calls.jsonl').open('a') as log:
     log.write(json.dumps([tool,*args])+'\n')
 if tool=='git':
     if args[:2]==['rev-parse','HEAD']:
-        print('2'*40 if os.environ.get('WRONG_SHA') else '1'*40)
+        print('2'*40 if os.environ.get('WRONG_SHA') or (root/'source-drift').exists() else '1'*40)
     elif args[:2]==['status','--porcelain'] and os.environ.get('DIRTY_TREE'):
         print(' M unreviewed.py')
     sys.exit(0)
@@ -45,6 +45,7 @@ if args[0]=='compose':
     if operation=='build' and os.environ.get('HUP_DURING_BUILD'):
         import signal
         os.kill(os.getppid(), signal.SIGHUP)
+    if operation=='build' and os.environ.get('SOURCE_DRIFT_AFTER_BUILD'): (root/'source-drift').touch()
     if operation=='build' and os.environ.get('FAIL_BUILD'): sys.exit(10)
     if operation=='build' and os.environ.get('POLICY_CHANGED_DURING_BUILD'): (root/'policy-changed').touch()
     if operation=='run' and os.environ.get('FAIL_MIGRATION'): sys.exit(15)
@@ -86,11 +87,13 @@ elif args[0]=='exec' and 'pg_database_size(current_database())' in ' '.join(args
 elif args[0]=='exec' and 'df' in args:
     print('Filesystem 1024-blocks Used Available Capacity Mounted on\nfixture 33554432 1048576 32505856 4% /')
 elif args[0]=='exec' and 'pg_dump' in args:
+    if os.environ.get('SOURCE_DRIFT_DURING_BACKUP'): (root/'source-drift').touch()
     if os.environ.get('FAIL_BACKUP'): sys.exit(11)
     print('fake-custom-format-archive')
 elif args[0]=='exec' and 'pg_restore' in args:
     sys.stdin.read()
     if '--file=/dev/null' in args and os.environ.get('FAIL_ARCHIVE_DATA'): sys.exit(12)
+    if '--file=/dev/null' in args and os.environ.get('SOURCE_DRIFT_DURING_INPUT_DECODE'): (root/'source-drift').touch()
     if '--list' in args:
         count=root/'archive-checks'
         number=int(count.read_text())+1 if count.exists() else 1
@@ -374,7 +377,7 @@ class StagingReleaseSafetyTests(unittest.TestCase):
                 self.assertFalse(self.operations('build'))
                 self.assertFalse(any(x[:2]==['docker','kill'] for x in self.calls))
 
-    def refresh(self, **extra):
+    def refresh(self, *args, **extra):
         source=Path(__file__).with_name('refresh-staging-db.sh').read_text()
         backups=self.root/'backups'
         backups.mkdir(exist_ok=True)
@@ -385,11 +388,47 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         archive=backups/'synthetic.dump'
         archive.write_bytes(b'fixture')
         env={**os.environ,'FAKE_ROOT':str(self.root),'STAGING_OPS_DIR':str(self.root/'ops'),
-             'PATH':str(self.root/'bin')+os.pathsep+os.environ['PATH'],'STAGING_STOP_TIMEOUT':'2','STAGING_RESOURCE_BUDGET_APPROVED':'0',**extra}
-        result=subprocess.run(['bash',str(script),'--confirm-production-data',str(archive)],
+             'PATH':str(self.root/'bin')+os.pathsep+os.environ['PATH'],'STAGING_STOP_TIMEOUT':'2','STAGING_RESOURCE_BUDGET_APPROVED':'0','STAGING_EXPECTED_SHA':'1'*40,**extra}
+        result=subprocess.run(['bash',str(script),'--confirm-production-data',str(archive),*args],
                               env=env,capture_output=True,text=True,timeout=30)
-        calls=[json.loads(x) for x in (self.root/'calls.jsonl').read_text().splitlines()]
+        calls_path=self.root/'calls.jsonl'
+        calls=[json.loads(x) for x in calls_path.read_text().splitlines()] if calls_path.exists() else []
         return result,calls
+
+    def test_refresh_requires_reviewed_clean_source_before_any_docker_call(self):
+        for flag in ({'STAGING_EXPECTED_SHA':''},{'WRONG_SHA':'1'},{'DIRTY_TREE':'1'}):
+            with self.subTest(flag=flag):
+                (self.root/'calls.jsonl').unlink(missing_ok=True)
+                result,calls=self.refresh(**flag)
+                self.assertNotEqual(result.returncode,0,result.stdout)
+                self.assertFalse(any(x[0]=='docker' for x in calls))
+
+    def test_refresh_explicit_sha_option_overrides_environment(self):
+        result,calls=self.refresh('--expected-sha','2'*40)
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse(any(x[0]=='docker' for x in calls))
+        (self.root/'calls.jsonl').unlink(missing_ok=True)
+        result,calls=self.refresh('--expected-sha','1'*40,STAGING_EXPECTED_SHA='')
+        self.assertEqual(result.returncode,0,result.stderr)
+
+    def test_refresh_source_drift_after_build_keeps_writers_and_schema(self):
+        result,calls=self.refresh(SOURCE_DRIFT_AFTER_BUILD='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertTrue(any('build' in x for x in calls))
+        self.assertFalse(any(x[:2]==['docker','kill'] or 'DROP SCHEMA' in ' '.join(x) for x in calls))
+
+    def test_refresh_source_drift_during_input_decode_keeps_writers_and_schema(self):
+        result,calls=self.refresh(SOURCE_DRIFT_DURING_INPUT_DECODE='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('Expected SHA',result.stderr)
+        self.assertTrue(any('--file=/dev/null' in x for x in calls))
+        self.assertFalse(any(x[:2]==['docker','kill'] or 'pg_dump' in x or 'DROP SCHEMA' in ' '.join(x) for x in calls))
+
+    def test_refresh_source_drift_during_backup_keeps_schema(self):
+        result,calls=self.refresh(SOURCE_DRIFT_DURING_BACKUP='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertTrue(any('pg_dump' in x for x in calls))
+        self.assertFalse(any('DROP SCHEMA' in ' '.join(x) for x in calls))
 
     def test_refresh_build_failure_preserves_writers_and_schema(self):
         result,calls=self.refresh(FAIL_BUILD='1')
@@ -548,7 +587,7 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         backup.write_bytes(b'disposable fixture; never restored')
         script.write_text(script.read_text().replace('/opt/backups/chemisttasker',str(backups)))
         try:
-            env={**os.environ,'STAGING_OPS_DIR':str(ops),'FAKE_ROOT':str(self.root),
+            env={**os.environ,'STAGING_OPS_DIR':str(ops),'FAKE_ROOT':str(self.root),'STAGING_EXPECTED_SHA':'1'*40,
                  'PATH':str(self.root/'bin')+os.pathsep+os.environ['PATH']}
             with (ops/'deploy.lock').open('w') as lock:
                 fcntl.flock(lock,fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -556,7 +595,8 @@ class StagingReleaseSafetyTests(unittest.TestCase):
                     env=env,capture_output=True,text=True,timeout=15)
             self.assertNotEqual(result.returncode,0)
             self.assertIn('lock',result.stderr.lower())
-            self.assertFalse((self.root/'calls.jsonl').exists())
+            calls=[json.loads(line) for line in (self.root/'calls.jsonl').read_text().splitlines()]
+            self.assertFalse(any(call[0]=='docker' for call in calls))
         finally:
             assert backup.resolve().parent==backups.resolve()
             backup.unlink(missing_ok=True)

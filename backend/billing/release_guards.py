@@ -36,6 +36,12 @@ def assert_can_create_shift_charge(charge_type):
     if mode == "invalid":
         raise LiveCollectionRestricted("provider_configuration_invalid", "Shift collection is not configured.")
     if mode == "test":
+        environment = os.environ.get("APP_ENV", "").strip().lower()
+        if environment not in {"local", "dev", "development", "test", "staging"}:
+            raise LiveCollectionRestricted(
+                "test_provider_environment_rejected",
+                "Test payments require an explicitly configured non-production environment.",
+            )
         return
     if os.environ.get("APP_ENV", "local").strip().lower() == "staging":
         raise LiveCollectionRestricted("staging_live_provider_rejected", "Live payments are unavailable in staging.")

@@ -31,3 +31,7 @@ New live shift fulfillment and penalty collection are now closed by default thro
 Ship the mobile build that echoes `expected_action` and `observed_session_id` first, and complete and record mobile adoption acceptance before promoting this backend artifact to production. There is no automatic minimum-version gate in this release. Deployment itself enforces session-bound confirmation; there is no separate enable switch. Deploy the web and kiosk bundles with that backend release; refresh any already-open kiosk page. A legacy mobile build sends only `confirm_opposite` and safely receives 409 until it updates (or the 60-second double-clock window expires). Do not weaken the server check to support old confirmation intent. Staging acceptance must exercise both the updated clients and this legacy refusal path.
 
 A confirmed request whose success response is lost may receive `STALE_CONFIRMATION` on retry. That refusal writes nothing; web/mobile reload current attendance and require a fresh user action. The server intentionally keeps the session check before duplicate replay: this release does not weaken confirmation authority to manufacture a repeated 200 response.
+
+## Reviewer responses
+
+See [PR 242 reviewer responses](PR242_REVIEW_RESPONSES_20261103.md) for finding dispositions, validation limits and the owner-merge/staging-deployment sequence.

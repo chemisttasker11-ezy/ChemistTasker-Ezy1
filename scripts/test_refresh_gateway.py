@@ -25,6 +25,9 @@ class RefreshGatewayPreflightTests(unittest.TestCase):
                 docker=root/'bin/docker'
                 docker.write_text("#!/usr/bin/env python3\nimport json,os,pathlib,sys\na=sys.argv[1:]\np=pathlib.Path(os.environ['FAKE_ROOT'])/'calls.jsonl'\nwith p.open('a') as f:f.write(json.dumps(a)+'\\n')\nif 'config' in a and '--format' in a:print(json.dumps({'services':{owner:{'environment':{}} for owner in ('web','migration')}}))\nelif 'ps' in a and '-q' in a:\n if not os.environ.get('MISSING_GATEWAY'):print('gateway-id')\nelif a and a[0]=='inspect':\n if a[-1]=='chemisttasker_staging_migrate':sys.exit(1)\n print('false')\n")
                 docker.chmod(0o755)
+                git=root/'bin/git'
+                git.write_text("#!/usr/bin/env python3\nimport sys\nif sys.argv[1:]==['rev-parse','HEAD']:print('1'*40)\n")
+                git.chmod(0o755)
                 backups=root/'backups'
                 backups.mkdir(parents=True,exist_ok=True)
                 backup=backups/('readiness-synthetic-'+uuid.uuid4().hex+'.dump')
@@ -32,7 +35,7 @@ class RefreshGatewayPreflightTests(unittest.TestCase):
                 script=root/'scripts/refresh-staging-db.sh'
                 script.write_text(script.read_text().replace('/opt/backups/chemisttasker',str(backups)))
                 try:
-                    env={**os.environ,'FAKE_ROOT':str(root),'STAGING_OPS_DIR':str(root/'ops'),
+                    env={**os.environ,'FAKE_ROOT':str(root),'STAGING_OPS_DIR':str(root/'ops'),'STAGING_EXPECTED_SHA':'1'*40,
                          'PATH':str(root/'bin')+os.pathsep+os.environ['PATH']}
                     if missing:env['MISSING_GATEWAY']='1'
                     result=subprocess.run(['bash',str(root/'scripts/refresh-staging-db.sh'),

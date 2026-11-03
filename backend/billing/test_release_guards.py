@@ -1,4 +1,5 @@
 """Collection is fail-closed without blocking settlement of historical provider events."""
+import os
 from unittest.mock import Mock, patch
 
 from django.core.exceptions import ImproperlyConfigured
@@ -24,10 +25,29 @@ class ProviderModeContracts(SimpleTestCase):
                     assert_can_create_shift_charge("fulfillment")
 
     def test_test_and_restricted_test_keys_work_with_live_flags_off(self):
-        for key in (TEST_KEY, TEST_KEY.replace("sk_", "rk_")):
-            with self.subTest(key=key), override_settings(STRIPE_SECRET_KEY=key):
-                assert_can_create_shift_charge("fulfillment")
-                assert_can_create_shift_charge("cancellation")
+        for environment in ("local", "dev", "development", "test", "staging"):
+            for key in (TEST_KEY, TEST_KEY.replace("sk_", "rk_")):
+                with self.subTest(environment=environment,key=key), patch.dict("os.environ", {"APP_ENV":environment}), override_settings(
+                    STRIPE_SECRET_KEY=key, BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED=False, BILLING_LIVE_SHIFT_PENALTY_ENABLED=False,
+                ):
+                    assert_can_create_shift_charge("fulfillment")
+                    assert_can_create_shift_charge("cancellation")
+
+    def test_test_keys_require_an_explicit_nonproduction_environment(self):
+        for environment in ("production", "prod", " PRODUCTION ", "preview", "", None):
+            for key in (TEST_KEY, TEST_KEY.replace("sk_", "rk_")):
+                for enabled in (False, True):
+                    with self.subTest(environment=environment,key=key,enabled=enabled), patch.dict("os.environ"), override_settings(
+                        STRIPE_SECRET_KEY=key, BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED=enabled, BILLING_LIVE_SHIFT_PENALTY_ENABLED=enabled,
+                    ):
+                        if environment is None:
+                            os.environ.pop("APP_ENV",None)
+                        else:
+                            os.environ["APP_ENV"]=environment
+                        for kind in ("fulfillment", "cancellation"):
+                            with self.assertRaises(LiveCollectionRestricted) as rejected:
+                                assert_can_create_shift_charge(kind)
+                            self.assertEqual(str(rejected.exception.detail["code"]),"test_provider_environment_rejected")
 
     @override_settings(STRIPE_SECRET_KEY=LIVE_KEY, BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED=True)
     def test_capabilities_are_independent_and_unknown_kind_never_bypasses(self):
@@ -65,6 +85,19 @@ class FulfillmentReleaseContracts(TestCase):
         self.offer.refresh_from_db()
         self.assertEqual(self.offer.status, "ACCEPTED_AWAITING_PAYMENT")
 
+    @override_settings(STRIPE_SECRET_KEY=TEST_KEY, BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED=False, BILLING_LIVE_SHIFT_PENALTY_ENABLED=False)
+    def test_production_test_key_creates_no_provider_checkout_reservation_or_booking(self):
+        with patch.dict("os.environ",{"APP_ENV":"production"}):
+            response=self.client.post(self.url,{"offer_ids":[self.offer.pk]},format="json")
+        self.assertEqual(response.status_code,503,response.data)
+        self.assertEqual(str(response.data["code"]),"test_provider_environment_rejected")
+        self.checkout.assert_not_called()
+        self.assertFalse(FulfillmentCheckout.objects.exists())
+        self.assertFalse(FulfillmentReservation.objects.exists())
+        self.assertFalse(self.shift.slot_assignments.exists())
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status,"ACCEPTED_AWAITING_PAYMENT")
+
     @override_settings(STRIPE_SECRET_KEY=LIVE_KEY)
     def test_direct_prepare_and_resume_cannot_bypass_collection_control(self):
         with self.assertRaises(LiveCollectionRestricted):
@@ -97,7 +130,7 @@ class FulfillmentReleaseContracts(TestCase):
         with override_settings(STRIPE_SECRET_KEY=TEST_KEY):
             response = self.client.post(self.url, {"offer_ids": [self.offer.pk]}, format="json")
         self.assertEqual(response.status_code, 200, response.data)
-        with override_settings(STRIPE_SECRET_KEY=LIVE_KEY, STRIPE_WEBHOOK_SECRET="disposable"):
+        with patch.dict("os.environ",{"APP_ENV":"production"}), override_settings(STRIPE_SECRET_KEY=LIVE_KEY, STRIPE_WEBHOOK_SECRET="disposable"):
             self.pay()
             self.pay()
         self.assertEqual(ShiftPayment.objects.count(), 1)
@@ -107,6 +140,18 @@ class FulfillmentReleaseContracts(TestCase):
 class PenaltyReleaseContracts(TestCase):
     def setUp(self):
         fixtures.PenaltyMoneyContracts.setUp(self)
+
+    @override_settings(STRIPE_SECRET_KEY=TEST_KEY, BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED=False, BILLING_LIVE_SHIFT_PENALTY_ENABLED=False)
+    def test_production_test_key_penalty_creates_no_provider_charge(self):
+        self.assignment.unit_rate=100
+        self.assignment.save(update_fields=['unit_rate'])
+        with patch.dict("os.environ",{"APP_ENV":"production"}), patch("django.utils.timezone.now",return_value=self.now), patch(
+            "billing.stripe_support.stripe.checkout.Session.create",
+        ) as create:
+            response=client_for(self.owner).post(self.url,{},format="json")
+        self.assertEqual(response.status_code,503,response.data)
+        create.assert_not_called()
+        self.assertFalse(ShiftPayment.objects.exists())
 
     @override_settings(STRIPE_SECRET_KEY=LIVE_KEY)
     def test_restricted_cancellation_never_calls_provider(self):

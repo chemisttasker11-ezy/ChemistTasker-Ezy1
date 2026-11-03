@@ -1,5 +1,10 @@
 """Hermetic settings for shared-core/backend contract tests and CI."""
 
+import os
+
+# CI and direct test runs must explicitly select the non-production provider environment.
+os.environ.setdefault("APP_ENV", "test")
+
 from .settings import *  # noqa: F403
 
 DATABASES = {

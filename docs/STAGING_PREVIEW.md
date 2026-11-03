@@ -152,10 +152,13 @@ Refresh the isolated staging database with a reviewed backup:
 
 ```bash
 bash scripts/refresh-staging-db.sh \
+  --expected-sha "$REVIEWED_SHA" \
   --confirm-production-data \
   /opt/backups/chemisttasker/legacy-production-public-YYYYMMDDTHHMMSSZ.dump
 ```
 
+Refresh requires the independently reviewed full SHA (or `STAGING_EXPECTED_SHA`) and a clean checkout.
+It rechecks source after building, immediately before pausing writers, before the schema drop and before completion.
 The refresh script builds the application images and copies/fully decodes the input archive before
 pausing writers. It creates and validates a rollback dump of the current staging database before
 dropping its schema, restores the already-staged input, and prints
