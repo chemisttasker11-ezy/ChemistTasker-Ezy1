@@ -108,6 +108,13 @@ set_runtime_value() {
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 rollback_dir="/opt/backups/chemisttasker"
 restore_input="/tmp/production-refresh-${timestamp}-$$.dump"
+partial=''; input_staged=0
+cleanup_refresh() {
+  # Never leave an unvalidated rollback archive or a staged production copy behind.
+  if [[ -n "$partial" ]]; then rm -f "$partial"; fi
+  if ((input_staged)); then docker exec chemisttasker_postgres_staging rm -f "$restore_input" >/dev/null 2>&1 || true; fi
+}
+trap cleanup_refresh EXIT
 
 mkdir -p "$rollback_dir"
 chmod 700 "$rollback_dir"
@@ -131,6 +138,7 @@ check_reviewed_source
 policy="$(docker exec chemisttasker_redis_staging redis-cli --raw CONFIG GET maxmemory-policy | tail -n 1)"
 [[ "$policy" == noeviction ]] || { echo 'Protected Redis policy changed during build; see docs/ops/REDIS_ROLE_ISOLATION.md.' >&2; exit 1; }
 python3 scripts/staging_backup_preflight.py "$rollback_dir" "$backup_path"
+input_staged=1
 docker cp "$backup_path" "chemisttasker_postgres_staging:$restore_input"
 docker exec chemisttasker_postgres_staging pg_restore --list "$restore_input" >/dev/null
 docker exec chemisttasker_postgres_staging pg_restore --file=/dev/null "$restore_input"
@@ -179,6 +187,7 @@ docker exec chemisttasker_postgres_staging \
   --username=chemisttasker_staging --dbname=chemisttasker_staging \
   "$restore_input"
 docker exec chemisttasker_postgres_staging rm "$restore_input"
+input_staged=0
 
 bash scripts/reconcile-staging-migration-history.sh
 

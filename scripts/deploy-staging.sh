@@ -27,12 +27,14 @@ chmod 700 "$OPS_DIR"
 exec 9>"$OPS_DIR/deploy.lock"
 flock -n 9 || { echo 'Another staging deployment holds the release lock.' >&2; exit 1; }
 attempt_dir="$(mktemp -d "$OPS_DIR/release-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")"
-phase=preflight; web_started=0; workers_started=0; backup=''
+phase=preflight; web_started=0; workers_started=0; backup=''; partial=''
 finish() {
   code=$?
   trap - EXIT
   set +e
   printf '%s\n' "$phase" > "$attempt_dir/phase"
+  # An unvalidated archive is never a backup, and rotation only prunes final dumps.
+  if [[ -n "$partial" ]]; then rm -f "$partial"; fi
   if ((code)); then
     printf '%s\n' "$code" > "$attempt_dir/failed.exit"
     # Request graceful cleanup only for services this release started. Never force

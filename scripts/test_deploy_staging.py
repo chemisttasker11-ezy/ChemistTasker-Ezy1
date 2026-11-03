@@ -439,11 +439,20 @@ class StagingReleaseSafetyTests(unittest.TestCase):
         result=self.release(FAIL_ARCHIVE_DATA='1')
         self.assertNotEqual(result.returncode,0)
         self.assertEqual(list((self.root/'backups').glob('*.dump')),[])
-        self.assertTrue(list((self.root/'backups').glob('*.partial')))
+        self.assertEqual(list((self.root/'backups').glob('*.partial')),[], 'A rejected archive must not linger outside rotation')
         (self.root/'calls.jsonl').unlink()
         result,calls=self.refresh(FAIL_ARCHIVE_DATA='1')
         self.assertNotEqual(result.returncode,0)
         self.assertFalse(any(x[:2]==['docker','kill'] or 'DROP SCHEMA' in ' '.join(x) for x in calls))
+        staged=next(x for x in calls if x[:2]==['docker','cp'])[-1].split(':',1)[1]
+        self.assertIn(['docker','exec','chemisttasker_postgres_staging','rm','-f',staged],calls,
+                      'A refused refresh must remove its staged production copy')
+
+    def test_refresh_rejected_rollback_archive_is_removed(self):
+        result,_=self.refresh(FAIL_ROLLBACK_CHECK='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertEqual(list((self.root/'backups').glob('*.partial')),[])
+        self.assertEqual(list((self.root/'backups').glob('staging-before-production-refresh-*.dump')),[])
 
     def test_refresh_input_is_copied_and_decoded_before_quiesce(self):
         result,calls=self.refresh()

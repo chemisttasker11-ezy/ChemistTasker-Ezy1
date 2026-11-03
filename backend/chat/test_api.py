@@ -1,6 +1,7 @@
 """Characterization of the chat REST API (/rooms/, /messages/, /messages/<id>/react/, /chat-participants/)."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -111,7 +112,9 @@ class DirectMessageTests(ChatBase):
         Participant.objects.create(conversation_id=room, membership=self.bob_m)
         self.assertEqual(authorized_participant(room, self.alice.pk).membership_id, valid.pk)
         consumer = RoomConsumer()
-        self.assertEqual(async_to_sync(consumer._get_membership)(room, self.alice.pk).pk, valid.pk)
+        # Channels closes the DB connection around consumer queries, which breaks TestCase's transaction on PostgreSQL.
+        with patch("channels.db.close_old_connections"):
+            self.assertEqual(async_to_sync(consumer._get_membership)(room, self.alice.pk).pk, valid.pk)
         sent = client_for(self.alice).post(MESSAGES, {"conversation": room, "body": "Still authorized"}, format="json")
         self.assertEqual(sent.status_code, 201, sent.data)
         self.assertEqual(Message.objects.get(pk=sent.data["id"]).sender_id, valid.pk)
