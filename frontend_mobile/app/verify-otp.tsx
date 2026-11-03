@@ -163,7 +163,7 @@ export default function VerifyOTPScreen() {
 
 const styles = StyleSheet.create({
     email: {
-        color: colors.textPrimary,
+        // No colour: it inherits the light subtitle colour on the brand band.
         fontFamily: font.inter.semiBold,
     },
     resend: {

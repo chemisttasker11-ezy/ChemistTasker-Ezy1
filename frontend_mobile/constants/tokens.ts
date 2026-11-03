@@ -47,6 +47,11 @@ export const touch = {
   min: Platform.OS === 'android' ? 48 : 44,
 } as const;
 
+// Web signed-out brand panel (landing_next AuthLayout): 145deg navy -> deep violet (67%) -> deep magenta. White text >= 11.5:1 on every stop.
+export const gradient = {
+  brand: { colors: ['#061B54', '#361E82', '#60146D'], locations: [0, 0.67, 1] },
+} as const;
+
 export const type = {
   displayLarge: {
     fontFamily: font.outfit.medium,
@@ -289,6 +294,7 @@ export const tokens = {
   font,
   type,
   touch,
+  gradient,
 } as const;
 
 export const colors = tokens.light;

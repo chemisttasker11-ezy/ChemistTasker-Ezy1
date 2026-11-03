@@ -31,6 +31,7 @@ import AuthLayout, { AuthLink, AuthNotice, AuthPrompt } from '../components/Auth
 import { Button, ScalePressable, TextField } from '@/components/ui';
 import { sizeIcon } from '@/components/ui/icon';
 import { colors, font, radius, space, touch, type } from '@/constants/tokens';
+import { registerRoleFromParam } from '../utils/registerRole';
 
 const ROLE_OPTIONS = [
   { label: 'Pharmacy owner', description: 'Post shifts, run rosters and manage your team.', value: 'OWNER', icon: <Store /> },
@@ -95,15 +96,18 @@ export default function RegisterScreen() {
     referral_code?: string | string[];
     referral_shift_id?: string | string[];
     referral_event_id?: string | string[];
+    role?: string | string[];
   }>();
   const { register } = useAuth();
   const recaptchaSiteKey = process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || '';
+  // Welcome's persona chips preselect a role; the cards below stay changeable.
+  const roleParam = registerRoleFromParam(params.role);
 
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     confirm_password: '',
-    role: '',
+    role: roleParam as string,
     accepted_terms: false,
   });
   const [newcomerType, setNewcomerType] = useState('');
@@ -403,15 +407,13 @@ export default function RegisterScreen() {
           </View>
         </ScalePressable>
         <Text style={styles.termsText} onPress={toggleTerms}>
-          I accept the{' '}
-          <Text style={styles.linkText} onPress={loading ? undefined : () => void openLink(TERMS_URL)} accessibilityRole="link">
-            Terms of Service
-          </Text>{' '}
-          and{' '}
-          <Text style={styles.linkText} onPress={loading ? undefined : () => void openLink(PRIVACY_URL)} accessibilityRole="link">
-            Privacy Policy
-          </Text>
+          I accept the Terms of Service and Privacy Policy
         </Text>
+      </View>
+      {/* 44pt AuthLinks: inline Text links inside the checkbox label were too small to tap. */}
+      <View style={styles.legalLinks}>
+        <AuthLink label="Terms of Service" onPress={() => void openLink(TERMS_URL)} disabled={loading} />
+        <AuthLink label="Privacy Policy" onPress={() => void openLink(PRIVACY_URL)} disabled={loading} />
       </View>
 
       {!recaptchaSiteKey ? (
@@ -640,11 +642,7 @@ const styles = StyleSheet.create({
     fontSize: type.bodyMedium.fontSize,
     lineHeight: type.bodyMedium.lineHeight,
   },
-  linkText: {
-    color: colors.accentStrong,
-    fontFamily: font.inter.medium,
-    textDecorationLine: 'underline',
-  },
+  legalLinks: { flexDirection: 'row', flexWrap: 'wrap', marginLeft: touch.min, marginTop: -space.sm },
   captchaRow: {
     minHeight: 56,
     flexDirection: 'row',

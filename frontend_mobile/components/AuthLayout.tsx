@@ -2,8 +2,8 @@ import React, { type ReactNode, type Ref, useEffect, useState } from 'react';
 import {
   AccessibilityInfo,
   BackHandler,
-  Image,
   KeyboardAvoidingView,
+  type LayoutChangeEvent,
   Platform,
   ScrollView,
   type StyleProp,
@@ -16,25 +16,101 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from 'expo-router';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused, useNavigation } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { ChevronLeft, CircleAlert, CircleCheck, Info } from 'lucide-react-native';
 import { ScalePressable } from '@/components/ui';
-import { colors, font, radius, space, touch, type } from '@/constants/tokens';
+import { alpha } from '@/components/ui/tone';
+import { colors, font, gradient, radius, space, touch, type } from '@/constants/tokens';
 import { durations, easings } from '@/constants/motion';
 
 export const officialLogo = require('../assets/images/official-logo.png');
-const LOGO_RATIO = 900 / 436;
 // Below this width the gutters and card padding drop to 16pt, so fields, the CTA and 44pt code boxes fit a 360pt phone.
 const COMPACT_WIDTH = 380;
+// The light sheet rides up over the band by this much.
+const SHEET_OVERLAP = 24;
+
+type Point = { x: number; y: number };
+const ORIGIN: Point = { x: 0, y: 0 };
+const DIAGONAL: Point = { x: 1, y: 1 };
+
+/**
+ * The band's gradient runs in pixels from its top-left to its bottom-right corner, so its top row is a horizontal
+ * gradient ending at x = 1 + (h/w)^2. The status-bar strip and the overscroll fill draw exactly that row: no seam.
+ */
+export function useBrandTopRow() {
+  const [size, setSize] = useState({ width: 1, height: 0 });
+  return {
+    topRowEnd: { x: 1 + (size.height / size.width) ** 2, y: 0 },
+    onBandLayout: (event: LayoutChangeEvent) => {
+      const { width, height } = event.nativeEvent.layout;
+      setSize({ width: width || 1, height });
+    },
+  };
+}
+
+/** Light status-bar icons over a fixed brand strip, so they stay legible at rest, scrolled and with the keyboard open. */
+export function BrandStatusStrip({ topRowEnd }: { topRowEnd: Point }) {
+  const { top } = useSafeAreaInsets();
+  const focused = useIsFocused();
+  return (
+    <>
+      {/* Only the focused screen sets the style: auth screens stay mounted under the dashboard after sign-in. */}
+      {focused ? <StatusBar style="light" /> : null}
+      <LinearGradient
+        colors={gradient.brand.colors}
+        locations={gradient.brand.locations}
+        start={ORIGIN}
+        end={topRowEnd}
+        style={{ height: top }}
+      />
+    </>
+  );
+}
+
+/** Web brand panel gradient (navy, deep violet, deep magenta), sized by its content. */
+export function BrandBand({
+  topRowEnd,
+  onLayout,
+  style,
+  children,
+}: {
+  topRowEnd: Point;
+  onLayout: (event: LayoutChangeEvent) => void;
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
+  return (
+    <LinearGradient
+      colors={gradient.brand.colors}
+      locations={gradient.brand.locations}
+      start={ORIGIN}
+      end={DIAGONAL}
+      onLayout={onLayout}
+      style={style}
+    >
+      {/* iOS pull-down reveals this instead of the light page above the band. */}
+      <LinearGradient
+        colors={gradient.brand.colors}
+        locations={gradient.brand.locations}
+        start={ORIGIN}
+        end={topRowEnd}
+        style={styles.overscroll}
+      />
+      {children}
+    </LinearGradient>
+  );
+}
 
 type AuthLayoutProps = {
   title: string;
   subtitle?: ReactNode;
   children: ReactNode;
   showTitle?: boolean;
-  /** Adds a labelled back chevron at the left; the logo stays centred either way. */
+  /** Adds a labelled back chevron before the brand line. */
   onBack?: () => void;
   /** Greys the back chevron and swallows hardware Back while a request runs, so the screen cannot be left mid-submit. */
   backDisabled?: boolean;
@@ -42,9 +118,11 @@ type AuthLayoutProps = {
   footer?: ReactNode;
 };
 
-/** Signed-out frame: logo, Outfit title, one hairline card for the form, footer; keyboard-safe and capped at 480pt. */
+/** Signed-out frame: brand band with the title, a light sheet over it with one hairline form card and the footer; keyboard-safe, capped at 480pt. */
 export default function AuthLayout({ title, subtitle, children, showTitle = true, onBack, backDisabled = false, footer }: AuthLayoutProps) {
   const compact = useWindowDimensions().width < COMPACT_WIDTH;
+  const reduceMotion = useReducedMotion();
+  const { topRowEnd, onBandLayout } = useBrandTopRow();
   const navigation = useNavigation();
   // Swallow Android Back while a request or redirect runs, like the on-screen chevron.
   useEffect(() => {
@@ -57,52 +135,72 @@ export default function AuthLayout({ title, subtitle, children, showTitle = true
     navigation.setOptions({ gestureEnabled: !backDisabled });
   }, [backDisabled, navigation]);
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
-      {/* Edge-to-edge Android no longer resizes the window for the keyboard, so both platforms avoid it here. */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, compact ? styles.scrollContentCompact : null]}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.column}>
-            <View style={styles.header}>
-              {onBack ? (
-                <ScalePressable onPress={onBack} disabled={backDisabled} accessibilityLabel="Back" style={styles.back} pressBg>
-                  <ChevronLeft size={24} color={colors.textPrimary} strokeWidth={2} />
-                </ScalePressable>
-              ) : null}
-              <Image
-                source={officialLogo}
-                style={styles.logo}
-                resizeMode="contain"
-                accessibilityRole="image"
-                accessibilityLabel="ChemistTasker"
-              />
+    <View style={styles.container}>
+      <BrandStatusStrip topRowEnd={topRowEnd} />
+      <SafeAreaView style={styles.flex} edges={['left', 'right', 'bottom']}>
+        {/* Edge-to-edge Android no longer resizes the window for the keyboard, so both platforms avoid it here. */}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            showsVerticalScrollIndicator={false}
+          >
+            <BrandBand topRowEnd={topRowEnd} onLayout={onBandLayout} style={[styles.band, compact ? styles.gutterCompact : null]}>
+              <View style={styles.column}>
+                <View style={styles.bandTop}>
+                  {onBack ? (
+                    <ScalePressable
+                      onPress={onBack}
+                      disabled={backDisabled}
+                      accessibilityLabel="Back"
+                      pressBg={onBandPress}
+                      style={[styles.back, backDisabled ? styles.backDisabled : null]}
+                    >
+                      <ChevronLeft size={24} color={colors.surfaceBg} strokeWidth={2} />
+                    </ScalePressable>
+                  ) : null}
+                  <Text style={styles.eyebrow} maxFontSizeMultiplier={1.6}>
+                    ChemistTasker
+                  </Text>
+                </View>
+
+                {showTitle ? (
+                  <Animated.View
+                    entering={reduceMotion ? undefined : FadeIn.duration(durations.fast).easing(easings.smoothOut)}
+                    style={styles.titleBlock}
+                  >
+                    <Text accessibilityRole="header" style={styles.title} maxFontSizeMultiplier={1.6}>
+                      {title}
+                    </Text>
+                    {subtitle ? (
+                      <Text style={styles.subtitle} maxFontSizeMultiplier={1.6}>
+                        {subtitle}
+                      </Text>
+                    ) : null}
+                  </Animated.View>
+                ) : null}
+              </View>
+            </BrandBand>
+
+            <View style={[styles.sheet, compact ? styles.sheetCompact : null]}>
+              <View style={styles.column}>
+                <Animated.View
+                  entering={
+                    reduceMotion ? undefined : FadeIn.duration(durations.fast).delay(durations.micro).easing(easings.smoothOut)
+                  }
+                  style={[styles.card, compact ? styles.cardCompact : null]}
+                >
+                  {children}
+                </Animated.View>
+
+                {footer ? <View style={styles.footer}>{footer}</View> : null}
+              </View>
             </View>
-
-            {showTitle ? (
-              <Animated.View entering={FadeIn.duration(durations.fast).easing(easings.smoothOut)} style={styles.titleBlock}>
-                <Text accessibilityRole="header" style={styles.title} maxFontSizeMultiplier={1.6}>
-                  {title}
-                </Text>
-                {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-              </Animated.View>
-            ) : null}
-
-            <Animated.View
-              entering={FadeIn.duration(durations.fast).delay(durations.micro).easing(easings.smoothOut)}
-              style={[styles.card, compact ? styles.cardCompact : null]}
-            >
-              {children}
-            </Animated.View>
-
-            {footer ? <View style={styles.footer}>{footer}</View> : null}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -117,13 +215,14 @@ const noticeTone = {
 /** Inline form message. Android reads it through the live region; iOS gets an explicit announcement. */
 export function AuthNotice({ tone, message, children }: { tone: NoticeTone; message: string; children?: ReactNode }) {
   const { bg, fg, Icon } = noticeTone[tone];
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
     if (Platform.OS === 'ios' && message) AccessibilityInfo.announceForAccessibility(message);
   }, [message]);
 
   return (
     <Animated.View
-      entering={FadeIn.duration(durations.quick)}
+      entering={reduceMotion ? undefined : FadeIn.duration(durations.quick)}
       accessibilityRole={tone === 'error' ? 'alert' : undefined}
       accessibilityLiveRegion={tone === 'error' ? 'assertive' : 'polite'}
       style={[styles.notice, { backgroundColor: bg }]}
@@ -256,46 +355,72 @@ export function OtpCodeInput({
   );
 }
 
+// Pressed tint for white-on-gradient controls.
+const onBandPress = alpha(colors.surfaceBg, 0.18);
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flex: { flex: 1 },
-  scrollContent: {
-    flexGrow: 1,
+  scrollContent: { flexGrow: 1 },
+  overscroll: { position: 'absolute', left: 0, right: 0, top: -1000, height: 1000 },
+  band: {
     paddingHorizontal: space.xl,
-    paddingTop: space.sm,
-    paddingBottom: space['3xl'],
+    paddingTop: space.md,
+    paddingBottom: space['2xl'] + SHEET_OVERLAP,
   },
-  scrollContentCompact: { paddingHorizontal: space.lg },
+  gutterCompact: { paddingHorizontal: space.lg },
   column: { width: '100%', maxWidth: 480, alignSelf: 'center', gap: space.lg },
-  header: { alignItems: 'center', justifyContent: 'center', minHeight: touch.min },
+  bandTop: { flexDirection: 'row', alignItems: 'center', gap: space.xs, minHeight: touch.min },
+  // Pulled left so the chevron glyph lines up with the title under it.
   back: {
-    position: 'absolute',
-    left: 0,
     width: touch.min,
     height: touch.min,
+    marginLeft: -(touch.min - 24) / 2,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logo: { height: 52, width: 52 * LOGO_RATIO },
+  backDisabled: { opacity: 0.4 },
+  eyebrow: {
+    color: colors.surfaceBg,
+    fontFamily: font.inter.semiBold,
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
   titleBlock: { gap: space.sm },
   title: {
-    color: colors.textPrimary,
+    color: colors.surfaceBg,
     fontFamily: type.displayMedium.fontFamily,
     fontSize: type.displayMedium.fontSize,
     lineHeight: type.displayMedium.lineHeight,
     letterSpacing: type.displayMedium.letterSpacing,
   },
   subtitle: {
-    color: colors.textSecondary,
+    color: colors.tone.violet.bg,
     fontFamily: font.inter.regular,
     fontSize: type.bodyLarge.fontSize,
     lineHeight: type.bodyLarge.lineHeight,
   },
+  sheet: {
+    flexGrow: 1,
+    marginTop: -SHEET_OVERLAP,
+    paddingHorizontal: space.xl,
+    paddingTop: space.xl,
+    paddingBottom: space['3xl'],
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
+    borderCurve: 'continuous',
+    backgroundColor: colors.pageBg,
+  },
+  // 16pt sheet gutter + 16pt card padding on a 360pt phone keeps the six code boxes at 44pt.
+  sheetCompact: { paddingHorizontal: space.lg, paddingTop: space.lg },
   card: {
     gap: space.lg,
     padding: space.xl,
     borderRadius: radius.card,
+    borderCurve: 'continuous',
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceBg,

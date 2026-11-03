@@ -158,26 +158,21 @@ export default function LoginScreen() {
   return (
     <AuthLayout
       title="Welcome back"
-      subtitle="Sign in to access your hub."
+      subtitle="Sign in to manage shifts, people and your pharmacy work."
       onBack={router.canGoBack() ? () => router.back() : undefined}
       backDisabled={busy}
       footer={
         <>
           <AuthPrompt
-            text="Don't have an account?"
+            text="New to ChemistTasker?"
             action={<AuthLink label="Create account" onPress={() => router.push('/register')} disabled={busy} />}
           />
-          <Text style={styles.terms}>
-            By using ChemistTasker, you agree to the{' '}
-            <Text style={styles.termsLink} accessibilityRole="link" onPress={busy ? undefined : () => void Linking.openURL(TERMS_URL).catch(() => {})}>
-              Terms of Service
-            </Text>{' '}
-            and{' '}
-            <Text style={styles.termsLink} accessibilityRole="link" onPress={busy ? undefined : () => void Linking.openURL(PRIVACY_URL).catch(() => {})}>
-              Privacy Policy
-            </Text>
-            .
-          </Text>
+          <Text style={styles.terms}>By using ChemistTasker, you agree to the</Text>
+          {/* 44pt AuthLinks: inline Text links are too small to tap. */}
+          <View style={styles.legalLinks}>
+            <AuthLink label="Terms of Service" onPress={() => void Linking.openURL(TERMS_URL).catch(() => {})} disabled={busy} />
+            <AuthLink label="Privacy Policy" onPress={() => void Linking.openURL(PRIVACY_URL).catch(() => {})} disabled={busy} />
+          </View>
         </>
       }
     >
@@ -261,9 +256,5 @@ const styles = StyleSheet.create({
     lineHeight: type.bodySmall.lineHeight,
     textAlign: 'center',
   },
-  termsLink: {
-    color: colors.accentStrong,
-    fontFamily: font.inter.medium,
-    textDecorationLine: 'underline',
-  },
+  legalLinks: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
 });

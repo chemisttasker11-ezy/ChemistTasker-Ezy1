@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import WelcomeScreen from './welcome';
 import { officialLogo } from '../components/AuthLayout';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,7 @@ const LOGO_RATIO = 900 / 436;
 
 export default function HomeScreen() {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
@@ -46,7 +47,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       {/* Delayed fade: a fast session restore never flashes the status line. */}
-      <Animated.View entering={FadeIn.duration(durations.fast).delay(durations.slow)} style={styles.boot}>
+      <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(durations.fast).delay(durations.slow)} style={styles.boot}>
         <Image
           source={officialLogo}
           style={styles.logo}
