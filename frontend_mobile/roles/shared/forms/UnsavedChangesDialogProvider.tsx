@@ -72,7 +72,7 @@ export function UnsavedChangesDialogProvider({ children }: { children: React.Rea
     setDialogState({
       ...options,
       open: true,
-      saveLabel: options.saveLabel || 'Save Changes',
+      saveLabel: options.saveLabel || 'Save changes',
       saving: false,
     });
     return pending;
@@ -95,13 +95,13 @@ export function UnsavedChangesDialogProvider({ children }: { children: React.Rea
             <Text variant="bodyMedium">{dialogState.message}</Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button disabled={dialogState.saving} onPress={() => closeDialog('keep')}>Keep Editing</Button>
+            <Button disabled={dialogState.saving} onPress={() => closeDialog('keep')}>Keep editing</Button>
             {dialogState.onSave ? (
               <Button disabled={dialogState.saving} onPress={saveAndClose}>
-                {dialogState.saveLabel || 'Save Changes'}
+                {dialogState.saveLabel || 'Save changes'}
               </Button>
             ) : null}
-            <Button disabled={dialogState.saving} onPress={() => closeDialog('discard')}>Discard Changes</Button>
+            <Button disabled={dialogState.saving} onPress={() => closeDialog('discard')}>Discard</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

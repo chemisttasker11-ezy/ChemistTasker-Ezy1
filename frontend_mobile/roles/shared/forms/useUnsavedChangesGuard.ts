@@ -50,7 +50,7 @@ export function useUnsavedChangesGuard<T>(value: T, options: Options = {}) {
     message = defaultMessage,
     onDiscard,
     onSave,
-    saveLabel = 'Save Changes',
+    saveLabel = 'Save changes',
   } = options;
   const isFocused = useIsFocused();
   const dialog = useUnsavedChangesDialog();
