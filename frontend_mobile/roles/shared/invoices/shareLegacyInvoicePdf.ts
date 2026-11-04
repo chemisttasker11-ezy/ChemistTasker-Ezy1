@@ -12,13 +12,22 @@ export async function shareLegacyInvoicePdf(id: number): Promise<void> {
   if (bytes.length < 5 || bytes[0] !== 37 || bytes[1] !== 80 || bytes[2] !== 68 || bytes[3] !== 70 || bytes[4] !== 45) {
     throw new Error('The invoice could not be opened as a PDF.');
   }
-  // Save only in ephemeral cache; never expose credentials in a URL or persisted file name.
+  // Save only in app cache. Remove the temporary document whether sharing
+  // succeeds, is cancelled, or the native share provider reports an error.
   const file = new File(Paths.cache, `invoice-${id}-${Date.now()}.pdf`);
-  file.create({ overwrite: false });
-  await file.write(bytes);
-  await Sharing.shareAsync(file.uri, {
-    dialogTitle: 'Open or share invoice PDF',
-    mimeType: 'application/pdf',
-    UTI: 'com.adobe.pdf',
-  });
+  try {
+    file.create({ overwrite: false });
+    await file.write(bytes);
+    await Sharing.shareAsync(file.uri, {
+      dialogTitle: 'Open or share invoice PDF',
+      mimeType: 'application/pdf',
+      UTI: 'com.adobe.pdf',
+    });
+  } finally {
+    try {
+      file.delete();
+    } catch {
+      // A platform share provider may already have moved or removed the file.
+    }
+  }
 }

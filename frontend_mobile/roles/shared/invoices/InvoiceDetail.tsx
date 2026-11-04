@@ -92,7 +92,7 @@ export default function InvoiceDetail({ basePath }: Props) {
   const segments = useSegments();
   const role = (segments[0] as string) || 'pharmacist';
   const resolvedBase = basePath || `/${role}/invoice`;
-  const isReceivedMode = role === 'owner';
+  const isReceivedMode = ['owner', 'organization', 'admin'].includes(String(role).toLowerCase());
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);

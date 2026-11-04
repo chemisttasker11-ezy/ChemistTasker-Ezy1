@@ -12,7 +12,11 @@ test('legacy invoice UI uses bearer-authenticated shared-core PDF retrieval, not
   assert.match(helper, /nativeFileBytes\(blob\)/);
   assert.match(helper, /new File\(Paths\.cache/);
   assert.match(helper, /Sharing\.shareAsync\(file\.uri/);
+  assert.match(helper, /finally\s*\{/);
+  assert.match(helper, /file\.delete\(\)/);
   assert.doesNotMatch(helper, /Linking\.openURL|getInvoicePdfUrl|\?token=/);
+  const detail = read('roles/shared/invoices/InvoiceDetail.tsx');
+  assert.match(detail, /\['owner', 'organization', 'admin'\]\.includes/);
   for (const screen of ['InvoiceList.tsx', 'InvoiceDetail.tsx']) {
     const source = read('roles/shared/invoices/' + screen);
     assert.match(source, /shareLegacyInvoicePdf\(/);
