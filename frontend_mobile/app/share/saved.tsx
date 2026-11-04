@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,13 +13,23 @@ export default function SavedQrContacts() {
   const { user } = useAuth();
   const [contacts, setContacts] = useState<SavedContact[]>([]);
   const [error, setError] = useState('');
+  const generation = useRef(0);
   const id = user?.id;
   const reload = useCallback(async () => {
-    if (id == null) { setContacts([]); return; }
-    try { setContacts(await listSavedContacts(id)); setError(''); }
-    catch { setError('Could not read saved contacts.'); }
+    const ticket = ++generation.current;
+    setContacts([]);
+    if (id == null) return;
+    try {
+      const rows = await listSavedContacts(id);
+      if (ticket === generation.current) { setContacts(rows); setError(''); }
+    } catch {
+      if (ticket === generation.current) setError('Could not read saved contacts.');
+    }
   }, [id]);
-  useFocusEffect(useCallback(() => { void reload(); }, [reload]));
+  useFocusEffect(useCallback(() => {
+    void reload();
+    return () => { generation.current++; };
+  }, [reload]));
   const open = async (contact: SavedContact) => {
     if (contact.kind === 'pharmacy-invitation') {
       router.push({ pathname: '/membership/apply/[token]', params: { token: contact.token } } as any);
@@ -29,14 +39,17 @@ export default function SavedQrContacts() {
   };
   const remove = async (url: string) => {
     if (id == null) return;
-    try { setContacts(await removeContact(id, url)); }
-    catch { setError('Could not remove this saved contact.'); }
+    const ticket = ++generation.current;
+    try {
+      const rows = await removeContact(id, url);
+      if (ticket === generation.current) setContacts(rows);
+    } catch { if (ticket === generation.current) setError('Could not remove this saved contact.'); }
   };
   return <SafeAreaView style={styles.page} edges={['top','left','right','bottom']}>
     <ScrollView contentContainerStyle={styles.content}>
       <Button icon="arrow-left" onPress={() => router.back()}>Back</Button>
       <Text variant="headlineMedium" style={styles.title}>Saved QR contacts</Text>
-      <Text style={styles.muted}>Saved only on this device and scoped to this account. No membership or favourite status is created by saving.</Text>
+      <Text style={styles.muted}>Public worker and organisation contacts sync to your account when online. Pharmacy invitation codes stay securely on this device. Saving never creates staff or favourite status.</Text>
       {contacts.length ? contacts.map(contact => <Card key={contact.url} mode="outlined" style={styles.card}><Card.Content style={styles.group}>
         <Text variant="titleMedium">{safeShareCodeLabel(contact)}</Text>
         <Text selectable style={styles.muted}>{contact.url}</Text>

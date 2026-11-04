@@ -1,5 +1,6 @@
 """QR bookmarks: user isolation, public visibility, idempotence and refusal controls."""
 from django.test import TestCase
+from django.utils import timezone
 from client_profile.characterization_support import BASE, client_for, make_user
 from talent.models import ExplorerPost, SavedProfessionalContact
 from organizations.models import Organization
@@ -12,7 +13,7 @@ class SavedProfessionalContactsTests(TestCase):
         self.other = make_user("PHARMACIST")
         self.worker = make_user("OTHER_STAFF")
         self.public = ExplorerPost.objects.create(author_user=self.worker, headline="Available", reference_code="PUBWORKER12")
-        self.hidden = ExplorerPost.objects.create(author_user=self.worker, headline="Hidden", reference_code="PUBHIDDEN12", hidden_at=__import__('django.utils.timezone',fromlist=['now']).now())
+        self.hidden = ExplorerPost.objects.create(author_user=self.worker, headline="Hidden", reference_code="PUBHIDDEN12", hidden_at=timezone.now())
         self.organisation = Organization.objects.create(name="Test organisation", slug="test-organisation")
 
     def test_auth_required_and_get_only_own_rows(self):

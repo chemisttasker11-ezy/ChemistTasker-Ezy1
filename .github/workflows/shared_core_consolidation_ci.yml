@@ -211,7 +211,7 @@ jobs:
         run: node --test scripts/admin-workspace-refresh.test.cjs scripts/calendar-request-budget.test.cjs scripts/attendance-double-clock.test.cjs scripts/attendance-pin-guidance.test.cjs scripts/invoice-generation.test.cjs scripts/native-file-bytes.test.cjs scripts/invoice-pdf-auth.test.cjs scripts/finance-revision-history.test.cjs scripts/marketplace-parity.test.cjs scripts/marketplace-terms.test.cjs scripts/ethical-scope.test.cjs features/parity/marketplaceBrowseModel.test.mjs features/support/contactModel.test.mjs scripts/worker-roster-ack.test.cjs scripts/timesheet-workspace-scope.test.cjs roles/shared/timesheets/timesheetDetailPolicy.test.mjs roles/shared/timesheets/timesheetDetailRoutes.test.mjs roles/shared/timesheets/timesheetAdjustmentPolicy.test.mjs roles/shared/messages/messageHistory.test.mjs roles/shared/messages/messageHistoryRoutes.test.mjs roles/shared/chat/pharmacyChats.test.mjs roles/explorer/explorerHomeModel.test.mjs roles/explorer/explorerDashboardRoutes.test.mjs roles/pharmacist/learningSearch.test.mjs features/parity/attendanceLocum.test.mjs features/parity/attendanceCoverTerms.test.mjs roles/shared/pharmacies/membershipApi.test.mjs roles/shared/pharmacies/organizationClaims.test.mjs roles/shared/calendar/calendarScope.test.mjs roles/shared/availability/availabilityModel.test.mjs roles/shared/shifts/activeShifts.test.mjs roles/shared/shifts/confirmedPayroll.test.mjs roles/shared/shifts/workerShiftPermissions.test.mjs roles/shared/memberships/magicApply.test.mjs
         working-directory: frontend_mobile
       - name: Mobile install, QR, security and next-shift regression contracts
-        run: node --test features/nextShift/nextShiftModel.test.mjs features/share/shareCode.test.mjs utils/appLock.test.mjs scripts/mobile-settings.test.cjs scripts/notification-push-preferences.test.cjs scripts/app-lock-settings.test.cjs scripts/next-shifts-access.test.cjs scripts/public-worker-qr.test.cjs scripts/public-articles.test.cjs scripts/public-community.test.cjs scripts/w8-legal-and-editorial.test.cjs
+        run: node --test features/nextShift/nextShiftModel.test.mjs features/share/shareCode.test.mjs utils/appLock.test.mjs scripts/mobile-settings.test.cjs scripts/notification-push-preferences.test.cjs scripts/saved-contact-sync.test.cjs scripts/app-lock-settings.test.cjs scripts/next-shifts-access.test.cjs scripts/public-worker-qr.test.cjs scripts/public-articles.test.cjs scripts/public-community.test.cjs scripts/w8-legal-and-editorial.test.cjs
         working-directory: frontend_mobile
       - name: Verify patched runtime dependencies and reject new advisories
         run: npm run security:dependencies
@@ -247,6 +247,8 @@ jobs:
         run: python backend/manage.py test shifts.test_operational_outages --settings=core.contract_test_settings
       - name: Notification preference isolation and quiet-hours contracts
         run: python backend/manage.py test notifications.test_push_preferences notifications.test_delivery_isolation --settings=core.contract_test_settings
+      - name: Saved public professional QR contact isolation contracts
+        run: python backend/manage.py test talent.test_saved_professional_contacts --settings=core.contract_test_settings
       - name: Marketplace contracts
         run: python backend/manage.py test marketplace.tests marketplace.test_listing_policy ethical_marketplace.tests ethical_marketplace.test_finalisation marketplace.test_pr201_b24_b25 --settings=core.contract_test_settings
       - name: Large-module ratchet
