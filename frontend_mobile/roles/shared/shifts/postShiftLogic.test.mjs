@@ -37,6 +37,7 @@ const helpers = loadTs('./PostShiftScreen.helpers.ts', {
 const {
   parsePostShiftSearchParams,
   pickScopedPharmacyId,
+  pickRetryPostShiftPharmacyId,
   canAccessPostShift,
   normalizePrefillRole,
   getStablePostShiftParamsKey,
@@ -189,6 +190,19 @@ test('pickScopedPharmacyId precedence swap test: routeId must strictly beat scop
     picked,
     'A swap in precedence must produce a different result and fail',
   );
+});
+
+
+test('same-scope Post Shift retry retains authorized pharmacy without cross-pharmacy leakage', () => {
+  const allowed = [{ id: 7 }, { id: 12 }];
+  assert.equal(pickRetryPostShiftPharmacyId(12, 7, allowed), 12,
+    'keep manually selected authorized pharmacy');
+  assert.equal(pickRetryPostShiftPharmacyId(18, 7, allowed), 7,
+    'revoke a selection no longer present in the authorized list');
+  assert.equal(pickRetryPostShiftPharmacyId(12, '', []), '',
+    'no pharmacy may remain selected when authorization list becomes empty');
+  assert.equal(pickRetryPostShiftPharmacyId('', 7, allowed), 7,
+    'first load should use authorized default');
 });
 
 test('canAccessPostShift guards entry points based on surface persona, capabilities and ready state', () => {
