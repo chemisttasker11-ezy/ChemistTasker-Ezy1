@@ -46,6 +46,7 @@ import {
     normalizePrefillRole,
     parsePostShiftSearchParams,
     pickScopedPharmacyId,
+    pickRetryPostShiftPharmacyId,
     canAccessPostShift,
     type PostShiftRawParams,
     AppliedPrefills,
@@ -605,14 +606,9 @@ export default function PostShiftScreen() {
                 scopedPharmacyId: surface.scopedPharmacyId,
                 pharmacies: pharmacyList,
             });
-            if (nextPharmacy !== '') {
-                setPharmacyId(current => preserveDraft && pharmacyList.some(p => String(p.id) === current)
-                    ? current
-                    : nextPharmacy);
-            } else if (preserveDraft) {
-                // A previously selected pharmacy can disappear after permissions change.
-                setPharmacyId(current => pharmacyList.some(p => String(p.id) === current) ? current : '');
-            }
+            setPharmacyId(current => preserveDraft
+                ? pickRetryPostShiftPharmacyId(current, nextPharmacy, pharmacyList)
+                : nextPharmacy);
             applyBookingPrefillFromParams();
             setLoading(false);
             return;
