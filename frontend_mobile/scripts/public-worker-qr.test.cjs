@@ -20,11 +20,11 @@ test('scan-to-invite handoff requires a public listing, pharmacy selection and e
  const handoff=read('features/share/InviteFromWorkerQr.tsx');
  assert.match(scanner,/code.kind === 'worker-public-listing'/);
  assert.match(scanner,/InviteFromWorkerQr/);
- assert.match(handoff,/getPublicTalentFeed\\(\\{ reference_code: referenceCode, page_size: 2 \\}\\)/);
+ assert.match(handoff,/getPublicTalentFeed\(\{ reference_code: referenceCode, page_size: 2 \}\)/);
  assert.match(handoff,/createMembershipInviteLinkService/);
- assert.match(handoff,/if \\(!verified \\|\\| !pharmacyId/);
- assert.match(handoff,/Alert\\.alert\\('Generate pharmacy invitation\\?'/);
+ assert.match(handoff,/if \(!verified \|\| !pharmacyId/);
+ assert.match(handoff,/Alert\.alert\('Generate pharmacy invitation\?'/);
  assert.match(handoff,/worker must submit the form/i);
- assert.doesNotMatch(handoff,/approveMembership\\(|createMembership\\(|addFavorite\\(/);
- assert.doesNotMatch(handoff,/role\\.startsWith\\('ORG_'\\)/);
+ assert.doesNotMatch(handoff,/approveMembership\(|createMembership\(|addFavorite\(/);
+ assert.doesNotMatch(handoff,/role\.startsWith\('ORG_'\)/);
 });
