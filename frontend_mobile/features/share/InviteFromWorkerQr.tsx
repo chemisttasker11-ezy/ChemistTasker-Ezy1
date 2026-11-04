@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Share, StyleSheet, View } from 'react-native';
 import { Button, Chip, Text } from 'react-native-paper';
-import { createMembershipInviteLinkService, fetchPharmaciesService } from '@chemisttasker/shared-core';
+import { createMembershipInviteLinkService, fetchPharmaciesService, getPublicTalentFeed } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { colors, space } from '@/constants/tokens';
@@ -18,7 +18,7 @@ export default function InviteFromWorkerQr({ referenceCode }: { referenceCode: s
   const { selectedPharmacyId } = useWorkspace();
   const role = String(user?.role || '').toUpperCase();
   const roleMayManage = role === 'OWNER' || role === 'ORGANIZATION' ||
-    role.startsWith('ORG_') || role === 'REGION_ADMIN' ||
+    ['ORG_OWNER', 'ORG_ADMIN'].includes(role) || role === 'REGION_ADMIN' ||
     role === 'CHIEF_ADMIN' || role === 'PHARMACY_MANAGER';
   const [pharmacies, setPharmacies] = useState<PharmacyChoice[]>([]);
   const [pharmacyId, setPharmacyId] = useState('');
@@ -27,15 +27,33 @@ export default function InviteFromWorkerQr({ referenceCode }: { referenceCode: s
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [inviteUrl, setInviteUrl] = useState('');
+  const [verified, setVerified] = useState(false);
+  const [workerLabel, setWorkerLabel] = useState('');
 
   useEffect(() => {
     let live = true;
     setPharmacies([]);
     setPharmacyId('');
     setInviteUrl('');
+    setVerified(false);
+    setWorkerLabel('');
     if (!user?.id) return () => { live = false; };
     setLoading(true);
-    void fetchPharmaciesService({}).then((response: any) => {
+    // A forged/unpublished QR can never open invitation creation without a fresh public lookup.
+    void Promise.all([
+      getPublicTalentFeed({ reference_code: referenceCode, page_size: 2 }),
+      fetchPharmaciesService({}),
+    ]).then(([publicResult, response]: [any, any]) => {
+      if (!live) return;
+      const publicRows: any[] = Array.isArray(publicResult?.results) ? publicResult.results :
+        Array.isArray(publicResult) ? publicResult : [];
+      const published = publicRows.find(row => row?.reference_code === referenceCode);
+      if (!published) {
+        setError('This worker listing is no longer public. No invitation can be generated.');
+        return;
+      }
+      setVerified(true);
+      setWorkerLabel(String(published.headline || 'Public worker listing').slice(0, 120));
       if (!live) return;
       const rows: any[] = Array.isArray(response?.results) ? response.results :
         Array.isArray(response) ? response : [];
@@ -56,10 +74,10 @@ export default function InviteFromWorkerQr({ referenceCode }: { referenceCode: s
       if (live) setError('Pharmacy choices could not be loaded. Reopen the scanner to retry.');
     }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [user?.id, selectedPharmacyId, roleMayManage, hasCapability]);
+  }, [user?.id, selectedPharmacyId, roleMayManage, hasCapability, referenceCode]);
 
   const createInvite = async () => {
-    if (!pharmacyId || sending || !pharmacies.some(row => row.id === pharmacyId)) return;
+    if (!verified || !pharmacyId || sending || !pharmacies.some(row => row.id === pharmacyId)) return;
     setSending(true);
     setInviteUrl('');
     setError('');
@@ -80,7 +98,7 @@ export default function InviteFromWorkerQr({ referenceCode }: { referenceCode: s
   };
 
   const confirm = () => {
-    if (!pharmacyId || sending) return;
+    if (!verified || !pharmacyId || sending) return;
     Alert.alert('Generate pharmacy invitation?', 'This creates a reusable 14-day link for the selected pharmacy. It is NOT addressed to the scanned worker, and sharing it does not add a member or grant favourite access.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Generate link', onPress: () => void createInvite() },
@@ -99,9 +117,9 @@ export default function InviteFromWorkerQr({ referenceCode }: { referenceCode: s
   if (!user || (!roleMayManage && !pharmacies.length && !loading)) return null;
   return <View style={styles.group}>
     <Text variant="titleMedium">Invite this professional to your pharmacy</Text>
-    <Text style={styles.muted}>Worker public reference: {referenceCode}. The service does not expose the worker email or create a targeted invitation. Choose the pharmacy and share its application link with the intended person.</Text>
+    <Text style={styles.muted}>Public worker reference: {referenceCode}. {verified ? workerLabel : 'Checking listing visibility…'} The link is not addressed to the worker. No email or private worker identity is revealed.</Text>
     {loading ? <Text style={styles.muted}>Loading authorised pharmacies…</Text> : null}
-    {pharmacies.length ? <>
+    {pharmacies.length && verified ? <>
       <Text style={styles.muted}>Select pharmacy</Text>
       <View style={styles.options}>{pharmacies.map(row =>
         <Chip key={row.id} selected={pharmacyId === row.id} onPress={() => {setPharmacyId(row.id);setInviteUrl('');}}>
@@ -113,7 +131,7 @@ export default function InviteFromWorkerQr({ referenceCode }: { referenceCode: s
         <Chip selected={category === 'FULL_PART_TIME'} onPress={() => {setCategory('FULL_PART_TIME');setInviteUrl('');}}>Staff employment</Chip>
         <Chip selected={category === 'LOCUM_CASUAL'} onPress={() => {setCategory('LOCUM_CASUAL');setInviteUrl('');}}>Favourite / locum</Chip>
       </View>
-      <Button mode="outlined" disabled={!pharmacyId || loading || sending} loading={sending} onPress={confirm}>
+      <Button mode="outlined" disabled={!verified || !pharmacyId || loading || sending} loading={sending} onPress={confirm}>
         Generate review-required invitation
       </Button>
       {inviteUrl ? <>
@@ -121,7 +139,7 @@ export default function InviteFromWorkerQr({ referenceCode }: { referenceCode: s
         <Button mode="contained" onPress={() => void share()}>Share invitation with intended worker</Button>
         <Text style={styles.muted}>The worker must submit the form. The pharmacy must still review and approve it.</Text>
       </> : null}
-    </> : !loading ? <Text style={styles.muted}>No pharmacy with invitation access is currently available in your account.</Text> : null}
+    </> : !loading && verified && !pharmacies.length ? <Text style={styles.muted}>No pharmacy with invitation access is currently available in your account.</Text> : null}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
   </View>;
 }
