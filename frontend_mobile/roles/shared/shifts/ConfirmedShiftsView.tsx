@@ -9,15 +9,11 @@ import {
 import {
     activateShiftOfferPayrollService,
     fetchAllConfirmedShifts,
-    fetchShiftOffers,
-
-    type ShiftOfferApi,
-
+    fetchDeferredPayrollOffersService,
     type Shift,
     type ShiftUser,
     viewAssignedShiftProfileService,
 } from '@chemisttasker/shared-core';
-import { camelCaseKeysDeep, fetchAllPages } from '@chemisttasker/shared-core/dist/utils/serialization';
 import { ContentState } from '@/components/ui';
 import { colors, radius, space } from '@/constants/tokens';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
@@ -129,16 +125,8 @@ export default function ConfirmedShiftsView() {
         setPayrollLoading(true);
         setPayrollError(null);
         try {
-            const [acceptedRaw, awaitingRaw] = await Promise.all([
-                fetchAllPages<ShiftOfferApi>((page) =>
-                    fetchShiftOffers(`?status=ACCEPTED&page=${page}`)
-                ),
-                fetchAllPages<ShiftOfferApi>((page) =>
-                    fetchShiftOffers(`?status=ACCEPTED_AWAITING_PAYMENT&page=${page}`)
-                ),
-            ]);
+            const rows = await fetchDeferredPayrollOffersService() as DeferredPayrollOffer[];
             if (gen !== payrollGenRef.current) return;
-            const rows = [...acceptedRaw, ...awaitingRaw].map(camelCaseKeysDeep) as unknown as DeferredPayrollOffer[];
             const filtered = filterDeferredPayrollOffers(rows, scopedPharmacyId);
             setDeferredPayrollOffers((prev) => (filtered.length === 0 && prev.length === 0 ? prev : filtered));
         } catch (err: any) {
