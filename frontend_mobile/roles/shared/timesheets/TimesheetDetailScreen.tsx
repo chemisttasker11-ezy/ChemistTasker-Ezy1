@@ -92,7 +92,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
     const when = missingPunchAt.trim();
     const note = missingPunchReason.trim();
     if (!Number.isSafeInteger(sessionId) || sessionId <= 0) { setError('This check has no attendance session to correct.'); return; }
-    if (!/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$/.test(when) || !Number.isFinite(Date.parse(when))) { setError('Enter a valid local date and time in YYYY-MM-DDTHH:mm format.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when) || !Number.isFinite(Date.parse(when))) { setError('Enter a valid local date and time in YYYY-MM-DDTHH:mm format.'); return; }
     if (!note) { setError('A reason is required for this attendance correction.'); return; }
     const eventType = missingPunchCheck.code === 'MISSING_CLOCK_IN' ? 'CLOCK_IN' : 'CLOCK_OUT';
     void run('punch', () => workforce.addMissingPunch(timesheetId, { sessionId, eventType, occurredAtLocal: when, reason: note }), 'Missing attendance time added for review.').then(saved => {
