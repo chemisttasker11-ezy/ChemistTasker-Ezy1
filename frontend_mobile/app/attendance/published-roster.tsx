@@ -80,7 +80,7 @@ export default function WorkerPublishedRosterScreen() {
       : shifts.map(shift => {
         const period = shift.period_id;
         const showAction = period != null && actionablePeriods.has(period) && !seenPeriods.has(period);
-        if (period != null) seenPeriods.add(period);
+        if (showAction && period != null) seenPeriods.add(period);
         return <Card key={shift.assignment_id} mode="outlined" style={styles.card}>
           <Card.Content style={styles.cardContent}>
             <View style={styles.row}>
