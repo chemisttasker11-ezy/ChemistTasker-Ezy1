@@ -29,6 +29,9 @@ test('worker and manager timesheet routes share a native detail implementation b
   assert.match(adjustment, /attendance\.correct/);
   assert.match(adjustment, /workforce\.recalculateTimesheet/);
   assert.match(adjustment, /correctionValidation/);
+  assert.match(adjustment, /finally\s*\{/);
+  assert.match(adjustment, /Partially saved attendance/);
+  assert.match(adjustment, /Recalculation required/);
   assert.match(detail, /hasCapability\('MANAGE_ROSTER'/);
   assert.match(detail, /data\?\.period_status === 'LOCKED'/);
   assert.match(detail, /managerAllowed && !periodLocked/);

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { attendance, workforce, type AttendanceTimeline, type AttendanceTimelineEvent } from '@chemisttasker/shared-core';
 import { BottomSheet } from '@/components/ui';
@@ -111,41 +111,43 @@ export default function TimesheetAdjustTimesSheet({
     setError('');
     let savedCount = 0;
     try {
-      for (const position of ordered) {
-        const change = byType[position];
-        await attendance.correct(change.event.event_id, change.stamp, reason.trim());
-        savedCount += 1;
+      try {
+        for (const position of ordered) {
+          const change = byType[position];
+          await attendance.correct(change.event.event_id, change.stamp, reason.trim());
+          savedCount += 1;
+        }
+      } catch (failure) {
+        if (savedCount > 0) {
+          // The server records two independent audited events; be explicit when
+          // only one succeeded. Recovery must not leave the sheet permanently busy.
+          try { await workforce.recalculateTimesheet(timesheetId); } catch { /* refresh still needed */ }
+          try { await onSaved(); } catch { /* show original partial-write failure */ }
+          try { await reload(); } catch { /* retain the original error */ }
+          const detail = 'One clock time was saved, but the other failed: ' + message(failure) + '. Review the recorded times before retrying.';
+          setError(detail);
+          Alert.alert('Partially saved attendance', detail);
+        } else {
+          setError(message(failure));
+        }
+        return;
       }
-    } catch (failure) {
-      if (savedCount > 0) {
-        // Never pretend an all-or-nothing write: preserve the audit event,
-        // rebuild accepted hours, and present the actual partial outcome.
-        try { await workforce.recalculateTimesheet(timesheetId); } catch { /* recovery follows */ }
+      try {
+        await workforce.recalculateTimesheet(timesheetId);
+      } catch (failure) {
+        try { await onSaved(); } catch { /* audit write succeeded */ }
+        try { await reload(); } catch { /* show recalculation error */ }
+        const detail = 'Clock correction saved, but hours could not be recalculated: ' + message(failure) + '. Recalculate the timesheet before approving.';
+        setError(detail);
+        Alert.alert('Recalculation required', detail);
+        return;
+      }
+      try {
         await onSaved();
-        await reload();
-        setError('One attendance event was saved, but the other failed: ' + message(failure) + ' Review the latest times before retrying.');
-      } else {
-        setError(message(failure));
+        onClose();
+      } catch (failure) {
+        setError('Clock correction saved, but refreshed hours could not load: ' + message(failure));
       }
-      busyRef.current = false;
-      setBusy(false);
-      return;
-    }
-    try {
-      await workforce.recalculateTimesheet(timesheetId);
-    } catch (failure) {
-      await onSaved();
-      await reload();
-      setError('Attendance correction saved, but recalculation failed: ' + message(failure) + ' Recalculate reviewed hours before approving.');
-      busyRef.current = false;
-      setBusy(false);
-      return;
-    }
-    try {
-      await onSaved();
-      onClose();
-    } catch (failure) {
-      setError('Attendance saved, but refreshed hours could not load: ' + message(failure));
     } finally {
       busyRef.current = false;
       setBusy(false);

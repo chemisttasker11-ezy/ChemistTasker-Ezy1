@@ -168,7 +168,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
             timesheetId={timesheetId} sessionId={adjustingDay.session_id}
             pharmacyId={data.pharmacy.id} workerId={data.worker.id}
             timeZone={timeZone} onClose={() => setAdjustingDay(null)}
-            onSaved={load}
+            onSaved={async () => { setAdjustingDay(null); await load(); }}
           /> : null}
         <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
           <Text style={styles.sectionTitle}>Checks and exceptions</Text>
