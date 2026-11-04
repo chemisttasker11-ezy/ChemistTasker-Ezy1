@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Chip, Icon, Modal, Portal, Snackbar, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import {
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useAhpra } from '@/context/AhpraContext';
+import { colors, radius, space } from '@/constants/tokens';
 
 type AdminInvitation = {
   id: number;
@@ -62,12 +63,14 @@ function adminCapabilitiesText(membership: Membership) {
 }
 
 export default function ManageMembershipsScreen() {
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const generationRef = useRef(0);
   const { refresh: refreshAhpra } = useAhpra();
   const theme = useTheme();
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [adminInvitations, setAdminInvitations] = useState<AdminInvitation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadedOnce, setLoadedOnce] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [actingKey, setActingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -75,11 +78,13 @@ export default function ManageMembershipsScreen() {
   const [toast, setToast] = useState<string | null>(null);
 
   const loadMemberships = useCallback(async () => {
+    const generation = ++generationRef.current;
     try {
       const [membershipsResult, invitationsResult] = await Promise.allSettled([
         getMyMemberships(),
         getPendingPharmacyAdminInvitations(),
       ]);
+      if (generation !== generationRef.current) return;
       if (membershipsResult.status === 'rejected') throw membershipsResult.reason;
       const data = membershipsResult.value;
       setMemberships((Array.isArray(data) ? data : data?.results || []) as unknown as Membership[]);
@@ -91,16 +96,25 @@ export default function ManageMembershipsScreen() {
         setError('Memberships loaded, but admin invitations could not be refreshed. Pull down to try again.');
       }
     } catch (err: any) {
-      setError(getMembershipErrorMessage(err, 'Unable to load memberships.'));
+      if (generation === generationRef.current) setError(getMembershipErrorMessage(err, 'Unable to load memberships.'));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (generation === generationRef.current) {
+        setLoadedOnce(true);
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    // Never show a previous account's pharmacy invites after an identity switch.
+    setMemberships([]);
+    setAdminInvitations([]);
+    setLoadedOnce(false);
+    setLoading(true);
     void loadMemberships();
-  }, [loadMemberships]);
+    return () => { generationRef.current += 1; };
+  }, [loadMemberships, user?.id]);
 
   const runAction = async (membership: Membership, action: 'accept' | 'reject' | 'quit') => {
     setActingKey(`membership-${membership.id}`);
@@ -146,7 +160,7 @@ export default function ManageMembershipsScreen() {
           <Text variant="bodyMedium" style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>Review pharmacy invitations and manage the pharmacies you belong to.</Text>
         </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <View style={styles.errorPanel}><Text style={styles.error}>{error}</Text><Button mode="outlined" onPress={() => void loadMemberships()}>Retry</Button></View> : null}
         {adminInvitations.length ? <Text variant="titleSmall" style={styles.sectionTitle}>Admin invitations</Text> : null}
         {adminInvitations.map((invitation) => (
           <Card key={`admin-${invitation.id}`} style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outlineVariant }]}>
@@ -162,7 +176,7 @@ export default function ManageMembershipsScreen() {
           </Card>
         ))}
         {loading ? <Text style={styles.emptyText}>Loading memberships...</Text> : null}
-        {!loading && memberships.length === 0 ? (
+        {!loading && loadedOnce && !error && memberships.length === 0 && adminInvitations.length === 0 ? (
           <Card style={[styles.emptyCard, { backgroundColor: theme.colors.surface }]}>
             <Card.Content>
               <Text variant="titleMedium" style={styles.cardTitle}>No memberships yet</Text>
@@ -257,31 +271,32 @@ export default function ManageMembershipsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 32 },
+  content: { padding: space.xl, paddingBottom: space['3xl'] },
   header: { marginBottom: 18 },
-  title: { fontWeight: '900' },
+  title: { color: colors.textPrimary, fontWeight: '600' },
   subtitle: { marginTop: 6, lineHeight: 20 },
   sectionTitle: { marginBottom: 10, fontWeight: '800' },
-  error: { color: '#DC2626', marginBottom: 12, fontWeight: '700' },
-  emptyText: { color: '#6B7280', textAlign: 'center', marginTop: 20 },
-  emptyCard: { borderRadius: 16, backgroundColor: '#FFFFFF' },
-  card: { borderRadius: 16, marginBottom: 12, borderWidth: 1 },
+  error: { color: colors.status.red.fg, marginBottom: space.sm, fontWeight: '600' },
+  errorPanel: { padding: space.md, borderRadius: radius.nested, borderWidth: 1, borderColor: colors.status.red.fg, marginBottom: space.md },
+  emptyText: { color: colors.textSecondary, textAlign: 'center', marginTop: 20 },
+  emptyCard: { borderRadius: radius.card, backgroundColor: colors.surfaceBg },
+  card: { borderRadius: radius.card, marginBottom: space.md, borderWidth: 1 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconWrap: { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   cardHeaderText: { flex: 1 },
-  cardTitle: { color: '#111827', fontWeight: '800' },
-  muted: { color: '#6B7280', marginTop: 2 },
-  detail: { color: '#6B7280', marginTop: 8, fontSize: 13, lineHeight: 18 },
+  cardTitle: { color: colors.textPrimary, fontWeight: '600' },
+  muted: { color: colors.textSecondary, marginTop: 2 },
+  detail: { color: colors.textSecondary, marginTop: 8, fontSize: 13, lineHeight: 18 },
   chip: { alignSelf: 'flex-start' },
-  pendingChip: { backgroundColor: '#FEF3C7' },
-  acceptedChip: { backgroundColor: '#D1FAE5' },
-  neutralChip: { backgroundColor: '#E5E7EB' },
+  pendingChip: { backgroundColor: colors.status.amber.bg },
+  acceptedChip: { backgroundColor: colors.status.green.bg },
+  neutralChip: { backgroundColor: colors.subtleBg },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 },
   primaryButton: { borderRadius: 12 },
   dangerOutline: { borderRadius: 12, borderColor: '#FCA5A5' },
   modal: { margin: 20, padding: 20, borderRadius: 16 },
-  modalTitle: { color: '#111827', fontWeight: '900', marginBottom: 8 },
-  modalBody: { color: '#6B7280', lineHeight: 20 },
+  modalTitle: { color: colors.textPrimary, fontWeight: '600', marginBottom: 8 },
+  modalBody: { color: colors.textSecondary, lineHeight: 20 },
   modalActions: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 18 },
   modalButton: { borderRadius: 12 },
 });
