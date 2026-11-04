@@ -468,7 +468,7 @@ export default function PublicShiftsPage({
     }
     setTermsConfirming(true);
     try {
-      await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, payload)));
+      await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, { ...payload, termsVersion: offer.engagementTermsPreview?.termsVersion })));
       setTermsOffers([]);
       await loadOffers();
     } catch (err) {
