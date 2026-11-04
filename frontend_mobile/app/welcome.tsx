@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeInUp, useReducedMotion } from 'react-native-reanimated';
-import { Building2, Check, LogIn, ShieldCheck, Smartphone, UserPlus, Users } from 'lucide-react-native';
+import { Building2, Check, LogIn, Search, ShieldCheck, Smartphone, UserPlus, Users } from 'lucide-react-native';
 import { Button, IconTile, ScalePressable, type Tone } from '@/components/ui';
 import { AuthLink, BrandBand, BrandStatusStrip, useBrandTopRow } from '@/components/AuthLayout';
 import { colors, font, radius, space, tokens, touch, type } from '@/constants/tokens';
@@ -253,6 +253,12 @@ export default function WelcomeScreen() {
                             onPress={() => router.push(role ? { pathname: '/register', params: { role } } : '/register')}
                         />
                         <Button variant="outlined" label="Sign in" icon={<LogIn />} onPress={() => router.push('/login')} />
+                        <Button
+                            variant="outlined"
+                            label="Browse shifts"
+                            icon={<Search />}
+                            onPress={() => router.push('/shifts/public-board')}
+                        />
                     </View>
                 </View>
             </SafeAreaView>

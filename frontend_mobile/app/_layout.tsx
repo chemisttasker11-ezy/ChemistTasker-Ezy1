@@ -15,6 +15,7 @@ import '../config/api'; // Configure shared-core on app load
 import { en, registerTranslation } from 'react-native-paper-dates';
 import { getOwnerSetupStatus, ownerSetupPaths } from '../utils/ownerSetup';
 import { initializeMobileSslPinning } from '../utils/sslPinning';
+import { evaluateRouteDecision, isPublicShiftRoute } from '../roles/shared/shifts/publicShiftRoute';
 import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChangesDialogProvider';
 import { UnsavedChangesRegistryProvider, useGuardedNavigation } from '../roles/shared/forms/UnsavedChangesRegistryProvider';
 import { decideAppUpdate, fetchMobileAppConfig, getInstalledAppVersion } from '../utils/appUpdates';
@@ -251,6 +252,7 @@ function AuthGate() {
     const third = segmentList[2];
     const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
     const isPublic = publicRoutes.has(top ?? '');
+
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
     // It is never included in normal startup or navigation menus.
     const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'kiosk-link', 'attendance-pin', 'my-hours', 'my-roster', 'my-leave', 'workforce-timesheets', 'workforce-settings', 'admin-invitations']);
@@ -273,6 +275,25 @@ function AuthGate() {
 
     let active = true;
     const runGate = async () => {
+      const normalizedRole = String(user?.role || '').toUpperCase();
+
+      if (top === 'shifts') {
+        const ownerNextPath = normalizedRole === 'OWNER' ? (await getOwnerSetupStatus(user)).nextPath : null;
+        if (!active) return;
+        const decision = evaluateRouteDecision({
+          user,
+          segments,
+          ahpra: { frozen: ahpraSummary?.frozen, refusal: Boolean(ahpraRefusal), state: ahpraSummary?.state },
+          ownerNextPath,
+        });
+        if (decision.type === 'redirect') {
+          router.replace(decision.path as any);
+          return;
+        }
+        if (decision.type === 'allow') {
+          return;
+        }
+      }
       if (user && !user.is_mobile_verified && !user.mobile_check_skipped) {
         if (top !== 'mobile-verify') {
           router.replace('/mobile-verify' as any);
@@ -360,6 +381,7 @@ function AuthGate() {
 
         if (hasOrganizationAccess(user)) {
           if (top === 'organization') return;
+          if (isPublicShiftRoute(segments)) return;
           if (!['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(normalizedRole)) {
             router.replace('/organization/dashboard' as any);
             return;
@@ -381,13 +403,17 @@ function AuthGate() {
             return;
           }
 
-          if (top !== 'owner') {
-            router.replace((status.nextPath || ownerSetupPaths.dashboard) as any);
+          if (status.nextPath) {
+            router.replace(status.nextPath as any);
             return;
           }
 
-          if (status.nextPath) {
-            router.replace(status.nextPath as any);
+          if (isPublicShiftRoute(segments)) {
+            return;
+          }
+
+          if (top !== 'owner') {
+            router.replace((status.nextPath || ownerSetupPaths.dashboard) as any);
             return;
           }
 
@@ -399,6 +425,10 @@ function AuthGate() {
           return;
         }
 
+        if (isPublicShiftRoute(segments)) {
+            return;
+          }
+
         const expectedTop = expectedTopByRole[normalizedRole];
         if (expectedTop && top !== expectedTop) {
           router.replace(getRoleHome(user.role) as any);
@@ -407,7 +437,7 @@ function AuthGate() {
       }
 
       // `/` has no segments; it is the landing (app/index.tsx), which also routes a signed-in user itself.
-      if (!user && !isPublic && top !== undefined) {
+      if (!user && !isPublic && !isPublicShiftRoute(segments) && top !== undefined) {
         router.replace('/login');
       }
     };

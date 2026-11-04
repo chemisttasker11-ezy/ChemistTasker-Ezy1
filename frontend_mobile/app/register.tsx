@@ -98,6 +98,14 @@ export default function RegisterScreen() {
     referral_event_id?: string | string[];
     role?: string | string[];
   }>();
+
+  const referralParams: Record<string, string> = {};
+  const refCode = Array.isArray(params.referral_code) ? params.referral_code[0] : params.referral_code;
+  const refEventId = Array.isArray(params.referral_event_id) ? params.referral_event_id[0] : params.referral_event_id;
+  const refShiftId = Array.isArray(params.referral_shift_id) ? params.referral_shift_id[0] : params.referral_shift_id;
+  if (refCode) referralParams.referral_code = refCode;
+  if (refEventId) referralParams.referral_event_id = refEventId;
+  if (refShiftId) referralParams.referral_shift_id = refShiftId;
   const { register } = useAuth();
   const recaptchaSiteKey = process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || '';
   // Welcome's persona chips preselect a role; the cards below stay changeable.
@@ -248,7 +256,7 @@ export default function RegisterScreen() {
           ? parsedReferralEventId
           : undefined,
       });
-      router.replace({ pathname: '/verify-otp', params: { email: formData.email } } as any);
+      router.replace({ pathname: '/verify-otp', params: { email: formData.email, ...referralParams } } as any);
     } catch (err: any) {
       setError(err.message);
       // A reCAPTCHA token is single-use; the next attempt needs a fresh check.
@@ -269,7 +277,19 @@ export default function RegisterScreen() {
       footer={
         <AuthPrompt
           text="Already have an account?"
-          action={<AuthLink label="Sign in" onPress={() => router.replace('/login')} disabled={loading} />}
+          action={
+            <AuthLink
+              label="Sign in"
+              onPress={() =>
+                router.replace(
+                  Object.keys(referralParams).length > 0
+                    ? ({ pathname: '/login', params: referralParams } as any)
+                    : '/login',
+                )
+              }
+              disabled={loading}
+            />
+          }
         />
       }
     >
@@ -450,14 +470,20 @@ export default function RegisterScreen() {
                 variant="outlined"
                 label="Sign in"
                 disabled={loading}
-                onPress={() => router.replace({ pathname: '/login', params: { email: formData.email } } as any)}
+                onPress={() => router.replace({ pathname: '/login', params: { email: formData.email, ...referralParams } } as any)}
                 style={styles.noticeButton}
               />
               <Button
                 variant="outlined"
                 label="Reset password"
                 disabled={loading}
-                onPress={() => router.push('/forgot-password')}
+                onPress={() =>
+                  router.push(
+                    Object.keys(referralParams).length > 0
+                      ? ({ pathname: '/forgot-password', params: referralParams } as any)
+                      : '/forgot-password',
+                  )
+                }
                 style={styles.noticeButton}
               />
             </View>
