@@ -317,6 +317,16 @@ export function pickScopedPharmacyId(input: {
     return '';
 }
 
+/** On a same-scope network retry, retain a manually selected authorized pharmacy. */
+export function pickRetryPostShiftPharmacyId(
+    currentPharmacyId: string,
+    defaultPharmacyId: number | '',
+    pharmacies: ReadonlyArray<{ id: number | string }>,
+): string {
+    if (pharmacies.some(item => String(item.id) === currentPharmacyId)) return currentPharmacyId;
+    return defaultPharmacyId === '' ? '' : String(defaultPharmacyId);
+}
+
 export function canAccessPostShift(
     surface: { persona: string | null; canManageShifts: boolean; ready: boolean },
     routePharmacyId?: number | null,
