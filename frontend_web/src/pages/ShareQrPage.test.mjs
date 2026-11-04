@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 const src=readFileSync(new URL('./ShareQrPage.tsx',import.meta.url),'utf8');
 const lookup=src.slice(src.indexOf('function resolveTarget'),src.indexOf('export default'));
-const js=ts.transpileModule(lookup.replace('function resolveTarget','export function resolveTarget'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const js=ts.transpileModule(lookup.replace('function resolveTarget','export function resolveTarget'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const box={exports:{},URLSearchParams,encodeURIComponent};
 vm.runInNewContext(js,box);
 const f=box.exports.resolveTarget;
