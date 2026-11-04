@@ -69,6 +69,7 @@ function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing
    const validation=enquiryValidation(message);
    if(validation){setLocalError(validation);return;}
    if(buyingPharmacy!=null&&!selectedPharmacy){setLocalError('Choose a pharmacy you are authorized to represent.');return;}
+   if(buyingPharmacy==null&&!access?.can_trade_personally){setLocalError('Select an eligible buying pharmacy for this enquiry.');return;}
    submittingRef.current=true;setBusy(true);setLocalError('');
    try{
      await api.createEnquiry(listing.id,{
@@ -98,7 +99,7 @@ function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing
      <Field label="Message to seller" value={message} onChangeText={setMessage} multiline placeholder="Ask about condition, pickup or delivery arrangements." disabled={busy}/>
      {access?.eligible_pharmacies?.length?<Section title="Buying context" description="Select a pharmacy only if you are authorized to act on its behalf.">
        <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-         <Chip selected={buyingPharmacy==null} onPress={()=>setBuyingPharmacy(null)} disabled={busy}>Personal</Chip>
+         <Chip selected={buyingPharmacy==null} onPress={()=>setBuyingPharmacy(null)} disabled={busy||!access.can_trade_personally}>Personal</Chip>
          {access.eligible_pharmacies.map(pharmacy=><Chip key={pharmacy.id} selected={buyingPharmacy===pharmacy.id} disabled={busy} onPress={()=>setBuyingPharmacy(pharmacy.id)}>{pharmacy.label}</Chip>)}
        </View>
      </Section>:null}
