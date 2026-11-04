@@ -303,8 +303,8 @@ function AuthGate() {
     const segmentList = segments as readonly string[];
     const second = segmentList[1];
     const third = segmentList[2];
-    const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact', 'membership']);
-    const isPublic = publicRoutes.has(top ?? '');
+    const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
+    const isPublic = publicRoutes.has(top ?? '') || (top === 'membership' && second === 'apply' && Boolean(third));
 
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
     // It is never included in normal startup or navigation menus.
