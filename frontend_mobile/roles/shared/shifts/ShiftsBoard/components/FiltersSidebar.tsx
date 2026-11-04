@@ -2,9 +2,11 @@
 // Complete filter UI with exact web logic adapted for mobile
 
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, Checkbox, TextInput, Button, IconButton, Chip } from 'react-native-paper';
+import { View, StyleSheet, Text } from 'react-native';
+import { ChevronDown, ChevronUp, MinusSquare, Square, SquareCheck } from 'lucide-react-native';
 import Slider from '@react-native-community/slider';
+import { Pill, ScalePressable, TextField } from '@/components/ui';
+import { colors, font, space, touch, type } from '@/constants/tokens';
 import { FILTER_SECTIONS } from '../constants';
 import { FilterConfig } from '../types';
 
@@ -20,6 +22,13 @@ type FiltersSidebarProps = {
     toggleBooleanFilter: (key: keyof FilterConfig) => void;
 };
 
+const CheckItem = ({ label, checked, indeterminate = false, onPress }: { label: string; checked: boolean; indeterminate?: boolean; onPress: () => void }) => (
+    <ScalePressable static pressBg haptic="selection" onPress={onPress} accessibilityRole="checkbox" accessibilityState={{ checked: indeterminate ? 'mixed' : checked }} accessibilityLabel={label} style={styles.checkboxRow}>
+        {checked ? <SquareCheck size={20} color={colors.accentStrong} strokeWidth={2} /> : indeterminate ? <MinusSquare size={20} color={colors.accentStrong} strokeWidth={2} /> : <Square size={20} color={colors.textSecondary} strokeWidth={2} />}
+        <Text style={styles.checkboxLabel}>{label}</Text>
+    </ScalePressable>
+);
+
 const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
     filterConfig,
     setFilterConfig,
@@ -33,7 +42,7 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
 }) => {
     const renderSection = (title: string, content: React.ReactNode) => (
         <View style={styles.section}>
-            <Text variant="labelLarge" style={styles.sectionTitle}>{title}</Text>
+            <Text style={styles.sectionTitle}>{title}</Text>
             {content}
         </View>
     );
@@ -41,35 +50,20 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
     return (
         // The filter sheet (BottomSheet) scrolls; a nested ScrollView here would fight it.
         <View style={styles.content}>
-            <TextInput
-                mode="outlined"
+            <TextField
+                label="Search"
                 placeholder="Search pharmacy, role..."
                 value={filterConfig.search}
                 onChangeText={(value) => setFilterConfig((prev) => ({ ...prev, search: value }))}
-                left={<TextInput.Icon icon="magnify" />}
-                style={styles.searchInput}
-                dense
             />
 
-            <View style={styles.urgentRow}>
-                <Checkbox
-                    status={filterConfig.onlyUrgent ? 'checked' : 'unchecked'}
-                    onPress={() => toggleBooleanFilter('onlyUrgent')}
-                />
-                <Text variant="bodyMedium">Urgent only</Text>
-            </View>
+            <CheckItem label="Urgent only" checked={filterConfig.onlyUrgent} onPress={() => toggleBooleanFilter('onlyUrgent')} />
 
             {renderSection(
                 FILTER_SECTIONS.roles,
                 <View style={styles.checkboxList}>
                     {roleOptions.map((role) => (
-                        <View key={role} style={styles.checkboxRow}>
-                            <Checkbox
-                                status={filterConfig.roles.includes(role) ? 'checked' : 'unchecked'}
-                                onPress={() => toggleFilter('roles', role)}
-                            />
-                            <Text variant="bodyMedium">{role}</Text>
-                        </View>
+                        <CheckItem key={role} label={role} checked={filterConfig.roles.includes(role)} onPress={() => toggleFilter('roles', role)} />
                     ))}
                 </View>
             )}
@@ -77,8 +71,7 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
             {renderSection(
                 FILTER_SECTIONS.dateRange,
                 <View style={styles.dateRange}>
-                    <TextInput
-                        mode="outlined"
+                    <TextField
                         label="From"
                         value={filterConfig.dateRange.start}
                         onChangeText={(value) =>
@@ -89,10 +82,8 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
                         }
                         placeholder="YYYY-MM-DD"
                         style={styles.dateInput}
-                        dense
                     />
-                    <TextInput
-                        mode="outlined"
+                    <TextField
                         label="To"
                         value={filterConfig.dateRange.end}
                         onChangeText={(value) =>
@@ -103,7 +94,6 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
                         }
                         placeholder="YYYY-MM-DD"
                         style={styles.dateInput}
-                        dense
                     />
                 </View>
             )}
@@ -111,41 +101,11 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
             {renderSection(
                 FILTER_SECTIONS.perks,
                 <View style={styles.checkboxList}>
-                    <View style={styles.checkboxRow}>
-                        <Checkbox
-                            status={filterConfig.bulkShiftsOnly ? 'checked' : 'unchecked'}
-                            onPress={() => toggleBooleanFilter('bulkShiftsOnly')}
-                        />
-                        <Text variant="bodyMedium">Bulk shifts (1 week+)</Text>
-                    </View>
-                    <View style={styles.checkboxRow}>
-                        <Checkbox
-                            status={filterConfig.negotiableOnly ? 'checked' : 'unchecked'}
-                            onPress={() => toggleBooleanFilter('negotiableOnly')}
-                        />
-                        <Text variant="bodyMedium">Negotiable rate</Text>
-                    </View>
-                    <View style={styles.checkboxRow}>
-                        <Checkbox
-                            status={filterConfig.flexibleOnly ? 'checked' : 'unchecked'}
-                            onPress={() => toggleBooleanFilter('flexibleOnly')}
-                        />
-                        <Text variant="bodyMedium">Flexible hours</Text>
-                    </View>
-                    <View style={styles.checkboxRow}>
-                        <Checkbox
-                            status={filterConfig.travelProvided ? 'checked' : 'unchecked'}
-                            onPress={() => toggleBooleanFilter('travelProvided')}
-                        />
-                        <Text variant="bodyMedium">Travel paid</Text>
-                    </View>
-                    <View style={styles.checkboxRow}>
-                        <Checkbox
-                            status={filterConfig.accommodationProvided ? 'checked' : 'unchecked'}
-                            onPress={() => toggleBooleanFilter('accommodationProvided')}
-                        />
-                        <Text variant="bodyMedium">Accommodation</Text>
-                    </View>
+                    <CheckItem label="Bulk shifts (1 week+)" checked={filterConfig.bulkShiftsOnly} onPress={() => toggleBooleanFilter('bulkShiftsOnly')} />
+                    <CheckItem label="Negotiable rate" checked={filterConfig.negotiableOnly} onPress={() => toggleBooleanFilter('negotiableOnly')} />
+                    <CheckItem label="Flexible hours" checked={filterConfig.flexibleOnly} onPress={() => toggleBooleanFilter('flexibleOnly')} />
+                    <CheckItem label="Travel paid" checked={filterConfig.travelProvided} onPress={() => toggleBooleanFilter('travelProvided')} />
+                    <CheckItem label="Accommodation" checked={filterConfig.accommodationProvided} onPress={() => toggleBooleanFilter('accommodationProvided')} />
                 </View>
             )}
 
@@ -157,13 +117,7 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
                         { id: 'PART_TIME', label: 'Part-time' },
                         { id: 'LOCUM', label: 'Locum' },
                     ].map((item) => (
-                        <View key={item.id} style={styles.checkboxRow}>
-                            <Checkbox
-                                status={filterConfig.employmentTypes.includes(item.id) ? 'checked' : 'unchecked'}
-                                onPress={() => toggleFilter('employmentTypes', item.id)}
-                            />
-                            <Text variant="bodyMedium">{item.label}</Text>
-                        </View>
+                        <CheckItem key={item.id} label={item.label} checked={filterConfig.employmentTypes.includes(item.id)} onPress={() => toggleFilter('employmentTypes', item.id)} />
                     ))}
                 </View>
             )}
@@ -180,29 +134,15 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
                         return (
                             <View key={state} style={styles.stateSection}>
                                 <View style={styles.stateHeader}>
-                                    <View style={styles.checkboxRow}>
-                                        <Checkbox
-                                            status={allSelected ? 'checked' : someSelected ? 'indeterminate' : 'unchecked'}
-                                            onPress={() => toggleStateSelection(cities)}
-                                        />
-                                        <Text variant="titleSmall">{state}</Text>
-                                    </View>
-                                    <IconButton
-                                        icon={isExpanded ? 'chevron-up' : 'chevron-down'}
-                                        size={20}
-                                        onPress={() => toggleStateExpand(state)}
-                                    />
+                                    <CheckItem label={state} checked={allSelected} indeterminate={!allSelected && someSelected} onPress={() => toggleStateSelection(cities)} />
+                                    <ScalePressable static pressBg haptic="selection" onPress={() => toggleStateExpand(state)} accessibilityRole="button" accessibilityLabel={`${isExpanded ? 'Collapse' : 'Expand'} ${state}`} style={styles.expandBtn}>
+                                        {isExpanded ? <ChevronUp size={20} color={colors.textSecondary} strokeWidth={2} /> : <ChevronDown size={20} color={colors.textSecondary} strokeWidth={2} />}
+                                    </ScalePressable>
                                 </View>
                                 {isExpanded && (
                                     <View style={styles.citiesList}>
                                         {cities.map((city) => (
-                                            <View key={city} style={styles.checkboxRow}>
-                                                <Checkbox
-                                                    status={filterConfig.city.includes(city) ? 'checked' : 'unchecked'}
-                                                    onPress={() => toggleFilter('city', city)}
-                                                />
-                                                <Text variant="bodyMedium">{city}</Text>
-                                            </View>
+                                            <CheckItem key={city} label={city} checked={filterConfig.city.includes(city)} onPress={() => toggleFilter('city', city)} />
                                         ))}
                                     </View>
                                 )}
@@ -222,14 +162,7 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
                     ].map((entry) => {
                         const active = filterConfig.timeOfDay.includes(entry.id as 'morning' | 'afternoon' | 'evening');
                         return (
-                            <Chip
-                                key={entry.id}
-                                selected={active}
-                                onPress={() => toggleFilter('timeOfDay', entry.id)}
-                                style={styles.chip}
-                            >
-                                {entry.label}
-                            </Chip>
+                            <Pill key={entry.id} label={entry.label} selected={active} tone="violet" onPress={() => toggleFilter('timeOfDay', entry.id)} />
                         );
                     })}
                 </View>
@@ -245,12 +178,13 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
                         step={5}
                         value={filterConfig.minRate}
                         onValueChange={(value) => setFilterConfig((prev) => ({ ...prev, minRate: value }))}
-                        minimumTrackTintColor="#6200ee"
-                        maximumTrackTintColor="#ccc"
+                        minimumTrackTintColor={colors.primary}
+                        maximumTrackTintColor={colors.border}
+                        thumbTintColor={colors.primary}
                     />
                     <View style={styles.sliderLabels}>
-                        <Text variant="bodySmall" style={styles.sliderLabel}>Any</Text>
-                        <Text variant="bodySmall" style={styles.sliderLabel}>$100+</Text>
+                        <Text style={styles.sliderLabel}>Any</Text>
+                        <Text style={styles.sliderLabel}>$100+</Text>
                     </View>
                 </View>
             )}
@@ -259,82 +193,23 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
 };
 
 const styles = StyleSheet.create({
-    content: {
-        paddingBottom: 16,
-    },
-    searchInput: {
-        marginBottom: 16,
-    },
-    urgentRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    section: {
-        marginBottom: 20,
-        paddingBottom: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
-    },
-    sectionTitle: {
-        marginBottom: 12,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-        color: '#666',
-    },
-    checkboxList: {
-        gap: 8,
-    },
-    checkboxRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    dateRange: {
-        gap: 12,
-    },
-    dateInput: {
-        marginBottom: 8,
-    },
-    stateSection: {
-        marginBottom: 12,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-    },
-    stateHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    citiesList: {
-        paddingLeft: 24,
-        gap: 8,
-        marginTop: 8,
-    },
-    chipRow: {
-        flexDirection: 'row',
-        gap: 8,
-        flexWrap: 'wrap',
-    },
-    chip: {
-        marginRight: 4,
-    },
-    sliderContainer: {
-        paddingHorizontal: 4,
-    },
-    slider: {
-        width: '100%',
-        height: 40,
-    },
-    sliderLabels: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: -8,
-    },
-    sliderLabel: {
-        color: '#666',
-    },
+    content: { paddingVertical: space.md, gap: space.md },
+    section: { paddingBottom: space.md, borderBottomWidth: 1, borderBottomColor: colors.border, gap: space.sm },
+    sectionTitle: { fontFamily: font.outfit.medium, fontSize: type.titleSmall.fontSize, lineHeight: type.titleSmall.lineHeight, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
+    checkboxList: { gap: space.xxs },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: touch.min, paddingVertical: space.xxs },
+    checkboxLabel: { fontFamily: font.inter.regular, fontSize: type.bodyMedium.fontSize, lineHeight: type.bodyMedium.lineHeight, color: colors.textPrimary },
+    dateRange: { flexDirection: 'row', gap: space.sm },
+    dateInput: { flex: 1 },
+    stateSection: { paddingBottom: space.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
+    stateHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    expandBtn: { width: touch.min, height: touch.min, alignItems: 'center', justifyContent: 'center' },
+    citiesList: { paddingLeft: space.xl, gap: space.xxs },
+    chipRow: { flexDirection: 'row', gap: space.xs, flexWrap: 'wrap' },
+    sliderContainer: { paddingHorizontal: space.xxs },
+    slider: { width: '100%', height: touch.min },
+    sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -space.xs },
+    sliderLabel: { fontFamily: font.inter.regular, fontSize: type.bodySmall.fontSize, lineHeight: type.bodySmall.lineHeight, color: colors.textSecondary, fontVariant: ['tabular-nums'] },
 });
 
 export default FiltersSidebar;

@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Animated, StyleSheet, View } from 'react-native';
-import { Card, Chip, Portal, Snackbar, Text, Button } from 'react-native-paper';
+import { Portal, Snackbar, Text } from 'react-native-paper';
 import {
     Shift,
     ShiftCounterOfferPayload,
@@ -25,13 +25,27 @@ import {
     getOnboardingDetail,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
-import { ContentState } from '@/components/ui';
-import { space } from '@/constants/tokens';
+import { Button as KitButton, ContentState, Pill } from '@/components/ui';
+import { colors, font, radius, space, type } from '@/constants/tokens';
 import { useShiftSurface } from './useShiftSurface';
 import ShiftsBoard from './ShiftsBoard';
 import { BoardTabs } from './ShiftsBoard/components/BoardTabs';
 import type { FilterConfig } from './ShiftsBoard/types';
 import ShiftEngagementTermsDialog from './ShiftsBoard/components/ShiftEngagementTermsDialog';
+import {
+    TermsAcceptanceState,
+    createTermsAcceptanceState,
+    dismissTermsAcceptance,
+    dropCachedOfferPreviews,
+    isTermsChangedError,
+    isTermsDialogVisible,
+    narrowSelectedOffers,
+    selectOffersForTerms,
+    transitionReloadFailure,
+    transitionReloadStart,
+    transitionReloadSuccess,
+    transitionTermsChanged,
+} from './workerShiftDetailLogic';
 import type { ShiftOfferAcceptancePayload } from '@chemisttasker/shared-core';
 
 type PublicShiftsViewProps = {
@@ -117,7 +131,7 @@ function PublicShiftsBoard({
     const [payrollActivationOffers, setPayrollActivationOffers] = useState<ShiftOffer[]>([]);
     const [offersLoading, setOffersLoading] = useState(false);
     const [offersError, setOffersError] = useState(false);
-    const [termsOffers, setTermsOffers] = useState<ShiftOffer[]>([]);
+    const [termsState, setTermsState] = useState<TermsAcceptanceState>(() => createTermsAcceptanceState());
     const [termsConfirming, setTermsConfirming] = useState(false);
     const [payrollActivatingId, setPayrollActivatingId] = useState<number | null>(null);
     const [payrollNotice, setPayrollNotice] = useState('');
@@ -450,9 +464,41 @@ function PublicShiftsBoard({
         [offersByShift]
     );
 
+    const reloadTermsOffers = async (selected: ShiftOffer[]) => {
+        setTermsConfirming(true);
+        setTermsState((prev) => transitionReloadStart(prev, selected));
+        try {
+            const fresh = await fetchShiftOffersService({ status: 'PENDING' });
+            const freshPending = (fresh as ShiftOffer[]).filter(
+                (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
+            );
+            setOffers(freshPending);
+            setTermsState((prev) => {
+                const next = transitionReloadSuccess(prev, freshPending);
+                if (next.status === 'failed') {
+                    showError('The selected offers are no longer available.');
+                }
+                return next;
+            });
+        } catch (fetchErr) {
+            setTermsState((prev) =>
+                transitionReloadFailure(prev, 'Shift engagement terms have changed. Failed to refresh terms. Please retry.')
+            );
+            showError('Failed to refresh updated terms. Please retry.');
+        } finally {
+            setTermsConfirming(false);
+        }
+    };
+
     const acceptOffers = async (list: ShiftOffer[], payload?: ShiftOfferAcceptancePayload) => {
         if (list.length === 0) return;
         if (!payload) {
+            const selection = selectOffersForTerms(termsState, list);
+            if (selection.needsReload) {
+                setTermsState(selection.state);
+                await reloadTermsOffers(list);
+                return;
+            }
             const blocked = list.some((offer) => Boolean(offer.engagementTermsPreview?.blocked));
             if (blocked) {
                 showError('This offer cannot be confirmed until the required onboarding/payment details are completed.');
@@ -460,16 +506,24 @@ function PublicShiftsBoard({
             }
             const requiresAcceptance = list.some((offer) => Boolean(offer.engagementTermsPreview?.acceptanceRequired));
             if (requiresAcceptance) {
-                setTermsOffers(list);
+                setTermsState(selection.state);
                 return;
             }
         }
         setTermsConfirming(true);
         try {
             await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, payload)));
-            setTermsOffers([]);
+            setTermsState(createTermsAcceptanceState());
             await loadOffers();
         } catch (err) {
+            if (isTermsChangedError(err)) {
+                const termsMsg = 'Shift engagement terms have changed. Please review the updated terms and confirm again.';
+                showError(termsMsg);
+                setOffers((prev) => dropCachedOfferPreviews(prev, list.map((o) => o.id)));
+                setTermsState((prev) => transitionTermsChanged(prev, list, termsMsg));
+                await reloadTermsOffers(list);
+                return;
+            }
             showError(errorMessage(err, 'Failed to confirm the shift offer.'));
             throw err;
         } finally {
@@ -634,53 +688,50 @@ function PublicShiftsBoard({
                                             || shift?.pharmacyName
                                             || 'Confirmed shift';
                                         return (
-                                            <Card key={offer.id} mode="outlined" style={styles.payrollCard}>
-                                                <Card.Content style={styles.payrollCardContent}>
-                                                    <View style={styles.chipRow}>
-                                                        <Chip compact>TFN</Chip>
-                                                        <Chip compact>
-                                                            {ready ? 'Ready to activate payroll' : 'Timesheet only · setup required'}
-                                                        </Chip>
-                                                    </View>
-                                                    <Text variant="titleSmall" style={styles.payrollItemTitle}>
-                                                        {pharmacyName}
+                                            <View key={offer.id} style={styles.payrollCard}>
+                                                <View style={styles.chipRow}>
+                                                    <Pill label="TFN" tone="violet" />
+                                                    <Pill
+                                                        label={ready ? 'Ready to activate payroll' : 'Timesheet only · setup required'}
+                                                        tone={ready ? 'green' : 'amber'}
+                                                    />
+                                                </View>
+                                                <Text style={styles.payrollItemTitle}>
+                                                    {pharmacyName}
+                                                </Text>
+                                                <Text style={styles.placeholderText}>
+                                                    {preview?.awardClassification
+                                                        ? `${preview.awardClassification.replaceAll('_', ' ')} · `
+                                                        : ''}
+                                                    {offer.settlementChannel === 'TIMESHEET_ONLY'
+                                                        ? 'Currently timesheet only'
+                                                        : offer.settlementChannel}
+                                                </Text>
+                                                {missing.length > 0 ? (
+                                                    <Text style={styles.warningText}>
+                                                        Private setup needed: {missing.map((field) => field.replaceAll('_', ' ')).join(', ')}
                                                     </Text>
-                                                    <Text variant="bodySmall" style={styles.placeholderText}>
-                                                        {preview?.awardClassification
-                                                            ? `${preview.awardClassification.replaceAll('_', ' ')} · `
-                                                            : ''}
-                                                        {offer.settlementChannel === 'TIMESHEET_ONLY'
-                                                            ? 'Currently timesheet only'
-                                                            : offer.settlementChannel}
+                                                ) : null}
+                                                {preview?.awardPayrollReviewRequired ? (
+                                                    <Text style={styles.warningText}>
+                                                        Award/overtime review is required before payroll activation.
                                                     </Text>
-                                                    {missing.length > 0 ? (
-                                                        <Text variant="bodySmall" style={styles.warningText}>
-                                                            Private setup needed: {missing.map((field) => field.replaceAll('_', ' ')).join(', ')}
-                                                        </Text>
+                                                ) : null}
+                                                <View style={styles.payrollActions}>
+                                                    {!ready && workerPaymentPath ? (
+                                                        <KitButton
+                                                            label="Complete private profile"
+                                                            variant="outlined"
+                                                            onPress={openPrivatePaymentProfile}
+                                                        />
                                                     ) : null}
-                                                    {preview?.awardPayrollReviewRequired ? (
-                                                        <Text variant="bodySmall" style={styles.warningText}>
-                                                            Award/overtime review is required before payroll activation.
-                                                        </Text>
-                                                    ) : null}
-                                                    <View style={styles.payrollActions}>
-                                                        {!ready && workerPaymentPath ? (
-                                                            <Button mode="outlined" compact onPress={openPrivatePaymentProfile}>
-                                                                Complete private profile
-                                                            </Button>
-                                                        ) : null}
-                                                        <Button
-                                                            mode="contained"
-                                                            compact
-                                                            disabled={!ready || payrollActivatingId === offer.id}
-                                                            loading={payrollActivatingId === offer.id}
-                                                            onPress={() => void handleActivatePayroll(offer)}
-                                                        >
-                                                            Activate payroll
-                                                        </Button>
-                                                    </View>
-                                                </Card.Content>
-                                            </Card>
+                                                    <KitButton
+                                                        label={payrollActivatingId === offer.id ? 'Activating...' : 'Activate payroll'}
+                                                        disabled={!ready || payrollActivatingId === offer.id}
+                                                        onPress={() => void handleActivatePayroll(offer)}
+                                                    />
+                                                </View>
+                                            </View>
                                         );
                                     })}
                                 </View>
@@ -725,11 +776,16 @@ function PublicShiftsBoard({
                 />
             )}
             <ShiftEngagementTermsDialog
-                visible={termsOffers.length > 0}
-                offers={termsOffers}
-                loading={termsConfirming}
-                onDismiss={() => setTermsOffers([])}
-                onConfirm={(payload) => acceptOffers(termsOffers, payload)}
+                visible={isTermsDialogVisible(termsState)}
+                offers={termsState.offers}
+                loading={termsConfirming || termsState.status === 'reloading'}
+                status={termsState.status}
+                error={termsState.error}
+                onDismiss={() => {
+                    setTermsState((prev) => dismissTermsAcceptance(prev));
+                }}
+                onConfirm={(payload) => acceptOffers(termsState.offers, payload)}
+                onRetry={() => void reloadTermsOffers(termsState.offers.length > 0 ? termsState.offers : termsState.selectedOfferIds.map((id) => ({ id } as ShiftOffer)))}
                 onOpenPaymentProfile={workerPaymentPath ? openPrivatePaymentProfile : undefined}
             />
             <Portal>
@@ -753,7 +809,7 @@ const styles = StyleSheet.create({
         margin: space.lg,
     },
     placeholderText: {
-        color: '#6B7280',
+        color: colors.textSecondary,
         textAlign: 'center',
     },
     offerWorkspace: {
@@ -765,16 +821,28 @@ const styles = StyleSheet.create({
         paddingHorizontal: space.lg,
     },
     payrollTitle: {
-        fontWeight: '800',
+        fontFamily: font.outfit.medium,
+        fontSize: type.titleMedium.fontSize,
+        lineHeight: type.titleMedium.lineHeight,
+        color: colors.textPrimary,
     },
     payrollCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surfaceBg,
+        borderRadius: radius.card,
+        borderCurve: 'continuous',
+        borderWidth: 1,
+        borderColor: colors.border,
+        padding: space.lg,
+        gap: space.sm,
     },
     payrollCardContent: {
         gap: 8,
     },
     payrollItemTitle: {
-        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
+        fontSize: type.labelLarge.fontSize,
+        lineHeight: type.labelLarge.lineHeight,
+        color: colors.textPrimary,
     },
     chipRow: {
         flexDirection: 'row',
@@ -788,11 +856,11 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     warningText: {
-        color: '#B45309',
+        color: colors.status.amber.fg,
     },
     successText: {
         marginHorizontal: space.lg,
-        color: '#15803D',
-        fontWeight: '700',
+        color: colors.status.green.fg,
+        fontFamily: font.inter.semiBold,
     },
 });

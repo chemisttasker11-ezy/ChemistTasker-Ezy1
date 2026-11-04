@@ -34,6 +34,20 @@ import ShiftsBoard from './ShiftsBoard';
 import { BoardTabs } from './ShiftsBoard/components/BoardTabs';
 import type { FilterConfig } from './ShiftsBoard/types';
 import ShiftEngagementTermsDialog from './ShiftsBoard/components/ShiftEngagementTermsDialog';
+import {
+    TermsAcceptanceState,
+    createTermsAcceptanceState,
+    dismissTermsAcceptance,
+    dropCachedOfferPreviews,
+    isTermsChangedError,
+    isTermsDialogVisible,
+    narrowSelectedOffers,
+    selectOffersForTerms,
+    transitionReloadFailure,
+    transitionReloadStart,
+    transitionReloadSuccess,
+    transitionTermsChanged,
+} from './workerShiftDetailLogic';
 import type { ShiftOfferAcceptancePayload } from '@chemisttasker/shared-core';
 
 type CommunityShiftsViewProps = {
@@ -123,7 +137,7 @@ function CommunityShiftsBoard({
     const [offers, setOffers] = useState<ShiftOffer[]>([]);
     const [offersLoading, setOffersLoading] = useState(false);
     const [offersError, setOffersError] = useState(false);
-    const [termsOffers, setTermsOffers] = useState<ShiftOffer[]>([]);
+    const [termsState, setTermsState] = useState<TermsAcceptanceState>(() => createTermsAcceptanceState());
     const [termsConfirming, setTermsConfirming] = useState(false);
 
     const showError = (message: string) => {
@@ -450,9 +464,41 @@ function CommunityShiftsBoard({
         [offersByShift]
     );
 
+    const reloadTermsOffers = async (selected: ShiftOffer[]) => {
+        setTermsConfirming(true);
+        setTermsState((prev) => transitionReloadStart(prev, selected));
+        try {
+            const fresh = await fetchShiftOffersService({ status: 'PENDING' });
+            const freshPending = (fresh as ShiftOffer[]).filter(
+                (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
+            );
+            setOffers(freshPending);
+            setTermsState((prev) => {
+                const next = transitionReloadSuccess(prev, freshPending);
+                if (next.status === 'failed') {
+                    showError('The selected offers are no longer available.');
+                }
+                return next;
+            });
+        } catch (fetchErr) {
+            setTermsState((prev) =>
+                transitionReloadFailure(prev, 'Shift engagement terms have changed. Failed to refresh terms. Please retry.')
+            );
+            showError('Failed to refresh updated terms. Please retry.');
+        } finally {
+            setTermsConfirming(false);
+        }
+    };
+
     const acceptOffers = async (list: ShiftOffer[], payload?: ShiftOfferAcceptancePayload) => {
         if (list.length === 0) return;
         if (!payload) {
+            const selection = selectOffersForTerms(termsState, list);
+            if (selection.needsReload) {
+                setTermsState(selection.state);
+                await reloadTermsOffers(list);
+                return;
+            }
             const blocked = list.some((offer) => Boolean(offer.engagementTermsPreview?.blocked));
             if (blocked) {
                 showError('This offer cannot be confirmed until the required onboarding/payment details are completed.');
@@ -460,16 +506,24 @@ function CommunityShiftsBoard({
             }
             const requiresAcceptance = list.some((offer) => Boolean(offer.engagementTermsPreview?.acceptanceRequired));
             if (requiresAcceptance) {
-                setTermsOffers(list);
+                setTermsState(selection.state);
                 return;
             }
         }
         setTermsConfirming(true);
         try {
             await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, payload)));
-            setTermsOffers([]);
+            setTermsState(createTermsAcceptanceState());
             await loadOffers();
         } catch (err) {
+            if (isTermsChangedError(err)) {
+                const termsMsg = 'Shift engagement terms have changed. Please review the updated terms and confirm again.';
+                showError(termsMsg);
+                setOffers((prev) => dropCachedOfferPreviews(prev, list.map((o) => o.id)));
+                setTermsState((prev) => transitionTermsChanged(prev, list, termsMsg));
+                await reloadTermsOffers(list);
+                return;
+            }
             showError(errorMessage(err, 'Failed to confirm the shift offer.'));
             throw err;
         } finally {
@@ -610,11 +664,16 @@ function CommunityShiftsBoard({
                 />
             )}
             <ShiftEngagementTermsDialog
-                visible={termsOffers.length > 0}
-                offers={termsOffers}
-                loading={termsConfirming}
-                onDismiss={() => setTermsOffers([])}
-                onConfirm={(payload) => acceptOffers(termsOffers, payload)}
+                visible={isTermsDialogVisible(termsState)}
+                offers={termsState.offers}
+                loading={termsConfirming || termsState.status === 'reloading'}
+                status={termsState.status}
+                error={termsState.error}
+                onDismiss={() => {
+                    setTermsState((prev) => dismissTermsAcceptance(prev));
+                }}
+                onConfirm={(payload) => acceptOffers(termsState.offers, payload)}
+                onRetry={() => void reloadTermsOffers(termsState.offers.length > 0 ? termsState.offers : termsState.selectedOfferIds.map((id) => ({ id } as ShiftOffer)))}
             />
             <Snackbar
                 visible={!!error}

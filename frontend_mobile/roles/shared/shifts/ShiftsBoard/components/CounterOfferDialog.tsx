@@ -2,10 +2,12 @@
 // Complex counter offer form with exact web logic adapted for mobile
 
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Portal, Dialog, Button, Text, TextInput, Checkbox, Card, Icon } from 'react-native-paper';
+import { View, StyleSheet, Text } from 'react-native';
+import { Calendar, Info, Square, SquareCheck } from 'lucide-react-native';
 import { Shift } from '@chemisttasker/shared-core';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import { BottomSheet, Button, ScalePressable, TextField } from '@/components/ui';
+import { colors, font, radius, space, touch, type } from '@/constants/tokens';
 import { CounterOfferFormSlot, TravelLocation } from '../types';
 import { getShiftFlexibleTime, getShiftNegotiable, getShiftPharmacyName } from '../utils/shift';
 
@@ -42,115 +44,107 @@ const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
     onClearTravelLocation,
     onSubmit,
 }) => (
-    <Portal>
-        <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
-            <Dialog.Title>
-                Submit Counter Offer
-                {counterOfferShift && (
-                    <Text variant="bodySmall" style={styles.pharmacy}>
-                        {getShiftPharmacyName(counterOfferShift)}
-                    </Text>
-                )}
-            </Dialog.Title>
-            <Dialog.ScrollArea>
-                <ScrollView contentContainerStyle={styles.content}>
+    <BottomSheet
+        open={visible}
+        onClose={counterSubmitting ? () => {} : onDismiss}
+        dismissable={!counterSubmitting}
+        title="Submit Counter Offer"
+        footer={
+            <View style={styles.footerRow}>
+                <Button label="Cancel" variant="outlined" onPress={onDismiss} disabled={counterSubmitting} style={styles.footerBtn} />
+                <Button label={counterSubmitting ? 'Sending...' : 'Send Offer'} onPress={onSubmit} disabled={!counterOfferShift || counterSubmitting} haptic="light" style={styles.footerBtn} />
+            </View>
+        }
+    >
+                <View style={styles.content}>
+                    {counterOfferShift && (
+                        <Text style={styles.pharmacy}>
+                            {getShiftPharmacyName(counterOfferShift)}
+                        </Text>
+                    )}
                     {counterOfferError && (
                         <View style={styles.errorBox}>
-                            <Text variant="bodyMedium" style={styles.error}>
+                            <Text style={styles.error}>
                                 {counterOfferError}
                             </Text>
                         </View>
                     )}
                     {counterOfferShift && (
                         <View style={styles.formContainer}>
-                            <Card style={styles.infoCard} mode="outlined">
-                                <Card.Content style={styles.infoContent}>
-                                    <Icon source="information-outline" size={20} color="#167B87" />
-                                    <Text variant="bodyMedium" style={styles.infoText}>
-                                        Negotiation options:{' '}
-                                        {getShiftNegotiable(counterOfferShift) ? 'Rate negotiable.' : 'Rate fixed.'}{' '}
-                                        {getShiftFlexibleTime(counterOfferShift) ? 'Time flexible.' : 'Time fixed.'}
-                                    </Text>
-                                </Card.Content>
-                            </Card>
+                            <View style={styles.infoCard}>
+                                <Info size={18} color={colors.accentStrong} strokeWidth={2} />
+                                <Text style={styles.infoText}>
+                                    Negotiation options:{' '}
+                                    {getShiftNegotiable(counterOfferShift) ? 'Rate negotiable.' : 'Rate fixed.'}{' '}
+                                    {getShiftFlexibleTime(counterOfferShift) ? 'Time flexible.' : 'Time fixed.'}
+                                </Text>
+                            </View>
 
                             {counterOfferSlots.map((slot, idx) => (
-                                <Card
+                                <View
                                     key={slot.slotId != null ? `${slot.slotId}-${slot.dateLabel || idx}` : `new-${idx}`}
                                     style={styles.slotCard}
-                                    mode="outlined"
                                 >
-                                    <Card.Content>
-                                        <View style={styles.slotGrid}>
-                                            <View style={styles.dateCell}>
-                                                <Icon source="calendar-month-outline" size={18} color="#167B87" />
-                                                <Text variant="titleSmall" style={styles.slotTitle} numberOfLines={2}>
-                                                    {slot.dateLabel}
-                                                </Text>
-                                            </View>
-                                            <TextInput
-                                                label="Start time"
-                                                value={slot.startTime}
-                                                onChangeText={(value) => onCounterSlotChange(idx, 'startTime', value)}
-                                                disabled={!getShiftFlexibleTime(counterOfferShift)}
-                                                style={styles.timeInput}
-                                                mode="outlined"
-                                                outlineColor="#D7E5EA"
-                                                activeOutlineColor="#167B87"
-                                                dense
-                                            />
-                                            <TextInput
-                                                label="End time"
-                                                value={slot.endTime}
-                                                onChangeText={(value) => onCounterSlotChange(idx, 'endTime', value)}
-                                                disabled={!getShiftFlexibleTime(counterOfferShift)}
-                                                style={styles.timeInput}
-                                                mode="outlined"
-                                                outlineColor="#D7E5EA"
-                                                activeOutlineColor="#167B87"
-                                                dense
-                                            />
-                                            <TextInput
-                                                label="Rate"
-                                                value={slot.rate}
-                                                onChangeText={(value) => onCounterSlotChange(idx, 'rate', value)}
-                                                disabled={!getShiftNegotiable(counterOfferShift)}
-                                                keyboardType="numeric"
-                                                style={styles.rateInput}
-                                                mode="outlined"
-                                                outlineColor="#D7E5EA"
-                                                activeOutlineColor="#167B87"
-                                                dense
-                                                left={<TextInput.Affix text="$" />}
-                                                right={<TextInput.Affix text="/hr" />}
-                                            />
-                                        </View>
-                                    </Card.Content>
-                                </Card>
+                                    <View style={styles.dateCell}>
+                                        <Calendar size={16} color={colors.accentStrong} strokeWidth={2} />
+                                        <Text style={styles.slotTitle} numberOfLines={2}>
+                                            {slot.dateLabel}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.slotGrid}>
+                                        <TextField
+                                            label="Start time"
+                                            value={slot.startTime}
+                                            onChangeText={(value) => onCounterSlotChange(idx, 'startTime', value)}
+                                            disabled={!getShiftFlexibleTime(counterOfferShift)}
+                                            style={styles.timeInput}
+                                        />
+                                        <TextField
+                                            label="End time"
+                                            value={slot.endTime}
+                                            onChangeText={(value) => onCounterSlotChange(idx, 'endTime', value)}
+                                            disabled={!getShiftFlexibleTime(counterOfferShift)}
+                                            style={styles.timeInput}
+                                        />
+                                    </View>
+                                    <TextField
+                                        label="Rate ($/hr)"
+                                        value={slot.rate}
+                                        onChangeText={(value) => onCounterSlotChange(idx, 'rate', value)}
+                                        disabled={!getShiftNegotiable(counterOfferShift)}
+                                        keyboardType="numeric"
+                                        style={styles.rateInput}
+                                    />
+                                </View>
                             ))}
 
                             {getShiftNegotiable(counterOfferShift) && (
-                                <View style={styles.checkboxRow}>
-                                    <Checkbox
-                                        status={counterOfferTravel ? 'checked' : 'unchecked'}
-                                        onPress={() => onCounterOfferTravelChange(!counterOfferTravel)}
-                                        color="#167B87"
-                                    />
-                                    <Text variant="bodyMedium" style={styles.checkboxLabel}>
+                                <ScalePressable
+                                    static
+                                    pressBg
+                                    haptic="selection"
+                                    onPress={() => onCounterOfferTravelChange(!counterOfferTravel)}
+                                    accessibilityRole="checkbox"
+                                    accessibilityState={{ checked: counterOfferTravel }}
+                                    accessibilityLabel="Request travel allowance"
+                                    style={styles.checkboxRow}
+                                >
+                                    {counterOfferTravel ? <SquareCheck size={20} color={colors.accentStrong} strokeWidth={2} /> : <Square size={20} color={colors.textSecondary} strokeWidth={2} />}
+                                    <Text style={styles.checkboxLabel}>
                                         Request travel allowance
                                     </Text>
-                                </View>
+                                </ScalePressable>
                             )}
 
                             {counterOfferTravel && (
-                                <Card style={styles.travelCard} mode="outlined">
-                                    <Card.Content>
-                                        <Text variant="titleSmall" style={styles.travelTitle}>
-                                            Traveling from
-                                        </Text>
+                                <View style={styles.slotCard}>
+                                    <Text style={styles.travelTitle}>
+                                        Traveling from
+                                    </Text>
                                         {!hasCounterOfferTravelLocation ? (
                                             <GooglePlacesAutocomplete
                                                 placeholder="Search Address"
+                                                disableScroll
                                                 onPress={(data, details = null) => {
                                                     if (details) {
                                                         let streetNumber = '';
@@ -193,7 +187,7 @@ const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                             />
                                         ) : (
                                             <View style={styles.addressForm}>
-                                                <TextInput
+                                                <TextField
                                                     label="Street Address"
                                                     value={counterOfferTravelLocation.streetAddress}
                                                     onChangeText={(value) =>
@@ -202,13 +196,8 @@ const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                                             streetAddress: value,
                                                         }))
                                                     }
-                                                    style={styles.addressInput}
-                                                    mode="outlined"
-                                                    outlineColor="#D7E5EA"
-                                                    activeOutlineColor="#167B87"
-                                                    dense
                                                 />
-                                                <TextInput
+                                                <TextField
                                                     label="Suburb"
                                                     value={counterOfferTravelLocation.suburb}
                                                     onChangeText={(value) =>
@@ -217,13 +206,8 @@ const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                                             suburb: value,
                                                         }))
                                                     }
-                                                    style={styles.addressInput}
-                                                    mode="outlined"
-                                                    outlineColor="#D7E5EA"
-                                                    activeOutlineColor="#167B87"
-                                                    dense
                                                 />
-                                                <TextInput
+                                                <TextField
                                                     label="State"
                                                     value={counterOfferTravelLocation.state}
                                                     onChangeText={(value) =>
@@ -232,13 +216,8 @@ const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                                             state: value,
                                                         }))
                                                     }
-                                                    style={styles.addressInput}
-                                                    mode="outlined"
-                                                    outlineColor="#D7E5EA"
-                                                    activeOutlineColor="#167B87"
-                                                    dense
                                                 />
-                                                <TextInput
+                                                <TextField
                                                     label="Postcode"
                                                     value={counterOfferTravelLocation.postcode}
                                                     onChangeText={(value) =>
@@ -247,156 +226,41 @@ const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
                                                             postcode: value,
                                                         }))
                                                     }
-                                                    style={styles.addressInput}
-                                                    mode="outlined"
-                                                    outlineColor="#D7E5EA"
-                                                    activeOutlineColor="#167B87"
-                                                    dense
                                                 />
-                                                <Button mode="text" onPress={onClearTravelLocation} style={styles.clearButton}>
-                                                    Clear Address & Search Again
-                                                </Button>
+                                                <Button label="Clear Address & Search Again" variant="outlined" onPress={onClearTravelLocation} style={styles.clearButton} />
                                             </View>
                                         )}
-                                    </Card.Content>
-                                </Card>
+                                </View>
                             )}
 
                         </View>
                     )}
-                </ScrollView>
-            </Dialog.ScrollArea>
-            <Dialog.Actions>
-                <Button onPress={onDismiss}>Cancel</Button>
-                <Button
-                    mode="contained"
-                    onPress={onSubmit}
-                    disabled={!counterOfferShift || counterSubmitting}
-                    loading={counterSubmitting}
-                >
-                    {counterSubmitting ? 'Sending...' : 'Send Offer'}
-                </Button>
-            </Dialog.Actions>
-        </Dialog>
-    </Portal>
+                </View>
+    </BottomSheet>
 );
 
 const styles = StyleSheet.create({
-    dialog: {
-        maxHeight: '90%',
-        borderRadius: 14,
-    },
-    pharmacy: {
-        marginTop: 4,
-        color: '#516178',
-    },
-    content: {
-        paddingHorizontal: 18,
-        paddingVertical: 16,
-    },
-    errorBox: {
-        borderWidth: 1,
-        borderColor: '#F5C2C7',
-        backgroundColor: '#FFF5F5',
-        borderRadius: 10,
-        padding: 12,
-        marginBottom: 12,
-    },
-    error: {
-        color: '#B42318',
-    },
-    formContainer: {
-        gap: 16,
-    },
-    infoCard: {
-        backgroundColor: '#F3FCFD',
-        borderColor: '#C7ECEF',
-        borderRadius: 12,
-    },
-    infoContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
-    infoText: {
-        flex: 1,
-        color: '#0F2A43',
-    },
-    slotCard: {
-        marginVertical: 4,
-        borderColor: '#D7E5EA',
-        borderRadius: 12,
-        backgroundColor: '#FFFFFF',
-    },
-    slotGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-        alignItems: 'center',
-    },
-    dateCell: {
-        minWidth: 132,
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        backgroundColor: '#EEF7F8',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-    },
-    slotTitle: {
-        flex: 1,
-        color: '#111827',
-        fontWeight: '800',
-    },
-    timeInput: {
-        minWidth: 116,
-        flex: 1,
-    },
-    rateInput: {
-        minWidth: 120,
-        flex: 1,
-    },
-    checkboxRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#D7E5EA',
-        borderRadius: 12,
-        paddingVertical: 6,
-        paddingHorizontal: 4,
-        backgroundColor: '#FFFFFF',
-    },
-    checkboxLabel: {
-        marginLeft: 8,
-        fontWeight: '700',
-        color: '#111827',
-    },
-    travelCard: {
-        marginVertical: 8,
-        borderColor: '#D7E5EA',
-        borderRadius: 12,
-    },
-    travelTitle: {
-        marginBottom: 12,
-    },
-    placesInput: {
-        borderWidth: 1,
-        borderColor: '#D7E5EA',
-        borderRadius: 10,
-        padding: 12,
-    },
-    addressForm: {
-        gap: 12,
-        marginTop: 12,
-    },
-    addressInput: {
-        marginVertical: 4,
-    },
-    clearButton: {
-        marginTop: 8,
-    },
+    pharmacy: { fontFamily: font.inter.regular, fontSize: type.bodySmall.fontSize, lineHeight: type.bodySmall.lineHeight, color: colors.textSecondary },
+    content: { paddingVertical: space.md, gap: space.md },
+    errorBox: { borderWidth: 1, borderColor: colors.status.red.fg, backgroundColor: colors.status.red.bg, borderRadius: radius.nested, borderCurve: 'continuous', padding: space.md },
+    error: { fontFamily: font.inter.medium, fontSize: type.bodySmall.fontSize, lineHeight: type.bodySmall.lineHeight, color: colors.status.red.fg },
+    formContainer: { gap: space.md },
+    infoCard: { flexDirection: 'row', alignItems: 'center', gap: space.sm, backgroundColor: colors.tone.cyan.bg, borderRadius: radius.nested, borderCurve: 'continuous', padding: space.md },
+    infoText: { flex: 1, fontFamily: font.inter.regular, fontSize: type.bodySmall.fontSize, lineHeight: type.bodySmall.lineHeight, color: colors.textPrimary },
+    slotCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.card, borderCurve: 'continuous', backgroundColor: colors.surfaceBg, padding: space.md, gap: space.sm },
+    slotGrid: { flexDirection: 'row', gap: space.sm },
+    dateCell: { flexDirection: 'row', alignItems: 'center', gap: space.sm, backgroundColor: colors.subtleBg, borderRadius: radius.nested, borderCurve: 'continuous', paddingHorizontal: space.md, paddingVertical: space.sm },
+    slotTitle: { flex: 1, fontFamily: font.inter.semiBold, fontSize: type.labelLarge.fontSize, lineHeight: type.labelLarge.lineHeight, color: colors.textPrimary },
+    timeInput: { flex: 1 },
+    rateInput: { flex: 1 },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: touch.min, borderWidth: 1, borderColor: colors.border, borderRadius: radius.control, borderCurve: 'continuous', paddingHorizontal: space.md, paddingVertical: space.xs, backgroundColor: colors.surfaceBg },
+    checkboxLabel: { flex: 1, fontFamily: font.inter.semiBold, fontSize: type.bodyMedium.fontSize, lineHeight: type.bodyMedium.lineHeight, color: colors.textPrimary },
+    travelTitle: { fontFamily: font.outfit.medium, fontSize: type.titleSmall.fontSize, lineHeight: type.titleSmall.lineHeight, color: colors.textPrimary },
+    placesInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.control, padding: space.md, fontFamily: font.inter.regular, fontSize: type.bodyMedium.fontSize, color: colors.textPrimary, backgroundColor: colors.surfaceBg },
+    addressForm: { gap: space.sm },
+    clearButton: { marginTop: space.xs },
+    footerRow: { flexDirection: 'row', gap: space.sm },
+    footerBtn: { flex: 1 },
 });
 
 export default CounterOfferDialog;
