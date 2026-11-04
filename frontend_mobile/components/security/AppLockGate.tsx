@@ -87,7 +87,7 @@ export default function AppLockGate(){
  return user?.id==null?null:<ScopedLock key={user.id} userId={user.id}/>;
 }
 const styles=StyleSheet.create({
- overlay:{...StyleSheet.absoluteFillObject,zIndex:20000,elevation:20000,backgroundColor:colors.pageBg,justifyContent:'center',padding:space['3xl'],gap:space.lg},
+ overlay:{position:'absolute',top:0,right:0,bottom:0,left:0,zIndex:20000,elevation:20000,backgroundColor:colors.pageBg,justifyContent:'center',padding:space['3xl'],gap:space.lg},
  heading:{color:colors.textPrimary,fontWeight:'700'},body:{color:colors.textSecondary,lineHeight:23},
  error:{color:colors.status.red.fg}
 });
