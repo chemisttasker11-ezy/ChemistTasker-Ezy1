@@ -462,6 +462,7 @@ function RosterSelectionScreen({ screen, pharmacyId, pharmacyName, weekStart, se
         {vacant.map((row:any,index:number)=><View key={'vacant'+(row.id||index)} style={{gap:4}}><DataRow title={replaceUnderscore(row.role || row.role_needed || 'Open role')} subtitle={slotSummary(row)} status={isRowUnpublished(row) ? "Unpublished" : "Vacant"} />{renderShiftActions(row)}</View>)}
       </Section>}
       {screen === 'workspace' ? <Section title="Roster tools">
+        <ScreenLink title="Roster operations" subtitle="Manage existing assignments, open shifts and legacy cover requests." onPress={() => router.push('/manager/roster/operations' as any)} />
         <ScreenLink title="Calendar" subtitle="Week-by-week schedule." onPress={() => router.push('/manager/roster/calendar' as any)} />
         <ScreenLink title="By staff" subtitle="Review allocations by worker." onPress={() => router.push('/manager/roster/staff' as any)} />
         <ScreenLink title="Coverage requirements" subtitle="Minimum role coverage by weekday." onPress={() => router.push('/manager/roster/coverage' as any)} />
