@@ -37,7 +37,18 @@ describe('source-backed wire/domain contracts after extraction',()=>{
       'acceptShiftApplication', 'rejectShiftApplication', 'fetchShiftApplicationsService',
       'acceptShiftApplicationService', 'rejectShiftApplicationService', 'refereeReject'];
     const checkoutRecoveryExports = ['resumeFulfillmentCheckout', 'expireFulfillmentCheckout'] as const;
-    expect(Object.keys(exportOwners)).toHaveLength(438 - retiredExports.length + checkoutRecoveryExports.length);
+    const newUtilityExports = {
+      getNotificationPushPreferences: 'domains/notifications/api.ts',
+      updateNotificationPushPreferences: 'domains/notifications/api.ts',
+      listSavedProfessionalContacts: 'domains/talent/api.ts',
+      saveProfessionalContact: 'domains/talent/api.ts',
+      deleteSavedProfessionalContact: 'domains/talent/api.ts',
+    } as const;
+    expect(Object.keys(exportOwners)).toHaveLength(438 - retiredExports.length + checkoutRecoveryExports.length + Object.keys(newUtilityExports).length);
+    for (const [name, owner] of Object.entries(newUtilityExports)) {
+      expect(exportOwners[name]).toBe(owner);
+      expect(typeof publicApi[name]).toBe('function');
+    }
     for (const name of checkoutRecoveryExports) {
       expect(exportOwners[name]).toBe('domains/billing/api.ts');
       expect(typeof publicApi[name]).toBe('function');
