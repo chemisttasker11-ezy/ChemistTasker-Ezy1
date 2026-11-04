@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Heart, Megaphone, Search, Sparkles, Store, UserRound } from 'lucide-react-native';
-import { fetchCommunityShifts, fetchPublicShifts, getExplorerPosts, getOnboardingDetail } from '@chemisttasker/shared-core';
+import { Briefcase, CalendarCheck, Heart, Megaphone, Search, ShieldCheck, Sparkles, Store, UserRound } from 'lucide-react-native';
+import { fetchCommunityShifts, fetchPublicShifts, getExplorerDashboard, getExplorerPosts, getOnboardingDetail } from '@chemisttasker/shared-core';
 import { ContentState, SectionCard, ViewAllLink } from '@/components/ui';
 import getShiftPharmacyName from '@/roles/shared/shifts/utils/getShiftPharmacyName';
 import { BlockLoading, BlockNote, HomeScroll, ItemRow, type NextStep, NextStepCard, Rows } from '@/roles/shared/dashboard/ManagerHome';
 import { formatDay, roleWord, slotStart, timeRange } from '@/roles/shared/dashboard/managerHomeLogic';
 import { explorerStep, type ExplorerStepKey } from '@/roles/shared/dashboard/workerHomeLogic';
+import { explorerDashboardFacts, explorerShiftDisplay, type ExplorerDashboardFacts } from './explorerHomeModel';
 
 type ShiftRow = {
   id: number;
@@ -15,6 +16,7 @@ type ShiftRow = {
 };
 type Post = { id: number; headline?: string | null; roleTitle?: string | null; role_title?: string | null };
 type HomeData = {
+  dashboard: ExplorerDashboardFacts | null;
   progress: number | null;
   interests: number | null;
   /** Public and community shifts, null when both boards failed. */
@@ -48,18 +50,20 @@ export default function ExplorerOverviewScreen() {
 
   const load = useCallback(async () => {
     const id = ++generation.current;
-    const [onboarding, publicShifts, communityShifts, posts] = await Promise.allSettled([
+    const [onboarding, publicShifts, communityShifts, posts, dashboard] = await Promise.allSettled([
       getOnboardingDetail('explorer'),
       fetchPublicShifts({}),
       fetchCommunityShifts({}),
       getExplorerPosts({ mine: true }),
+      getExplorerDashboard(),
     ]);
     if (id !== generation.current) return;
     const profile = valueOf(onboarding) as any;
     const boards = [publicShifts, communityShifts].filter((result) => result.status === 'fulfilled');
     setNow(new Date());
-    setFailed([onboarding, publicShifts, communityShifts, posts].every((result) => result.status === 'rejected'));
+    setFailed([onboarding, publicShifts, communityShifts, posts, dashboard].every((result) => result.status === 'rejected'));
     setData({
+      dashboard: dashboard.status === 'fulfilled' ? explorerDashboardFacts(dashboard.value) : null,
       progress: profile?.progress_percent ?? null,
       interests: profile ? (Array.isArray(profile.interests) ? profile.interests.length : 0) : null,
       // A shift on both boards shows once.
@@ -162,13 +166,39 @@ export default function ExplorerOverviewScreen() {
     <HomeScroll refreshing={refreshing} onRefresh={refresh}>
       <NextStepCard step={step} loading={loading} />
 
-      <SectionCard title="Shifts for you" icon={<Search />} flush action={<ViewAllLink onPress={() => go('/explorer/shifts')}>All shifts</ViewAllLink>}>
+      <SectionCard title="Recommended for you" icon={<Sparkles />} flush action={<ViewAllLink onPress={() => go('/explorer/shifts')}>Find more</ViewAllLink>}>
+        {loading ? <BlockLoading rows={2} /> : data?.dashboard == null
+          ? <BlockNote text="Personalized matches could not load. You can still browse open opportunities." action="Try again" onAction={refresh} />
+          : data.dashboard.recommended.length === 0
+            ? <BlockNote text="No availability-matched opportunities yet. Add your availability and travel preferences to improve matching." action="Set availability" onAction={() => go('/explorer/availability')} />
+            : <Rows>{data.dashboard.recommended.slice(0, ROWS).map(shift => {
+                const display = explorerShiftDisplay(shift);
+                return <ItemRow key={shift.id} icon={<Store />} tone="violet" label={display.label} detail={display.detail} onPress={() => go(`/explorer/shifts/${shift.id}`)} />;
+              })}</Rows>}
+      </SectionCard>
+
+      <SectionCard title="Your shift activity" icon={<Briefcase />} flush action={<ViewAllLink onPress={() => go('/explorer/shifts')}>View shifts</ViewAllLink>}>
+        {loading ? <BlockLoading rows={2} /> : data?.dashboard == null
+          ? <BlockNote text="Your shift activity could not load. Nothing has been assumed about your bookings." action="Try again" onAction={refresh} />
+          : <>
+              <Rows>
+                <ItemRow icon={<CalendarCheck />} tone="blue" label="Upcoming this week" detail="Shift commitments from your dashboard" count={data.dashboard.upcomingWeek} onPress={() => go('/explorer/shifts')} />
+                <ItemRow icon={<ShieldCheck />} tone="violet" label="Confirmed shifts" detail="Booked work" count={data.dashboard.committedCount} onPress={() => go('/explorer/shifts')} />
+              </Rows>
+              {data.dashboard.commitments.length > 0 ? <Rows>{data.dashboard.commitments.slice(0, ROWS).map(shift => {
+                const display = explorerShiftDisplay(shift);
+                return <ItemRow key={shift.id} icon={<Store />} tone="blue" label={display.label} detail={display.detail} onPress={() => go(`/explorer/shifts/${shift.id}`)} />;
+              })}</Rows> : <BlockNote text="No personal shift activity yet. Browse opportunities to get started." action="Browse shifts" onAction={() => go('/explorer/shifts')} />}
+            </>}
+      </SectionCard>
+
+      <SectionCard title="Open opportunities" icon={<Search />} flush action={<ViewAllLink onPress={() => go('/explorer/shifts')}>All shifts</ViewAllLink>}>
         {loading ? (
           <BlockLoading rows={3} />
         ) : data?.shifts == null ? (
           <BlockNote text="Shifts could not load." action="Try again" onAction={refresh} />
         ) : upcoming.length === 0 && !data.shiftsPartial ? (
-          <BlockNote text="No open shifts right now. New ones show up here first." action="Set availability" onAction={() => go('/explorer/availability')} />
+          <BlockNote text="No open opportunities on the loaded boards right now." action="Set availability" onAction={() => go('/explorer/availability')} />
         ) : (
           <Rows>
             {data.shiftsPartial ? <BlockNote text="Some shifts could not load. Showing shifts from the board that loaded." action="Try again" onAction={refresh} /> : null}
