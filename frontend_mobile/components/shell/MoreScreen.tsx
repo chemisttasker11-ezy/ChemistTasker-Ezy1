@@ -7,6 +7,7 @@ import {
   Newspaper,
   PenLine,
   Settings2,
+  ScanLine,
   Users,
   ChevronRight,
   Clock,
@@ -154,8 +155,12 @@ export function MoreScreen({ children }: { children?: ReactNode }) {
         {publisherError ? <Text accessibilityRole="alert" style={styles.publisherError}>{publisherError}</Text> : null}
       </SectionCard> : null}
       {children}
-      <SectionCard title="Mobile settings" flush dense>
-        <Rows items={[{ label: 'Security, notifications and permissions', icon: Settings2, route: '/settings/mobile' }]} tone="blue" onItem={open} />
+      <SectionCard title="Mobile tools" flush dense>
+        <Rows items={[
+          { label: 'Scan a pharmacy or worker code', icon: ScanLine, route: '/share/scan' },
+          { label: 'Saved QR contacts', icon: BookOpen, route: '/share/saved' },
+          { label: 'Security, notifications and permissions', icon: Settings2, route: '/settings/mobile' },
+        ]} tone="blue" onItem={open} />
       </SectionCard>
       <SectionCard title="Account" flush dense>
         <Rows items={account} tone="violet" onItem={open} />
