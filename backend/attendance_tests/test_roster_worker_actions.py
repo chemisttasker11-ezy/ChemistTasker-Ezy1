@@ -496,7 +496,13 @@ class RosterWorkerActionsTests(unittest.TestCase):
             week_start=self.monday,
             status=RosterPeriod.Status.DRAFT,
         )
-        RosterPeriod.objects.filter(pk=period.id).update(status=RosterPeriod.Status.PUBLISHED)
+        # A published roster always carries a publication timestamp. The worker
+        # acknowledgement endpoint uses that timestamp to distinguish current
+        # acceptance from an acknowledgement of an earlier publication.
+        from django.utils import timezone
+        RosterPeriod.objects.filter(pk=period.id).update(
+            status=RosterPeriod.Status.PUBLISHED, published_at=timezone.now(),
+        )
         client = APIClient()
         client.force_authenticate(user=self.worker_a)
         query = {
