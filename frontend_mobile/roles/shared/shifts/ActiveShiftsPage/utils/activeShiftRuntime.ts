@@ -20,6 +20,21 @@ export const getSlotIds = (shift: Shift): number[] => {
         .filter((id: number | null): id is number => id != null);
 };
 
+/** Parse notification ids as positive integers, never as untrusted slot indexes. */
+export const positiveShiftLinkId = (raw: unknown): number | null => {
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if ((typeof value !== 'string' && typeof value !== 'number') || !/^[1-9]\d*$/.test(String(value))) return null;
+    const id = Number(value);
+    return Number.isSafeInteger(id) ? id : null;
+};
+
+/** Only select a slot confirmed to belong to the retrieved authorized shift. */
+export const getDeepLinkedShiftSlotId = (shift: Shift, requestedSlotId: number | null): number | null => {
+    const slotIds = getSlotIds(shift);
+    return requestedSlotId != null && slotIds.includes(requestedSlotId)
+        ? requestedSlotId : slotIds[0] ?? null;
+};
+
 export const slotHasAwaitingPayment = (slot: any): boolean => {
     return Boolean(slot?.awaitingPayment ?? slot?.awaiting_payment);
 };

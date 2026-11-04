@@ -5,7 +5,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { Alert, View, ScrollView, Linking } from 'react-native';
 import { Text, Snackbar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { subscribeShiftSlotActivity } from '@/utils/pushNotifications';
 import {
@@ -54,6 +54,8 @@ import { styles } from './styles';
 import {
     ACTIVE_SHIFT_SLOT_SEEN_KEY_PREFIX,
     getSlotIds,
+    positiveShiftLinkId,
+    getDeepLinkedShiftSlotId,
     findInterestForMember,
     buildPublicSlotSignature,
     buildMemberSlotSignature,
@@ -73,10 +75,11 @@ type ActiveShiftsPageProps = {
 type ActiveShiftsCentreProps = {
     surface: ShiftSurface;
     shiftId: number | null;
+    routeSlotId: number | null;
     title: string;
 };
 
-const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftId, title }) => {
+const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftId, routeSlotId, title }) => {
     const router = useRouter();
     const { user } = useAuth();
     const selectedPharmacyId = surface.scopedPharmacyId;
@@ -100,6 +103,7 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
     const [expandedShifts, setExpandedShifts] = useState<Set<number>>(new Set());
     const reviewLoadingId: number | null = null;
     const candidateReviewRequest = useRef(0);
+    const appliedShiftLinkRef = useRef<string | null>(null);
     useEffect(() => () => { candidateReviewRequest.current += 1; }, []);
 
     const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<DeleteConfirmDialogState>({
@@ -129,6 +133,23 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
         scopeKey: surface.scopeKey,
     });
     const { tabData, setTabData, loadTabDataForShift } = useTabData(shifts, selectedLevelByShift, getTabKey);
+
+    // Notification links focus the exact shift and slot, without overriding later manual selection.
+    useEffect(() => {
+        if (shiftId == null) return;
+        const shift = shifts.find(item => item.id === shiftId);
+        if (!shift) return;
+        const link = `${shiftId}:${routeSlotId ?? 'default'}`;
+        if (appliedShiftLinkRef.current === link) return;
+        appliedShiftLinkRef.current = link;
+        setExpandedShifts(previous => previous.has(shiftId) ? previous : new Set([...previous, shiftId]));
+        if (!(shift as any).singleUserOnly && !(shift as any).single_user_only) {
+            const slotId = getDeepLinkedShiftSlotId(shift, routeSlotId);
+            if (slotId != null) {
+                setSelectedSlotByShift(previous => previous[shiftId] === slotId ? previous : { ...previous, [shiftId]: slotId });
+            }
+        }
+    }, [shiftId, routeSlotId, shifts]);
     const handlePayWithPills = useCallback(async (shift: Shift, offerIds: number[] = []) => {
         setPillPayingShiftId(shift.id);
         try {
@@ -1017,13 +1038,17 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
 // GAP 1 FIX: Key the whole centre by surface.scopeKey + shiftId so cards and dialogs never survive scope/shift changes
 const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, title = 'Active Shifts' }) => {
     const surface = useShiftSurface();
-    const centreKey = buildActiveShiftsScopeKey(surface.scopeKey, shiftId);
+    const params = useLocalSearchParams<{ shift_id?: string; slot_id?: string }>();
+    const activeShiftId = positiveShiftLinkId(params.shift_id) ?? shiftId;
+    const slotId = positiveShiftLinkId(params.slot_id);
+    const centreKey = buildActiveShiftsScopeKey(surface.scopeKey, activeShiftId);
 
     return (
         <ActiveShiftsCentre
             key={centreKey}
             surface={surface}
-            shiftId={shiftId}
+            shiftId={activeShiftId}
+            routeSlotId={slotId}
             title={title}
         />
     );

@@ -31,6 +31,8 @@ const surface = loadTs('./shiftSurface.ts');
 const {
   getShiftPharmacyId,
   filterShiftsByPharmacy,
+  positiveShiftLinkId,
+  getDeepLinkedShiftSlotId,
   isCandidateLevelVisible,
   mergeSlotSignatures,
   getNextGeneration,
@@ -248,3 +250,16 @@ test('scope keying: buildActiveShiftsScopeKey binds surface scope with shiftId',
   // Key differs when scopeKey changes (preventing pharmacy/workspace switch bleed)
   assert.notEqual(shift42Key, otherScopeKey);
 });
+
+test('W3 Shift Centre notification links select only valid shift-owned slots', () => {
+  assert.equal(positiveShiftLinkId('52'), 52);
+  assert.equal(positiveShiftLinkId(['52']), 52);
+  for (const invalid of [undefined, '', '0', '-4', '3.2', 'abc', '1e3', '9007199254740993']) {
+    assert.equal(positiveShiftLinkId(invalid), null);
+  }
+  const shift = { id: 52, slots: [{ id: 101 }, { id: 102 }] };
+  assert.equal(getDeepLinkedShiftSlotId(shift, 102), 102);
+  assert.equal(getDeepLinkedShiftSlotId(shift, 999), 101);
+  assert.equal(getDeepLinkedShiftSlotId(shift, null), 101);
+  assert.equal(getDeepLinkedShiftSlotId({ id: 9, slots: [] }, 102), null);
+});
