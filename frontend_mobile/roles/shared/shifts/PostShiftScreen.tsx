@@ -666,6 +666,8 @@ export default function PostShiftScreen() {
         const templateKey = `${pharmacyId}:${roleNeeded}`;
 
         const loadDescriptionTemplate = async () => {
+            // Never offer an old pharmacy/role template while the new scope loads.
+            setDescriptionTemplate(null);
             setDescriptionTemplateLoading(true);
             try {
                 const data = await listShiftDescriptionTemplates(Number(pharmacyId), roleNeeded);
