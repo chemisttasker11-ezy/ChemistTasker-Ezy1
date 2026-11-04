@@ -17,6 +17,7 @@ import './index.css';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 import App from './App';
+import ShareQrPage from './pages/ShareQrPage';
 import MobileInstallPrompt from './components/MobileInstallPrompt';
 import PublicRouteBridge from './components/PublicRouteBridge';
 function WebRoot(){return <PublicRouteBridge><App/><MobileInstallPrompt path={window.location.pathname} /></PublicRouteBridge>;}
@@ -154,6 +155,7 @@ const router = createBrowserRouter([
 
       { path: 'shifts/public-board', element: <PublicJobBoardPage /> },
       { path: 'talent/public-board', element: <PublicTalentBoardPage /> },
+      { path: 'share/qr', element: <ShareQrPage /> },
       { path: 'shifts/link', element: <SharedShiftLandingPage /> },
       { path: 'organization/:slug', element: <PublicOrganizationPage /> },
 
