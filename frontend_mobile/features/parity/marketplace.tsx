@@ -73,6 +73,12 @@ function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing
    if(buyingPharmacy==null&&!access?.can_trade_personally){setLocalError('Select an eligible buying pharmacy for this enquiry.');return;}
    submittingRef.current=true;setBusy(true);setLocalError('');
    try{
+     const eligibility=await api.getEligibility(listing.id,buyingPharmacy!=null?{pharmacy:buyingPharmacy}:undefined);
+     if(!eligibility.can_enquire){
+       const blocker=eligibility.blocker;
+       const detail=typeof blocker==='string'?blocker:blocker&&typeof blocker==='object'?(blocker as any).message||(blocker as any).detail||(blocker as any).code:null;
+       throw new Error(detail||'This account cannot enquire about this listing in the selected buying context.');
+     }
      await api.createEnquiry(listing.id,{
        client_request_id:requestIdRef.current,
        buying_pharmacy:buyingPharmacy,
