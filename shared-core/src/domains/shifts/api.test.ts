@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { configureApi } from '../../transport/application';
-import { getActiveShiftDetail, getCommunityShiftDetail, getPublicShiftDetail, getActiveShiftsPage, getConfirmedShiftsPage, fetchAllActiveShifts, fetchAllConfirmedShifts } from './api';
+import { getActiveShiftDetail, getCommunityShiftDetail, getPublicShiftDetail, getActiveShiftsPage, getConfirmedShiftsPage, fetchAllActiveShifts, fetchAllConfirmedShifts, acceptShiftOfferService } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -47,4 +47,30 @@ it.each([
         `https://dashboard.example.test/api/v1/shifts/${kind}/?page=1`,
         `https://dashboard.example.test/api/v1/shifts/${kind}/?page=2`,
     ]);
+});
+
+it('echoes the version of each reviewed shift offer while preserving no-consent acceptance', async () => {
+    const payloads: Array<Record<string, unknown>> = [];
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        payloads.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return new Response(JSON.stringify({ status: 'ACCEPTED_AWAITING_PAYMENT' }), {
+            status: 200, headers: { 'content-type': 'application/json' },
+        });
+    }) as unknown as typeof fetch;
+    configureApi({ baseURL: 'https://dashboard.example.test/api/v1', getToken: async () => null, fetchImpl });
+
+    await acceptShiftOfferService(3, {
+        engagementTermsAccepted: true, independentContractorStatusConfirmed: true,
+        termsVersion: 'reviewed-offer-version-3',
+    });
+    await acceptShiftOfferService(4);
+    expect(payloads[0]).toMatchObject({
+        engagement_terms_accepted: true,
+        independent_contractor_status_confirmed: true,
+        terms_version: 'reviewed-offer-version-3',
+    });
+    expect(payloads[1]).toEqual({
+        engagement_terms_accepted: false,
+        independent_contractor_status_confirmed: false,
+    });
 });
