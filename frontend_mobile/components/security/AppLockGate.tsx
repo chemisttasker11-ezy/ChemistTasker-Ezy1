@@ -64,7 +64,7 @@ function ScopedLock({userId}:{userId:number}) {
   }catch{setError('Device authentication failed. Retry or sign in with your password.');}
   finally{attempting.current=false;setBusy(false);}
  };
- const usePassword=async()=>{
+ const signInWithPassword=async()=>{
   if(busy)return;
   setBusy(true);
   try{await logout();router.replace('/login' as any);}
@@ -78,7 +78,7 @@ function ScopedLock({userId}:{userId:number}) {
   {error?<Text accessibilityRole="alert" style={styles.error}>{error}</Text>:null}
   {hidden?<Text style={styles.body}>Securing your workspace…</Text>:<>
    <Button mode="contained" loading={busy} disabled={busy} onPress={()=>void unlock()}>Unlock app</Button>
-   <Button mode="outlined" disabled={busy} onPress={()=>void usePassword()}>Sign in with password instead</Button>
+   <Button mode="outlined" disabled={busy} onPress={()=>void signInWithPassword()}>Sign in with password instead</Button>
   </>}
  </View>;
 }
