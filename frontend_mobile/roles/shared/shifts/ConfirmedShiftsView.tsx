@@ -74,6 +74,10 @@ export function filterDeferredPayrollOffers(
 
 export default function ConfirmedShiftsView() {
     const surface = useShiftSurface();
+    return <ScopedConfirmedShifts key={surface.scopeKey} surface={surface} />;
+}
+
+function ScopedConfirmedShifts({ surface }: { surface: ReturnType<typeof useShiftSurface> }) {
     const scopedPharmacyId = surface.scopedPharmacyId;
 
     const [shifts, setShifts] = useState<Shift[]>([]);
@@ -95,7 +99,7 @@ export default function ConfirmedShiftsView() {
 
     const loadShifts = useCallback(async () => {
         const gen = ++loadGenRef.current;
-        setShifts([]); // Clear stale pharmacy data before the new scoped request.
+        // Same-scope refreshes preserve already rendered bookings if the network fails.
         setLoading(true);
         setError(null);
         try {
@@ -121,7 +125,6 @@ export default function ConfirmedShiftsView() {
 
     const loadDeferredPayroll = useCallback(async () => {
         const gen = ++payrollGenRef.current;
-        setDeferredPayrollOffers([]);
         setPayrollLoading(true);
         setPayrollError(null);
         try {
@@ -177,11 +180,8 @@ export default function ConfirmedShiftsView() {
             loadGenRef.current++;
             payrollGenRef.current++;
             profileGenRef.current++;
-            setDeferredPayrollOffers([]);
-            setActivatingPayrollOfferIds(new Set());
-            setPayrollError(null);
         };
-    }, [surface.scopeKey]);
+    }, []);
 
     const openProfile = async (shiftId: number, slotId: number | null, userId: number) => {
         const gen = ++profileGenRef.current;
