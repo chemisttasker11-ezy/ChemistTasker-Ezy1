@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
+  BookOpen,
   Building2,
   CalendarCheck,
   CalendarClock,
@@ -56,6 +57,7 @@ const titles: Record<string, string> = {
   pills: 'Pills',
   notifications: 'Notifications',
   calendar: 'Calendar',
+  learning: 'Learning',
   'talent-board': 'Talent Board',
   invoice: 'Invoices',
   'invoice/new': 'New invoice',
@@ -113,6 +115,7 @@ const more: MoreGroup[] = [
     items: [
       { label: 'Talent Board', icon: Search, route: '/owner/talent-board' },
       { label: 'Marketplace', icon: ShoppingBag, route: '/marketplace' },
+          { label: 'Learning materials', icon: BookOpen, route: '/owner/learning' },
       { label: 'Ethical Marketplace', icon: ShieldCheck, route: '/marketplace/ethical/access' },
     ],
   },
