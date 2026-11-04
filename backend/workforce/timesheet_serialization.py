@@ -54,13 +54,17 @@ def serialize_timesheet(timesheet, *, detail=False, user=None):
         "comments_count": timesheet.comments.count(),
         "last_built_at": timesheet.last_built_at.isoformat() if timesheet.last_built_at else None,
     }
-    if detail and revision:
-        open_checks = effective_open_checks(revision)
+    if detail:
+        # Newly opened periods can contain uncalculated timesheets without a revision.
+        # Retain the pharmacy and locked-period authority even without snapshot data.
         data.update({
-            "snapshot": revision.snapshot,
-            "checks": [serialize_check(check) for check in revision.checks.all().order_by("work_date", "severity", "code", "id")],
-            "effective_blocking_checks": sum(1 for check in open_checks if check.severity == TimesheetCheck.Severity.BLOCKER),
-            "effective_warning_checks": sum(1 for check in open_checks if check.severity == TimesheetCheck.Severity.WARNING),
+            "pharmacy": {"id": timesheet.period.pharmacy_id, "name": timesheet.period.pharmacy.name},
+            "period_status": timesheet.period.status,
+            "period_timezone": timesheet.period.timezone,
+            "snapshot": revision.snapshot if revision else None,
+            "checks": [serialize_check(check) for check in revision.checks.all().order_by("work_date", "severity", "code", "id")] if revision else [],
+            "effective_blocking_checks": effective_blockers,
+            "effective_warning_checks": effective_warnings,
             "comments": [
                 {
                     "id": comment.pk,

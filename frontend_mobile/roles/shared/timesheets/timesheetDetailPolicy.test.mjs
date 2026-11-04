@@ -13,6 +13,7 @@ const { canApproveTimesheet, isSourceCorrectionRequired, formatPharmacyClock, fo
 test('timesheet approval only allows fresh non-blocked non-locked revision', () => {
   const fresh = { status: 'SUBMITTED', revision_number: 4, needs_rebuild: false, blocking_checks: 0, effective_blocking_checks: 0 };
   assert.equal(canApproveTimesheet(fresh, false), true);
+  assert.equal(canApproveTimesheet({ ...fresh, period_status: 'LOCKED' }, true), false);
   assert.equal(canApproveTimesheet(fresh, true), false);
   assert.equal(canApproveTimesheet({ ...fresh, status: 'APPROVED' }, false), false);
   assert.equal(canApproveTimesheet({ ...fresh, status: 'LOCKED' }, false), false);

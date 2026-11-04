@@ -15,7 +15,7 @@ test('worker and manager timesheet routes share a native detail implementation b
   assert.match(workerList, /\/my-hours\/\$\{row\.id\}/);
   assert.match(detail, /getTimesheet\(timesheetId\)/);
   assert.match(detail, /effective_blocking_checks/);
-  assert.match(detail, /canApproveTimesheet\(data, false\)/);
+  assert.match(detail, /canApproveTimesheet\(data, periodLocked\)/);
   assert.match(detail, /managerAllowed && !sourceRequired/);
   assert.match(detail, /isSourceCorrectionRequired\(check\)/);
   assert.match(detail, /workforce\.addMissingPunch/);
@@ -23,4 +23,7 @@ test('worker and manager timesheet routes share a native detail implementation b
   assert.match(detail, /workforce\.addTimesheetComment/);
   assert.match(detail, /workerVisible/);
   assert.match(detail, /hasCapability\('MANAGE_ROSTER'/);
+  assert.match(detail, /data\?\.period_status === 'LOCKED'/);
+  assert.match(detail, /managerAllowed && !periodLocked/);
+  assert.match(detail, /!data\.snapshot/);
 });
