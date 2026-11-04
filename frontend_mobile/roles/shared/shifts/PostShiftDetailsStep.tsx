@@ -42,6 +42,7 @@ type Props = {
   descriptionTemplateSaving: boolean;
   handleUseDescriptionTemplate: () => void;
   handleSaveDescriptionTemplate: () => void | Promise<void>;
+  handleDeleteDescriptionTemplate: () => void;
   description: string;
   setDescription: Setter<string>;
   workloadTags: string[];
@@ -78,6 +79,7 @@ export default function PostShiftDetailsStep({
   descriptionTemplateSaving,
   handleUseDescriptionTemplate,
   handleSaveDescriptionTemplate,
+  handleDeleteDescriptionTemplate,
   description,
   setDescription,
   workloadTags,
@@ -163,6 +165,20 @@ export default function PostShiftDetailsStep({
         >
           Save for future shifts
         </Button>
+        {descriptionTemplate?.id ? (
+          <Button
+            mode="text"
+            compact
+            textColor={colors.status.red.fg}
+            disabled={descriptionTemplateSaving || descriptionTemplateLoading}
+            onPress={handleDeleteDescriptionTemplate}
+            style={styles.templateButton}
+            contentStyle={{ minHeight: touch.min }}
+            accessibilityLabel="Delete saved description template"
+          >
+            Delete template
+          </Button>
+        ) : null}
       </View>
 
       <Text style={styles.label}>On the day</Text>
