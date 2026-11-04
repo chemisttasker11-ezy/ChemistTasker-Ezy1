@@ -97,7 +97,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when) || !Number.isFinite(Date.parse(when))) { setError('Enter a valid local date and time in YYYY-MM-DDTHH:mm format.'); return; }
     if (!note) { setError('A reason is required for this attendance correction.'); return; }
     const eventType = missingPunchCheck.code === 'MISSING_CLOCK_IN' ? 'CLOCK_IN' : 'CLOCK_OUT';
-    void run('punch', () => workforce.addMissingPunch(timesheetId, { sessionId, eventType, occurredAtLocal: when, reason: note }), 'Missing attendance time added for review.').then(saved => {
+    void run('punch', () => workforce.addMissingPunch(timesheetId, { session_id: sessionId, event_type: eventType, occurred_at_local: when, reason: note }), 'Missing attendance time added for review.').then(saved => {
       if (saved) { setMissingPunchCheck(null); setMissingPunchAt(''); setMissingPunchReason(''); }
     });
   };
