@@ -1173,7 +1173,7 @@
         },
         {
           "path": "shifts/serialization/projections.py",
-          "line": 74,
+          "line": 114,
           "import": "invoicing.services",
           "kind": "delayed"
         }
