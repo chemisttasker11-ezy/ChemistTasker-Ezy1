@@ -7,6 +7,7 @@ import { Button, Card, Text, TextInput } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
 import { parseChemistTaskerShareCode, safeShareCodeLabel, type ShareCode } from '@/features/share/shareCode';
 import { saveContact } from '@/features/share/savedContacts';
+import InviteFromWorkerQr from '@/features/share/InviteFromWorkerQr';
 import { colors, radius, space } from '@/constants/tokens';
 
 export default function ShareCodeScanner() {
@@ -77,6 +78,7 @@ export default function ShareCodeScanner() {
         <Text style={styles.muted}>A QR is not proof of employment or verification. Pharmacy admission, favourite status and invitations require existing server approval.</Text>
         <Button mode="contained" onPress={() => void open()}>{code.kind === 'pharmacy-invitation' ? 'Review membership application' : 'View public details'}</Button>
         <Button mode="outlined" onPress={() => void save()}>Save privately for later</Button>
+        {user && code.kind === 'worker-public-listing' ? <InviteFromWorkerQr key={`${user.id}:${code.referenceCode}`} referenceCode={code.referenceCode} /> : null}
       </Card.Content></Card> : null}
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       {notice ? <Text accessibilityRole="alert" style={styles.muted}>{notice}</Text> : null}
