@@ -353,7 +353,7 @@ function ScopedWorkerShiftDetail({ id, offerParam, surface }: { id?: string; off
         setOfferActionBusy(true);
         setOfferActionError(null);
         try {
-            const result = await acceptWorkerShiftOfferService(activeOffer.id, payload);
+            const result = await acceptWorkerShiftOfferService(activeOffer.id, { ...payload, termsVersion: activeOffer.engagementTermsPreview?.termsVersion });
             if (!mutation.isLatest()) return;
             triggerHaptic('success');
             setConfirmAcceptOpen(false);
