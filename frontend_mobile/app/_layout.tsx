@@ -378,6 +378,10 @@ function AuthGate() {
       if (user && top) {
         if (isSharedAuthenticatedRoute) {
           const normalizedSharedRole = String(user.role || '').toUpperCase();
+          if (top === 'next-shifts' && !['PHARMACIST', 'OTHER_STAFF'].includes(normalizedSharedRole)) {
+            router.replace(getRoleHome(user.role) as any);
+            return;
+          }
           const ownerAccess = normalizedSharedRole === 'OWNER';
           const storedPersona = await readPersonaSelection(user);
           const activeAdminAssignment = storedPersona?.startsWith('ADMIN:')
