@@ -57,6 +57,7 @@ export function AnonymousShiftBoardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [nextPage, setNextPage] = useState<number | null>(null);
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +70,7 @@ export function AnonymousShiftBoardScreen() {
     const gen = ++requestGenRef.current;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setLoadingMore(false);
+    setLoadMoreError(null);
     setError(null);
 
     try {
@@ -103,6 +105,7 @@ export function AnonymousShiftBoardScreen() {
     if (!nextPage || loadingMore || loading || refreshing) return;
     const gen = requestGenRef.current;
     setLoadingMore(true);
+    setLoadMoreError(null);
 
     try {
       const payload: any = { page: nextPage };
@@ -120,8 +123,10 @@ export function AnonymousShiftBoardScreen() {
       setTotalCount(count);
       const nextNum = parseNextPage(response?.next) ?? (response?.next ? nextPage + 1 : null);
       setNextPage(nextNum);
-    } catch {
-      // User can retry by pressing load more or scrolling again
+    } catch (err: any) {
+      if (gen === requestGenRef.current) {
+        setLoadMoreError(err?.message || 'Could not load more shifts. Your current results are still available.');
+      }
     } finally {
       if (gen === requestGenRef.current) {
         setLoadingMore(false);
@@ -232,7 +237,7 @@ export function AnonymousShiftBoardScreen() {
           onRefresh={() => void loadShifts(true)}
           refreshing={refreshing}
           renderItem={renderShiftItem}
-          onEndReached={() => void loadMoreShifts()}
+          onEndReached={() => { if (!loadMoreError) void loadMoreShifts(); }}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
             loadingMore ? (
@@ -242,7 +247,10 @@ export function AnonymousShiftBoardScreen() {
               </View>
             ) : nextPage ? (
               <View style={styles.loadMoreWrap}>
-                <Button label="Load more shifts" onPress={() => void loadMoreShifts()} variant="outlined" />
+                {loadMoreError ? (
+                  <Text accessibilityRole="alert" style={styles.footerLoadingText}>{loadMoreError}</Text>
+                ) : null}
+                <Button label={loadMoreError ? 'Retry loading shifts' : 'Load more shifts'} onPress={() => void loadMoreShifts()} variant="outlined" />
               </View>
             ) : undefined
           }
