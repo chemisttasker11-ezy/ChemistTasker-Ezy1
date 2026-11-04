@@ -283,6 +283,8 @@ function UpdatePrompt() {
 function AuthGate() {
   const router = useRouter();
   const segments = useSegments();
+  // Typed Expo routes can infer a narrow tuple; deep-link matching needs a read-only path array.
+  const routeSegments: readonly string[] = segments;
   const { user, isLoading, hasCapability } = useAuth();
   const { selectedPharmacyId } = useWorkspace();
   const { summary: ahpraSummary, loading: ahpraLoading, refusal: ahpraRefusal, clearRefusal } = useAhpra();
@@ -290,7 +292,7 @@ function AuthGate() {
   const onAhpraStep = `/${segments.join('/')}` === ahpraPath;
   // Invitations are never blocked by AHPRA.
   const onInvitePage = ['/pharmacist/memberships', '/otherstaff/memberships', '/admin-invitations'].includes(`/${segments.join('/')}`)
-    || (segments[0] === 'membership' && segments[1] === 'apply' && Boolean(segments[2]));
+    || (routeSegments[0] === 'membership' && routeSegments[1] === 'apply' && Boolean(routeSegments[2]));
 
   useEffect(() => {
     if (isLoading || ahpraLoading) return;

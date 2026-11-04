@@ -19,6 +19,10 @@ import { resolveApiBaseUrl } from '@/utils/apiUrl';
 type MemberRows = Record<number, MembershipSummary[] | 'error'>;
 type Editor = 'create' | 'edit' | null;
 
+// Preserve the existing per-pharmacy error state while narrowing member rows safely.
+const firstMembers = (rows: MembershipSummary[] | 'error' | undefined): MembershipSummary[] =>
+  Array.isArray(rows) ? rows.slice(0, 5) : [];
+
 const memberName = (row: MembershipSummary) =>
   [row.userDetails?.firstName, row.userDetails?.lastName].filter(Boolean).join(' ').trim()
   || row.invitedName || row.userDetails?.email || 'Team member';
@@ -270,7 +274,7 @@ export default function ChainScreen() {
                   <Divider />
                   {members[pharmacy.id] === 'error' ? (
                     <Button mode="text" onPress={() => void load(chain.id)}>Retry staff load</Button>
-                  ) : (Array.isArray(members[pharmacy.id]) ? members[pharmacy.id] : []).slice(0, 5).map((member) => (
+                  ) : firstMembers(members[pharmacy.id]).map((member) => (
                     <Text key={member.id} style={styles.memberText}>{memberName(member)}{member.role ? ' · ' + member.role.replaceAll('_', ' ').toLowerCase() : ''}</Text>
                   ))}
                   <Button mode="text" textColor={colors.status.red.fg} disabled={busy} onPress={() => requestRemove(pharmacy)}>

@@ -70,8 +70,8 @@ export default function MagicMembershipApplyScreen() {
     if (!user) return;
     setForm((current) => ({
       ...current,
-      firstName: user.firstName ?? (user as any).first_name ?? '',
-      lastName: user.lastName ?? (user as any).last_name ?? '',
+      firstName: user.first_name ?? (user as { firstName?: string }).firstName ?? '',
+      lastName: user.last_name ?? (user as { lastName?: string }).lastName ?? '',
       username: (user as any).username ?? '',
       email: user.email ?? '',
       mobile: (user as any).mobileNumber ?? (user as any).mobile_number ?? '',
