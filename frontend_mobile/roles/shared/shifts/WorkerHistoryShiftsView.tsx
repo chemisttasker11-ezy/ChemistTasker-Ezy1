@@ -85,7 +85,8 @@ export default function WorkerHistoryShiftsView({ invoiceRoute }: { invoiceRoute
             return (
               <WorkerBookedShiftCard key={shift.id} shift={shift} mode="history" rating={p?.id ? ratings[p.id] : undefined}
                 actions={<>
-                  <Button mode="contained" icon="receipt" onPress={() => router.push({ pathname: (invoiceRoute || '/pharmacist/invoice/new') as any, params: { shiftId: shift.id, pharmacyId: p?.id ?? '' } })}>Create invoice</Button>
+                  {/* Explorers have no invoices on web, so no route = no button. */}
+                  {invoiceRoute ? <Button mode="contained" icon="receipt" onPress={() => router.push({ pathname: invoiceRoute as any, params: { shiftId: shift.id, pharmacyId: p?.id ?? '' } })}>Create invoice</Button> : null}
                   <Button mode="outlined" icon="star-outline" disabled={!p?.id} onPress={() => p?.id && void openRating(p.id, p.name ?? 'Pharmacy')}>Rate pharmacy</Button>
                   <Button mode="text" icon="storefront-outline" disabled={!p} onPress={() => setPharmacy(p)}>Details</Button>
                 </>} />

@@ -14,6 +14,7 @@ import {
 import {
     COUNTER_OFFER_STORAGE_KEY,
     EMPTY_TRAVEL_LOCATION,
+    shiftStorageKey,
 } from '../constants';
 import {
     CounterOfferFormSlot,
@@ -50,6 +51,8 @@ const offerHasValidSlots = (offer: any): boolean =>
 
 type UseCounterOffersParams = {
     shifts: Shift[];
+    /** useShiftSurface().scopeKey: sent-offer badges are stored per persona, workspace, pharmacy and user. */
+    scopeKey: string;
     userRole?: string | null;
     pharmacistRatePref?: RatePreference;
     hideCounterOffer?: boolean;
@@ -66,6 +69,7 @@ type UseCounterOffersParams = {
 
 export const useCounterOffers = ({
     shifts,
+    scopeKey,
     userRole,
     pharmacistRatePref,
     hideCounterOffer,
@@ -84,6 +88,8 @@ export const useCounterOffers = ({
     const [reviewOfferShiftId, setReviewOfferShiftId] = useState<number | null>(null);
     const [reviewOffers, setReviewOffers] = useState<any[]>([]);
     const [reviewLoading, setReviewLoading] = useState(false);
+    const [reviewError, setReviewError] = useState(false);
+    const [reviewAttempt, setReviewAttempt] = useState(0);
     const [isHydrated, setIsHydrated] = useState(false);
 
     const [counterOfferOpen, setCounterOfferOpen] = useState(false);
@@ -93,8 +99,10 @@ export const useCounterOffers = ({
     const [counterOfferTravelLocation, setCounterOfferTravelLocation] = useState<TravelLocation>(EMPTY_TRAVEL_LOCATION);
     const [counterOfferError, setCounterOfferError] = useState<string | null>(null);
 
+    // Fixed for this mount: ShiftsBoard remounts per scope.
+    const storageKey = shiftStorageKey(COUNTER_OFFER_STORAGE_KEY, scopeKey);
     const persistCounterOffers = (data: Record<number, CounterOfferTrack>) =>
-        AsyncStorage.setItem(COUNTER_OFFER_STORAGE_KEY, JSON.stringify(data)).catch(() => null);
+        AsyncStorage.setItem(storageKey, JSON.stringify(data)).catch(() => null);
 
     const hasCounterOfferTravelLocation = useMemo(() => {
         const { googlePlaceId, streetAddress, suburb, state, postcode } = counterOfferTravelLocation;
@@ -105,7 +113,7 @@ export const useCounterOffers = ({
     useEffect(() => {
         (async () => {
             try {
-                const counters = await AsyncStorage.getItem(COUNTER_OFFER_STORAGE_KEY);
+                const counters = await AsyncStorage.getItem(storageKey);
                 if (counters) {
                     const normalized = normalizeCounterOffers(JSON.parse(counters));
                     setCounterOffers(normalized);
@@ -155,15 +163,20 @@ export const useCounterOffers = ({
 
     // Fetch fresh offers when opening review dialog so we show full slot details and multiple offers.
     useEffect(() => {
+        // Set by cleanup when the dialog closes or opens another shift: a late reply never writes.
+        let stale = false;
         const load = async () => {
+            setReviewError(false);
             if (reviewOfferShiftId == null) {
                 setReviewOffers([]);
+                setReviewLoading(false);
                 return;
             }
             setReviewOffers([]); // clear stale data while loading another shift
             setReviewLoading(true);
             try {
                 const remote = await fetchShiftCounterOffersService(reviewOfferShiftId);
+                if (stale) return;
                 let offers = Array.isArray(remote) ? remote : [];
                 // Candidates should only see their own offers; filter defensively.
                 if (currentUserId != null) {
@@ -187,14 +200,19 @@ export const useCounterOffers = ({
                     });
                 }
             } catch (err) {
+                if (stale) return;
                 console.warn('Failed to load counter offers for review', err);
                 setReviewOffers([]);
+                setReviewError(true);
             } finally {
-                setReviewLoading(false);
+                if (!stale) setReviewLoading(false);
             }
         };
         load();
-    }, [reviewOfferShiftId, currentUserId]);
+        return () => {
+            stale = true;
+        };
+    }, [reviewOfferShiftId, currentUserId, reviewAttempt]);
 
     // Reconcile local counter offers with backend data to avoid stale badges when offers are removed server-side.
     useEffect(() => {
@@ -494,5 +512,7 @@ export const useCounterOffers = ({
         setReviewOfferShiftId,
         reviewOffers,
         reviewLoading,
+        reviewError,
+        retryReview: () => setReviewAttempt((attempt) => attempt + 1),
     };
 };

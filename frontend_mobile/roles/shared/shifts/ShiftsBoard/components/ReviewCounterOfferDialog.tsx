@@ -5,6 +5,7 @@ import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Portal, Dialog, Button, ActivityIndicator, Text } from 'react-native-paper';
 import { Shift } from '@chemisttasker/shared-core';
+import { ContentState } from '@/components/ui/ContentState';
 import ReviewOfferSlotList from './ReviewOfferSlotList';
 import { useReviewOfferDisplay } from '../hooks/useReviewOfferDisplay';
 
@@ -12,6 +13,8 @@ type ReviewCounterOfferDialogProps = {
     visible: boolean;
     onDismiss: () => void;
     reviewLoading: boolean;
+    reviewError: boolean;
+    onRetry: () => void;
     reviewOfferShiftId: number | null;
     reviewOffers: any[];
     shifts: Shift[];
@@ -21,6 +24,8 @@ const ReviewCounterOfferDialog: React.FC<ReviewCounterOfferDialogProps> = ({
     visible,
     onDismiss,
     reviewLoading,
+    reviewError,
+    onRetry,
     reviewOfferShiftId,
     reviewOffers,
     shifts,
@@ -45,10 +50,20 @@ const ReviewCounterOfferDialog: React.FC<ReviewCounterOfferDialogProps> = ({
                                 </Text>
                             </View>
                         )}
-                        {reviewOfferShiftId != null ? (
-                            hasOffers ? (
+                        {reviewOfferShiftId != null && !reviewLoading ? (
+                            reviewError ? (
+                                <ContentState
+                                    kind="error"
+                                    compact
+                                    title="Counter offers could not load"
+                                    description="Check your connection, then try again."
+                                    onAction={onRetry}
+                                />
+                            ) : hasOffers ? (
                                 <ReviewOfferSlotList offers={offers} shift={shift} />
-                            ) : null
+                            ) : (
+                                <ContentState kind="empty" compact title="No counter offers on this shift" />
+                            )
                         ) : null}
                     </ScrollView>
                 </Dialog.ScrollArea>

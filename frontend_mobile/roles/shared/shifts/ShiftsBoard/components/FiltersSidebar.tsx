@@ -2,7 +2,7 @@
 // Complete filter UI with exact web logic adapted for mobile
 
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Text, Checkbox, TextInput, Button, IconButton, Chip } from 'react-native-paper';
 import Slider from '@react-native-community/slider';
 import { FILTER_SECTIONS } from '../constants';
@@ -39,7 +39,8 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
     );
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        // The filter sheet (BottomSheet) scrolls; a nested ScrollView here would fight it.
+        <View style={styles.content}>
             <TextInput
                 mode="outlined"
                 placeholder="Search pharmacy, role..."
@@ -253,16 +254,13 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
                     </View>
                 </View>
             )}
-        </ScrollView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
     content: {
-        padding: 16,
+        paddingBottom: 16,
     },
     searchInput: {
         marginBottom: 16,

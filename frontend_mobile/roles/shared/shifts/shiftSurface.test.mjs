@@ -117,6 +117,22 @@ test('the surface waits for the workspace and the admin assignment; scope keys d
   assert.equal(new Set([a, b, c]).size, 3);
 });
 
+test('an internal worker board is keyed by the selected pharmacy; platform and poster keys are not', () => {
+  for (const persona of ['pharmacist', 'otherstaff']) {
+    const base = { pathname: `/${persona}/shifts`, userId: 5, workspace: 'internal', canUsePlatform: true };
+    const key = (selectedPharmacyId, extra = {}) => resolveShiftSurface({ ...base, ...extra, selectedPharmacyId }).scopeKey;
+    assert.equal(key(4), `${persona}:internal:4:5`);
+    assert.notEqual(key(4), key(5), 'a different internal pharmacy remounts the board');
+    assert.equal(key(null), `${persona}:internal:all:5`);
+    assert.equal(key(4, { workspace: 'platform' }), key(5, { workspace: 'platform' }), 'platform boards are not pharmacy-scoped');
+    assert.equal(resolveShiftSurface({ ...base, selectedPharmacyId: 4 }).scopedPharmacyId, null, 'display scope unchanged');
+  }
+  assert.equal(resolveShiftSurface({ pathname: '/explorer/shifts', userId: 6, selectedPharmacyId: 4 }).scopeKey, 'explorer:platform:all:6');
+  assert.equal(resolveShiftSurface({ pathname: '/owner/shifts', userId: 1, selectedPharmacyId: 4 }).scopeKey, 'owner:all:4:1');
+  assert.equal(resolveShiftSurface({ pathname: '/organization/shifts', userId: 2, selectedPharmacyId: 9 }).scopeKey, 'organization:all:9:2');
+  assert.equal(resolveShiftSurface({ pathname: '/admin/shifts', userId: 3, selectedPharmacyId: 99, adminPharmacyId: 7 }).scopeKey, 'admin:all:7:3');
+});
+
 test('persona from the route and from the role', () => {
   assert.equal(shiftPersonaFromPath('/admin/notifications?x=1'), 'admin');
   assert.equal(shiftPersonaFromPath('/notifications'), null);

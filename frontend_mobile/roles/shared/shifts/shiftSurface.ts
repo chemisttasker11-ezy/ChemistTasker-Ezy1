@@ -103,6 +103,8 @@ export function resolveShiftSurface(input: ShiftSurfaceInput): ShiftSurface {
   }
 
   const ready = !input.workspaceLoading && !(persona === 'admin' && input.adminLoading);
+  // Internal worker boards request the selected pharmacy's shifts, so each pharmacy gets its own key.
+  const keyPharmacyId = workspace === 'internal' ? input.selectedPharmacyId ?? null : scopedPharmacyId;
   return {
     persona,
     scopedPharmacyId,
@@ -111,7 +113,7 @@ export function resolveShiftSurface(input: ShiftSurfaceInput): ShiftSurface {
     canManageShifts,
     canManageAdmins,
     ready,
-    scopeKey: [persona ?? 'none', workspace ?? 'all', scopedPharmacyId ?? 'all', input.userId ?? 'anon'].join(':'),
+    scopeKey: [persona ?? 'none', workspace ?? 'all', keyPharmacyId ?? 'all', input.userId ?? 'anon'].join(':'),
   };
 }
 
