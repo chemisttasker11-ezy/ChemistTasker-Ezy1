@@ -59,14 +59,30 @@ def _send_expo_push(tokens: Sequence[str], title: str, body: str, data: Optional
             "sound": "default",
         })
     try:
-        requests.post(
+        response = requests.post(
             "https://exp.host/--/api/v2/push/send",
             json=payloads,
             timeout=5,
         )
+        # Push is a disposable transport; record failure without exposing tokens or
+        # changing durable in-app notifications, and without automatic duplicate retries.
+        if not (200 <= response.status_code < 300):
+            logger.warning("Expo push transport returned HTTP %s for %d devices",
+                           response.status_code, len(payloads))
+            return
+        try:
+            tickets = response.json()
+        except ValueError:
+            logger.warning("Expo push transport returned invalid ticket JSON for %d devices", len(payloads))
+            return
+        rows = tickets.get("data") if isinstance(tickets, dict) else None
+        if isinstance(rows, list):
+            rejected = sum(isinstance(item, dict) and item.get("status") == "error" for item in rows)
+            if rejected:
+                logger.warning("Expo push transport rejected %d of %d tickets", rejected, len(payloads))
     except Exception:
-        # Fail silently; do not break main notification flow
-        pass
+        # An outbound push failure cannot roll back notification state or another recipient.
+        logger.warning("Expo push transport unavailable for %d devices", len(payloads))
 
 
 def notify_users(
