@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Chip, Text, TextInput } from 'react-native-paper';
@@ -35,6 +35,8 @@ export default function WorkforceTimesheetsScreen() {
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
   const [periods, setPeriods] = useState<WorkforceTimesheetPeriod[]>([]);
   const [periodId, setPeriodId] = useState<number | null>(null);
+  const periodsRequestRef = useRef(0);
+  const detailRequestRef = useRef(0);
   const [summary, setSummary] = useState<WorkforceTimesheetSummary | null>(null);
   const [rows, setRows] = useState<WorkforceTimesheetRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,24 +55,36 @@ export default function WorkforceTimesheetsScreen() {
   }, []);
 
   const loadPeriods = useCallback(async () => {
+    const request = ++periodsRequestRef.current;
     if (!pharmacyId) {
       setPeriods([]); setPeriodId(null); return;
     }
-    const next = await workforce.listTimesheetPeriods(pharmacyId) as WorkforceTimesheetPeriod[];
-    setPeriods(next);
-    setPeriodId(current => current && next.some(row => row.id === current) ? current : (next[0]?.id ?? null));
+    try {
+      const next = await workforce.listTimesheetPeriods(pharmacyId) as WorkforceTimesheetPeriod[];
+      if (request !== periodsRequestRef.current) return;
+      setPeriods(next);
+      setPeriodId(current => current && next.some(row => row.id === current) ? current : (next[0]?.id ?? null));
+    } catch (failure) {
+      if (request === periodsRequestRef.current) throw failure;
+    }
   }, [pharmacyId]);
 
   const loadPeriod = useCallback(async () => {
+    const request = ++detailRequestRef.current;
     if (!periodId) {
       setSummary(null); setRows([]); return;
     }
-    const [nextSummary, nextRows] = await Promise.all([
-      workforce.getTimesheetPeriodSummary(periodId),
-      workforce.listTimesheets(periodId),
-    ]) as [WorkforceTimesheetSummary, WorkforceTimesheetRow[]];
-    setSummary(nextSummary);
-    setRows(nextRows);
+    try {
+      const [nextSummary, nextRows] = await Promise.all([
+        workforce.getTimesheetPeriodSummary(periodId),
+        workforce.listTimesheets(periodId),
+      ]) as [WorkforceTimesheetSummary, WorkforceTimesheetRow[]];
+      if (request !== detailRequestRef.current) return;
+      setSummary(nextSummary);
+      setRows(nextRows);
+    } catch (failure) {
+      if (request === detailRequestRef.current) throw failure;
+    }
   }, [periodId]);
 
   const refresh = useCallback(async (pull = false) => {
@@ -87,7 +101,10 @@ export default function WorkforceTimesheetsScreen() {
   }, [loadPeriod, loadPeriods]);
 
   useEffect(() => { void loadPeriods().catch((failure: any) => setError(failure?.message || 'Unable to load timesheet periods.')).finally(() => setLoading(false)); }, [loadPeriods]);
-  useEffect(() => { void loadPeriod().catch((failure: any) => setError(failure?.message || 'Unable to load timesheets.')); }, [loadPeriod]);
+  useFocusEffect(useCallback(() => {
+    void loadPeriod().catch((failure: any) => setError(failure?.message || 'Unable to load timesheets.'));
+    return () => { detailRequestRef.current += 1; };
+  }, [loadPeriod]));
 
   const selectedPeriod = useMemo(() => periods.find(row => row.id === periodId) ?? null, [periodId, periods]);
 
@@ -153,7 +170,7 @@ export default function WorkforceTimesheetsScreen() {
 
         <Text variant="labelLarge">Pharmacy</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {pharmacies.map(pharmacy => <Chip key={pharmacy.id} selected={pharmacyId === pharmacy.id} onPress={() => { setPharmacyId(pharmacy.id); setPeriodId(null); }}>{pharmacy.name}</Chip>)}
+          {pharmacies.map(pharmacy => <Chip key={pharmacy.id} selected={pharmacyId === pharmacy.id} onPress={() => { periodsRequestRef.current += 1; detailRequestRef.current += 1; setPharmacyId(pharmacy.id); setPeriodId(null); setPeriods([]); setSummary(null); setRows([]); }}>{pharmacy.name}</Chip>)}
         </ScrollView>
 
         <View style={styles.actionRow}>
@@ -177,7 +194,7 @@ export default function WorkforceTimesheetsScreen() {
         {!!periods.length && <>
           <Text variant="labelLarge">Period</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            {periods.map(period => <Chip key={period.id} selected={periodId === period.id} onPress={() => setPeriodId(period.id)}>{period.start_date} – {period.end_date} · {period.status}</Chip>)}
+            {periods.map(period => <Chip key={period.id} selected={periodId === period.id} onPress={() => { detailRequestRef.current += 1; setPeriodId(period.id); setSummary(null); setRows([]); }}>{period.start_date} – {period.end_date} · {period.status}</Chip>)}
           </ScrollView>
         </>}
 
