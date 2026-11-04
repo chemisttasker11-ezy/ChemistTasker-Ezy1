@@ -22,7 +22,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useLiveMessages } from './useLiveMessages';
 import debounce from 'lodash.debounce';
 import { triggerUnreadBump } from '@/utils/pushNotifications';
-import { setActiveRoomId } from '../chat/activeRoomState';
+import { getActiveRoomId, setActiveRoomId } from '../chat/activeRoomState';
 import { displayNameFromUser } from '../chat/displayName';
 import { resolveApiBaseUrl } from '@/utils/apiUrl';
 import { isNextPageForRoom, mergeOlderMessages, shouldAutoFollowMessage } from './messageHistory';
@@ -356,9 +356,11 @@ export default function SharedMessageDetailScreen() {
     useFocusEffect(
         useCallback(() => {
             const roomId = parseRoomId();
-            if (roomId) {
-                setActiveRoomId(roomId);
-            }
+            if (Number.isSafeInteger(roomId) && roomId > 0) setActiveRoomId(roomId);
+            return () => {
+                // Background notification filtering must resume as soon as this conversation loses focus.
+                if (getActiveRoomId() === roomId) setActiveRoomId(null);
+            };
         }, [parseRoomId])
     );
 
