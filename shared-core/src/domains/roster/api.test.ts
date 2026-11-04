@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureApi } from '../../transport/application';
-import { fetchRosterWorkerAssignments, fetchWorkerShiftRequestsService, rosterV2, deleteRosterAssignmentService, deleteRosterShiftService, escalateRosterShiftService, fetchOwnerOpenShifts } from './api';
-import { approveWorkerShiftRequestService, rejectWorkerShiftRequestService } from '../shiftRequests/api';
+import { fetchRosterWorkerAssignments, fetchWorkerShiftRequestsService, rosterV2, deleteRosterAssignmentService, deleteRosterShiftService, escalateRosterShiftService, fetchOwnerOpenShifts, createShiftAndAssignService, fetchRosterOwnerMembersService } from './api';
+import { approveWorkerShiftRequestService, rejectWorkerShiftRequestService, approveLeaveRequestService, rejectLeaveRequestService } from '../shiftRequests/api';
 
 let mockedFetch: ReturnType<typeof vi.fn>;
 const success = (value: unknown) => new Response(JSON.stringify(value), {
@@ -96,5 +96,34 @@ describe('W4 legacy roster operations preserve their domain-owned endpoints', ()
         await rejectWorkerShiftRequestService(92);
         expect(lastCall()[1].method).toBe('POST');
         expect(lastCall()[0].pathname).toMatch(/92.*reject/);
+    });
+});
+
+describe('W4 legacy roster parity: assigned shift and leave operations', () => {
+    it('posts the exact pharmacy, member, role and occurrence contract', async () => {
+        const payload = {
+            pharmacy_id: 7, role_needed: 'PHARMACIST', user_id: 34,
+            slot_date: '2026-11-12', start_time: '09:00', end_time: '17:00',
+        };
+        await createShiftAndAssignService(payload);
+        expect(lastCall()[0].pathname).toBe('/api/v1/roster/create-and-assign-shift/');
+        expect(lastCall()[1].method).toBe('POST');
+        expect(requestBody()).toEqual(payload);
+    });
+    it('does not expose another pharmacy in scoped roster-member lookup', async () => {
+        mockedFetch.mockResolvedValue(success([{id: 1, user: 34, role: 'PHARMACIST'}]));
+        const rows = await fetchRosterOwnerMembersService(7, 'PHARMACIST');
+        expect(rows.map((row) => row.user)).toEqual([34]);
+        expect(lastCall()[0].pathname).toBe('/api/v1/roster-owner/members-for-roster/');
+        expect(lastCall()[0].searchParams.get('pharmacy_id')).toBe('7');
+        expect(lastCall()[0].searchParams.get('role')).toBe('PHARMACIST');
+    });
+    it('preserves separate approved/rejected leave mutations', async () => {
+        await approveLeaveRequestService(51);
+        expect(lastCall()[0].pathname).toBe('/api/v1/leave-requests/51/approve/');
+        expect(lastCall()[1].method).toBe('POST');
+        await rejectLeaveRequestService(52);
+        expect(lastCall()[0].pathname).toBe('/api/v1/leave-requests/52/reject/');
+        expect(lastCall()[1].method).toBe('POST');
     });
 });
