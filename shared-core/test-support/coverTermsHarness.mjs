@@ -35,14 +35,14 @@ export function nodes(node, type) {
   if (node == null || typeof node !== 'object') return [];
   if (Array.isArray(node)) return node.flatMap(child => nodes(child, type));
   if (hidden(node)) return [];
-  return [...(!type || node.type === type ? [node] : []), ...nodes(node.props?.children, type), ...nodes(node.props?.control, type), ...nodes(node.props?.action, type)];
+  return [...(!type || node.type === type ? [node] : []), ...nodes(node.props?.children, type), ...nodes(node.props?.control, type), ...nodes(node.props?.action, type), ...nodes(node.props?.footer, type)];
 }
 export function text(node) {
   if (node == null || typeof node === 'boolean') return '';
   if (Array.isArray(node)) return node.map(text).join(' ');
   if (typeof node !== 'object') return String(node);
   if (hidden(node)) return '';
-  return [node.props?.label, node.props?.title, node.props?.body, node.props?.subtitle, text(node.props?.children), text(node.props?.action)].filter(value => value != null).join(' ');
+  return [node.props?.label, node.props?.title, node.props?.body, node.props?.subtitle, text(node.props?.children), text(node.props?.action), text(node.props?.footer)].filter(value => value != null).join(' ');
 }
 
 async function mount(platform, { rows = [cover], loadError = false, acceptError = false, termsChanged = false, refreshError = false, pending = false, acceptPending = false, dialogOnly = false, pathname = '/dashboard/pharmacist/attendance', role = 'PHARMACIST' } = {}) {
@@ -85,6 +85,20 @@ async function mount(platform, { rows = [cover], loadError = false, acceptError 
   const Dialog = props => ({ type: 'Dialog', props });
   for (const name of ['Title', 'Actions', 'ScrollArea', 'Content']) Dialog[name] = `Dialog.${name}`;
   const paper = { ...Object.fromEntries(['Button', 'Chip', 'Icon', 'Text', 'Portal'].map(name => [name, name])), Dialog, Checkbox: { Item: 'Checkbox.Item' } };
+  // Test the actual native sheet/checkbox semantics introduced by the mobile design system.
+  // Keep the real press handlers, disabled states and footer reachable to the contract assertions.
+  const nativeUI = {
+    BottomSheet: props => ({ type: 'Dialog', props: { ...props, visible: props.open } }),
+    Button: props => ({ type: 'Button', props: { ...props, children: props.label } }),
+    Pill: props => ({ type: 'Chip', props: { ...props, children: props.label } }),
+    ScalePressable: props => ({ type: props.accessibilityRole === 'checkbox' ? 'Checkbox.Item' : 'ScalePressable', props }),
+  };
+  const nativeTokens = {
+    colors: { accentStrong: '#5222B8', textSecondary: '#5E6B8D', textPrimary: '#06123A', border: '#E5ECF7', subtleBg: '#F7F8FC', status: { amber: { fg: '#8A4B00' }, red: { fg: '#B42318' } } },
+    font: { outfit: { medium: 'Outfit' }, inter: { medium: 'Inter', regular: 'Inter' } },
+    space: { xs: 4, sm: 8, md: 12 }, radius: { nested: 14 }, touch: { min: 44 },
+    type: { titleSmall: { fontSize: 16, lineHeight: 21 }, bodyMedium: { fontSize: 14, lineHeight: 21 }, bodySmall: { fontSize: 13 } },
+  };
   const api = {
     async getWorkerStatus() { calls.push(['status']); return { has_active_session: false, session_id: null, cover_type: null }; },
     async getWorkerCoverTerms() {
@@ -117,7 +131,9 @@ async function mount(platform, { rows = [cover], loadError = false, acceptError 
   const imports = {
     react: hooks,
     'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }), Fragment: 'Fragment' },
-    '@mui/material': names, 'lucide-react': names, 'react-native': native, 'react-native-paper': paper,
+    '@mui/material': names, 'lucide-react': names, 'lucide-react-native': names,
+    'react-native': { ...native, Text: 'Text' }, 'react-native-paper': paper,
+    '@/components/ui': nativeUI, '@/constants/tokens': nativeTokens,
     moment: () => ({ format: () => '' }),
     'react-router-dom': {
       Link: 'Link', NavLink: 'NavLink',
