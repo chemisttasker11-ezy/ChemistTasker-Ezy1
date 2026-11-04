@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureApi } from '../../transport/application';
-import { fetchRosterWorkerAssignments, fetchWorkerShiftRequestsService, rosterV2 } from './api';
+import { fetchRosterWorkerAssignments, fetchWorkerShiftRequestsService, rosterV2, deleteRosterAssignmentService, deleteRosterShiftService, escalateRosterShiftService, fetchOwnerOpenShifts } from './api';
+import { approveWorkerShiftRequestService, rejectWorkerShiftRequestService } from '../shiftRequests/api';
 
 let mockedFetch: ReturnType<typeof vi.fn>;
 const success = (value: unknown) => new Response(JSON.stringify(value), {
@@ -70,5 +71,30 @@ describe('roster collections', () => {
         const rows = await fetchRosterWorkerAssignments({ pharmacyId: 7 });
         expect(rows.map((item) => item.id)).toEqual([1, 51]);
         expect(lastCall()[0].searchParams.get('pharmacy')).toBe('7');
+    });
+});
+
+describe('W4 legacy roster operations preserve their domain-owned endpoints', () => {
+    it('only sends explicit assignment or open shift IDs to deletion endpoints', async () => {
+        await deleteRosterAssignmentService(71);
+        expect(lastCall()[0].pathname).toBe('/api/v1/roster-owner/71/');
+        expect(lastCall()[1].method).toBe('DELETE');
+        await deleteRosterShiftService(72);
+        expect(lastCall()[0].pathname).toBe('/api/v1/roster-shifts/72/');
+        expect(lastCall()[1].method).toBe('DELETE');
+        await escalateRosterShiftService(73, {target_visibility: 'PLATFORM'});
+        expect(lastCall()[0].pathname).toBe('/api/v1/roster-shifts/73/escalate/');
+        expect(requestBody()).toEqual({target_visibility: 'PLATFORM'});
+    });
+    it('preserves pharmacy scope when listing open shifts and keeps request decisions separate', async () => {
+        mockedFetch.mockResolvedValueOnce(success([{id: 81, pharmacy: 7, role_needed: 'PHARMACIST'}]));
+        const shifts = await fetchOwnerOpenShifts({pharmacyId: 7});
+        expect(shifts[0]).toMatchObject({id: 81, pharmacy: 7});
+        expect(lastCall()[0].searchParams.get('pharmacy')).toBe('7');
+        await approveWorkerShiftRequestService(91);
+        expect(lastCall()[1].method).toBe('POST');
+        await rejectWorkerShiftRequestService(92);
+        expect(lastCall()[1].method).toBe('POST');
+        expect(lastCall()[0].pathname).toMatch(/92.*reject/);
     });
 });
