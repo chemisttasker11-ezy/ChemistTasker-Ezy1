@@ -44,6 +44,15 @@ export function validateShiftPostingDraft(draft: Pick<ShiftPostingDraft, 'pharma
   if (!draft.pharmacyId || !draft.roleNeeded || !draft.employmentType) return 'Choose a pharmacy, role and type of work.';
   const locum = ['LOCUM', 'CASUAL'].includes(draft.employmentType);
   if (locum && !draft.slots.length) return 'Add at least one date before posting.';
+  if (locum) {
+    // Midnight-crossing shifts are valid; equal clock times produce a zero/ambiguous window.
+    const validTime = (value: string) => /^(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$/.test(value);
+    for (const slot of draft.slots) {
+      if (!validTime(slot.startTime) || !validTime(slot.endTime) || slot.startTime.slice(0, 5) === slot.endTime.slice(0, 5)) {
+        return 'Select a valid shift start and end time; they cannot be the same.';
+      }
+    }
+  }
   if (!locum && draft.ftptPayMode === 'HOURLY' && (!draft.minHourly || !draft.maxHourly)) return 'Enter minimum and maximum hourly rates.';
   if (!locum && draft.ftptPayMode === 'ANNUAL' && (!draft.minAnnual || !draft.maxAnnual || !draft.superPercent)) return 'Enter minimum and maximum annual pay and super percentage.';
   return null;
