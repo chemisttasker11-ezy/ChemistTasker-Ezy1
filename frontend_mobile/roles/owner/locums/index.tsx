@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Surface, Text } from 'react-native-paper';
@@ -18,13 +18,17 @@ export default function ManageLocumsScreen() {
     const router = useRouter();
     const { selectedPharmacyId, selectedPharmacyName } = useWorkspace();
     const [memberships, setMemberships] = useState<MembershipDTO[]>([]);
+    const loadGeneration = useRef(0);
+    const [loadedScope, setLoadedScope] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string>('');
     const [messagingMemberId, setMessagingMemberId] = useState<string | number | null>(null);
 
     const loadData = useCallback(async () => {
+        const generation = ++loadGeneration.current;
         if (!selectedPharmacyId) {
             setMemberships([]);
+            setLoadedScope('');
             setError('Select a pharmacy scope to view locums.');
             setLoading(false);
             return;
@@ -34,27 +38,33 @@ export default function ManageLocumsScreen() {
         setError('');
         try {
             const membershipData = await fetchMembershipsForPharmacy(selectedPharmacyId);
+            if (generation !== loadGeneration.current) return;
             setMemberships(Array.isArray(membershipData) ? (membershipData as MembershipDTO[]) : []);
+            setLoadedScope(String(selectedPharmacyId));
         } catch (e) {
             console.error('Failed to load locum memberships', e);
             setError('Failed to load locums.');
             setMemberships([]);
         } finally {
-            setLoading(false);
+            if (generation === loadGeneration.current) setLoading(false);
         }
     }, [selectedPharmacyId]);
 
     useEffect(() => {
         void loadData();
+        return () => { loadGeneration.current += 1; };
     }, [loadData]);
 
+    // An old pharmacy's members must never render while a new scope hydrates.
+    const scopedMemberships = loadedScope === String(selectedPharmacyId ?? '') ? memberships : [];
+
     const locumMemberships = useMemo(
-        () => memberships.filter((membership) => LOCUM_TYPES.has(getEmploymentType(membership))),
-        [memberships]
+        () => scopedMemberships.filter((membership) => LOCUM_TYPES.has(getEmploymentType(membership))),
+        [scopedMemberships]
     );
 
     const handleMessageMember = useCallback(async (memberId: string | number) => {
-        const membership = memberships.find((item) => String(item.id) === String(memberId));
+        const membership = scopedMemberships.find((item) => String(item.id) === String(memberId));
         if (!membership) return;
         setMessagingMemberId(memberId);
         try {
@@ -78,7 +88,7 @@ export default function ManageLocumsScreen() {
         } finally {
             setMessagingMemberId(null);
         }
-    }, [memberships, router, selectedPharmacyId]);
+    }, [scopedMemberships, router, selectedPharmacyId]);
 
     if (loading) {
         return (
