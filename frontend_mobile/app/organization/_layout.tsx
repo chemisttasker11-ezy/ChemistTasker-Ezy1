@@ -3,6 +3,7 @@ import { Tabs, usePathname, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
   CalendarCheck,
+  Building2,
   CalendarClock,
   CalendarDays,
   ClipboardCheck,
@@ -47,6 +48,7 @@ const titles: Record<string, string> = {
   'shifts/[id]': 'Shift',
   'post-shift': 'Post shift',
   'pharmacies/index': 'Pharmacies',
+  chain: 'My chain',
   'pharmacies/[id]': 'Pharmacy',
   'pharmacies/[id]/edit': 'Edit pharmacy',
   'pharmacies/[id]/staff': 'Staff',
@@ -236,6 +238,7 @@ export default function OrganizationLayout() {
         title: 'Pharmacies & people',
         tone: 'cyan',
         items: [
+          { label: 'My chain', icon: Building2, route: '/organization/chain', hidden: !can.pharmacies },
           { label: 'Invite staff', icon: UserPlus, route: '/organization/invite', hidden: !can.invite },
           { label: 'Workforce & Payroll', icon: Wallet, route: '/workforce-settings', hidden: !can.staff },
           { label: 'Employment terms', icon: HardHat, route: '/workforce/employment-engagements', hidden: !(can.staff || can.roster) },
