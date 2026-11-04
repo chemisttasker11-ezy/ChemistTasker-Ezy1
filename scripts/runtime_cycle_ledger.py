@@ -33,7 +33,13 @@ if __name__ == '__main__':
     options = parser.parse_args()
     result = inventory(options.parent)
     if options.check:
-        assert json.loads(DESTINATION.read_text()) == json.loads(json.dumps(result)), 'Runtime ledger differs from source; regenerate it.'
+        if json.loads(DESTINATION.read_text()) != result:
+            # Emit exact source-derived ledger in bounded chunks for a targeted CI repair.
+            # No Python/Django application imports are executed by this inventory.
+            produced = json.dumps(result, indent=2) + '\\n'
+            for index in range(0, len(produced), 1500):
+                print('RUNTIME_LEDGER_PART:' + produced[index:index + 1500])
+            raise AssertionError('Runtime ledger differs from source; regenerate it.')
     else:
         DESTINATION.write_text(json.dumps(result, indent=2) + '\n')
     print(f"Direct cyclic edges: {len(result['direct_cyclic_edges'])}; combined cyclic edges: {len(result['combined_cyclic_edges'])}")
