@@ -43,3 +43,13 @@ test('multiple organisation claims must choose a specific eligible organisation'
     { id: 12, label: 'Second Group' },
   ]);
 });
+
+test('claim UI sends explicitly selected organization and describes new pharmacy invitations truthfully', () => {
+  const screen = readFileSync(new URL('../../../app/organization/pharmacies/claims.tsx', import.meta.url), 'utf8');
+  assert.match(screen, /organization_id: targetId/);
+  assert.match(screen, /getClaimableOrganizations\(user\)/);
+  assert.match(screen, /organizations\.length > 1/);
+  assert.match(screen, /pharmacy_admin_id/);
+  assert.match(screen, /invitation sent/);
+  assert.match(screen, /Alert\.alert\(/);
+});

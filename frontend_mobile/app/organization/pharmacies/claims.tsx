@@ -1,12 +1,12 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, Button, Card, Chip, Text, TextInput } from 'react-native-paper';
 import { claimOnboarding, getPharmacyClaims } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { ContentState } from '@/components/ui/ContentState';
 import { colors, space } from '@/constants/tokens';
-import { getActiveOrganizationId, validatePharmacyClaimEmail } from '@/roles/shared/pharmacies/organizationClaims';
+import { getClaimableOrganizations, validatePharmacyClaimEmail } from '@/roles/shared/pharmacies/organizationClaims';
 
 type Claim = {
   id: number;
@@ -20,7 +20,13 @@ type Claim = {
 
 export default function OrganizationPharmacyClaimsScreen() {
   const { user } = useAuth();
-  const organizationId = getActiveOrganizationId(user);
+  const organizations = getClaimableOrganizations(user);
+  const [chosenOrganizationId, setChosenOrganizationId] = useState<number | null>(null);
+  // Multi-org accounts must choose deliberately; never silently send a claim
+  // for a different organisation from the one whose history is displayed.
+  const organizationId = organizations.length === 1
+    ? organizations[0].id
+    : (organizations.some(item => item.id === chosenOrganizationId) ? chosenOrganizationId : null);
   const currentRequest = useRef(0);
   const submittingRef = useRef(false);
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -36,21 +42,28 @@ export default function OrganizationPharmacyClaimsScreen() {
     const request = ++currentRequest.current;
     setLoading(true);
     setError(null);
+    setClaims([]);
     if (organizationId == null) {
       setClaims([]);
       setLoading(false);
       return;
     }
     try {
-      const response = await getPharmacyClaims({ organization: organizationId });
-      const all = Array.isArray((response as any)?.results)
-        ? (response as any).results : Array.isArray(response) ? response : [];
-      // Do not accept another organization's rows even if an upstream filter misbehaves.
-      const scoped = all.filter((row: any) => {
-        const value = row.organization;
-        const id = typeof value === 'object' ? value?.id : value;
-        return Number(id) === organizationId;
-      });
+      const scoped: Claim[] = [];
+      let page = 1;
+      while (page <= 50) {
+        if (request !== currentRequest.current) return;
+        const response: any = await getPharmacyClaims({ organization: organizationId, page });
+        const all = Array.isArray(response?.results) ? response.results : Array.isArray(response) ? response : [];
+        // Defensive scope filtering; backend is still the authorization authority.
+        scoped.push(...all.filter((row: any) => {
+          const value = row.organization;
+          const id = typeof value === 'object' ? value?.id : value;
+          return Number(id) === organizationId;
+        }));
+        if (!response?.next) break;
+        page += 1;
+      }
       if (request === currentRequest.current) setClaims(scoped);
     } catch (failure: any) {
       if (request === currentRequest.current) setError(failure?.response?.data?.detail || failure?.message || 'Could not load claim history.');
@@ -64,18 +77,23 @@ export default function OrganizationPharmacyClaimsScreen() {
     return () => { currentRequest.current += 1; };
   }, [load]));
 
-  const submit = async () => {
-    if (submittingRef.current || organizationId == null) return;
-    const validation = validatePharmacyClaimEmail(email);
-    setFormError(validation);
-    if (validation) return;
+  const sendClaim = async (targetId: number, targetEmail: string) => {
+    if (submittingRef.current || organizationId !== targetId) return;
     submittingRef.current = true;
     setSubmitting(true);
     setNotice(null);
     try {
-      await claimOnboarding({ pharmacy_email: email.trim() });
+      const result: any = await claimOnboarding({ pharmacy_email: targetEmail, organization_id: targetId });
       setEmail('');
-      setNotice('Claim submitted. The pharmacy owner can now review the request.');
+      // The existing backend creates a new placeholder pharmacy and sends an
+      // invitation when the email is unknown; no owner approval occurs then.
+      if (result?.pharmacy_admin_id != null && result?.pharmacy != null) {
+        setNotice('New pharmacy entry created and an invitation sent to its contact.');
+      } else if (result?.status === 'ACCEPTED') {
+        setNotice('This pharmacy is already linked to your organisation.');
+      } else {
+        setNotice('Claim requested. The pharmacy owner can review it.');
+      }
       await load();
     } catch (failure: any) {
       const response = failure?.response?.data;
@@ -86,8 +104,25 @@ export default function OrganizationPharmacyClaimsScreen() {
     }
   };
 
-  if (organizationId == null) {
-    return <ContentState kind="forbidden" title="Organization access required" description="A current organization membership is required to submit pharmacy claims." />;
+  const submit = () => {
+    if (submittingRef.current || organizationId == null) return;
+    const validation = validatePharmacyClaimEmail(email);
+    setFormError(validation);
+    if (validation) return;
+    const targetId = organizationId;
+    const targetEmail = email.trim();
+    Alert.alert(
+      'Request or invite pharmacy?',
+      'If the email belongs to an existing pharmacy, its owner will review the claim. If it is new to ChemistTasker, a pharmacy entry and account invitation will be created immediately.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Continue', onPress: () => void sendClaim(targetId, targetEmail) },
+      ],
+    );
+  };
+
+  if (organizations.length === 0) {
+    return <ContentState kind="forbidden" title="Claim authority required" description="Only an authorised organisation administrator can claim a pharmacy." />;
   }
 
   const pending = claims.filter(item => item.status === 'PENDING').length;
@@ -97,15 +132,27 @@ export default function OrganizationPharmacyClaimsScreen() {
     <ScrollView style={styles.page} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.heading}>
         <Text variant="headlineSmall" style={styles.title}>Claim a pharmacy</Text>
-        <Text style={styles.subtitle}>Request access by pharmacy email. The owner decides whether to approve your request.</Text>
+        <Text style={styles.subtitle}>Existing pharmacies request owner approval. An email not registered on ChemistTasker creates a new pharmacy entry and sends an invitation immediately.</Text>
       </View>
+      {organizations.length > 1 ? <Card mode="outlined" style={styles.card}><Card.Content style={styles.cardContent}>
+        <Text style={styles.label}>Choose organisation</Text>
+        <View style={styles.counts}>{organizations.map(item => <Chip key={item.id} selected={organizationId === item.id} onPress={() => {
+          currentRequest.current += 1;
+          setChosenOrganizationId(item.id);
+          setClaims([]);
+          setNotice(null);
+          setFormError(null);
+          setEmail('');
+        }}>{item.label}</Chip>)}</View>
+        {organizationId == null ? <Text style={styles.subtitle}>Select the organisation that will make this request.</Text> : null}
+      </Card.Content></Card> : null}
       <Card mode="outlined" style={styles.card}>
         <Card.Content style={styles.cardContent}>
           <Text variant="titleMedium" style={styles.label}>New request</Text>
-          <TextInput mode="outlined" label="Pharmacy email" value={email} onChangeText={value => { setEmail(value); setFormError(null); }} autoCapitalize="none" autoComplete="email" keyboardType="email-address" editable={!submitting} maxLength={254} error={!!formError} accessibilityLabel="Pharmacy email address" />
+          <TextInput mode="outlined" label="Pharmacy email" value={email} onChangeText={value => { setEmail(value); setFormError(null); }} autoCapitalize="none" autoComplete="email" keyboardType="email-address" editable={!submitting && organizationId != null} maxLength={254} error={!!formError} accessibilityLabel="Pharmacy email address" />
           {formError ? <Text style={styles.error}>{formError}</Text> : null}
           {notice ? <Text style={styles.success}>{notice}</Text> : null}
-          <Button mode="contained" loading={submitting} disabled={submitting} onPress={() => void submit()} contentStyle={styles.button}>Submit claim</Button>
+          <Button mode="contained" loading={submitting} disabled={submitting || organizationId == null} onPress={submit} contentStyle={styles.button}>Request or invite pharmacy</Button>
         </Card.Content>
       </Card>
       <Card mode="outlined" style={styles.card}>
@@ -118,7 +165,7 @@ export default function OrganizationPharmacyClaimsScreen() {
             <Chip compact>Pending {pending}</Chip>
             <Chip compact>Accepted {accepted}</Chip>
           </View>
-          {expanded ? (
+          {expanded && organizationId != null ? (
             <>
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <Button mode="text" onPress={() => void load()} disabled={loading}>Refresh requests</Button>
