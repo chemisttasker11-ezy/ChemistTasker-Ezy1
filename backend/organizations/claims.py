@@ -243,11 +243,21 @@ class OwnerOnboardingClaim(APIView):
         }
 
     def post(self, request):
+        memberships = request.user.organization_memberships.select_related('organization').order_by('id')
+        # An explicit organisation target avoids silently acting for another
+        # membership of a multi-organisation account. Legacy web callers may
+        # omit this field to retain the established first-authorised fallback.
+        requested_org_id = request.data.get('organization_id')
+        if requested_org_id is not None:
+            if (isinstance(requested_org_id, bool)
+                    or not str(requested_org_id).isdigit()
+                    or int(requested_org_id) <= 0):
+                return Response({'detail': 'A valid organization_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            memberships = memberships.filter(organization_id=int(requested_org_id))
         membership = next(
             (
-                org_membership
-                for org_membership in request.user.organization_memberships.select_related('organization').order_by('id')
-                if OrgCapability.CLAIM_PHARMACY in membership_capabilities(org_membership)
+                row for row in memberships
+                if OrgCapability.CLAIM_PHARMACY in membership_capabilities(row)
             ),
             None,
         )

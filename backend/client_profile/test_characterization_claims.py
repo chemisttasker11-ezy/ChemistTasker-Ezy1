@@ -129,3 +129,32 @@ class ClaimDecisionTests(ClaimsBase):
         c = client_for(self.owner)
         self.assertEqual(c.post(URL, {"pharmacy_id": self.pharmacy.id}, format="json").status_code, 405)
         self.assertEqual(c.delete(f"{URL}{self.claim.id}/").status_code, 405)
+
+class ClaimCreationTargetTests(ClaimsBase):
+    URL = BASE + "owner-onboarding/claim/"
+
+    def test_explicit_target_selects_eligible_organisation_not_first_membership(self):
+        from unittest.mock import patch
+
+        _, unclaimed_pharmacy = make_owner_with_pharmacy("Targeted claim")
+        OrganizationMembership.objects.create(
+            user=self.org_admin, organization=self.other_org, role="CHIEF_ADMIN",
+        )
+        with patch("organizations.claims._send_owner_claim_email"), patch("organizations.claims._create_owner_claim_notification"):
+            response = client_for(self.org_admin).post(
+                self.URL, {"organization_id": self.other_org.pk, "pharmacy_id": unclaimed_pharmacy.pk}, format="json",
+            )
+        self.assertEqual(response.status_code, 201, response.data)
+        new_claim = PharmacyClaim.objects.get(pharmacy=unclaimed_pharmacy)
+        self.assertEqual(new_claim.organization_id, self.other_org.pk)
+
+    def test_target_rejects_unrelated_organisation_and_invalid_identifiers(self):
+        _, unclaimed_pharmacy = make_owner_with_pharmacy("Unauthorised claim")
+        another_org = Organization.objects.create(name="Not user's group")
+        client = client_for(self.org_admin)
+        for target in [another_org.pk, True, "oops", 0]:
+            response = client.post(
+                self.URL, {"organization_id": target, "pharmacy_id": unclaimed_pharmacy.pk}, format="json",
+            )
+            self.assertIn(response.status_code, (400, 403), response.data)
+        self.assertFalse(PharmacyClaim.objects.filter(pharmacy=unclaimed_pharmacy).exists())

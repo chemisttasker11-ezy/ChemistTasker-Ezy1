@@ -8,7 +8,7 @@ const source = readFileSync(new URL('./organizationClaims.ts', import.meta.url),
 const result = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } });
 const api = {};
 vm.runInNewContext(result.outputText, { exports: api });
-const { validatePharmacyClaimEmail, getActiveOrganizationId } = api;
+const { validatePharmacyClaimEmail, getActiveOrganizationId, getClaimableOrganizations } = api;
 
 test('claim form validates email before making a request', () => {
   assert.match(validatePharmacyClaimEmail('   '), /Enter/);
@@ -22,5 +22,24 @@ test('organization claims require an active authorized organization membership',
   assert.equal(getActiveOrganizationId({ memberships: [{ role: 'OWNER', organization_id: 13 }] }), null);
   assert.equal(getActiveOrganizationId({ memberships: [{ role: 'ORG_STAFF', organization_id: 'abc' }] }), null);
   assert.equal(getActiveOrganizationId({ memberships: [{ role: 'ORG_STAFF', organization_id: 13.5 }] }), null);
+  assert.equal(getActiveOrganizationId({ memberships: [{ role: 'ORG_STAFF', organization_id: 13 }] }), null);
+  assert.equal(getActiveOrganizationId({ memberships: [{ role: 'REGION_ADMIN', organization_id: 13 }] }), null);
+  assert.equal(getActiveOrganizationId({ memberships: [{ role: 'CHIEF_ADMIN', organization_id: 21 }] }), 21);
   assert.equal(getActiveOrganizationId(null), null);
+});
+
+test('multiple organisation claims must choose a specific eligible organisation', () => {
+  const organizations = getClaimableOrganizations({
+    memberships: [
+      { role: 'REGION_ADMIN', organization_id: 4 },
+      { role: 'ORG_ADMIN', organization_id: 10, organization_name: 'First Group' },
+      { role: 'CHIEF_ADMIN', organization_id: 12, organization: { name: 'Second Group' } },
+      { role: 'ORG_ADMIN', organization_id: 10, organization_name: 'First Group' },
+      { role: 'ORG_ADMIN', organization_id: 25, is_active: false },
+    ],
+  });
+  assert.deepEqual(Array.from(organizations), [
+    { id: 10, label: 'First Group' },
+    { id: 12, label: 'Second Group' },
+  ]);
 });

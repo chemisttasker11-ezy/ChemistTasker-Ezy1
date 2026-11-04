@@ -6,17 +6,30 @@ export function validatePharmacyClaimEmail(raw: string): string | null {
   return null;
 }
 
-export function getActiveOrganizationId(user: unknown): number | null {
+export type ClaimableOrganization = { id: number; label: string };
+
+/** Only roles with server-side CLAIM_PHARMACY authority can submit a claim. */
+export function getClaimableOrganizations(user: unknown): ClaimableOrganization[] {
   const memberships = (user as { memberships?: unknown } | null)?.memberships;
-  if (!Array.isArray(memberships)) return null;
+  if (!Array.isArray(memberships)) return [];
+  const found = new Map<number, ClaimableOrganization>();
   for (const item of memberships) {
     if (!item || typeof item !== 'object') continue;
     const membership = item as Record<string, unknown>;
-    const role = String(membership.role ?? '').toUpperCase();
-    if (!['ORG_ADMIN', 'ORG_OWNER', 'ORG_STAFF', 'CHIEF_ADMIN', 'REGION_ADMIN', 'ORGANIZATION'].includes(role)) continue;
     if (membership.is_active === false || membership.isActive === false) continue;
+    const role = String(membership.role ?? '').toUpperCase();
+    if (role !== 'ORG_ADMIN' && role !== 'CHIEF_ADMIN') continue;
     const id = Number(membership.organization_id ?? membership.organizationId);
-    if (Number.isSafeInteger(id) && id > 0) return id;
+    if (!Number.isSafeInteger(id) || id <= 0) continue;
+    const nested = membership.organization;
+    const nestedName = nested && typeof nested === 'object'
+      ? String((nested as Record<string, unknown>).name ?? '').trim() : '';
+    const name = String(membership.organization_name ?? nestedName).trim();
+    found.set(id, { id, label: name || `Organisation #${id}` });
   }
-  return null;
+  return [...found.values()];
+}
+
+export function getActiveOrganizationId(user: unknown): number | null {
+  return getClaimableOrganizations(user)[0]?.id ?? null;
 }
