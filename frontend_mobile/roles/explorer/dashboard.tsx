@@ -138,7 +138,7 @@ export default function ExplorerOverviewScreen() {
         body: 'Pharmacies browse the Talent Board for new people. Post what you are looking for.',
         action: 'Post on the Talent Board',
         icon: <Megaphone />,
-        onPress: () => go('/explorer/talent-board'),
+        onPress: () => go('/explorer/talent-board?compose=1'),
       }),
       shifts: () => ({
         key: 'shifts',
@@ -222,7 +222,7 @@ export default function ExplorerOverviewScreen() {
         ) : data?.posts == null ? (
           <BlockNote text="Your posts could not load." action="Try again" onAction={refresh} />
         ) : data.posts.length === 0 ? (
-          <BlockNote text="You have not posted yet. A short post tells pharmacies what you want to learn." action="Write a post" onAction={() => go('/explorer/talent-board')} />
+          <BlockNote text="You have not posted yet. A short post tells pharmacies what you want to learn." action="Write a post" onAction={() => go('/explorer/talent-board?compose=1')} />
         ) : (
           <Rows>
             {data.posts.slice(0, ROWS).map((post) => (
