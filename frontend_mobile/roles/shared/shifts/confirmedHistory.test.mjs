@@ -330,3 +330,21 @@ test('WorkerBookedShifts pure helpers format address, time, and text labels', ()
   assert.equal(humanize('COMMUNITY_PHARMACIST'), 'Community pharmacist');
   assert.equal(humanize(''), '');
 });
+
+test('pharmacy-scoped confirmed shifts and payroll actions fail closed on missing identities', () => {
+  const shifts = [
+    { id: 1 }, { id: 2, pharmacyId: '10' }, { id: 3, pharmacy: { id: 10 } },
+    { id: 4, pharmacyId: 'invalid' }, { id: 5, pharmacyId: 11 },
+  ];
+  assert.deepEqual([...filterShiftsByPharmacy(shifts, 10).map((s) => s.id)], [2, 3]);
+  assert.equal(filterShiftsByPharmacy(shifts, null).length, 5);
+  const offer = (id, pharmacyId) => ({
+    id, paymentPreferenceSnapshot: 'TFN', payrollActivatedAt: null,
+    engagementTermsSnapshot: pharmacyId === undefined
+      ? { payrollActivationRequired: true }
+      : { payrollActivationRequired: true, pharmacyId },
+  });
+  const offers = [offer(1, undefined), offer(2, '10'), offer(3, 11), offer(4, 'invalid')];
+  assert.deepEqual([...filterDeferredPayrollOffers(offers, 10).map((o) => o.id)], [2]);
+  assert.equal(filterDeferredPayrollOffers(offers, null).length, 4);
+});

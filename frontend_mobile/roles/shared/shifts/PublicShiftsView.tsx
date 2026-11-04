@@ -576,6 +576,7 @@ function PublicShiftsBoard({
     };
 
     const openPrivatePaymentProfile = () => {
+        setTermsState((prev) => dismissTermsAcceptance(prev));
         if (workerPaymentPath) {
             router.push(workerPaymentPath as any);
         }

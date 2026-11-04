@@ -32,7 +32,7 @@ export type DeferredPayrollOffer = {
     payrollActivatedAt?: string | null;
     engagementTermsSnapshot?: {
         payrollActivationRequired?: boolean;
-        pharmacyId?: number;
+        pharmacyId?: number | string;
         pharmacyName?: string;
         workerName?: string;
         awardClassification?: string;
@@ -44,13 +44,15 @@ export function filterShiftsByPharmacy(shifts: Shift[], scopedPharmacyId: number
     if (!Array.isArray(shifts)) return [];
     if (scopedPharmacyId == null) return shifts;
     return shifts.filter((shift: Shift) => {
-        const targetId =
+        const raw =
             (shift as any).pharmacyDetail?.id ??
             (shift as any).pharmacy_detail?.id ??
             (shift as any).pharmacy_id ??
             (shift as any).pharmacyId ??
             (shift as any).pharmacy;
-        return typeof targetId === 'number' ? targetId === scopedPharmacyId : true;
+        const identity = typeof raw === 'object' && raw !== null ? raw.id : raw;
+        const id = identity == null || identity === '' ? NaN : Number(identity);
+        return Number.isSafeInteger(id) && id > 0 && id === scopedPharmacyId;
     });
 }
 
@@ -67,10 +69,10 @@ export function filterDeferredPayrollOffers(
         const isTfn = pref === 'TFN' || pref === 'PAYROLL' || kind === 'EMPLOYEE' || Boolean(terms?.payrollActivationRequired);
         const pending = !offer.payrollActivatedAt;
         if (!isTfn || !pending) return false;
-        if (scopedPharmacyId != null && typeof terms?.pharmacyId === 'number') {
-            return terms.pharmacyId === scopedPharmacyId;
-        }
-        return true;
+        if (scopedPharmacyId == null) return true;
+        const identity = terms?.pharmacyId;
+        const id = identity == null || identity === '' ? NaN : Number(identity);
+        return Number.isSafeInteger(id) && id > 0 && id === scopedPharmacyId;
     });
 }
 
@@ -97,6 +99,7 @@ export default function ConfirmedShiftsView() {
 
     const loadShifts = useCallback(async () => {
         const gen = ++loadGenRef.current;
+        setShifts([]); // Clear stale pharmacy data before the new scoped request.
         setLoading(true);
         setError(null);
         try {
@@ -122,6 +125,7 @@ export default function ConfirmedShiftsView() {
 
     const loadDeferredPayroll = useCallback(async () => {
         const gen = ++payrollGenRef.current;
+        setDeferredPayrollOffers([]);
         setPayrollLoading(true);
         setPayrollError(null);
         try {
