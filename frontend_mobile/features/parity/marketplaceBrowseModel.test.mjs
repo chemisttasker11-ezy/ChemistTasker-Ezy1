@@ -5,8 +5,8 @@ import vm from 'node:vm';
 import ts from 'typescript';
 const source=readFileSync(new URL('./marketplaceBrowseModel.ts',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText;
-const exported={};vm.runInNewContext(compiled,{exports:exported,String});
-const { browseQuery,normalizeBrowseMode,enquiryValidation,categorySlug }=exported;
+const exported={};vm.runInNewContext(compiled,{exports:exported,String,Map,Number});
+const { browseQuery,normalizeBrowseMode,enquiryValidation,categorySlug,appendBrowsePage,nextBrowsePage }=exported;
 
 test('marketplace sends distinct API filters rather than using category text as search',()=>{
   const filters=browseQuery({search:'  uniforms  ',category:'workwear',mode:'SELL'});
@@ -26,4 +26,15 @@ test('buyer enquiry must be purposeful and stay within API text limit',()=>{
 test('category filters use backend slugs, not display names',()=>{
   assert.equal(categorySlug({slug:'books-study',name:'Books & study'}),'books-study');
   assert.equal(categorySlug(null),'');
+});
+test('marketplace browse append preserves previous results, replaces overlapping rows and stops on last page',()=>{
+ const first=[{id:'a',title:'A'},{id:'b',title:'B'}];
+ const second=[{id:'b',title:'B updated'},{id:'c',title:'C'}];
+ const combined=appendBrowsePage(first,second);
+ assert.equal(Array.from(combined,row=>row.id).join(','),'a,b,c');
+ assert.equal(combined[1].title,'B updated');
+ assert.equal(first.length,2);
+ assert.equal(nextBrowsePage({next:'https://api.example.test/marketplace/listings/?page=2'},1),2);
+ assert.equal(nextBrowsePage({next:null},2),null);
+ assert.equal(nextBrowsePage({next:'?page=2'},0),null);
 });

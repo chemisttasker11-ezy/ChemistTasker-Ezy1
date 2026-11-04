@@ -28,3 +28,16 @@ export function enquiryValidation(message: string): string | null {
 export function categorySlug(value: {slug?: string | null; name?: string | null} | null | undefined): string {
   return String(value?.slug || '').trim();
 }
+
+/** Preserve list position while replacing overlapping records with newer server data. */
+export function appendBrowsePage<T extends {id: string | number}>(existing: T[], incoming: T[]): T[] {
+  const rows = new Map<string, T>();
+  for (const row of existing) rows.set(String(row.id), row);
+  for (const row of incoming) rows.set(String(row.id), row);
+  return [...rows.values()];
+}
+
+/** Public marketplace uses the backend's PageNumberPagination (24 rows/page). */
+export function nextBrowsePage(page: {next?: string | null} | null, requestedPage: number): number | null {
+  return page?.next && Number.isSafeInteger(requestedPage) && requestedPage >= 1 ? requestedPage + 1 : null;
+}

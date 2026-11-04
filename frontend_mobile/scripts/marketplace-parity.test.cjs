@@ -37,3 +37,14 @@ test('every role can review real OS notification settings rather than a cosmetic
    assert.doesNotMatch(read(`roles/${role}/profile.tsx`),/notificationsEnabled|setNotificationsEnabled/);
  }
 });
+
+test('catalogue load-more honors backend pagination and abandons stale filter results',()=>{
+ const src=read('features/parity/marketplace.tsx');
+ assert.match(src,/api\.listListings\(\{\.\.\.browseQuery\(\{search:query,category:categoryFilter,mode:modeFilter\}\),page:pageNumber\}\)/);
+ assert.match(src,/moreRequest!==moreRequestRef\.current/);
+ assert.match(src,/parentRequest!==requestRef\.current/);
+ assert.match(src,/appendBrowsePage\(existing,rows\)/);
+ assert.match(src,/nextBrowsePage\(page,pageNumber\)/);
+ assert.match(src,/Load more listings/);
+ assert.match(src,/More listings unavailable/);
+});
