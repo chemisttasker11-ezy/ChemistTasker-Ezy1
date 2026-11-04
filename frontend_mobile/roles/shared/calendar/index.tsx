@@ -60,6 +60,7 @@ import {
   parseTime,
   formatTime,
   withCalendarRequestBudget,
+  pickAllowedCalendarPharmacyId,
 } from './calendarModel';
 
 
@@ -152,11 +153,7 @@ export default function SharedCalendarScreen() {
         if (request !== membershipGenerationRef.current) return;
         const list = normalizeList(raw);
         setMemberships(list);
-        const allowedIds = list.map((membership: any) => Number(
-          membership?.pharmacyId ?? membership?.pharmacy_id ?? membership?.pharmacyDetail?.id ?? membership?.pharmacy?.id
-        )).filter((id: number) => Number.isInteger(id) && id > 0);
-        const requested = Number(getParamString(params?.pharmacy_id));
-        setSelectedPharmacyId(allowedIds.includes(requested) ? requested : allowedIds[0] ?? null);
+        setSelectedPharmacyId(pickAllowedCalendarPharmacyId(list, getParamString(params?.pharmacy_id)));
       } catch {
         if (request === membershipGenerationRef.current) setError('Unable to load your pharmacy memberships.');
       }
@@ -338,7 +335,7 @@ export default function SharedCalendarScreen() {
     const pharmacyParam = getParamString(params?.pharmacy_id);
     if (pharmacyParam) {
       const nextPharmacyId = Number(pharmacyParam);
-      const authorized = memberships.some((membership) => Number(getPharmacyId(membership)) === nextPharmacyId);
+      const authorized = pickAllowedCalendarPharmacyId(memberships, nextPharmacyId) === nextPharmacyId;
       if (authorized && Number.isInteger(nextPharmacyId) && nextPharmacyId > 0 && nextPharmacyId !== selectedPharmacyId) {
         setSelectedPharmacyId(nextPharmacyId);
       }
