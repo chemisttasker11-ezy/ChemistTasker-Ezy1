@@ -1,14 +1,17 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
     acceptShiftCounterOfferService,
     fetchShiftCounterOffersService,
     rejectShiftCounterOfferService,
 } from '@chemisttasker/shared-core';
+import { getNextGeneration, isLatestGeneration } from '../utils/activeShiftRuntime';
 
 export function useCounterOffers() {
     const [counterOffersByShift, setCounterOffersByShift] = useState<Record<number, any[]>>({});
     const [counterOffersLoadingByShift, setCounterOffersLoadingByShift] = useState<Record<number, boolean>>({});
+    const [counterOffersErrorByShift, setCounterOffersErrorByShift] = useState<Record<number, string | null>>({});
     const [counterActionLoading, setCounterActionLoading] = useState<number | null>(null);
+    const generationsRef = useRef<Record<string, number>>({});
 
     const resolveOfferSlotId = useCallback((offer: any): number | null => {
         const offerSlots = offer?.slots || offer?.offer_slots || [];
@@ -22,18 +25,27 @@ export function useCounterOffers() {
     }, []);
 
     const loadCounterOffers = useCallback(async (shiftId: number) => {
+        const genKey = String(shiftId);
+        const generation = getNextGeneration(generationsRef.current, genKey);
         setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: true }));
+        setCounterOffersErrorByShift(prev => ({ ...prev, [shiftId]: null }));
         try {
             const offers = await fetchShiftCounterOffersService(shiftId);
+            if (!isLatestGeneration(generationsRef.current, genKey, generation)) return;
             const pendingOffers = (offers || []).filter(
                 (offer: any) => String(offer?.status ?? '').toUpperCase() === 'PENDING'
             );
             setCounterOffersByShift(prev => ({ ...prev, [shiftId]: pendingOffers }));
-        } catch (error) {
+            setCounterOffersErrorByShift(prev => ({ ...prev, [shiftId]: null }));
+        } catch (error: any) {
+            if (!isLatestGeneration(generationsRef.current, genKey, generation)) return;
             console.error('Failed to load counter offers', error);
             setCounterOffersByShift(prev => ({ ...prev, [shiftId]: [] }));
+            setCounterOffersErrorByShift(prev => ({ ...prev, [shiftId]: error?.message || 'Failed to load counter offers' }));
         } finally {
-            setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: false }));
+            if (isLatestGeneration(generationsRef.current, genKey, generation)) {
+                setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: false }));
+            }
         }
     }, []);
 
@@ -103,6 +115,7 @@ export function useCounterOffers() {
     return {
         counterOffersByShift,
         counterOffersLoadingByShift,
+        counterOffersErrorByShift,
         loadCounterOffers,
         acceptOffer,
         rejectOffer,

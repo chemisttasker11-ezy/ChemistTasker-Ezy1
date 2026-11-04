@@ -245,3 +245,87 @@ export const getCandidateUserId = (record: any): number | null => {
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
 };
+
+export const getShiftPharmacyId = (shift: Shift | null | undefined): number | null => {
+    if (!shift) return null;
+    const shiftAny = shift as any;
+    const raw =
+        shiftAny?.pharmacyDetail?.id ??
+        shiftAny?.pharmacy_detail?.id ??
+        shiftAny?.pharmacyId ??
+        shiftAny?.pharmacy_id ??
+        shiftAny?.pharmacy ??
+        null;
+    return toFiniteNumber(raw);
+};
+
+export const filterShiftsByPharmacy = (shifts: Shift[], pharmacyId: number | null): Shift[] => {
+    if (pharmacyId == null) return shifts;
+    return shifts.filter((shift) => getShiftPharmacyId(shift) === pharmacyId);
+};
+
+export const isCandidateLevelVisible = (
+    targetLevel: string,
+    currentLevel: string,
+    allowedLevels?: string[] | null
+): boolean => {
+    const ALL_LEVELS = ['FULL_PART_TIME', 'LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN', 'PLATFORM'];
+    const allowedSet = new Set((allowedLevels || []).filter((l) => ALL_LEVELS.includes(l)));
+    const levels = allowedSet.size ? ALL_LEVELS.filter((l) => allowedSet.has(l)) : ALL_LEVELS;
+    const currentIdx = levels.indexOf(currentLevel);
+    const visibleLevels = currentIdx === -1 ? levels : levels.slice(0, currentIdx + 1);
+    return visibleLevels.includes(targetLevel);
+};
+
+export type SignatureMergeResult = {
+    mergedSeen: Record<string, string>;
+    updatesByShift: Record<number, Record<number, boolean>>;
+};
+
+export const mergeSlotSignatures = (
+    seen: Record<string, string>,
+    signatures: Record<string, { shiftId: number; slotId: number; signature: string }>
+): SignatureMergeResult => {
+    const mergedSeen = { ...seen };
+    const updatesByShift: Record<number, Record<number, boolean>> = {};
+
+    Object.entries(signatures).forEach(([key, { shiftId, slotId, signature }]) => {
+        const previous = seen[key];
+        if (previous == null) {
+            mergedSeen[key] = signature;
+            return;
+        }
+        if (previous !== signature) {
+            if (!updatesByShift[shiftId]) updatesByShift[shiftId] = {};
+            updatesByShift[shiftId][slotId] = true;
+        }
+    });
+
+    return { mergedSeen, updatesByShift };
+};
+
+export const getNextGeneration = (
+    generations: Record<string | number, number>,
+    key: string | number
+): number => {
+    const k = String(key);
+    const next = (generations[k] ?? 0) + 1;
+    generations[k] = next;
+    return next;
+};
+
+export const isLatestGeneration = (
+    generations: Record<string | number, number>,
+    key: string | number,
+    generation: number
+): boolean => {
+    return generations[String(key)] === generation;
+};
+
+export const buildActiveShiftsScopeKey = (
+    scopeKey: string,
+    shiftId?: number | null
+): string => {
+        return shiftId != null ? `${scopeKey}:shift:${shiftId}` : `${scopeKey}:all`;
+};
+

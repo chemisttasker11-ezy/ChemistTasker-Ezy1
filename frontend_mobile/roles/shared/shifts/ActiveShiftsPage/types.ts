@@ -5,6 +5,7 @@ import { ShiftMemberStatus, ShiftReviewCandidate } from '@chemisttasker/shared-c
 
 export interface TabDataState {
     loading: boolean;
+    error?: string | null;
     interestsAll?: any[];
     interestsBySlot?: Record<number, any[]>;
     membersBySlot?: Record<number, ShiftMemberStatus[]>;
