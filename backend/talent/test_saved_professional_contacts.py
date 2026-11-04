@@ -37,6 +37,17 @@ class SavedProfessionalContactsTests(TestCase):
             self.assertEqual(client.post(URL,{"kind":kind,"reference":ref},format="json").status_code,400)
         self.assertEqual(SavedProfessionalContact.objects.count(),0)
 
+    def test_hidden_public_listing_is_withdrawn_from_existing_bookmarks(self):
+        client = client_for(self.user)
+        response = client.post(URL, {"kind":"WORKER_LISTING","reference":"PUBWORKER12"}, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(client.get(URL).json()), 1)
+        self.public.hidden_at = timezone.now()
+        self.public.save(update_fields=['hidden_at'])
+        self.assertEqual(client.get(URL).json(), [])
+        self.assertEqual(SavedProfessionalContact.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(client.post(URL, {"kind":"WORKER_LISTING","reference":"PUBWORKER12"}, format="json").status_code, 400)
+
     def test_duplicate_idempotent_and_cross_account_delete_is_refused(self):
         first=client_for(self.user).post(URL,{"kind":"ORGANIZATION","reference":"test-organisation"},format="json")
         second=client_for(self.user).post(URL,{"kind":"ORGANIZATION","reference":"test-organisation"},format="json")
