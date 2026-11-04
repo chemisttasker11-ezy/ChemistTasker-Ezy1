@@ -5,7 +5,7 @@ import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults,
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 import { normalizeShiftRequirements, canNotifyShiftChainMembers, isPrivateShiftBooking, automaticShiftEscalationDates, type ShiftEscalationPlan } from '@chemisttasker/shared-core';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { Alert, View, ScrollView, TouchableOpacity } from 'react-native';
 import {
     Text,
     Button,
@@ -25,7 +25,7 @@ import {
     updateOwnerShiftService,
     calculateShiftRates,
 } from '@chemisttasker/shared-core';
-import { listShiftDescriptionTemplates, saveShiftDescriptionTemplate, updatePharmacy } from '@chemisttasker/shared-core';
+import { listShiftDescriptionTemplates, saveShiftDescriptionTemplate, deleteShiftDescriptionTemplate, updatePharmacy } from '@chemisttasker/shared-core';
 
 import {
     BASE_STEP_ORDER,
@@ -727,6 +727,31 @@ export default function PostShiftScreen() {
         }
     }, [description, pharmacyId, roleNeeded]);
 
+    const handleDeleteDescriptionTemplate = useCallback(() => {
+        if (!descriptionTemplate?.id || descriptionTemplateSaving) return;
+        const selectedTemplateId = descriptionTemplate.id;
+        Alert.alert(
+            'Delete saved description?',
+            'This removes the reusable pharmacy-role template. Your current shift description will not be changed.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete template', style: 'destructive',
+                    onPress: () => {
+                        setDescriptionTemplateSaving(true);
+                        void deleteShiftDescriptionTemplate(selectedTemplateId)
+                            .then(() => {
+                                setDescriptionTemplate(current => current?.id === selectedTemplateId ? null : current);
+                                setToast('Description template removed');
+                            })
+                            .catch(() => setToast('Unable to delete description template'))
+                            .finally(() => setDescriptionTemplateSaving(false));
+                    },
+                },
+            ],
+        );
+    }, [descriptionTemplate, descriptionTemplateSaving]);
+
     const handleSavePharmacyRateDefaults = useCallback(async () => {
         if (!pharmacyId) {
             setToast('Select a pharmacy before updating default rates');
@@ -1167,6 +1192,7 @@ export default function PostShiftScreen() {
                         descriptionTemplateSaving={descriptionTemplateSaving}
                         handleUseDescriptionTemplate={edited(handleUseDescriptionTemplate)}
                         handleSaveDescriptionTemplate={handleSaveDescriptionTemplate}
+                        handleDeleteDescriptionTemplate={handleDeleteDescriptionTemplate}
                         description={description}
                         setDescription={edited(setDescription)}
                         workloadTags={workloadTags}
