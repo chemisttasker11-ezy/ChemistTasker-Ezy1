@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { configureApi } from '../../transport/application';
 import { deleteShiftDescriptionTemplate } from './descriptionTemplates';
-import { getActiveShiftDetail, getCommunityShiftDetail, getPublicShiftDetail, getActiveShiftsPage, getConfirmedShiftsPage, fetchAllActiveShifts, fetchAllConfirmedShifts, acceptShiftOfferService } from './api';
+import { getActiveShiftDetail, getCommunityShiftDetail, getPublicShiftDetail, getActiveShiftsPage, getConfirmedShiftsPage, fetchAllActiveShifts, fetchAllConfirmedShifts, acceptShiftOfferService, fetchDeferredPayrollOffersService } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -85,4 +85,23 @@ it('deletes a scoped shift-description template through the shared SDK', async (
     configureApi({baseURL: 'https://dashboard.example.test/api/v1', getToken: async () => null, fetchImpl});
     await deleteShiftDescriptionTemplate(31);
     expect(requests).toEqual([{url: 'https://dashboard.example.test/api/v1/shift-description-templates/31/', method: 'DELETE'}]);
+});
+
+it('paginates both deferred payroll offer states without mobile deep transport imports', async () => {
+    const requested: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        const status = url.searchParams.get('status');
+        const page = Number(url.searchParams.get('page') || 1);
+        requested.push(status + ':' + page);
+        return new Response(JSON.stringify({
+            results: [{ id: page + (status === 'ACCEPTED' ? 10 : 20), payment_preference_snapshot: 'TFN', engagement_terms_preview: {payroll_activation_required: true} }],
+            next: page === 1 ? '?page=2' : null,
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch;
+    configureApi({ baseURL: 'https://dashboard.example.test/api/v1', getToken: async () => null, fetchImpl });
+    const offers = await fetchDeferredPayrollOffersService();
+    expect(offers.map((row) => row.id).sort((a,b) => a-b)).toEqual([11,12,21,22]);
+    expect(offers[0]).toMatchObject({paymentPreferenceSnapshot: 'TFN'});
+    expect(requested.sort()).toEqual(['ACCEPTED:1','ACCEPTED:2','ACCEPTED_AWAITING_PAYMENT:1','ACCEPTED_AWAITING_PAYMENT:2']);
 });
