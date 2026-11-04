@@ -37,6 +37,7 @@ import {
   type AvailabilityDraft,
   type AvailabilityPayload,
   createEmptyEntry,
+  unsavedAvailabilityPayloads,
   weekDays,
   radiusOptions,
   stateOptions,
@@ -493,12 +494,42 @@ export default function SetAvailabilityScreen() {
         notes: currentEntry.notes,
       }));
 
-      const createdEntries = await Promise.all(payloads.map(createUserAvailabilityService));
+      const remaining = unsavedAvailabilityPayloads(payloads, availabilityEntries);
+      if (!remaining.length) {
+        setCurrentEntry(createEmptyEntry());
+        setSelectedDates([]);
+        showSnackbar('These time slots are already saved', 'success');
+        return;
+      }
+
+      const results = await Promise.allSettled(remaining.map(createUserAvailabilityService));
+      const saved = results.flatMap((result) => result.status === 'fulfilled' ? [result.value as AvailabilityEntry] : []);
+      const hadFailure = results.some((result) => result.status === 'rejected');
+      let authoritative = [...availabilityEntries, ...saved];
+
+      if (hadFailure) {
+        // The server may have committed a request even if its response was lost.
+        // Reconcile before offering another write; never blindly repeat the whole batch.
+        try {
+          const refreshed = await fetchUserAvailabilityService();
+          authoritative = refreshed as AvailabilityEntry[];
+          setAvailabilityLoadError(false);
+        } catch {
+          setAvailabilityLoadError(true);
+        }
+      }
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setAvailabilityEntries((prev) => [...prev, ...(createdEntries as AvailabilityEntry[])]);
-      setCurrentEntry(createEmptyEntry());
-      setSelectedDates([]);
-      showSnackbar('Time slot added', 'success');
+      setAvailabilityEntries(authoritative);
+      const unresolved = unsavedAvailabilityPayloads(payloads, authoritative);
+      if (hadFailure && unresolved.length) {
+        setSelectedDates(unresolved.map((item) => item.date));
+        setCurrentEntry((previous) => ({ ...previous, date: unresolved[0].date }));
+        showSnackbar('Some slots were saved. Review remaining dates and retry.', 'error');
+      } else {
+        setCurrentEntry(createEmptyEntry());
+        setSelectedDates([]);
+        showSnackbar('Time slots saved', 'success');
+      }
     } catch {
       showSnackbar('Failed to save slot', 'error');
     } finally {
