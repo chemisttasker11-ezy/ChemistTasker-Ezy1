@@ -28,22 +28,26 @@ export function ArticleDetail({ slug }: { slug: string }) {
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [message, setMessage] = useState('');
+  const [replyTo, setReplyTo] = useState<number | null>(null);
+  const [page, setPage] = useState<number | null>(null);
+  const [paging, setPaging] = useState(false);
+  const [reportId, setReportId] = useState<number | null>(null);
+  const [reason, setReason] = useState('');
 
   const load = useCallback(async () => {
     const ticket = ++generation.current;
     setLoading(true); setError(''); setActionError('');
-    setArticle(null); setComments([]);
+    setArticle(null); setComments([]); setPage(null); setPaging(false); setReplyTo(null);
     try {
       const result = await chemistTaskerApi.publicContent.getArticle(slug);
       if (ticket !== generation.current) return;
       setArticle(result);
-      if (result.comments_open) {
-        setCommentsLoading(true);
-        try {
-          const discussion = await chemistTaskerApi.publicContent.listArticleComments(slug);
-          if (ticket === generation.current) setComments(discussion.results || []);
-        } catch { if (ticket === generation.current) setActionError('Comments are unavailable. You can still read the article.'); }
-      }
+      // Closed discussions remain readable; only new comments are blocked.
+      setCommentsLoading(true);
+      try {
+        const discussion = await chemistTaskerApi.publicContent.listArticleComments(slug);
+        if (ticket === generation.current) { setComments(discussion.results || []); setPage(discussion.next ? 2 : null); }
+      } catch { if (ticket === generation.current) setActionError('Comments are unavailable. You can still read the article.'); }
     } catch (failure: any) {
       if (ticket === generation.current) setError(failure?.message || 'Article could not load.');
     } finally {
@@ -61,11 +65,11 @@ export function ArticleDetail({ slug }: { slug: string }) {
     const ticket = generation.current;
     submitting.current = true; setBusy(true); setActionError('');
     try {
-      await chemistTaskerApi.publicContent.createArticleComment(slug, { body: message.trim() });
+      await chemistTaskerApi.publicContent.createArticleComment(slug, { body: message.trim(), ...(replyTo === null ? {} : { parent: replyTo }) });
       if (ticket !== generation.current) return;
-      setMessage('');
+      setMessage(''); setReplyTo(null);
       const response = await chemistTaskerApi.publicContent.listArticleComments(slug);
-      if (ticket === generation.current) setComments(response.results || []);
+      if (ticket === generation.current) { setComments(response.results || []); setPage(response.next ? 2 : null); }
     } catch (failure: any) {
       if (ticket === generation.current) setActionError(failure?.message || 'Comment could not be published. Retry safely.');
     } finally {
@@ -80,9 +84,37 @@ export function ArticleDetail({ slug }: { slug: string }) {
     try {
       await chemistTaskerApi.publicContent.deleteArticleComment(comment.id);
       const response = await chemistTaskerApi.publicContent.listArticleComments(slug);
-      if (ticket === generation.current) setComments(response.results || []);
+      if (ticket === generation.current) { setComments(response.results || []); setPage(response.next ? 2 : null); }
     } catch (failure: any) {
       if (ticket === generation.current) setActionError(failure?.message || 'Unable to delete this comment.');
+    } finally { if (ticket === generation.current) setBusy(false); }
+  };
+  const loadMoreComments = async () => {
+    if (page === null || paging) return;
+    const ticket = generation.current;
+    setPaging(true); setActionError('');
+    try {
+      const response = await chemistTaskerApi.publicContent.listArticleComments(slug, { page });
+      if (ticket !== generation.current) return;
+      setComments(old => {
+        const merged = new Map(old.map(comment => [comment.id, comment]));
+        for (const comment of response.results || []) merged.set(comment.id, comment);
+        return [...merged.values()];
+      });
+      setPage(response.next ? page + 1 : null);
+    } catch (failure: any) {
+      if (ticket === generation.current) setActionError(failure?.message || 'Older comments could not load.');
+    } finally { if (ticket === generation.current) setPaging(false); }
+  };
+  const reportComment = async () => {
+    if (!user || reportId === null || !reason.trim() || busy) return;
+    const ticket = generation.current;
+    setBusy(true); setActionError('');
+    try {
+      await chemistTaskerApi.publicContent.reportArticleComment(reportId, { reason: reason.trim() });
+      if (ticket === generation.current) { setReportId(null); setReason(''); }
+    } catch (failure: any) {
+      if (ticket === generation.current) setActionError(failure?.message || 'Could not report comment.');
     } finally { if (ticket === generation.current) setBusy(false); }
   };
   const react = async () => {
@@ -119,19 +151,28 @@ export function ArticleDetail({ slug }: { slug: string }) {
           <RichContent document={article.body_document} fallback={article.body} />
           {safePublicUrl(article.source_url) ? <Button mode="outlined" icon="open-in-new" onPress={() => void Linking.openURL(safePublicUrl(article.source_url)!).catch(() => setActionError('Original source unavailable.'))}>Original source: {article.source_name || 'Website'}</Button> : null}
           <View style={styles.actions}><Button mode="outlined" icon="share-variant" onPress={() => void share()}>Share</Button><Button mode="outlined" onPress={() => void react()} disabled={busy}>{article.reactions.mine ? 'Unlike' : 'Like'}</Button></View>
-          {article.comments_open ? <Card mode="outlined" style={styles.card}><Card.Content style={styles.comments}>
+          <Card mode="outlined" style={styles.card}><Card.Content style={styles.comments}>
             <Text variant="titleLarge" style={styles.title}>Discussion</Text>
             {commentsLoading ? <ActivityIndicator /> : comments.length === 0 ? <Text style={styles.subtitle}>No comments yet.</Text> : comments.map(row => <View key={row.id} style={styles.comment}>
               <Text variant="titleSmall">{row.author_name}</Text>
               <Text style={styles.subtitle}>{row.deleted ? 'Comment removed' : row.body}</Text>
               <Text style={styles.meta}>{displayDate(row.created_at)}</Text>
               {row.can_delete && user && !row.deleted ? <Button mode="text" disabled={busy} onPress={() => void deleteComment(row)}>Delete my comment</Button> : null}
+              {!row.deleted && article.comments_open ? <Button mode="text" onPress={() => user ? setReplyTo(row.parent || row.id) : requiresSignIn()}>Reply</Button> : null}
+              {!row.deleted && user ? <Button mode="text" disabled={busy} onPress={() => { setReportId(row.id); setReason(''); }}>Report comment</Button> : null}
             </View>)}
-            {user ? <>
-              <TextInput mode="outlined" label="Add a comment" multiline value={message} onChangeText={setMessage} maxLength={4000} disabled={busy} />
-              <Button mode="contained" disabled={busy || !message.trim()} loading={busy} onPress={() => void sendComment()}>Post comment</Button>
+            {page !== null ? <Button mode="outlined" disabled={paging} loading={paging} onPress={() => void loadMoreComments()}>Load more comments</Button> : null}
+            {reportId !== null ? <View style={styles.warning}>
+              <TextInput mode="outlined" label="Reason for reporting" multiline maxLength={500} value={reason} onChangeText={setReason} disabled={busy} />
+              <Button mode="contained" onPress={() => void reportComment()} disabled={busy || !reason.trim()}>Send report</Button>
+              <Button mode="text" onPress={() => setReportId(null)}>Cancel report</Button>
+            </View> : null}
+            {!article.comments_open ? <Text style={styles.meta}>Comments are closed for this article.</Text> : user ? <>
+              {replyTo !== null ? <Button onPress={() => setReplyTo(null)}>Cancel reply</Button> : null}
+              <TextInput mode="outlined" label={replyTo !== null ? 'Write reply' : 'Add a comment'} multiline value={message} onChangeText={setMessage} maxLength={3000} disabled={busy} />
+              <Button mode="contained" disabled={busy || !message.trim()} loading={busy} onPress={() => void sendComment()}>{replyTo !== null ? 'Post reply' : 'Post comment'}</Button>
             </> : <Button mode="outlined" onPress={requiresSignIn}>Sign in to join the discussion</Button>}
-          </Card.Content></Card> : <Text style={styles.meta}>Comments are closed for this article.</Text>}
+          </Card.Content></Card>}
           {actionError ? <View style={styles.warning}><Text style={styles.error} accessibilityRole="alert">{actionError}</Text><Button onPress={() => void load()}>Retry loading</Button></View> : null}
         </>}
     </ScrollView>

@@ -25,3 +25,12 @@ test('article detail reads published content and checks sign-in for comments and
   assert.match(src, /returnTo: '\/explore\/article\/'/);
   assert.match(src, /publicWebUrl\('\/' \+ article\.kind/);
 });
+
+test('closed discussions remain readable and replies reports and comment pagination use existing endpoints', () => {
+ const src = read('features/explore/ArticleDetail.tsx');
+ assert.match(src, /Closed discussions remain readable/);
+ assert.match(src, /listArticleComments\(slug, \{ page \}\)/);
+ assert.match(src, /createArticleComment\(slug, \{ body: message\.trim\(\),/);
+ assert.match(src, /reportArticleComment\(reportId, \{ reason: reason\.trim\(\) \}\)/);
+ assert.match(src, /!article\.comments_open \? <Text/);
+});
