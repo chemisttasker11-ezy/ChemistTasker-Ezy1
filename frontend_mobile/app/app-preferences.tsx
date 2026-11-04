@@ -15,7 +15,7 @@ export default function AppPreferencesScreen() {
     setLoading(true); setError('');
     try {
       const permission = await Notifications.getPermissionsAsync();
-      const granted = permission.granted || permission.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+      const granted = permission.granted;
       setStatus(granted ? 'Allowed' : permission.canAskAgain ? 'Not enabled' : 'Blocked by device settings');
     } catch (failure: any) {
       setError(failure?.message || 'Unable to read notification permissions.');
@@ -36,7 +36,7 @@ export default function AppPreferencesScreen() {
     <Text style={styles.subtitle}>Choose how ChemistTasker works with notifications and communication on this device.</Text>
     <Card mode="outlined" style={styles.card}><Card.Content style={styles.cardContent}>
       <Text variant="titleMedium">Push notifications</Text>
-      <Text style={styles.subtitle}>Delivery is controlled by your phone's permissions. This setting is separate from email and in-app messages.</Text>
+      <Text style={styles.subtitle}>Delivery is controlled by device permissions. This setting is separate from email and in-app messages.</Text>
       <View style={styles.row}>
         <Text style={styles.statusLabel}>Device permission</Text>
         {loading ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.status}>{status ?? 'Unknown'}</Text>}
