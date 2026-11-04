@@ -1,7 +1,7 @@
 import { useAhpra } from '../context/AhpraContext';
 import AhpraStatus from '../components/AhpraStatus';
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Platform, StatusBar, View } from 'react-native';
+import { AppState, Linking, Platform, Pressable, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
@@ -10,6 +10,7 @@ import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { WorkspaceProvider, useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../constants/theme';
+import { colors, font, radius, space, touch } from '../constants/tokens';
 import OfflineBanner from '../components/OfflineBanner';
 import '../config/api'; // Configure shared-core on app load
 import { en, registerTranslation } from 'react-native-paper-dates';
@@ -76,14 +77,22 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     if (this.state.hasError) {
       return (
         <SafeAreaProvider>
-          <SafeAreaView
-            style={{ flex: 1, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' }}
-            edges={['top', 'left', 'right']}
-          >
+          <SafeAreaView style={crashRecoveryStyles.root} edges={['top', 'bottom', 'left', 'right']}>
             <StatusBar barStyle="dark-content" />
-            <PaperProvider theme={theme}>
-              <Stack screenOptions={{ headerShown: false }} />
-            </PaperProvider>
+            <View style={crashRecoveryStyles.card} accessibilityRole="alert">
+              <Text style={crashRecoveryStyles.heading}>We could not open this screen</Text>
+              <Text style={crashRecoveryStyles.description}>
+                Your account information is safe. Try opening the app again. If the issue continues, contact ChemistTasker support.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Try opening the app again"
+                onPress={() => this.setState({ hasError: false })}
+                style={crashRecoveryStyles.button}
+              >
+                <Text style={crashRecoveryStyles.buttonText}>Try again</Text>
+              </Pressable>
+            </View>
           </SafeAreaView>
         </SafeAreaProvider>
       );
@@ -91,6 +100,49 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     return this.props.children;
   }
 }
+
+const crashRecoveryStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.pageBg,
+    justifyContent: 'center',
+    padding: space.lg,
+  },
+  card: {
+    backgroundColor: colors.surfaceBg,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.card,
+    padding: space.xl,
+    gap: space.lg,
+  },
+  heading: {
+    color: colors.textPrimary,
+    fontFamily: font.outfit.medium,
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  description: {
+    color: colors.textSecondary,
+    fontFamily: font.inter.regular,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  button: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.control,
+    minHeight: touch.min,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: space.xl,
+    paddingVertical: space.sm,
+  },
+  buttonText: {
+    color: colors.surfaceBg,
+    fontFamily: font.inter.semiBold,
+    fontSize: 16,
+  },
+});
 
 function UpdatePrompt() {
   const [mode, setMode] = useState<'none' | 'store-required' | 'store-optional' | 'ota'>('none');
