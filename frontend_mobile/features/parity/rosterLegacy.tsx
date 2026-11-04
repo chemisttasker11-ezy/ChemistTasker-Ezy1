@@ -31,7 +31,7 @@ function ScopedLegacyRoster({ pharmacyId, pharmacyName }: { pharmacyId: number |
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [selectedVisibility, setSelectedVisibility] = useState<(typeof visibilityChoices)[number]>('PLATFORM');
+  const [visibilityByShift, setVisibilityByShift] = useState<Record<number, string>>({});
 
   const load = useCallback(async () => {
     const ticket = requestScope.begin('load');
@@ -119,9 +119,13 @@ function ScopedLegacyRoster({ pharmacyId, pharmacyName }: { pharmacyId: number |
         <View key={row.id} style={{ gap: 8 }}>
           <DataRow title={replaceUnderscore(row.roleNeeded)} subtitle={'Shift ' + row.id} status={replaceUnderscore(row.visibility)} />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {visibilityChoices.map((value) => <Chip key={value} selected={selectedVisibility === value} onPress={() => setSelectedVisibility(value)} disabled={busy}>{replaceUnderscore(value)}</Chip>)}
+            {visibilityChoices.filter((value) => !row.allowedEscalationLevels?.length || row.allowedEscalationLevels.includes(value)).map((value) => (
+              <Chip key={value} selected={(visibilityByShift[row.id] ?? '') === value}
+                onPress={() => setVisibilityByShift((current) => ({ ...current, [row.id]: value }))}
+                disabled={busy}>{replaceUnderscore(value)}</Chip>
+            ))}
           </View>
-          <Button mode="outlined" disabled={busy} onPress={() => confirmDecision('Escalate open shift?', () => escalateRosterShiftService(row.id, { target_visibility: selectedVisibility }), 'Visibility updated')}>Escalate</Button>
+          <Button mode="outlined" disabled={busy || !visibilityByShift[row.id]} onPress={() => confirmDecision('Escalate open shift?', () => escalateRosterShiftService(row.id, { target_visibility: visibilityByShift[row.id] }), 'Visibility updated')}>Escalate</Button>
           <Button mode="outlined" textColor="#B42318" disabled={busy} onPress={() => confirmDelete(
             'Delete open shift?', 'The server rejects protected or financially linked shifts. This cannot be undone.',
             () => deleteRosterShiftService(row.id),
