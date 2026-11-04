@@ -1,0 +1,120 @@
+/* Week planner: operational density, readable at 375px through desktop. */
+.week-planner{display:grid;gap:22px;min-width:0}
+.week-page-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.week-page-heading h1{font-size:32px;margin:0 0 7px;letter-spacing:-.03em}
+.week-page-heading p{margin:0;max-width:66ch;color:var(--subtle);font-size:14px}
+.week-navigation{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:14px 18px}
+.week-navigation-controls{display:flex;align-items:center;gap:9px;min-width:0;flex-wrap:wrap}
+.week-navigation h2{font-size:17px;line-height:1.3;margin:0 0 0 10px}
+.week-phase{display:inline-flex;padding:7px 12px;background:var(--soft-purple);color:var(--purple);border-radius:999px;font-weight:700;font-size:12px}
+.week-overview{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:28px;padding:26px;background:var(--paper)}
+.week-score-main{min-width:0}
+.week-overline{font-size:13px;font-weight:800;color:var(--subtle)}
+.week-score-main>p{font-size:12px;line-height:1.55;color:var(--subtle);margin:10px 0 0;max-width:60ch}
+.weekly-meter{display:grid;gap:10px;margin-top:11px}
+.weekly-meter-heading{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:13px;font-weight:600;color:var(--subtle)}
+.weekly-meter-heading strong{font-size:28px;line-height:1;color:var(--ink);font-weight:800}
+.weekly-meter.compact{margin:0}
+.weekly-meter.compact .weekly-meter-heading strong{font-size:19px}
+.weekly-meter-track{height:11px;background:var(--soft-purple);border-radius:20px;overflow:hidden}
+.weekly-meter.compact .weekly-meter-track{height:8px}
+.weekly-meter-fill{background:linear-gradient(90deg,#6b5bd7,#37a99a);height:100%;border-radius:inherit;transition:width .2s ease-out}
+.week-numbers{display:flex;gap:20px;align-items:center}
+.week-numbers>div{min-width:86px;display:grid;grid-template-columns:1fr;justify-items:center;gap:4px;text-align:center}
+.week-numbers svg{color:var(--purple)}
+.week-numbers strong{font-size:24px;color:var(--ink);line-height:1.2}
+.week-numbers span{font-size:12px;color:var(--subtle)}
+.week-section-title{display:flex;justify-content:space-between;gap:14px;margin:2px 0 14px;align-items:end}
+.week-section-title h2{font-size:20px;margin:0}
+.week-section-title p{font-size:13px;color:var(--subtle);margin:0;max-width:62ch}
+.week-days-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+.week-day{min-height:207px;background:var(--paper);border:1px solid var(--border);border-radius:14px;padding:12px;min-width:0}
+.week-day.is-today{border-color:var(--purple);box-shadow:0 6px 20px rgba(95,77,210,.12)}
+.week-day-head{display:grid;grid-template-columns:1fr auto;align-items:center;gap:5px}
+.week-day-head>span{font-size:12px;font-weight:700;color:var(--subtle)}
+.week-day-head>strong{grid-row:2;font-size:26px;color:var(--ink);line-height:1.1}
+.week-day-head>button{grid-row:1/3;grid-column:2;display:grid;place-items:center;width:36px;height:36px;border-radius:10px;border:1px solid var(--border);color:var(--purple);background:var(--paper)}
+.week-day-focus{display:flex;align-items:center;gap:6px;margin:12px 0;color:var(--subtle);font-size:11px;font-weight:700}
+.week-day-focus svg{color:var(--purple)}
+.week-day-events{display:grid;gap:8px}
+.week-day-empty{font-size:12px;line-height:1.45;margin:0;color:var(--muted)}
+.week-task{border:1px solid var(--border);border-radius:10px;padding:9px;background:color-mix(in srgb,var(--bg) 35%,var(--paper));min-width:0}
+.week-task-title{display:grid;gap:5px;border:0;background:transparent;color:var(--ink);width:100%;text-align:left;padding:1px;cursor:pointer;min-width:0}
+.week-task-title strong{font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+.week-task-title small{font-size:11px;color:var(--subtle);line-height:1.4}
+.week-task-controls{display:flex;align-items:center;justify-content:space-between;gap:5px;margin-top:10px}
+.week-focus-toggle{display:grid;place-items:center;min-width:33px;height:33px;background:var(--paper);border:1px solid var(--border);color:var(--subtle);border-radius:9px}
+.week-focus-toggle.is-selected{color:var(--purple);background:var(--soft-purple)}
+.week-commit-toggle{min-height:33px;padding:4px 8px;border:1px solid var(--border);background:var(--paper);color:var(--subtle);border-radius:9px;font-weight:800;font-size:11px}
+.week-commit-toggle.is-selected{color:var(--positive);border-color:var(--positive)}
+.week-bottom-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(290px,.75fr);gap:18px;align-items:start}
+.week-commitments,.week-review{padding:22px;min-width:0}
+.week-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:20px}
+.week-panel-head h2{margin:0 0 4px;font-size:20px}
+.week-panel-head p{color:var(--subtle);font-size:12px;line-height:1.4;margin:0}
+.week-panel-head svg{color:var(--purple)}
+.week-commit-list{display:grid;gap:0}
+.week-commit-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--border)}
+.week-status-mark{display:grid;place-items:center;flex:none;width:18px;height:18px;color:var(--subtle)}
+.week-status-mark.status-finished{color:var(--positive)}
+.week-status-mark.status-progressing,.week-status-mark.status-started{color:var(--purple)}
+.week-status-mark.status-postponed{color:var(--caution)}
+.week-commit-details{display:grid;gap:3px;flex:1;min-width:0}
+.week-commit-details strong{font-size:13px;overflow-wrap:anywhere}
+.week-commit-details span,.week-commit-details small{font-size:11px;line-height:1.45;color:var(--subtle)}
+.week-commit-details small{color:var(--caution)}
+.week-earned-points{font-size:12px;color:var(--ink);white-space:nowrap}
+.week-remove{min-height:33px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--paper);color:var(--subtle);font-size:11px}
+.week-empty-commit{padding:24px 12px;text-align:center;color:var(--subtle)}
+.week-empty-commit svg{color:var(--purple);margin-bottom:7px}
+.week-empty-commit h3{font-size:16px;color:var(--ink);margin:0 0 5px}
+.week-empty-commit p{font-size:12px;max-width:42ch;margin:0 auto}
+.week-pick-list{display:grid;gap:4px;margin-top:22px}
+.week-pick-list h3{font-size:15px;margin:0 0 5px}
+.week-pick-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--border)}
+.week-pick-row span{font-size:12px;color:var(--ink);overflow-wrap:anywhere}
+.week-pick-row button{flex:none;min-height:34px;padding:5px 9px;border:1px solid var(--border);border-radius:8px;background:var(--paper);color:var(--purple);font-size:11px;font-weight:700}
+.week-muted{font-size:12px;color:var(--muted);margin:5px 0}
+.week-review form{display:grid;gap:17px}
+.week-review label{display:grid;gap:7px;font-size:13px;font-weight:700;color:var(--ink)}
+.week-review textarea{width:100%;min-height:82px;border:1px solid var(--border);background:var(--paper);border-radius:10px;padding:11px 13px;resize:vertical;font-size:13px;line-height:1.5}
+.week-review form>.button{justify-self:start}
+.week-review-footnote{color:var(--subtle);font-size:11px;line-height:1.45;margin:0}
+.week-scoring-guide{padding:16px 20px}
+.week-scoring-guide summary{display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:700;font-size:14px;color:var(--ink)}
+.week-scoring-guide[open] summary svg{transform:rotate(90deg)}
+.week-scoring-guide p{color:var(--subtle);font-size:13px;line-height:1.6;margin:14px 0 0;max-width:90ch}
+.week-score-legend{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+.week-score-legend>span{padding:8px 11px;background:var(--bg);border-radius:9px;color:var(--subtle);font-size:12px}
+.week-score-legend strong{font-variant-numeric:tabular-nums;color:var(--ink);margin-left:5px}
+@media(max-width:1480px){.week-days-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:980px){
+ .week-days-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .week-bottom-grid{grid-template-columns:1fr}
+ .week-overview{grid-template-columns:1fr}
+ .week-numbers{justify-content:flex-start;flex-wrap:wrap}
+}
+@media(max-width:680px){
+ .week-page-heading{align-items:stretch;flex-direction:column}
+ .week-page-heading h1{font-size:26px}
+ .week-section-title{display:block}
+ .week-section-title p{margin-top:5px}
+ .week-navigation{padding:14px}
+ .week-navigation-controls h2{flex-basis:100%;margin:5px 0}
+ .week-days-grid{grid-template-columns:1fr}
+ .week-day{min-height:0}
+ .week-day-head{display:flex}
+ .week-day-head>strong{font-size:23px;margin-left:6px;margin-right:auto}
+ .week-day-head>button{grid-row:auto;grid-column:auto;min-width:44px;height:44px}
+ .week-day-focus{margin:5px 0 10px}
+ .week-overview{padding:17px}
+ .week-numbers{gap:14px;justify-content:space-between}
+ .week-numbers>div{min-width:70px}
+ .week-commitments,.week-review{padding:16px}
+ .week-commit-row{gap:6px;flex-wrap:wrap}
+ .week-earned-points{margin-left:auto}
+ .week-remove{min-height:40px}
+ .week-task-controls button,.week-pick-row button{min-height:44px}
+ .week-task-title strong{font-size:14px}
+ .week-task-title small{font-size:12px}
+}
