@@ -32,6 +32,7 @@ test('scanned tokens are not permissions and remain account scoped',()=>{
  const scan=readFileSync(new URL('../../app/share/scan.tsx',import.meta.url),'utf8');
  assert.match(scan,/No action was taken/);
  assert.match(scan,/requestPermission\(\)/);
+ assert.match(scan,/user\?\.id == null \|\| !code/);
  assert.match(scan,/saveContact\(user\.id, code\)/);
  assert.doesNotMatch(scan,/approveMembership|createMembership|addFavorite|addFavourite/);
 });

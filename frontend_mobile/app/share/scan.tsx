@@ -42,7 +42,7 @@ export default function ShareCodeScanner() {
     setProcessing(true); inspect(data);
   };
   const save = async () => {
-    if (!user || !code) return;
+    if (user?.id == null || !code) return;
     try { await saveContact(user.id, code); setNotice('Saved privately on this device for this account. This does not send an application or add a staff member.'); }
     catch { setError('Could not save this contact. Try again.'); }
   };
