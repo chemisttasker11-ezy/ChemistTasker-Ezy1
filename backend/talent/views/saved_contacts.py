@@ -29,8 +29,23 @@ class SavedProfessionalContactsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        rows = SavedProfessionalContact.objects.filter(user=request.user).order_by("-created_at", "-id")[:MAX_CONTACTS]
-        return Response([_serialize(row) for row in rows])
+        rows = list(SavedProfessionalContact.objects.filter(
+            user=request.user
+        ).order_by("-created_at", "-id")[:MAX_CONTACTS])
+        worker_refs = {row.reference for row in rows if row.kind == SavedProfessionalContact.Kind.WORKER_LISTING}
+        org_refs = {row.reference for row in rows if row.kind == SavedProfessionalContact.Kind.ORGANIZATION}
+        public_workers = {
+            post.reference_code for post in ExplorerPost.objects.filter(
+                reference_code__in=worker_refs, hidden_at__isnull=True,
+            ) if post.is_talent_board_visible()
+        }
+        public_orgs = set(Organization.objects.filter(slug__in=org_refs).values_list('slug', flat=True))
+        visible = [
+            row for row in rows
+            if (row.kind == SavedProfessionalContact.Kind.WORKER_LISTING and row.reference in public_workers)
+            or (row.kind == SavedProfessionalContact.Kind.ORGANIZATION and row.reference in public_orgs)
+        ]
+        return Response([_serialize(row) for row in visible])
 
     def post(self, request):
         kind = request.data.get("kind")
