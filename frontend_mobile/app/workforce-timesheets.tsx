@@ -203,7 +203,7 @@ export default function WorkforceTimesheetsScreen() {
             <View><Text variant="labelSmall">Checks</Text><Text>{row.blocking_checks} blocking · {row.warning_checks} warning</Text></View>
           </View>
           <View style={styles.actionRow}>
-            <Button compact disabled={busy || !row.revision_number || row.needs_rebuild || row.status === 'APPROVED'} onPress={() => void run(() => workforce.approveTimesheet(row.id, row.revision_number!, 'Approved from mobile manager timesheets'))}>Approve</Button>
+            <Button compact mode="contained-tonal" disabled={busy} onPress={() => router.push(`/workforce-timesheets/${row.id}` as any)}>Review details</Button>
             <Button compact disabled={busy || selectedPeriod?.status === 'LOCKED'} onPress={() => void run(() => workforce.recalculateTimesheet(row.id))}>Recalculate</Button>
           </View>
         </Card.Content></Card>)}
