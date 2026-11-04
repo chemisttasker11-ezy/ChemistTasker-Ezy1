@@ -89,8 +89,10 @@ async function mount(platform, { rows = [cover], loadError = false, acceptError 
   // Keep the real press handlers, disabled states and footer reachable to the contract assertions.
   const nativeUI = {
     BottomSheet: props => ({ type: 'Dialog', props: { ...props, visible: props.open } }),
-    Button: props => ({ type: 'Button', props: { ...props, children: props.label } }),
-    Pill: props => ({ type: 'Chip', props: { ...props, children: props.label } }),
+    // The native Button/Pill expose their spoken text through `label`; mirroring it
+    // into `children` duplicates the name and makes anchored action checks fail.
+    Button: props => ({ type: 'Button', props }),
+    Pill: props => ({ type: 'Chip', props }),
     ScalePressable: props => ({ type: props.accessibilityRole === 'checkbox' ? 'Checkbox.Item' : 'ScalePressable', props }),
   };
   const nativeTokens = {
