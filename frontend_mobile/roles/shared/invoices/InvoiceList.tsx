@@ -2,7 +2,6 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
-  Linking,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
@@ -14,11 +13,11 @@ import { useRouter, useSegments } from 'expo-router';
 import {
   deleteInvoice,
   getInvoices,
-  getInvoicePdfUrl,
   reportInvoiceIssue,
   sendInvoiceEmail,
   updateInvoice,
 } from '@chemisttasker/shared-core';
+import { shareLegacyInvoicePdf } from './shareLegacyInvoicePdf';
 import MobileInvoiceStats from './MobileInvoiceStats';
 import FinanceWorkspace from './FinanceWorkspace';
 import {
@@ -131,12 +130,19 @@ function LegacyInvoiceList({ basePath }: Props) {
     return Number.isFinite(num) ? formatInvoiceCurrency(num) : String(val);
   };
 
-  const onOpenPdf = (id: number) => {
+  const [sharingPdfId, setSharingPdfId] = useState<number | null>(null);
+  const sharingPdfRef = React.useRef(false);
+  const onOpenPdf = async (id: number) => {
+    if (sharingPdfRef.current) return;
+    sharingPdfRef.current = true;
+    setSharingPdfId(id);
     try {
-      const url = getInvoicePdfUrl(id);
-      Linking.openURL(url).catch(() => setSnackbar('Unable to open PDF'));
-    } catch {
-      setSnackbar('Unable to open PDF');
+      await shareLegacyInvoicePdf(id);
+    } catch (error: any) {
+      setSnackbar(error?.message || 'Unable to open invoice PDF');
+    } finally {
+      sharingPdfRef.current = false;
+      setSharingPdfId(null);
     }
   };
 
@@ -306,10 +312,11 @@ function LegacyInvoiceList({ basePath }: Props) {
               /> : null}
               <Menu.Item
                 leadingIcon="file-pdf-box"
-                title="Open PDF"
+                title={sharingPdfId === item.id ? "Preparing PDF…" : "Open PDF"}
+                disabled={sharingPdfId != null}
                 onPress={() => {
                   setMenuFor(null);
-                  onOpenPdf(item.id);
+                  void onOpenPdf(item.id);
                 }}
               />
               {!financeManaged && (isReceivedMode ? (
