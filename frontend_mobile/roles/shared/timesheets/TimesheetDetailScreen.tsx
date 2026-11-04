@@ -23,6 +23,9 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   const [workerVisible, setWorkerVisible] = useState(true);
   const [reasonsByCheck, setReasonsByCheck] = useState<Record<number, string>>({});
   const [reopenReason, setReopenReason] = useState('');
+  const [missingPunchCheck, setMissingPunchCheck] = useState<WorkforceTimesheetCheck | null>(null);
+  const [missingPunchAt, setMissingPunchAt] = useState('');
+  const [missingPunchReason, setMissingPunchReason] = useState('');
 
   const load = useCallback(async () => {
     const request = ++generation.current;
@@ -50,7 +53,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   }, [load]));
 
   const run = async (label: string, action: () => Promise<unknown>, done: string) => {
-    if (writeRef.current || !valid) return;
+    if (writeRef.current || !valid) return false;
     writeRef.current = true;
     setBusy(label);
     setError('');
@@ -59,8 +62,10 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
       await action();
       setSuccess(done);
       await load();
+      return true;
     } catch (failure: any) {
       setError(failure?.response?.data?.error || failure?.response?.data?.detail || failure?.message || 'The action could not be saved.');
+      return false;
     } finally {
       writeRef.current = false;
       setBusy('');
@@ -78,7 +83,21 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
       setError('A reason is required to resolve or waive this check.');
       return;
     }
-    void run('check', () => workforce.decideTimesheetCheck(check.id, decision, notes || 'Reopened for review'), 'Timesheet check updated.').then(() => setReasonsByCheck(previous => ({ ...previous, [check.id]: '' })));
+    void run('check', () => workforce.decideTimesheetCheck(check.id, decision, notes || 'Reopened for review'), 'Timesheet check updated.').then(saved => { if (saved) setReasonsByCheck(previous => ({ ...previous, [check.id]: '' })); });
+  };
+
+  const saveMissingPunch = () => {
+    if (!managerMode || !missingPunchCheck || writeRef.current) return;
+    const sessionId = Number(missingPunchCheck.details?.session_id);
+    const when = missingPunchAt.trim();
+    const note = missingPunchReason.trim();
+    if (!Number.isSafeInteger(sessionId) || sessionId <= 0) { setError('This check has no attendance session to correct.'); return; }
+    if (!/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$/.test(when) || !Number.isFinite(Date.parse(when))) { setError('Enter a valid local date and time in YYYY-MM-DDTHH:mm format.'); return; }
+    if (!note) { setError('A reason is required for this attendance correction.'); return; }
+    const eventType = missingPunchCheck.code === 'MISSING_CLOCK_IN' ? 'CLOCK_IN' : 'CLOCK_OUT';
+    void run('punch', () => workforce.addMissingPunch(timesheetId, { sessionId, eventType, occurredAtLocal: when, reason: note }), 'Missing attendance time added for review.').then(saved => {
+      if (saved) { setMissingPunchCheck(null); setMissingPunchAt(''); setMissingPunchReason(''); }
+    });
   };
 
   const approve = () => {
@@ -143,7 +162,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
                 {check.work_date ? <Text style={styles.small}>{check.work_date}</Text> : null}
                 {managerMode && sourceRequired && !resolved ? <>
                   <Text style={styles.warningText}>This exception requires correcting the source attendance. It cannot be waived.</Text>
-                  <Button mode="outlined" onPress={() => router.push(check.code === 'UNRESOLVED_PROVISIONAL_ATTENDANCE' ? '/attendance/reviews' : `/attendance/corrections/new?timesheetId=${timesheetId}&sessionId=${data.snapshot.days.find(day => day.date === check.work_date)?.session_id ?? ''}` as any)}>Fix attendance</Button>
+                  <Button mode="outlined" onPress={() => check.code === 'UNRESOLVED_PROVISIONAL_ATTENDANCE' ? router.push('/attendance/reviews' as any) : (setMissingPunchCheck(check), setMissingPunchAt(''), setMissingPunchReason(''))}>Fix attendance</Button>
                 </> : null}
                 {managerMode && !sourceRequired ? <>
                   <TextInput mode="outlined" dense label={resolved ? 'Reason to reopen (optional)' : 'Reason to resolve or waive'} value={reasonsByCheck[check.id] ?? ''} onChangeText={value => setReasonsByCheck(previous => ({ ...previous, [check.id]: value }))} multiline disabled={busy !== ''} />
@@ -158,6 +177,16 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
             })}
         </Card.Content></Card>
 
+        {managerMode && missingPunchCheck ? <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
+          <Text style={styles.sectionTitle}>Add missing {missingPunchCheck.code === 'MISSING_CLOCK_IN' ? 'clock-in' : 'clock-out'}</Text>
+          <Text style={styles.subtitle}>Enter the worker's confirmed time in {timeZone}. This appends a manager correction without erasing original attendance.</Text>
+          <TextInput mode="outlined" label="Local date and time (YYYY-MM-DDTHH:mm)" placeholder="2026-11-04T09:00" value={missingPunchAt} onChangeText={setMissingPunchAt} autoCapitalize="none" disabled={busy !== ''} />
+          <TextInput mode="outlined" label="Reason for correction" value={missingPunchReason} onChangeText={setMissingPunchReason} multiline disabled={busy !== ''} />
+          <View style={styles.actions}>
+            <Button mode="outlined" disabled={busy !== ''} onPress={() => setMissingPunchCheck(null)}>Cancel</Button>
+            <Button mode="contained" disabled={busy !== '' || !missingPunchAt.trim() || !missingPunchReason.trim()} onPress={saveMissingPunch}>Save attendance time</Button>
+          </View>
+        </Card.Content></Card> : null}
         <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
           <Text style={styles.sectionTitle}>Comments</Text>
           {data.comments.length === 0 ? <Text style={styles.subtitle}>No comments yet.</Text> : data.comments.filter(row => managerMode || row.worker_visible).map(row =>
