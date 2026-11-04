@@ -232,7 +232,7 @@ function ScopedLegacyRoster({ pharmacyId, pharmacyName }: { pharmacyId: number |
           <DataRow title={[row.userDetail?.firstName, row.userDetail?.lastName].filter(Boolean).join(' ') || 'Worker'}
             subtitle={String(row.slotDate || '') + ' · ' + String(row.slotDetail?.startTime || '') + '–' + String(row.slotDetail?.endTime || '')}
             status={row.isPublishedRoster ? 'Published roster' : 'Assignment'} />
-          <Button mode="outlined" textColor="#B42318" disabled={busy} onPress={() => confirmDelete(
+          <Button mode="outlined" textColor={colors.status.red.fg} disabled={busy} onPress={() => confirmDelete(
             'Remove assignment?',
             'Remove this assignment only if it has no protected payroll, booking or invoice history.',
             () => deleteRosterAssignmentService(row.id),
@@ -252,7 +252,7 @@ function ScopedLegacyRoster({ pharmacyId, pharmacyName }: { pharmacyId: number |
             ))}
           </View>
           <Button mode="outlined" disabled={busy || !visibilityByShift[row.id]} onPress={() => confirmDecision('Escalate open shift?', () => escalateRosterShiftService(row.id, { target_visibility: visibilityByShift[row.id] }), 'Visibility updated')}>Escalate</Button>
-          <Button mode="outlined" textColor="#B42318" disabled={busy} onPress={() => confirmDelete(
+          <Button mode="outlined" textColor={colors.status.red.fg} disabled={busy} onPress={() => confirmDelete(
             'Delete open shift?', 'The server rejects protected or financially linked shifts. This cannot be undone.',
             () => deleteRosterShiftService(row.id),
           )}>Delete open shift</Button>
