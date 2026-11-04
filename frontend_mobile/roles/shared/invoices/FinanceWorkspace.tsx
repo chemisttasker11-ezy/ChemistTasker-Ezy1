@@ -25,6 +25,9 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const [editor, setEditor] = useState<{ invoice?: FinanceInvoice; key: string } | null>(null);
   const [form, setForm] = useState<Form | null>(null); const [formError, setFormError] = useState('');
   const [selected, setSelected] = useState<FinanceInvoice | null>(null);
+  const [historyDocument, setHistoryDocument] = useState<FinanceInvoice | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
   const [start, setStart] = useState(`${financeToday().slice(0, 4)}-01-01`); const [end, setEnd] = useState(financeToday());
   const [basis, setBasis] = useState<'cash' | 'accrual'>('cash'); const [worksheet, setWorksheet] = useState<FinanceWorksheet | null>(null);
   const load = useCallback(async () => {
@@ -37,6 +40,21 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   }, [receivedMode]);
   useEffect(() => { load().catch(e => setError(e.message)).finally(() => setLoading(false)); }, [load]);
   const run = async (action: () => Promise<unknown>) => { if (running.current) return; running.current = true; setBusy(true); setError(''); try { await action(); } catch (e: any) { setError(e.message || 'Unable to complete this action.'); } finally { running.current = false; setBusy(false); } };
+  const openHistoricalRevision = async (invoice: FinanceInvoice, version: number) => {
+    if (historyLoading || running.current) return;
+    setHistoryLoading(true);
+    setHistoryError('');
+    setHistoryDocument(null);
+    try {
+      const revision = receivedMode ? await finance.receivedRevision(invoice.id, version) : await finance.invoiceRevision(invoice.id, version);
+      if (revision.id === invoice.id && revision.version === version) setHistoryDocument(revision);
+      else setHistoryError('This revision could not be verified. Please retry.');
+    } catch (failure: any) {
+      setHistoryError(failure?.message || 'Historical revision could not be opened.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
   const sharePdf = async (invoice: FinanceInvoice, received = false, version?: number) => {
     if (!(await Sharing.isAvailableAsync())) throw new Error('PDF sharing is not available on this device.');
     const targetVersion = version ?? invoice.version;
@@ -103,7 +121,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       {tab === 'Invoices' && <>
         <View style={{ flexDirection: 'row', gap: 24, marginBottom: 20 }}><View><Text variant="labelMedium">Balance due</Text><Text variant="titleLarge">{money(invoices.filter(i => !i.voided && i.kind === 'invoice').reduce((sum, i) => sum + Number(i.balance), 0))}</Text></View><View><Text variant="labelMedium">Saved</Text><Text variant="titleLarge">{invoices.filter(i => financeStatus(i) === 'Saved').length}</Text></View></View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 16 }}>{['All', 'Saved', 'Sent', 'Approved for payment', 'Revision requested', 'Overdue', 'Part paid', 'Paid'].map(s => <Chip key={s} selected={status === s} onPress={() => setStatus(s)}>{s}</Chip>)}</ScrollView>
-        {invoices.filter(i => (status === 'All' || financeStatus(i) === status) && matches(i.number, i.payload.customer?.name || '', i.payload.reference)).map(i => <Surface key={i.id} elevation={0} style={panel}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleMedium">{i.number}</Text><Text>{i.payload.customer?.name}</Text></View><Chip compact>{financeStatus(i)}</Chip></View><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 16 }}><Text variant="bodySmall">Due {i.payload.due_date}</Text><Text variant="titleMedium">{money(i.balance)}</Text></View><Button mode="outlined" onPress={() => setSelected(i)}>View invoice</Button></Surface>)}
+        {invoices.filter(i => (status === 'All' || financeStatus(i) === status) && matches(i.number, i.payload.customer?.name || '', i.payload.reference)).map(i => <Surface key={i.id} elevation={0} style={panel}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleMedium">{i.number}</Text><Text>{i.payload.customer?.name}</Text></View><Chip compact>{financeStatus(i)}</Chip></View><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 16 }}><Text variant="bodySmall">Due {i.payload.due_date}</Text><Text variant="titleMedium">{money(i.balance)}</Text></View><Button mode="outlined" onPress={() => { setHistoryDocument(null); setHistoryError(''); setSelected(i); }}>View invoice</Button></Surface>)}
         {!invoices.length && <View style={{ padding: 24, alignItems: 'center', gap: 12 }}><Text variant="titleMedium">Create your first invoice</Text><Text>Save a customer and an item, then bill your work.</Text><Button mode="contained" onPress={() => setEditor({ key: key() })}>Create invoice</Button></View>}
       </>}
       {tab === 'Received' && <>
@@ -112,7 +130,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
           <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleMedium">{i.number}</Text><Text>{i.payload.issuer_name}</Text><Text variant="bodySmall">{i.payload.customer?.name} · revision {i.version}</Text></View><Chip compact>{financeStatus(i)}</Chip></View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 12 }}><Text>Payable</Text><Text variant="titleMedium">{money(i.calculation.payable)}</Text></View>
           {i.last_review_note ? <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 8 }}>{i.last_review_note}</Text> : null}
-          <Button mode="outlined" onPress={() => setSelected(i)}>Review invoice</Button>
+          <Button mode="outlined" onPress={() => { setHistoryDocument(null); setHistoryError(''); setSelected(i); }}>Review invoice</Button>
         </Surface>)}
         {!receivedInvoices.length && <View style={{ padding: 24, alignItems: 'center' }}><Text variant="titleMedium">No received invoices yet</Text><Text>Internal invoices will appear after the contractor sends them.</Text></View>}
       </>}
@@ -122,11 +140,35 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       {tab === 'GST / BAS' && <View style={{ gap: 16 }}><Text variant="titleMedium">GST worksheet</Text><Text>Estimate only. Legacy invoices and unsupported adjustments are excluded; this is not a complete BAS.</Text><TextInput mode="outlined" label="Start (YYYY-MM-DD)" value={start} onChangeText={v => { setStart(v); setWorksheet(null); }} /><TextInput mode="outlined" label="End (YYYY-MM-DD)" value={end} onChangeText={v => { setEnd(v); setWorksheet(null); }} /><View style={{ flexDirection: 'row', gap: 8 }}>{(['cash', 'accrual'] as const).map(b => <Chip key={b} selected={basis === b} onPress={() => { setBasis(b); setWorksheet(null); }}>{b === 'cash' ? 'Cash' : 'Accrual'}</Chip>)}</View><Button mode="contained" disabled={busy} onPress={() => void run(async () => setWorksheet(await finance.worksheet(start, end, basis)))}>Calculate worksheet</Button>{worksheet && <Surface elevation={0} style={panel}>{[['G1 · Sales', worksheet.G1], ['1A · GST on sales', worksheet['1A']], ['1B · GST credits', worksheet['1B']], ['Estimated net GST', worksheet.estimated_gst_net]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }}><Text>{label}</Text><Text>{money(amount)}</Text></View>)}{worksheet.warnings.map(w => <Text key={w} variant="bodySmall">{w}</Text>)}<Text>Excluded legacy invoices: {worksheet.excluded_legacy_invoice_count}</Text></Surface>}</View>}
       </>}
     </ScrollView>}
-    <Modal visible={!!selected} animationType="slide" onRequestClose={() => setSelected(null)}>
+    <Modal visible={!!selected} animationType="slide" onRequestClose={() => { if (!historyLoading) { setHistoryDocument(null); setSelected(null); } }}>
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
         <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
-          <Button icon="arrow-left" onPress={() => setSelected(null)}>Back to invoices</Button>
-          {selected ? <>
+          <Button icon="arrow-left" disabled={historyLoading} onPress={() => { if (historyDocument) setHistoryDocument(null); else setSelected(null); }}>
+            {historyDocument ? 'Back to invoice' : 'Back to invoices'}
+          </Button>
+          {historyError ? <Text accessibilityRole="alert" style={{ color: theme.colors.error }}>{historyError}</Text> : null}
+          {historyLoading ? <ActivityIndicator accessibilityLabel="Loading historical invoice revision" /> : null}
+          {selected && historyDocument ? <>
+            <Text variant="headlineSmall">Revision {historyDocument.version} · {historyDocument.number}</Text>
+            <Chip style={{ alignSelf: 'flex-start' }}>Read-only historical document</Chip>
+            <Text>{historyDocument.payload.customer?.name || historyDocument.payload.issuer_name}</Text>
+            <Text>Issued {historyDocument.payload.invoice_date} · Due {historyDocument.payload.due_date}</Text>
+            {historyDocument.payload.lines.map((line, index) =>
+              <List.Item key={index} title={line.description} description={line.quantity + ' ' + (line.unit || '') + ' × ' + money(line.unit_price)} />
+            )}
+            <Surface elevation={0} style={panel}>
+              <Text variant="titleMedium">Revision totals</Text>
+              <Text>Subtotal {money(historyDocument.calculation.subtotal)}</Text>
+              <Text>GST {money(historyDocument.calculation.gst)}</Text>
+              <Text variant="titleLarge">Payable {money(historyDocument.calculation.payable)}</Text>
+            </Surface>
+            <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected, receivedMode, historyDocument.version))}>
+              Share this revision PDF
+            </Button>
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+              Historical revisions cannot be edited, sent, approved or marked paid from this view.
+            </Text>
+          </> : selected ? <>
             <Text variant="headlineSmall">{selected.number}</Text>
             <Chip style={{ alignSelf: 'flex-start' }}>{financeStatus(selected)}</Chip>
             <Text>{receivedMode ? selected.payload.issuer_name : selected.payload.customer?.name}</Text>
@@ -138,7 +180,8 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
               <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: 8 }}>Revision history</Text>
               {selected.revisions.map(revision => <View key={revision.version} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
                 <View style={{ flex: 1 }}><Text>Revision {revision.version}</Text><Text variant="bodySmall">{revision.invoice_status.replaceAll('_', ' ')} · {money(revision.calculation.payable)}</Text></View>
-                <Button compact disabled={busy} onPress={() => void run(() => sharePdf(selected, receivedMode, revision.version))}>Share PDF</Button>
+                <Button compact disabled={busy || historyLoading} onPress={() => void openHistoricalRevision(selected, revision.version)}>View</Button>
+                <Button compact disabled={busy || historyLoading} onPress={() => void run(() => sharePdf(selected, receivedMode, revision.version))}>Share PDF</Button>
               </View>)}
             </Surface>}
             {receivedMode ? <View style={{ gap: 8 }}>
