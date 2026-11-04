@@ -191,7 +191,7 @@ export default function ExplorerOverviewScreen() {
           ? <BlockNote text="Your shift activity could not load. Nothing has been assumed about your bookings." action="Try again" onAction={refresh} />
           : <>
               <Rows>
-                <ItemRow icon={<CalendarCheck />} tone="blue" label="Upcoming this week" detail="Shift commitments from your dashboard" count={data.dashboard.upcomingWeek} onPress={() => go('/explorer/shifts')} />
+                <ItemRow icon={<CalendarCheck />} tone="blue" label="Upcoming this week" detail="Your upcoming applications, offers and bookings" count={data.dashboard.upcomingWeek} onPress={() => go('/explorer/shifts')} />
                 <ItemRow icon={<ShieldCheck />} tone="violet" label="Confirmed shifts" detail="Booked work" count={data.dashboard.committedCount} onPress={() => go('/explorer/shifts')} />
               </Rows>
               {data.dashboard.commitments.length > 0 ? <Rows>{data.dashboard.commitments.slice(0, ROWS).map(shift => {
