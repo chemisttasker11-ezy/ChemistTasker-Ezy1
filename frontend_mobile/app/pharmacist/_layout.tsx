@@ -7,6 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
 import { triggerShiftSlotActivity } from '@/utils/pushNotifications';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
+import { useAdminCan } from '@/context/AdminWorkspaceContext';
 import { colors } from '@/constants/tokens';
 import { PersonaShell, useWorkerShell } from '@/components/shell';
 
@@ -48,6 +50,9 @@ export default function PharmacistTabs() {
   const unsavedRegistry = useUnsavedChangesRegistry();
   const guardedNavigation = useGuardedNavigation();
   const pathname = usePathname();
+  // Push taps open in the active shell (a delegated admin in /admin stays there), not the base role's.
+  const persona = shiftPersonaFromPath(pathname) ?? 'pharmacist';
+  const adminCan = useAdminCan();
   const { tabs, more, account } = useWorkerShell('pharmacist');
 
   useEffect(() => {
@@ -59,13 +64,15 @@ export default function PharmacistTabs() {
         payload: data,
       });
       if (roomId) {
-        guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId) as any));
+        guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId, persona) as any));
         return;
       }
       const calendarRoute = resolveCalendarNotificationRoute({
         actionUrl: data.action_url ?? data.actionUrl ?? null,
         payload: data,
         userRole: user?.role ?? null,
+        persona,
+        adminCan,
       });
       if (calendarRoute) {
         guardedNavigation(() => router.push(calendarRoute as any));
@@ -75,13 +82,15 @@ export default function PharmacistTabs() {
         actionUrl: data.action_url ?? data.actionUrl ?? null,
         payload: data,
         userRole: user?.role ?? null,
+        persona,
+        adminCan,
       });
       if (route) {
         guardedNavigation(() => router.push(route as any));
       }
     });
     return () => sub.remove();
-  }, [guardedNavigation, router, user?.role]);
+  }, [adminCan, guardedNavigation, persona, router, user?.role]);
 
   useEffect(() => {
     const sub = Notifications.addNotificationReceivedListener((notification) => {

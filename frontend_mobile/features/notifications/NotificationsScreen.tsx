@@ -3,8 +3,9 @@ import { View, StyleSheet, FlatList, Pressable, RefreshControl, DeviceEventEmitt
 import { Text, Surface, Icon, IconButton, Badge, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useAdminCan } from '@/context/AdminWorkspaceContext';
 import {
   resolveCalendarNotificationRoute,
   resolveChatNotificationRoomId,
@@ -13,6 +14,7 @@ import {
   resolveShiftNotificationRoute,
 } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
 import { NOTIFICATIONS_READ_EVENT } from './events';
 
 type Notification = {
@@ -29,6 +31,9 @@ type Notification = {
 export default function NotificationsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  // /admin/notifications opens admin routes even though a delegated admin's role is PHARMACIST, OWNER etc.
+  const persona = shiftPersonaFromPath(usePathname());
+  const adminCan = useAdminCan();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -123,13 +128,15 @@ export default function NotificationsScreen() {
       payload: item.payload,
     });
     if (roomId) {
-      router.push(getMessageDetailRoute(user?.role, roomId) as any);
+      router.push(getMessageDetailRoute(user?.role, roomId, persona) as any);
       return;
     }
     const route = resolveShiftNotificationRoute({
       actionUrl: item.actionUrl,
       payload: item.payload,
       userRole: user?.role ?? null,
+      persona,
+      adminCan,
     });
     if (route) {
       router.push(route as any);
@@ -139,6 +146,8 @@ export default function NotificationsScreen() {
       actionUrl: item.actionUrl,
       payload: item.payload,
       userRole: user?.role ?? null,
+      persona,
+      adminCan,
     });
     if (calendarRoute) {
       router.push(calendarRoute as any);

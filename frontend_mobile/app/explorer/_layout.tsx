@@ -7,6 +7,7 @@ import { Briefcase, CalendarCheck, CalendarDays, Compass, Gift, Heart, LifeBuoy,
 import { useAuth } from '../../context/AuthContext';
 import { resolveChatNotificationRoomId } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
 import { colors } from '@/constants/tokens';
 import { type MoreGroup, type MoreItem, PersonaShell, type ShellTab } from '@/components/shell';
 
@@ -68,6 +69,8 @@ export default function ExplorerTabs() {
   const unsavedRegistry = useUnsavedChangesRegistry();
   const guardedNavigation = useGuardedNavigation();
   const pathname = usePathname();
+  // Push taps open in the active shell (a delegated admin in /admin stays there), not the base role's.
+  const persona = shiftPersonaFromPath(pathname) ?? 'explorer';
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -77,12 +80,12 @@ export default function ExplorerTabs() {
         payload: data,
       });
       if (roomId) {
-        guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId) as any));
+        guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId, persona) as any));
         return;
       }
     });
     return () => sub.remove();
-  }, [guardedNavigation, router, user?.role]);
+  }, [guardedNavigation, persona, router, user?.role]);
 
   useEffect(() => {
     if (isLoading) return;

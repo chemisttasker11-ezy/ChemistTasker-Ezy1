@@ -33,6 +33,8 @@ import {
   resolveShiftNotificationRoute,
 } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
+import { useAdminCan } from '@/context/AdminWorkspaceContext';
 import { orgCapabilities } from '@/roles/shared/dashboard/ManagerHome';
 import { useGuardedNavigation, useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
 import { type MoreGroup, type MoreItem, PersonaShell, type ShellTab } from '@/components/shell';
@@ -69,6 +71,9 @@ const account: MoreItem[] = [{ label: 'Profile', icon: UserRound, route: '/organ
 export default function OrganizationLayout() {
   const router = useRouter();
   const pathname = usePathname();
+  // Push taps open in the active shell (a delegated admin in /admin stays there), not the base role's.
+  const persona = shiftPersonaFromPath(pathname) ?? 'organization';
+  const adminCan = useAdminCan();
   const unsavedRegistry = useUnsavedChangesRegistry();
   const guardedNavigation = useGuardedNavigation();
   const { user, isLoading } = useAuth();
@@ -145,15 +150,18 @@ export default function OrganizationLayout() {
         payload: data,
       });
       if (roomId) {
-        guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId) as any));
+        guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId, persona) as any));
         return;
       }
       const calendarRoute = resolveCalendarNotificationRoute({
         actionUrl: data.action_url ?? data.actionUrl ?? null,
         payload: data,
         userRole: user?.role ?? null,
+        persona,
+        adminCan,
       });
-      if (calendarRoute && calendarRoute.startsWith('/organization/')) {
+      // The resolver already picks a route this user may open (active shell, else their base role).
+      if (calendarRoute) {
         guardedNavigation(() => router.push(calendarRoute as any));
         return;
       }
@@ -161,13 +169,15 @@ export default function OrganizationLayout() {
         actionUrl: data.action_url ?? data.actionUrl ?? null,
         payload: data,
         userRole: user?.role ?? null,
+        persona,
+        adminCan,
       });
       if (route) {
-        guardedNavigation(() => router.push(route.startsWith('/organization/') ? (route as any) : (`/organization/shifts` as any)));
+        guardedNavigation(() => router.push(route as any));
       }
     });
     return () => sub.remove();
-  }, [guardedNavigation, router, user?.role]);
+  }, [adminCan, guardedNavigation, persona, router, user?.role]);
 
   const { backTarget, isPharmacyDetail } = useMemo(() => {
     if (!pathname) return { backTarget: null, isPharmacyDetail: false };

@@ -6,6 +6,7 @@ import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies,
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useUnsavedChangesRegistry } from '@/roles/shared/forms/UnsavedChangesRegistryProvider';
+import { parseShiftLink, shiftRoute } from '@/roles/shared/shifts/shiftSurface';
 import {
   getAdminAssignments,
   getAssignmentId,
@@ -394,6 +395,12 @@ export function activityRoute(item: NonNullable<DashboardPayload['activity']>[nu
   const path = raw.replace(/^https?:\/\/[^/]+/i, '');
   const hubMatch = path.match(/^\/dashboard\/pharmacy-hub\/?([?#].*)?$/);
   if (hubMatch) return persona ? `/${persona}/hub${hubMatch[1] || ''}` : null;
+  // Shift links (sections, shift-center, /shifts/active/12) need the shift mapping: /owner/shift-center is no mobile route.
+  const shiftLink = parseShiftLink(path);
+  if (shiftLink) {
+    const toAdmin = shiftLink.persona === 'admin' || (persona === 'admin' && shiftLink.persona === 'owner');
+    return shiftRoute(toAdmin ? 'admin' : shiftLink.persona, shiftLink);
+  }
   const adminMatch = path.match(/^\/dashboard\/admin\/[^/?#]+(\/[^?#]*)?([?#].*)?$/);
   if (adminMatch) return `/admin${adminMatch[1] || ''}${adminMatch[2] || ''}`;
   const roleMatch = path.match(/^\/dashboard\/(owner|organization|pharmacist|otherstaff|explorer)(?=\/|[?#]|$)/);

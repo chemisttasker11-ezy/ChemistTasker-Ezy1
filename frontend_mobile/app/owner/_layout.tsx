@@ -30,6 +30,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
+import { useAdminCan } from '@/context/AdminWorkspaceContext';
 import { useGuardedNavigation, useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
 import { type MoreGroup, type MoreItem, PersonaShell, type ShellTab } from '@/components/shell';
 
@@ -120,6 +122,9 @@ export default function OwnerLayout() {
   const guardedNavigation = useGuardedNavigation();
   const { user, isLoading } = useAuth();
   const pathname = usePathname();
+  // Push taps open in the active shell (a delegated admin in /admin stays there), not the base role's.
+  const persona = shiftPersonaFromPath(pathname) ?? 'owner';
+  const adminCan = useAdminCan();
 
   const requestNavigation = useCallback(
     (action: () => void) => {
@@ -196,15 +201,19 @@ export default function OwnerLayout() {
         payload: data,
       });
       if (roomId) {
-        guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId) as any));
+        guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId, persona) as any));
         return;
       }
       const calendarRoute = resolveCalendarNotificationRoute({
         actionUrl: data.action_url ?? data.actionUrl ?? null,
         payload: data,
         userRole: user?.role ?? null,
+        persona,
+        adminCan,
       });
-      if (calendarRoute && calendarRoute.startsWith('/owner/')) {
+      // The active shell's route, or the owner's own when /admin's guard refused it.
+      const inShell = (route: string) => route.startsWith(`/${persona}/`) || route.startsWith('/owner/');
+      if (calendarRoute && inShell(calendarRoute)) {
         guardedNavigation(() => router.push(calendarRoute as any));
         return;
       }
@@ -212,13 +221,15 @@ export default function OwnerLayout() {
         actionUrl: data.action_url ?? data.actionUrl ?? null,
         payload: data,
         userRole: user?.role ?? null,
+        persona,
+        adminCan,
       });
-      if (route && route.startsWith('/owner/')) {
+      if (route && inShell(route)) {
         guardedNavigation(() => router.push(route as any));
       }
     });
     return () => sub.remove();
-  }, [guardedNavigation, router, user?.role]);
+  }, [adminCan, guardedNavigation, persona, router, user?.role]);
 
   const { backTarget, isPharmacyDetail } = useMemo(() => {
     if (!pathname) return { backTarget: null, isPharmacyDetail: false };

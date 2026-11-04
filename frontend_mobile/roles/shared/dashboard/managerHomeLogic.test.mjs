@@ -161,6 +161,7 @@ const dashboardScope = loadTs('./dashboardScope.tsx', {
   'react-native-paper': {}, 'expo-router': {}, '@chemisttasker/shared-core': { ORG_PORTAL_ROLES: [] },
   '@/context/AuthContext': {}, '@/context/WorkspaceContext': {}, '@/utils/mobilePersona': {},
   '@/roles/shared/forms/UnsavedChangesRegistryProvider': {},
+  '@/roles/shared/shifts/shiftSurface': loadTs('../shifts/shiftSurface.ts', {}),
 });
 
 test('dashboard response decisions require both the latest request and the selected scope', () => {
@@ -211,6 +212,7 @@ function scopedDashboardHook({ role = 'OWNER', pharmacyId = 1, pharmacies = [{ i
     },
     '@/context/AuthContext': { useAuth: () => ({ user }) }, '@/context/WorkspaceContext': { useWorkspace: () => workspace },
     '@/utils/mobilePersona': {}, '@/roles/shared/forms/UnsavedChangesRegistryProvider': {},
+    '@/roles/shared/shifts/shiftSurface': {},
   });
   return {
     pending, workspace, writes,

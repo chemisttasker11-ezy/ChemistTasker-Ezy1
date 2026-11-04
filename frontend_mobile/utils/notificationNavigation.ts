@@ -1,17 +1,37 @@
+import {
+  isWorkerPersona,
+  parseShiftLink,
+  shiftPersonaFromRole,
+  shiftRoute,
+  type ShiftPersona,
+} from '@/roles/shared/shifts/shiftSurface';
+
 type NotificationPayload = Record<string, any>;
 
 type ResolveRouteInput = {
   actionUrl?: string | null;
   payload?: NotificationPayload | null;
   userRole?: string | null;
+  /** The active shell (shiftPersonaFromPath); wins over userRole so a delegated admin stays in /admin. */
+  persona?: ShiftPersona | null;
+  /** useAdminCan(): the capability check on the active admin pharmacy. /admin wins only when it allows the destination. */
+  adminCan?: ((capability: string) => boolean) | null;
 };
 
-const ROLE_ROUTE_MAP: Record<string, string> = {
-  owner: '/owner/shifts',
-  pharmacist: '/pharmacist/shifts',
-  otherstaff: '/otherstaff/shifts',
-  explorer: '/explorer/shifts',
-  organization: '/organization/shifts',
+// The /admin route guards (app/_layout.tsx AuthGate, app/admin/_layout.tsx): shifts need MANAGE_ROSTER; calendar needs
+// MANAGE_COMMUNICATIONS, MANAGE_STAFF or MANAGE_ROSTER. Without them the tap opens the base role's own screen.
+const ADMIN_GUARDS = {
+  shifts: ['MANAGE_ROSTER'],
+  calendar: ['MANAGE_COMMUNICATIONS', 'MANAGE_STAFF', 'MANAGE_ROSTER'],
+} as const;
+
+const activeShell = (
+  persona: ShiftPersona | null | undefined,
+  adminCan: ResolveRouteInput['adminCan'],
+  area: keyof typeof ADMIN_GUARDS,
+): ShiftPersona | null => {
+  if (persona !== 'admin') return persona ?? null;
+  return ADMIN_GUARDS[area].some((capability) => adminCan?.(capability)) ? persona : null;
 };
 
 const ROLE_CALENDAR_ROUTE_MAP: Record<string, string> = {
@@ -49,21 +69,16 @@ const normalizeRoleSlug = (rawRole?: string | null): string | null => {
 };
 
 const parseShiftFromActionUrl = (actionUrl?: string | null) => {
-  if (!actionUrl) return null;
-  let path = actionUrl;
+  const link = parseShiftLink(actionUrl);
+  if (!link) return null;
   let searchParams: URLSearchParams | null = null;
   try {
-    const url = new URL(actionUrl, 'http://localhost');
-    path = url.pathname || actionUrl;
-    searchParams = url.searchParams;
+    searchParams = new URL(actionUrl!, 'http://localhost').searchParams;
   } catch {
-    // ignore malformed URLs and treat as raw path
+    // ignore malformed URLs: the path alone still names the shift
   }
 
-  const match = path.match(/\/dashboard\/([^/]+)\/shifts(?:\/(?:active\/)?(\d+))?/);
-  if (!match) return null;
-  const roleSlug = match[1];
-  const shiftId = Number(match[2]);
+  const shiftId = link.shiftId ?? NaN;
   const tab = searchParams?.get('tab') ?? null;
   const offerIdRaw = searchParams?.get('offer_id') ?? searchParams?.get('offerId') ?? null;
   const shiftIdFromQueryRaw = searchParams?.get('shift_id') ?? searchParams?.get('shiftId') ?? null;
@@ -71,7 +86,7 @@ const parseShiftFromActionUrl = (actionUrl?: string | null) => {
   const shiftIdFromQuery = shiftIdFromQueryRaw != null ? Number(shiftIdFromQueryRaw) : null;
 
   return {
-    roleSlug,
+    link,
     shiftId: Number.isFinite(shiftId) ? shiftId : (Number.isFinite(shiftIdFromQuery) ? shiftIdFromQuery : null),
     tab,
     offerId: Number.isFinite(offerId) ? offerId : null,
@@ -227,44 +242,53 @@ export const resolveShiftNotificationRoute = ({
   actionUrl,
   payload,
   userRole,
+  persona,
+  adminCan,
 }: ResolveRouteInput): string | null => {
   const actionMatch = parseShiftFromActionUrl(actionUrl);
   const shiftId = actionMatch?.shiftId ?? parseShiftIdFromPayload(payload);
   const offerId = actionMatch?.offerId ?? parseOfferIdFromPayload(payload);
   const incomingTab = actionMatch?.tab ?? null;
 
-  // Always prioritize the authenticated user's role when provided.
-  // This prevents cross-role deep links (e.g. owner being sent to pharmacist routes)
-  // when backend action URLs contain a mismatched role slug.
-  const normalizedUserRole = normalizeRoleSlug(userRole);
-  const roleSlug =
-    normalizedUserRole ??
-    actionMatch?.roleSlug ??
-    null;
+  // The active shell first (when its guard allows it), then the signed-in role, and the URL's role slug only when
+  // neither is known: backend action URLs can name another role (an owner's link reaching a delegated admin).
+  const target =
+    activeShell(persona, adminCan, 'shifts') ??
+    (userRole ? shiftPersonaFromRole(userRole) : actionMatch?.link.persona ?? null);
+  if (!target) return null;
+  const baseRoute = `/${target}/shifts`;
 
-  const baseRoute = roleSlug ? ROLE_ROUTE_MAP[roleSlug] : null;
-  if (!baseRoute) return null;
-
-  const isWorkerRole = roleSlug === 'pharmacist' || roleSlug === 'otherstaff' || roleSlug === 'explorer';
-  const shouldOpenOffers = isWorkerRole && (incomingTab === 'accepted' || offerId != null);
+  const link = actionMatch?.link;
+  const suffix = link?.suffix ?? '';
+  const shouldOpenOffers = isWorkerPersona(target) && (incomingTab === 'accepted' || offerId != null);
   if (shouldOpenOffers) {
-    const params = new URLSearchParams();
+    // Merge the offer params into the incoming query (fragment kept), so other params survive.
+    const hashAt = suffix.indexOf('#');
+    const params = new URLSearchParams(hashAt < 0 ? suffix : suffix.slice(0, hashAt));
     params.set('tab', 'accepted');
     if (shiftId != null) params.set('shift_id', String(shiftId));
     if (offerId != null) params.set('offer_id', String(offerId));
-    return `${baseRoute}?${params.toString()}`;
+    return shiftRoute(target, { section: link?.section, suffix: `?${params.toString()}${hashAt < 0 ? '' : suffix.slice(hashAt)}` });
   }
 
-  if (!shiftId) return null;
-  return `${baseRoute}/${shiftId}`;
+  // A detail path keeps its query; a shift id taken from the query (an offer link) opens the bare detail.
+  if (shiftId) return shiftRoute(target, { shiftId, suffix: link?.shiftId != null ? suffix : '' });
+  // Section and board links (/shift-center/active, /shifts/roster) open that section, query kept.
+  return link ? shiftRoute(target, { section: link.section, suffix }) : null;
 };
 
 export const resolveCalendarNotificationRoute = ({
   actionUrl,
   payload,
   userRole,
+  persona,
+  adminCan,
 }: ResolveRouteInput): string | null => {
   const actionParams = parseCalendarFromActionUrl(actionUrl);
+  // Shift notifications (cancellations carry shift_id + date) open the shift, never the calendar.
+  if (!actionParams && (parseShiftLink(actionUrl) || parseShiftIdFromPayload(payload) != null || parseOfferIdFromPayload(payload) != null)) {
+    return null;
+  }
   const payloadParams = parseCalendarFromPayload(payload);
   const merged = {
     pharmacyId: actionParams?.pharmacyId ?? payloadParams?.pharmacyId ?? null,
@@ -275,7 +299,13 @@ export const resolveCalendarNotificationRoute = ({
   if (!merged.pharmacyId && !merged.date && !merged.noteId) return null;
 
   const roleSlug = normalizeRoleSlug(userRole);
-  const baseRoute = roleSlug ? ROLE_CALENDAR_ROUTE_MAP[roleSlug] : null;
+  // Every shell has a calendar (/admin/calendar too); the active shell wins over the role when its guard allows it.
+  const shell = activeShell(persona, adminCan, 'calendar');
+  // Base-role fallback by persona so CHIEF_ADMIN / REGION_ADMIN reach /organization/calendar.
+  const rolePersona = shiftPersonaFromRole(userRole);
+  const baseRoute = shell
+    ? `/${shell}/calendar`
+    : (rolePersona ? ROLE_CALENDAR_ROUTE_MAP[rolePersona] : null) ?? (roleSlug ? ROLE_CALENDAR_ROUTE_MAP[roleSlug] : null);
   if (!baseRoute) return null;
 
   const params = new URLSearchParams();

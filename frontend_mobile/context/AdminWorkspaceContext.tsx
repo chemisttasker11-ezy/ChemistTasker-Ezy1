@@ -80,6 +80,25 @@ export function AdminWorkspaceProvider({ children }: { children: React.ReactNode
   return <AdminWorkspaceContext.Provider value={value}>{children}</AdminWorkspaceContext.Provider>;
 }
 
+/** The admin workspace inside the /admin shell, null elsewhere (for hooks every persona shares). */
+export function useOptionalAdminWorkspace() {
+  return useContext(AdminWorkspaceContext);
+}
+
+/**
+ * The admin capability check on the active admin pharmacy, for notification routes: the /admin shell's assignment,
+ * else the pharmacy AdminWorkspaceProvider copied to the workspace (read only while the active shell is /admin).
+ */
+export function useAdminCan() {
+  const { hasCapability } = useAuth();
+  const { selectedPharmacyId } = useWorkspace();
+  const pharmacyId = useOptionalAdminWorkspace()?.activePharmacyId ?? selectedPharmacyId;
+  return useCallback(
+    (capability: string) => Boolean(pharmacyId && hasCapability(capability, pharmacyId)),
+    [hasCapability, pharmacyId],
+  );
+}
+
 export function useAdminWorkspace() {
   const context = useContext(AdminWorkspaceContext);
   if (!context) {
