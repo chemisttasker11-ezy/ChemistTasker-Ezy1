@@ -413,6 +413,17 @@ export async function fetchShiftOffersService(filters?: {
     const data = await fetchShiftOffers(query ? `?${query}` : '');
     return asList(data).map(camelCaseKeysDeep);
 }
+/** Owner shift centre must exhaust both accepted-offer pages through public SDK ownership. */
+export async function fetchDeferredPayrollOffersService() {
+    const statuses = ['ACCEPTED', 'ACCEPTED_AWAITING_PAYMENT'] as const;
+    const groups = await Promise.all(statuses.map((status) =>
+        fetchAllPages<ShiftOfferApi>((page) =>
+            fetchShiftOffers(`?status=${status}&page=${page}`)
+        )
+    ));
+    return groups.flat().map((offer) => camelCaseKeysDeep(offer));
+}
+
 export async function acceptShiftOfferService(offerId: number | string, payload: ShiftOfferAcceptancePayload = {}) {
     return camelCaseKeysDeep(await acceptShiftOffer(offerId, payload));
 }
