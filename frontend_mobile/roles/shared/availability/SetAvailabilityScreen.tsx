@@ -803,13 +803,17 @@ export default function SetAvailabilityScreen() {
 
           <TextInput mode="outlined" label="Notes" multiline numberOfLines={3} value={currentEntry.notes || ''} onChangeText={(v) => setCurrentEntry((p) => ({ ...p, notes: v }))} style={styles.input} outlineStyle={styles.inputOutline} />
 
-          <Button mode="contained" onPress={handleAddEntry} disabled={loading} loading={loading} style={styles.primaryButton} labelStyle={styles.primaryButtonLabel}>
+          <Button mode="contained" onPress={handleAddEntry} disabled={loading || availabilityLoading || availabilityLoadError} loading={loading} style={styles.primaryButton} labelStyle={styles.primaryButtonLabel}>
             Add Time Slot
           </Button>
         </Surface>
 
         <Text style={styles.sectionTitle}>Your Time Slots</Text>
-        {availabilityEntries.length === 0 ? (
+        {availabilityLoading ? (
+          <Text style={styles.empty}>Loading saved time slots...</Text>
+        ) : availabilityLoadError ? (
+          <Text style={styles.empty}>Unable to show saved time slots until the request succeeds.</Text>
+        ) : availabilityEntries.length === 0 ? (
           <Text style={styles.empty}>No time slots added yet.</Text>
         ) : (
           availabilityEntries.map((item) => (
