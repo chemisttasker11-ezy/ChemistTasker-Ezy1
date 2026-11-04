@@ -1,0 +1,120 @@
+name: Frontend Contractor CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - run: node scripts/check-frontend-boundary.mjs
+
+  shared-core:
+    needs: frontend-boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: shared-core/package-lock.json
+      - run: npm ci
+        working-directory: shared-core
+      - run: npm run typecheck
+        working-directory: shared-core
+      - run: npm run test:ci
+        working-directory: shared-core
+
+  vite-react:
+    needs: frontend-boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            frontend_web/package-lock.json
+            shared-core/package-lock.json
+      - run: npm ci
+        working-directory: frontend_web
+      - run: npx tsc -p tsconfig.app.json --noEmit
+        working-directory: frontend_web
+      - run: node scripts/audit-ui-boundaries.mjs
+        working-directory: frontend_web
+      - run: node --test scripts/auth-flow.test.mjs scripts/ws-url.test.mjs
+        working-directory: frontend_web
+      - run: npm run build
+        working-directory: frontend_web
+        env:
+          VITE_API_URL: https://staging.invalid/api/v1
+
+  next-public:
+    needs: frontend-boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            frontend_web/landing_next/package-lock.json
+            shared-core/package-lock.json
+      - run: npm ci
+        working-directory: frontend_web/landing_next
+      - run: npm run typecheck
+        working-directory: frontend_web/landing_next
+      - run: node --test lib/api-root.test.mjs lib/public-route-contract.test.mjs
+        working-directory: frontend_web/landing_next
+      - run: npm run build
+        working-directory: frontend_web/landing_next
+        env:
+          PLATFORM_API_URL: https://staging.invalid/api/v1
+          HUB_API_URL: https://staging.invalid/api/v1
+
+  expo-mobile:
+    needs: frontend-boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            frontend_mobile/package-lock.json
+            shared-core/package-lock.json
+      - run: npm ci
+        working-directory: frontend_mobile
+      - run: npm run lint
+        working-directory: frontend_mobile
+      - run: npx tsc --noEmit
+        working-directory: frontend_mobile
+      - run: npm run test:security
+        working-directory: frontend_mobile
+      - run: npm run security:dependencies
+        working-directory: frontend_mobile
