@@ -648,6 +648,13 @@ export default function PostShiftScreen() {
         }, [applyBookingPrefillFromParams])
     );
 
+    // Do not refetch the role template on each description keystroke.
+    // Read the newest user draft when an in-flight role-template request resolves.
+    const latestDescriptionRef = React.useRef(description);
+    latestDescriptionRef.current = description;
+    const latestTemplateAppliedKeyRef = React.useRef(descriptionTemplateAutoAppliedKey);
+    latestTemplateAppliedKeyRef.current = descriptionTemplateAutoAppliedKey;
+
     useEffect(() => {
         if (!pharmacyId || !roleNeeded) {
             setDescriptionTemplate(null);
@@ -669,8 +676,8 @@ export default function PostShiftScreen() {
                 if (
                     template?.description &&
                     !editingId &&
-                    !description.trim() &&
-                    descriptionTemplateAutoAppliedKey !== templateKey
+                    !latestDescriptionRef.current.trim() &&
+                    latestTemplateAppliedKeyRef.current !== templateKey
                 ) {
                     setDescription(template.description);
                     setDescriptionTemplateAutoAppliedKey(templateKey);
@@ -691,7 +698,7 @@ export default function PostShiftScreen() {
         return () => {
             cancelled = true;
         };
-    }, [pharmacyId, roleNeeded, editingId, description, descriptionTemplateAutoAppliedKey]);
+    }, [pharmacyId, roleNeeded, editingId]);
 
     const handleUseDescriptionTemplate = useCallback(() => {
         if (!descriptionTemplate?.description) return;
