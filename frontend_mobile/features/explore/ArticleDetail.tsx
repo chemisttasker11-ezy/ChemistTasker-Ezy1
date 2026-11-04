@@ -122,15 +122,15 @@ export function ArticleDetail({ slug }: { slug: string }) {
       if (ticket === generation.current) setActionError(failure?.message || 'Could not report comment.');
     } finally { if (ticket === generation.current) setBusy(false); }
   };
-  const react = async () => {
+  const react = async (kind: 'like' | 'insightful' | 'support') => {
     if (!user) return requiresSignIn();
     if (!article || busy) return;
     const ticket = generation.current;
     setBusy(true); setActionError('');
     try {
-      const summary = article.reactions.mine
+      const summary = article.reactions.mine === kind
         ? await chemistTaskerApi.publicContent.removeArticleReaction(slug)
-        : await chemistTaskerApi.publicContent.reactToArticle(slug, { kind: 'like' });
+        : await chemistTaskerApi.publicContent.reactToArticle(slug, { kind });
       if (ticket === generation.current) setArticle(old => old ? { ...old, reactions: summary } : null);
     } catch (failure: any) {
       if (ticket === generation.current) setActionError(failure?.message || 'Could not update reaction.');
@@ -155,7 +155,11 @@ export function ArticleDetail({ slug }: { slug: string }) {
           {safePublicUrl(article.cover_url, true) ? <Image accessible accessibilityLabel={article.cover_alt || 'Article cover'} source={{uri: safePublicUrl(article.cover_url, true)!}} style={styles.image} resizeMode="cover" /> : null}
           <RichContent document={article.body_document} fallback={article.body} />
           {safePublicUrl(article.source_url) ? <Button mode="outlined" icon="open-in-new" onPress={() => void Linking.openURL(safePublicUrl(article.source_url)!).catch(() => setActionError('Original source unavailable.'))}>Original source: {article.source_name || 'Website'}</Button> : null}
-          <View style={styles.actions}><Button mode="outlined" icon="share-variant" onPress={() => void share()}>Share</Button><Button mode="outlined" onPress={() => void react()} disabled={busy}>{article.reactions.mine ? 'Unlike' : 'Like'}</Button></View>
+          <View style={styles.actions}>
+            <Button mode="outlined" icon="share-variant" onPress={() => void share()}>Share</Button>
+            {(['like','insightful','support'] as const).map(kind => <Button key={kind} mode={article.reactions.mine === kind ? 'contained-tonal' : 'outlined'}
+              disabled={busy} onPress={() => void react(kind)}>{kind === 'like' ? 'Helpful' : kind === 'insightful' ? 'Insightful' : 'Support'} · {article.reactions.counts[kind] || 0}</Button>)}
+          </View>
           <Card mode="outlined" style={styles.card}><Card.Content style={styles.comments}>
             <Text variant="titleLarge" style={styles.title}>Discussion</Text>
             {commentsLoading ? <ActivityIndicator /> : comments.length === 0 ? <Text style={styles.subtitle}>No comments yet.</Text> : comments.map(row => <View key={row.id} style={styles.comment}>

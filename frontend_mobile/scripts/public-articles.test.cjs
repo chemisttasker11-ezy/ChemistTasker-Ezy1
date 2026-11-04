@@ -34,3 +34,11 @@ test('closed discussions remain readable and replies reports and comment paginat
  assert.match(src, /reportArticleComment\(reportId, \{ reason: reason\.trim\(\) \}\)/);
  assert.match(src, /!article\.comments_open \? <Text/);
 });
+
+test('article reaction choices and toggling match web semantics without removing another reaction',()=>{
+ const src=read('features/explore/ArticleDetail.tsx');
+ assert.match(src,/kind: 'like' \| 'insightful' \| 'support'/);
+ assert.match(src,/article\.reactions\.mine === kind/);
+ assert.match(src,/reactToArticle\(slug, \{ kind \}\)/);
+ assert.match(src,/removeArticleReaction\(slug\)/);
+});
