@@ -14,6 +14,8 @@ test('marketplace browser routes native category and mode filters to the approve
 test('mobile ordinary-goods enquiry requires meaningful message, identity access and authorized buying context', () => {
  const src=read('features/parity/marketplace.tsx');
  assert.match(src,/api\.getAccess\(\)/);
+ assert.match(src,/options\.can_trade_personally\|\|options\.can_trade_for_pharmacy/);
+ assert.match(src,/MarketplaceAccessResolution access=\{options\}/);
  assert.match(src,/api\.getEligibility\(listing\.id/);
  assert.match(src,/enquiryValidation\(message\)/);
  assert.match(src,/!access\?\.can_trade_personally/);
