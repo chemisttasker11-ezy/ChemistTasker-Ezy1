@@ -2,7 +2,7 @@
 
 **Date:** 5 November 2026 (Australia/Brisbane)  
 **Base:** PR #248 (`feat/mobile-merge-sdk`); **working PR:** #249 (`fix/pr248-expo-production-waves-20261104`)  
-**Review/implementation checkpoint:** `388c1ae68a75738c1555508ee11a81c144dec221`  
+**Review/implementation checkpoint:** `dfb9cfd54d0e3c01a5990f975cccff4ea3660afd`  
 **State:** draft, unmerged, undeployed, native release **not** accepted.
 
 ## Binding operating rules
@@ -31,6 +31,8 @@
 | `1c841cd5` | Active Shift Centre branded typography/cards, less elevation and amber financial attention cue; visual contract test |
 | `0d3d8718` | Complete stat/action control token/low-elevation refinements |
 | `388c1ae6` | Clarify QR worker-public-listing handoff makes a reusable, non-worker-targeted invite link; consent/approval disclosure test |
+| `9c2ec4af` | Write source-grounded senior continuation handover and deferred release acceptance register |
+| `dfb9cfd5` | Gate roster, kiosk and payroll shortcuts to selected-pharmacy capabilities; retain actual backend permissions and add regression contract |
 
 Tests have been **authored but not executed** as instructed. All conclusions are source-level implementation only.
 
