@@ -1,4 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Building2 } from 'lucide-react-native';
@@ -36,6 +38,7 @@ export default function ChainScreen() {
   const [editor, setEditor] = useState<Editor>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [logoFile, setLogoFile] = useState<{uri: string; name: string; type: string} | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const chain = chains.find((item) => item.id === chainId) ?? null;
 
@@ -83,7 +86,30 @@ export default function ChainScreen() {
   const beginEditor = (mode: 'create' | 'edit') => {
     setName(mode === 'edit' ? chain?.name ?? '' : '');
     setEmail(mode === 'edit' ? chain?.primaryContactEmail ?? '' : '');
+    setLogoFile(null);
     setEditor(mode);
+  };
+
+  const chooseLogo = async () => {
+    if (busy) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'], quality: 0.85, allowsEditing: true,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const image = result.assets[0];
+      if (image.fileSize && image.fileSize > 5 * 1024 * 1024) {
+        setNotice('Choose a chain logo smaller than 5 MB');
+        return;
+      }
+      setLogoFile({
+        uri: image.uri,
+        name: image.fileName || 'chain-logo.jpg',
+        type: image.mimeType || 'image/jpeg',
+      });
+    } catch {
+      setNotice('Could not open the photo library');
+    }
   };
 
   const save = async () => {
@@ -93,6 +119,7 @@ export default function ChainScreen() {
       const data = new FormData();
       data.append('name', name.trim());
       data.append('primary_contact_email', email.trim());
+      if (logoFile) data.append('logo', logoFile as any);
       const saved = editor === 'edit' && chain
         ? await updateChainService(chain.id, data)
         : await createChainService(data);
@@ -173,6 +200,10 @@ export default function ChainScreen() {
               <Text style={styles.section}>{editor === 'edit' ? 'Edit chain' : 'Create a chain'}</Text>
               <TextInput mode="outlined" label="Chain name" value={name} onChangeText={setName} maxLength={120} />
               <TextInput mode="outlined" label="Contact email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+              {logoFile ? <Image source={{ uri: logoFile.uri }} style={styles.logo} contentFit="contain" accessibilityLabel="Selected chain logo" /> : null}
+              <Button mode="outlined" icon="image-outline" onPress={() => void chooseLogo()} disabled={busy}>
+                {logoFile ? 'Change selected logo' : 'Choose chain logo'}
+              </Button>
               <View style={styles.actions}>
                 <Button mode="outlined" onPress={() => setEditor(null)} disabled={busy}>Cancel</Button>
                 <Button mode="contained" onPress={() => void save()} loading={busy} disabled={busy || !name.trim()}>Save chain</Button>
@@ -187,6 +218,9 @@ export default function ChainScreen() {
           ) : (
             <>
               <Surface style={styles.card} elevation={0}>
+                {chain.logo && /^https?:\\/\\//.test(chain.logo)
+                  ? <Image source={{ uri: chain.logo }} style={styles.logo} contentFit="contain" accessibilityLabel="Chain logo" />
+                  : null}
                 <Text style={styles.section}>{chain.name}</Text>
                 <Text style={styles.subtext}>{chain.primaryContactEmail || 'No contact email'}</Text>
                 <View style={styles.actions}>
@@ -256,6 +290,7 @@ const styles = StyleSheet.create({
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
   pharmacyRow: { flexDirection: 'row', alignItems: 'center', minHeight: touch.min, gap: space.sm },
+  logo: { width: 68, height: 68, borderRadius: radius.control },
   memberText: { fontFamily: font.inter.regular, fontSize: type.bodySmall.fontSize, lineHeight: type.bodySmall.lineHeight, color: colors.textSecondary },
   busy: { position: 'absolute', bottom: space.xl, alignSelf: 'center' },
 });
