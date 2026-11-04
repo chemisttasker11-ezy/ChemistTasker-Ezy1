@@ -28,6 +28,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   const [missingPunchCheck, setMissingPunchCheck] = useState<WorkforceTimesheetCheck | null>(null);
   const [missingPunchAt, setMissingPunchAt] = useState('');
   const [missingPunchReason, setMissingPunchReason] = useState('');
+  const managerAllowed = Boolean(managerMode && data?.snapshot?.pharmacy?.id && hasCapability('MANAGE_ROSTER', data.snapshot.pharmacy.id));
 
   const load = useCallback(async () => {
     const request = ++generation.current;
@@ -112,7 +113,6 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   };
 
   const timeZone = data?.snapshot?.period?.timezone || 'Australia/Brisbane';
-  const managerAllowed = Boolean(managerMode && data?.snapshot?.pharmacy?.id && hasCapability('MANAGE_ROSTER', data.snapshot.pharmacy.id));
   if (managerMode && data && !managerAllowed) {
     return <ContentState kind="forbidden" title="Timesheet management unavailable" description="You do not have roster management permission for this pharmacy." />;
   }
