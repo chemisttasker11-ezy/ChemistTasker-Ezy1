@@ -514,10 +514,11 @@ export type PrefillPlan = {
 
 export function getStablePostShiftParamsKey(params?: PostShiftRawParams | null): string {
     if (!params) return '';
+    const datesParam = params.dates ?? params.slot_dates;
     return [
         firstParam(params.edit),
         firstParam(params.pharmacyId ?? params.pharmacy_id ?? params.pharmacy),
-        Array.isArray(params.dates ?? params.slot_dates) ? (params.dates ?? params.slot_dates as string[]).join(',') : firstParam(params.dates ?? params.slot_dates),
+        Array.isArray(datesParam) ? datesParam.join(',') : firstParam(datesParam),
         firstParam(params.date ?? params.slot_date),
         firstParam(params.role_needed ?? params.role),
         firstParam(params.start_time ?? params.start),
