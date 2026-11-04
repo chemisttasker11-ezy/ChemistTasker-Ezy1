@@ -4,6 +4,23 @@ export type AvailabilityEntry = UserAvailability & { notifyNewShifts?: boolean }
 export type AvailabilityDraft = Omit<AvailabilityEntry, 'id'>;
 export type AvailabilityPayload = UserAvailabilityPayload & { notify_new_shifts?: boolean };
 
+/** Ignore already persisted availability when retrying a partially successful batch. */
+export function unsavedAvailabilityPayloads(
+  payloads: readonly AvailabilityPayload[],
+  existing: readonly AvailabilityEntry[],
+): AvailabilityPayload[] {
+  const slotKey = (row: Record<string, any>) => {
+    const start = String(row.startTime ?? row.start_time ?? '').slice(0, 5);
+    const end = String(row.endTime ?? row.end_time ?? '').slice(0, 5);
+    const recurring = Boolean(row.isRecurring ?? row.is_recurring);
+    const days = recurring ? [...(row.recurringDays ?? row.recurring_days ?? [])].map(Number).sort((a, b) => a - b) : [];
+    const until = recurring ? String(row.recurringEndDate ?? row.recurring_end_date ?? '') : '';
+    return [String(row.date ?? ''), start, end, recurring ? '1' : '0', days.join(','), until].join('|');
+  };
+  const persisted = new Set(existing.map((entry) => slotKey(entry)));
+  return payloads.filter((payload) => !persisted.has(slotKey(payload)));
+}
+
 export const createEmptyEntry = (): AvailabilityDraft => ({
   date: '',
   startTime: '09:00',
