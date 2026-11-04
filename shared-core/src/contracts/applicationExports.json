@@ -261,6 +261,8 @@
   "approveMembershipApplicationService": "domains/memberships/api.ts",
   "rejectMembershipApplicationService": "domains/memberships/api.ts",
   "getNotifications": "domains/notifications/api.ts",
+  "getNotificationPushPreferences": "domains/notifications/api.ts",
+  "updateNotificationPushPreferences": "domains/notifications/api.ts",
   "markNotificationsAsRead": "domains/notifications/api.ts",
   "fetchNotificationsPage": "domains/notifications/api.ts",
   "markNotificationsReadService": "domains/notifications/api.ts",

@@ -331,7 +331,10 @@ export {
   fetchNotificationsPage,
   markNotificationsReadService,
   registerPushDeviceToken,
+  getNotificationPushPreferences,
+  updateNotificationPushPreferences,
 } from './domains/notifications/api';
+export type { NotificationPushPreferences } from './domains/notifications/api';
 export {
   getRatings,
   createRating,
