@@ -19,7 +19,21 @@ import {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ email?: string; reset?: string }>();
+  const params = useLocalSearchParams<{
+    email?: string;
+    reset?: string;
+    referral_code?: string | string[];
+    referral_event_id?: string | string[];
+    referral_shift_id?: string | string[];
+  }>();
+
+  const referralParams: Record<string, string> = {};
+  const refCode = Array.isArray(params.referral_code) ? params.referral_code[0] : params.referral_code;
+  const refEventId = Array.isArray(params.referral_event_id) ? params.referral_event_id[0] : params.referral_event_id;
+  const refShiftId = Array.isArray(params.referral_shift_id) ? params.referral_shift_id[0] : params.referral_shift_id;
+  if (refCode) referralParams.referral_code = refCode;
+  if (refEventId) referralParams.referral_event_id = refEventId;
+  if (refShiftId) referralParams.referral_shift_id = refShiftId;
   const { loginWithCredentials, loginWithStoredSession } = useAuth();
 
   const [email, setEmail] = useState(typeof params.email === 'string' ? params.email : '');
@@ -126,7 +140,7 @@ export default function LoginScreen() {
       // Web parity (login.tsx): an unverified email goes to the code screen. AuthContext keeps only the
       // detail text, so match backend login_security.py's "email address is not verified" as well.
       if (/verify your email|email address is not verified/i.test(String(err?.message || ''))) {
-        router.push({ pathname: '/verify-otp', params: { email: email.toLowerCase() } } as never);
+        router.push({ pathname: '/verify-otp', params: { email: email.toLowerCase(), ...referralParams } } as never);
       }
     } finally {
       setLoading(false);
@@ -165,7 +179,19 @@ export default function LoginScreen() {
         <>
           <AuthPrompt
             text="New to ChemistTasker?"
-            action={<AuthLink label="Create account" onPress={() => router.push('/register')} disabled={busy} />}
+            action={
+              <AuthLink
+                label="Create account"
+                onPress={() =>
+                  router.push(
+                    Object.keys(referralParams).length > 0
+                      ? ({ pathname: '/register', params: referralParams } as any)
+                      : '/register',
+                  )
+                }
+                disabled={busy}
+              />
+            }
           />
           <Text style={styles.terms}>By using ChemistTasker, you agree to the</Text>
           {/* 44pt AuthLinks: inline Text links are too small to tap. */}
@@ -212,7 +238,18 @@ export default function LoginScreen() {
           onSubmitEditing={() => void handleLogin()}
           disabled={busy}
         />
-        <AuthLink label="Forgot password?" onPress={() => router.push('/forgot-password')} disabled={busy} style={styles.forgot} />
+        <AuthLink
+          label="Forgot password?"
+          onPress={() =>
+            router.push(
+              Object.keys(referralParams).length > 0
+                ? ({ pathname: '/forgot-password', params: referralParams } as any)
+                : '/forgot-password',
+            )
+          }
+          disabled={busy}
+          style={styles.forgot}
+        />
       </View>
 
       <Button
