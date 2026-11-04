@@ -286,7 +286,7 @@ export default function PharmacistProfileScreen() {
                 key={`${item.title}-${idx}`}
                 title={item.title}
                 left={(props) => <List.Icon {...props} icon={item.icon} />}
-                right={item.right}
+                right={(props) => <List.Icon {...props} icon="chevron-right" />}
                 onPress={item.onPress}
               />
             ))}
