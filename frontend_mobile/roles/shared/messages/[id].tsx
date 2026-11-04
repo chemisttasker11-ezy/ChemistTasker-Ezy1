@@ -128,6 +128,7 @@ export default function SharedMessageDetailScreen() {
     const insets = useSafeAreaInsets();
 
     const [messages, setMessages] = useState<MessageDisplay[]>([]);
+    const [messagesRoomId, setMessagesRoomId] = useState<number | null>(null);
     const [participantCache, setParticipantCache] = useState<Record<number, IdentityRecord>>({});
     const [shiftContactByUserId, setShiftContactByUserId] = useState<Record<number, ChatIdentity>>({});
     const [newMessage, setNewMessage] = useState('');
@@ -278,7 +279,9 @@ export default function SharedMessageDetailScreen() {
     const fetchMessages = useCallback(async () => {
         const roomId = parseRoomId();
         const generation = ++roomGenerationRef.current;
+        setMessagesRoomId(null);
         setMessages([]);
+        setLastReadAt(null);
         setNextHistoryUrl(null);
         setHistoryError(null);
         setMessageLoadError(null);
@@ -299,6 +302,7 @@ export default function SharedMessageDetailScreen() {
             const rows = Array.isArray((data as any)?.results) ? (data as any).results
                 : Array.isArray(data) ? data : [];
             setMessages(current => mergeOlderMessages(current, rows.map((msg: any, idx: number) => mapMessage(msg, roomId, idx))));
+            setMessagesRoomId(roomId);
             const next = (data as any)?.next ?? null;
             setNextHistoryUrl(isNextPageForRoom(next, roomId) ? next : null);
             if ((data as any)?.my_last_read_at) setLastReadAt((data as any).my_last_read_at);
@@ -366,6 +370,7 @@ export default function SharedMessageDetailScreen() {
         const roomId = parseRoomId();
         if (payload.type === 'chat.message' || payload.type === 'message.created') {
             const msg = payload.message || payload;
+            if (Number(msg.conversation ?? msg.room ?? msg.room_id ?? roomId) !== roomId) return;
             const senderUserId =
                 msg.sender?.user_details?.id ??
                 msg.sender?.user?.id ??
@@ -631,10 +636,11 @@ export default function SharedMessageDetailScreen() {
     const reactionToEmoji = (value: string) => REACTION_DISPLAY[value] ?? value;
 
 const pinnedMessage = useMemo(() => {
+        if (messagesRoomId !== currentRoomId) return null;
         const pinned = messages.filter((m) => m.is_pinned);
         if (!pinned.length) return null;
         return pinned.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-    }, [messages]);
+    }, [messages, messagesRoomId, currentRoomId]);
 
     const renderReactions = (item: MessageDisplay) => {
         if (!item.reactions || item.reactions.length === 0) return null;
@@ -815,7 +821,7 @@ const pinnedMessage = useMemo(() => {
             <View style={{ flex: 1 }}>
                 <FlatList
                     ref={flatListRef}
-                    data={messages}
+                    data={messagesRoomId === currentRoomId ? messages : []}
                     maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
                     onScroll={event => {
                         const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
