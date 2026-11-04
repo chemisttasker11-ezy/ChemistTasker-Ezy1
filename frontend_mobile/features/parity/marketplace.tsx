@@ -48,7 +48,73 @@ export function MarketplaceParityScreen({screen}:{screen:MarketplaceScreen}){
 
 function ListingCard({row,onPress}:{row:MarketplacePublicListing;onPress:()=>void}){const image=row.images?.[0]?.derivative_url;return <Card mode="outlined" onPress={onPress} style={{overflow:'hidden'}}>{image?<Image source={{uri:image}} style={{width:'100%',height:170,backgroundColor:'#EEF2FF'}} resizeMode="cover"/>:null}<Card.Content style={{gap:6,paddingTop:12}}><Text variant="titleMedium">{row.title}</Text><Text variant="bodySmall" style={{color:palette.muted}}>{row.summary||row.description}</Text><View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}><Chip compact>{row.category?.name||replaceUnderscore(row.mode)}</Chip><Text variant="titleSmall">{row.mode==='FREE'?'Free':row.mode==='SWAP'?'Swap':money(row.item_amount)}</Text></View></Card.Content></Card>;}
 
-function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing|null;loading:boolean;error:string}){const router=useRouter();const[busy,setBusy]=useState(false),[localError,setLocalError]=useState('');const enquire=async()=>{if(!listing)return;setBusy(true);setLocalError('');try{await api.createEnquiry(listing.id,{client_request_id:idempotencyKey('enquiry'),message:'Interested via ChemistTasker mobile Marketplace.'});router.push('/marketplace/exchanges' as any);}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};return <ParityPage title="Listing detail" subtitle="Public listing information and eligibility." loading={loading} error={error||localError}>{!listing?<EmptyState title="Listing not found" body="This listing is unavailable."/>:<>{listing.images?.[0]?.derivative_url?<Image source={{uri:listing.images[0].derivative_url}} style={{width:'100%',height:240,borderRadius:16}} resizeMode="cover"/>:null}<Section title={listing.title} description={listing.coarse_location}><Text>{listing.description}</Text><MetricGrid items={[{label:'Condition',value:replaceUnderscore(listing.condition)},{label:'Mode',value:replaceUnderscore(listing.mode)},{label:'Amount',value:listing.mode==='FREE'?'Free':listing.mode==='SWAP'?'Swap':money(listing.item_amount)}]}/><DataRow title="Seller" subtitle={listing.seller_role_label}/><DataRow title="Delivery" subtitle={asArray(listing.delivery_options).map(replaceUnderscore).join(', ')||'Seller arrangements'}/></Section><ActionButtons><Button mode="contained" loading={busy} onPress={()=>void enquire()}>Enquire</Button><Button mode="outlined" onPress={()=>router.push(('/marketplace/items/'+listing.id+'/report') as any)}>Report</Button></ActionButtons></>}</ParityPage>;}
+
+function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing|null;loading:boolean;error:string}){
+ const router=useRouter();const{user}=useAuth();
+ const[busy,setBusy]=useState(false),[localError,setLocalError]=useState(''),[message,setMessage]=useState(''),[buyingPharmacy,setBuyingPharmacy]=useState<number|null>(null);
+ const[access,setAccess]=useState<import('@chemisttasker/shared-core').MarketplaceAccess|null>(null);
+ const[accessLoading,setAccessLoading]=useState(false),[contactOpen,setContactOpen]=useState(false),[submitted,setSubmitted]=useState(false);
+ const requestRef=useRef(0),submittingRef=useRef(false),requestIdRef=useRef(idempotencyKey('enquiry'));
+ useEffect(()=>{
+   const request=++requestRef.current;setContactOpen(false);setSubmitted(false);setMessage('');setBuyingPharmacy(null);setAccess(null);setLocalError('');requestIdRef.current=idempotencyKey('enquiry');
+   if(!listing||!user)return()=>{requestRef.current+=1;};
+   setAccessLoading(true);
+   void api.getAccess().then(value=>{if(request===requestRef.current)setAccess(value);}).catch(e=>{if(request===requestRef.current)setLocalError(errorMessage(e,'Trade eligibility could not be checked.'));}).finally(()=>{if(request===requestRef.current)setAccessLoading(false);});
+   return()=>{requestRef.current+=1;};
+ },[listing?.id,user?.id]);
+ const selectedPharmacy=access?.eligible_pharmacies?.find(p=>p.id===buyingPharmacy);
+ const canTrade=Boolean(access&&(access.can_trade_personally||access.can_trade_for_pharmacy));
+ const enquire=async()=>{
+   if(!listing||!canTrade||submittingRef.current)return;
+   const validation=enquiryValidation(message);
+   if(validation){setLocalError(validation);return;}
+   if(buyingPharmacy!=null&&!selectedPharmacy){setLocalError('Choose a pharmacy you are authorized to represent.');return;}
+   submittingRef.current=true;setBusy(true);setLocalError('');
+   try{
+     await api.createEnquiry(listing.id,{
+       client_request_id:requestIdRef.current,
+       buying_pharmacy:buyingPharmacy,
+       message:message.trim(),
+       terms:{intent:'ENQUIRY'},
+     });
+     setSubmitted(true);router.push('/marketplace/exchanges' as any);
+   }catch(e){setLocalError(errorMessage(e,'Unable to send enquiry.'));}finally{submittingRef.current=false;setBusy(false);}
+ };
+ return <ParityPage title="Listing detail" subtitle="Approved ordinary goods with verified seller and buyer eligibility." loading={loading} error={error} onRetry={()=>router.replace('/marketplace' as any)}>
+  {!listing?<EmptyState title="Listing not found" body="This listing may have been removed or withdrawn." actionLabel="Browse listings" onAction={()=>router.replace('/marketplace' as any)}/>:<>
+   {listing.images?.[0]?.derivative_url?<Image source={{uri:listing.images[0].derivative_url}} style={{width:'100%',height:240,borderRadius:16}} resizeMode="cover"/>:null}
+   <Section title={listing.title} description={listing.coarse_location}>
+     <Text>{listing.description}</Text>
+     <MetricGrid items={[{label:'Condition',value:replaceUnderscore(listing.condition)},{label:'Mode',value:replaceUnderscore(listing.mode)},{label:'Amount',value:listing.mode==='FREE'?'Free':listing.mode==='SWAP'?'Swap':money(listing.item_amount)}]}/>
+     <DataRow title="Seller" subtitle={listing.seller_role_label}/>
+     <DataRow title="Delivery" subtitle={asArray(listing.delivery_options).map(replaceUnderscore).join(', ')||'Seller arrangements'}/>
+     <DataRow title="Eligible buyers" subtitle={asArray(listing.permitted_buyer_labels).join(', ')||'Eligibility checked before contact'}/>
+   </Section>
+   {user==null?<InfoNote title="Sign in to enquire">You can browse approved items without signing in. Sign in with an eligible verified account to contact the seller.</InfoNote>:
+     accessLoading?<InfoNote title="Checking eligibility">Checking current marketplace trading permissions.</InfoNote>:
+     access&&!canTrade?<InfoNote title="Trading access required">{access.blockers.map(b=>b.message||b.detail||b.code).join(' · ')||'Complete account verification and accept applicable marketplace terms to contact a seller.'}</InfoNote>:null}
+   {localError?<InfoNote title="Marketplace needs attention" tone="warning">{localError}</InfoNote>:null}
+   {contactOpen&&!submitted&&canTrade?<Section title="Enquire with seller" description="No purchase is committed by sending this enquiry.">
+     <Field label="Message to seller" value={message} onChangeText={setMessage} multiline placeholder="Ask about condition, pickup or delivery arrangements." disabled={busy}/>
+     {access?.eligible_pharmacies?.length?<Section title="Buying context" description="Select a pharmacy only if you are authorized to act on its behalf.">
+       <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+         <Chip selected={buyingPharmacy==null} onPress={()=>setBuyingPharmacy(null)} disabled={busy}>Personal</Chip>
+         {access.eligible_pharmacies.map(pharmacy=><Chip key={pharmacy.id} selected={buyingPharmacy===pharmacy.id} disabled={busy} onPress={()=>setBuyingPharmacy(pharmacy.id)}>{pharmacy.label}</Chip>)}
+       </View>
+     </Section>:null}
+     <ActionButtons>
+       <Button mode="outlined" onPress={()=>setContactOpen(false)} disabled={busy}>Cancel</Button>
+       <Button mode="contained" loading={busy} disabled={busy||!!enquiryValidation(message)} onPress={()=>void enquire()}>Send gated enquiry</Button>
+     </ActionButtons>
+   </Section>:null}
+   <ActionButtons>
+     {!contactOpen&&!submitted?<Button mode="contained" loading={accessLoading} disabled={!user||accessLoading||!canTrade} onPress={()=>{setContactOpen(true);setLocalError('');}}>Check eligibility & enquire</Button>:null}
+     <Button mode="outlined" onPress={()=>router.push(('/marketplace/items/'+listing.id+'/report') as any)}>Report listing</Button>
+   </ActionButtons>
+   {submitted?<InfoNote title="Enquiry sent" tone="success">The seller conversation is available in My exchanges.</InfoNote>:null}
+  </>}
+ </ParityPage>;
+}
 
 function useDraftStep(initial:MarketplaceMobileDraft){const{user}=useAuth();const scope=String(user?.id??user?.email??user?.username??'anonymous');const[value,setValue]=useState(initial);useEffect(()=>setValue(initial),[initial]);const patch=async(p:Partial<MarketplaceMobileDraft>)=>{const next={...value,...p};setValue(next);await patchMarketplaceDraft(scope,p);return next;};return{value,patch,scope};}
 function SellerStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string}){const router=useRouter();const{value,patch}=useDraftStep(draft);const pharmacies=asArray<any>(options?.eligible_pharmacies);const changeContext=(v:string)=>void patch({seller_context:v as MarketplaceMobileDraft['seller_context'],pharmacy:v==='PERSONAL'?null:value.pharmacy,category:null,category_name:'',mode:'SELL',allowed_buyer_roles:[],current_circle:'OWNED_CHAIN'});return <ParityPage title="Who is selling?" subtitle="Choose personal or pharmacy seller context." loading={loading} error={error}><ChoiceChips value={value.seller_context} onChange={changeContext} options={[{value:'PERSONAL',label:'Personal'},{value:'PHARMACY',label:'Pharmacy'}]}/>{value.seller_context==='PHARMACY'?<Section title="Eligible pharmacies"><View style={{gap:8}}>{pharmacies.map(p=><Chip key={p.id} selected={value.pharmacy===p.id} onPress={()=>void patch({pharmacy:p.id})}>{p.label}</Chip>)}</View></Section>:null}<Button mode="contained" disabled={value.seller_context==='PHARMACY'&&!value.pharmacy} onPress={()=>router.push('/marketplace/new/category' as any)}>Continue</Button></ParityPage>;}
