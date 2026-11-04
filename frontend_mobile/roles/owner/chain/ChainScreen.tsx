@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Building2, ChevronRight } from 'lucide-react-native';
+import { Building2 } from 'lucide-react-native';
 import {
   addPharmacyToChain, createChainService, deleteChainService, fetchChainPharmaciesService,
   fetchChainsService, fetchMembershipsByPharmacy, fetchPharmaciesService,
@@ -220,7 +220,7 @@ export default function ChainScreen() {
                       <Text style={styles.section}>{pharmacy.name}</Text>
                       <Text style={styles.subtext}>{Array.isArray(members[pharmacy.id]) ? members[pharmacy.id].length + ' team members' : members[pharmacy.id] === 'error' ? 'Staff unavailable' : 'Loading staff...'}</Text>
                     </View>
-                    <Button compact mode="text" onPress={() => router.push(('/owner/pharmacies/' + pharmacy.id + '/staff') as any)} accessibilityLabel={'View staff for ' + pharmacy.name}>Staff <ChevronRight size={16} color={colors.primary} /></Button>
+                    <Button compact mode="text" icon="chevron-right" onPress={() => router.push(('/owner/pharmacies/' + pharmacy.id + '/staff') as any)} accessibilityLabel={'View staff for ' + pharmacy.name}>View staff</Button>
                   </View>
                   <Divider />
                   {members[pharmacy.id] === 'error' ? (
