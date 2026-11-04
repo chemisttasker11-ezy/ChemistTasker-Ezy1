@@ -143,6 +143,7 @@ export default function SharedMessageDetailScreen() {
     const [nextHistoryUrl, setNextHistoryUrl] = useState<string | null>(null);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [historyError, setHistoryError] = useState<string | null>(null);
+    const [messageLoadError, setMessageLoadError] = useState<string | null>(null);
     const [unseenMessages, setUnseenMessages] = useState(0);
     const readerNearBottomRef = useRef(true);
     const historyBusyRef = useRef(false);
@@ -280,6 +281,7 @@ export default function SharedMessageDetailScreen() {
         setMessages([]);
         setNextHistoryUrl(null);
         setHistoryError(null);
+        setMessageLoadError(null);
         setUnseenMessages(0);
         setLoadingHistory(false);
         historyBusyRef.current = false;
@@ -287,7 +289,7 @@ export default function SharedMessageDetailScreen() {
         shouldScrollRef.current = false;
         setLoading(true);
         if (!Number.isSafeInteger(roomId) || roomId <= 0) {
-            setSnackbar('This conversation link is invalid.');
+            setMessageLoadError('This conversation link is invalid.');
             setLoading(false);
             return;
         }
@@ -313,7 +315,7 @@ export default function SharedMessageDetailScreen() {
         } catch (error) {
             if (generation === roomGenerationRef.current) {
                 console.error('Error fetching messages:', error);
-                setSnackbar('Unable to load this conversation. Open it again to retry.');
+                setMessageLoadError('Unable to load this conversation. Check your connection and try again.');
             }
         } finally {
             if (generation === roomGenerationRef.current) setLoading(false);
@@ -834,6 +836,12 @@ const pinnedMessage = useMemo(() => {
                     onContentSizeChange={scrollIfNeeded}
                     onLayout={scrollIfNeeded}
                 />
+                {messageLoadError && !loading ? (
+                    <View style={styles.messageLoadError}>
+                        <Text accessibilityRole="alert" style={styles.historyError}>{messageLoadError}</Text>
+                        <IconButton icon="refresh" accessibilityLabel="Retry loading conversation" onPress={() => void fetchMessages()} />
+                    </View>
+                ) : null}
                 {loading ? (
                     <View style={[StyleSheet.absoluteFill, styles.centerContainer]}>
                         <ActivityIndicator size="large" color="#6366F1" />
@@ -914,6 +922,7 @@ const styles = StyleSheet.create({
         paddingBottom: 24,
     },
     historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap', paddingVertical: 8 },
+    messageLoadError: { padding: 12, alignItems: 'center', gap: 6 },
     historyHint: { fontSize: 12, color: '#52617A' },
     historyError: { color: '#B42318', width: '100%', textAlign: 'center' },
     jumpRow: { position: 'absolute', right: 16, bottom: 18, borderRadius: 22, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F0FF', borderColor: '#BBCDF9', borderWidth: 1 },
