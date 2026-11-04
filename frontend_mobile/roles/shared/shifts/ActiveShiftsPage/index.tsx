@@ -141,16 +141,18 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
     );
 
     const linkedShiftSignature = shiftId == null ? null : `${shiftId}:${routeSlotId ?? 'default'}:${notificationKey ?? 'none'}`;
-    const handleShiftLayout = useCallback((renderedShiftId: number, y: number) => {
-        if (shiftId == null || renderedShiftId !== shiftId) return;
-        targetOffsetRef.current = y;
-    }, [shiftId]);
     const scrollToLinkedShift = useCallback(() => {
         if (!linkedShiftSignature || scrolledLinkRef.current === linkedShiftSignature) return;
         if (targetOffsetRef.current == null) return;
         scrolledLinkRef.current = linkedShiftSignature;
         scrollRef.current?.scrollTo({ y: Math.max(0, targetOffsetRef.current - 16), animated: true });
     }, [linkedShiftSignature]);
+    const handleShiftLayout = useCallback((renderedShiftId: number, y: number) => {
+        if (shiftId == null || renderedShiftId !== shiftId) return;
+        targetOffsetRef.current = y;
+        // Content-size and row-layout events can arrive in either order on Android/iOS.
+        requestAnimationFrame(scrollToLinkedShift);
+    }, [shiftId, scrollToLinkedShift]);
     const { shifts, setShifts, loading: shiftsLoading, error: shiftsError, loadShifts } = useShiftsData({
         selectedPharmacyId,
         shiftId,
