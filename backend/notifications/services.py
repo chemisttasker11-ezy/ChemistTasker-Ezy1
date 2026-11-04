@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Iterable, Optional, Sequence
 import logging
 import requests
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -11,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
-from notifications.models import Notification
+from notifications.models import Notification, NotificationPushPreference
 from users.models import DeviceToken
 
 USER_GROUP_FMT = "user.{user_id}"
@@ -99,6 +100,34 @@ def notify_users(
             _deliver_notification(notification)
 
 
+def push_allowed_for_notification(notification: Notification, now=None) -> bool:
+    """Push-only policy: durable in-app notification and counters never change."""
+    pref = NotificationPushPreference.objects.filter(user_id=notification.user_id).first()
+    if pref is None:
+        return True
+    field = {
+        Notification.Type.MESSAGE: "push_messages",
+        Notification.Type.TASK: "push_tasks",
+        Notification.Type.WORK_NOTE: "push_work_notes",
+        Notification.Type.ALERT: "push_alerts",
+    }.get(notification.type)
+    if field and not getattr(pref, field):
+        return False
+    # Alerts bypass quiet hours, but an explicit alert-category opt-out is honoured.
+    if notification.type == Notification.Type.ALERT or not pref.quiet_hours_enabled:
+        return True
+    try:
+        local = timezone.localtime(now or timezone.now(), ZoneInfo(pref.time_zone)).time()
+    except (ZoneInfoNotFoundError, ValueError):
+        logger.warning("Invalid push preference timezone for user %s", notification.user_id)
+        return False
+    start, end = pref.quiet_start, pref.quiet_end
+    if start == end:
+        return True
+    inside = (start <= local < end) if start < end else (local >= start or local < end)
+    return not inside
+
+
 def _deliver_notification(notification: Notification) -> None:
     payload = {"notification": _serialize_notification(notification)}
     try:
@@ -111,10 +140,11 @@ def _deliver_notification(notification: Notification) -> None:
         _broadcast(notification.user_id, "notification.counter", {"unread": unread})
     except Exception:
         logger.exception("Notification %s counter delivery failed", notification.pk)
-    tokens = list(
-        DeviceToken.objects.filter(user_id=notification.user_id, active=True).values_list("token", flat=True)
-    )
-    _send_expo_push(tokens, title=notification.title, body=notification.body, data=notification.payload or {})
+    if push_allowed_for_notification(notification):
+        tokens = list(
+            DeviceToken.objects.filter(user_id=notification.user_id, active=True).values_list("token", flat=True)
+        )
+        _send_expo_push(tokens, title=notification.title, body=notification.body, data=notification.payload or {})
 
 
 def mark_notifications_read(user, notification_ids: Optional[Sequence[int]] = None) -> int:
