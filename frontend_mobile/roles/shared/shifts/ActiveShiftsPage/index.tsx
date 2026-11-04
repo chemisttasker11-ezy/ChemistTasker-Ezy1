@@ -67,6 +67,7 @@ import {
     buildActiveShiftsScopeKey,
     isCandidateLevelVisible,
     mergeSlotSignatures,
+    getLinkedShiftScrollY,
 } from './utils/activeShiftRuntime';
 
 type ShiftSurface = ReturnType<typeof useShiftSurface>;
@@ -114,8 +115,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
     const reviewLoadingId: number | null = null;
     const candidateReviewRequest = useRef(0);
     const appliedShiftLinkRef = useRef<string | null>(null);
-    const scrollRef = useRef<ScrollView>(null);
-    const targetOffsetRef = useRef<number | null>(null);
+    const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+    const targetOffsetRef = useRef<{ shiftId: number; scopeKey: string; y: number } | null>(null);
     const scrolledLinkRef = useRef<string | null>(null);
     useEffect(() => () => { candidateReviewRequest.current += 1; }, []);
 
@@ -143,16 +144,17 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
     const linkedShiftSignature = shiftId == null ? null : `${shiftId}:${routeSlotId ?? 'default'}:${notificationKey ?? 'none'}`;
     const scrollToLinkedShift = useCallback(() => {
         if (!linkedShiftSignature || scrolledLinkRef.current === linkedShiftSignature) return;
-        if (targetOffsetRef.current == null) return;
+        const y = getLinkedShiftScrollY(targetOffsetRef.current, shiftId, surface.scopeKey);
+        if (y == null || !scrollRef.current) return;
+        scrollRef.current.scrollTo({ y, animated: true });
         scrolledLinkRef.current = linkedShiftSignature;
-        scrollRef.current?.scrollTo({ y: Math.max(0, targetOffsetRef.current - 16), animated: true });
-    }, [linkedShiftSignature]);
+    }, [linkedShiftSignature, shiftId, surface.scopeKey]);
     const handleShiftLayout = useCallback((renderedShiftId: number, y: number) => {
         if (shiftId == null || renderedShiftId !== shiftId) return;
-        targetOffsetRef.current = y;
+        targetOffsetRef.current = { shiftId: renderedShiftId, scopeKey: surface.scopeKey, y };
         // Content-size and row-layout events can arrive in either order on Android/iOS.
         requestAnimationFrame(scrollToLinkedShift);
-    }, [shiftId, scrollToLinkedShift]);
+    }, [shiftId, surface.scopeKey, scrollToLinkedShift]);
     const { shifts, setShifts, loading: shiftsLoading, error: shiftsError, loadShifts } = useShiftsData({
         selectedPharmacyId,
         shiftId,
