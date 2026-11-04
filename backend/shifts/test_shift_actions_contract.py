@@ -956,6 +956,9 @@ class BookingSafetyTests(ShiftActionFixture):
              mock.patch("shifts.offers.notify_shift_users"), mock.patch("shifts.offers.async_task"), \
              mock.patch("shifts.offers.send_shift_payment_finalized_notifications"):
             client = client_for(worker)
+            shown = client.get(f"{API}shift-offers/{offer.pk}/")
+            self.assertEqual(shown.status_code, 200, shown.data)
+            self.assertEqual(shown.data["engagement_terms_preview"]["terms_version"], reviewed_version)
             for rejected in (payload, {**payload, "terms_version": "outdated"}):
                 response = client.post(f"{API}shift-offers/{offer.pk}/accept/", rejected, format="json")
                 self.assertEqual((response.status_code, response.data.get("code")), (409, "TERMS_CHANGED"))
