@@ -3,7 +3,7 @@ import type { Shift } from '@chemisttasker/shared-core';
 import { sanitizeConfirmedShifts, type OfflineShift } from './nextShiftModel';
 
 type Snapshot = { savedAt: string; rows: OfflineShift[] };
-const key = (userId: number | string) => 'ct.offline.confirmed-shifts.v1.' + String(userId).replace(/[^a-zA-Z0-9_-]/g, '_');
+const key = (userId: number | string) => 'ct.offline.confirmed-shifts.v2.' + String(userId).replace(/[^a-zA-Z0-9_-]/g, '_');
 
 /** Read-only, minimally scoped display snapshot. Never proof of a live booking. */
 export async function readConfirmedShiftSnapshot(userId: number | string): Promise<Snapshot | null> {
