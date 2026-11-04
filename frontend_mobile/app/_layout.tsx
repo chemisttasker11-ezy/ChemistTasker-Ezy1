@@ -7,6 +7,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
 import * as Updates from 'expo-updates';
 import * as Notifications from 'expo-notifications';
+import AppLockGate from '@/components/security/AppLockGate';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { WorkspaceProvider, useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../constants/theme';
@@ -560,6 +561,7 @@ export default function RootLayout() {
                       }}
                     />
                     <AuthGate />
+                    <AppLockGate />
                   </WorkspaceProvider>
                 </AuthProvider>
               </UnsavedChangesRegistryProvider>

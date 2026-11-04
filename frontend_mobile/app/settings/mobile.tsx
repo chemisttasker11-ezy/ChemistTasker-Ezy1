@@ -2,11 +2,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, Card, Divider, Switch, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Card, Divider, SegmentedButtons, Switch, Text } from 'react-native-paper';
 import * as Notifications from 'expo-notifications';
 import { Camera } from 'expo-camera';
 import { useAuth } from '@/context/AuthContext';
 import { colors, radius, space } from '@/constants/tokens';
+import { getAppLockPreference, setAppLockPreference, validDelay, type AppLockDelay } from '@/utils/appLock';
 import { fetchMobileAppConfig, getInstalledAppVersion, decideAppUpdate } from '@/utils/appUpdates';
 import {
   authenticateWithDeviceLock, disableBiometricLogin, enableBiometricLogin,
@@ -26,6 +27,8 @@ export default function MobileSettings() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [versionStatus, setVersionStatus] = useState('');
+  const [appLockEnabled, setAppLockEnabled] = useState(false);
+  const [appLockDelay, setAppLockDelay] = useState<AppLockDelay>(60);
   const [message, setMessage] = useState('');
   const userId = user?.id;
 
@@ -49,6 +52,30 @@ export default function MobileSettings() {
   }, [userId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    let active = true;
+    if (userId == null) return () => { active = false; };
+    void getAppLockPreference(userId).then(value => {
+      if (active) { setAppLockEnabled(value.enabled); setAppLockDelay(value.delaySeconds); }
+    });
+    return () => { active = false; };
+  }, [userId]);
+
+  const updateAppLock = async (enabled: boolean, delay: AppLockDelay = appLockDelay) => {
+    if (userId == null || busy || Platform.OS === 'web') return;
+    setBusy(true); setMessage('');
+    try {
+      if (!await authenticateWithDeviceLock()) {
+        setMessage('Your device passcode or biometric verification is required to change app lock.');
+        return;
+      }
+      await setAppLockPreference(userId, { enabled, delaySeconds: delay });
+      setAppLockEnabled(enabled);
+      setAppLockDelay(delay);
+      setMessage('App lock preference saved. The new setting applies the next time the app opens.');
+    } catch { setMessage('App lock setting could not be saved. Try again.'); }
+    finally { setBusy(false); }
+  };
 
   const configureBiometric = async (enabled: boolean) => {
     if (!user || busy) return;
@@ -119,6 +146,18 @@ export default function MobileSettings() {
         <Button mode="outlined" onPress={() => void openSystemSettings()}>Manage device PIN, Face ID or fingerprint</Button>
         <Text style={styles.muted}>Attendance kiosk PINs are separate, pharmacy-specific credentials. They do not unlock your app account.</Text>
         <Button mode="text" onPress={() => router.push('/attendance-pin' as any)}>Manage attendance PIN</Button>
+      </Card.Content></Card>
+      <Card mode="outlined" style={styles.card}><Card.Content style={styles.group}>
+        <Text variant="titleLarge" style={styles.heading}>Automatic app lock</Text>
+        <Text style={styles.muted}>Require device authentication after inactivity. The screen is covered in the app switcher. This does not replace server session expiry or password verification.</Text>
+        <View style={styles.row}><Text style={styles.copy}>Lock when returning to the app</Text>
+          <Switch value={appLockEnabled} disabled={busy || loading || Platform.OS === 'web'} onValueChange={value => void updateAppLock(value)} />
+        </View>
+        {appLockEnabled ? <SegmentedButtons value={String(appLockDelay)} onValueChange={value => {
+          const seconds = Number(value);
+          if (validDelay(seconds)) void updateAppLock(true, seconds);
+        }} buttons={[{ value: '0', label: 'Now' }, { value: '30', label: '30s' }, { value: '60', label: '1m' }, { value: '300', label: '5m' }]} /> : null}
+        <Text style={styles.muted}>If authentication fails, use the password option to sign out and sign in again.</Text>
       </Card.Content></Card>
       <Card mode="outlined" style={styles.card}><Card.Content style={styles.group}>
         <Text variant="titleLarge" style={styles.heading}>Notifications</Text>
