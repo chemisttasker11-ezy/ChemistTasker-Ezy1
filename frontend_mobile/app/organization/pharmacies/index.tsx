@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { fetchPharmaciesService, deletePharmacy, PharmacyDTO } from '@chemisttasker/shared-core';
 import { fetchMembershipsForPharmacy } from '@/roles/shared/pharmacies/membershipApi';
 import PharmaciesListView from '@/roles/shared/pharmacies/PharmaciesListView';
-import { Snackbar } from 'react-native-paper';
+import { Button, Snackbar } from 'react-native-paper';
 import { ContentState } from '@/components/ui';
 
 export default function OrganizationPharmaciesScreen() {
@@ -83,6 +83,9 @@ export default function OrganizationPharmaciesScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <Button mode="outlined" icon="link-variant" onPress={() => router.push('/organization/pharmacies/claims')} contentStyle={{ minHeight: 44 }} style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 8 }} accessibilityLabel="Claim a pharmacy or view claim requests">
+        Claim a pharmacy · View requests
+      </Button>
       {loadError && !loading ? (
         <ContentState kind="error" title="Unable to load pharmacies" description="Check your connection and retry." actionLabel="Try again" onAction={() => void loadPharmacies()} />
       ) : <PharmaciesListView
