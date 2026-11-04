@@ -45,7 +45,7 @@ test('distinct recurring assignments survive even when backed by one template sl
  ]};
  const rows=sanitizeConfirmedShifts([recurring],7);
  assert.equal(rows.length,2);
- assert.deepEqual(rows.map(row=>row.wallStart),['2027-01-08T09:00:00','2027-01-10T10:00:00']);
+ assert.deepEqual(Array.from(rows,row=>row.wallStart),['2027-01-08T09:00:00','2027-01-10T10:00:00']);
  assert.equal(sanitizeConfirmedShifts([{...recurring,assignedOccurrences:undefined}],7).length,0);
 });
 test('explicit pharmacy time zone overrides state for regional daylight saving',()=>{
