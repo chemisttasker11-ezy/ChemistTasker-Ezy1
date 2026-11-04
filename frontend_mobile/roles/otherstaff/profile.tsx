@@ -45,6 +45,7 @@ export default function OtherStaffProfileScreen() {
     { title: 'How you get paid', description: 'ABN or TFN, bank account and super', icon: 'cash-multiple', route: '/otherstaff/profile-payment' },
     { title: 'References', description: 'Optional · earns the References badge', icon: 'account-group-outline', route: '/otherstaff/profile-referees' },
     { title: 'Bio', description: 'Short bio and resume', icon: 'file-account-outline', route: '/otherstaff/profile-bio' },
+    { title: 'App preferences', description: 'Notifications and communication settings', icon: 'cog-outline', route: '/app-preferences' },
   ];
 
   useEffect(() => {
