@@ -20,3 +20,11 @@ test('contact topics expose relevant role workflows without exposing another rol
  assert.equal(contactTopics('EXPLORER').includes('Talent Board'),true);
  assert.equal(contactTopics('EXPLORER').includes('Organization access'),false);
 });
+
+test('contact drafts and response state are remounted when the signed-in account changes', () => {
+ const source = readFileSync(new URL('../../app/contact.tsx', import.meta.url), 'utf8');
+ assert.match(source, /const sessionKey = user\?\.id != null/);
+ assert.match(source, /<ContactForm key=\{sessionKey\} user=\{user\}/);
+ assert.match(source, /function ContactForm\(\{ user \}/);
+ assert.match(source, /if \(submittingRef\.current\) return/);
+});

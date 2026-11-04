@@ -10,6 +10,13 @@ import { contactTopics, validateContactForm, type ContactForm } from '@/features
 
 export default function ContactScreen() {
   const { user } = useAuth();
+  // A route may remain mounted across sign-out / account switching. Remount its
+  // form so another user cannot see the previous account's draft or response.
+  const sessionKey = user?.id != null ? `user:${user.id}` : user?.email ? `email:${user.email}` : 'guest';
+  return <ContactForm key={sessionKey} user={user} />;
+}
+
+function ContactForm({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
   const submittingRef = useRef(false);
   const appVersion = useMemo(() => {
     const expo = Constants?.expoConfig;
