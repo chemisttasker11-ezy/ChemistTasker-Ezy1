@@ -16,7 +16,7 @@ test('worker and manager timesheet routes share a native detail implementation b
   assert.match(detail, /getTimesheet\(timesheetId\)/);
   assert.match(detail, /effective_blocking_checks/);
   assert.match(detail, /canApproveTimesheet\(data, periodLocked\)/);
-  assert.match(detail, /managerAllowed && !sourceRequired/);
+  assert.match(detail, /managerCanChange && !sourceRequired/);
   assert.match(detail, /isSourceCorrectionRequired\(check\)/);
   assert.match(detail, /workforce\.addMissingPunch/);
   assert.match(detail, /session_id: sessionId, event_type: eventType, occurred_at_local: when/);

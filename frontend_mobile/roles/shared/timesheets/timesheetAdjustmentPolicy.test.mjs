@@ -29,6 +29,6 @@ test('corrections keep intermediate start/finish chronology and preserve breaks'
   assert.deepEqual(Array.from(correctionOrder('2026-11-04T09:30:00Z', '2026-11-04T18:00:00Z', '2026-11-04T17:00:00Z')), ['finish', 'start']);
   assert.deepEqual(Array.from(correctionOrder('2026-11-04T07:30:00Z', '2026-11-04T16:30:00Z', '2026-11-04T17:00:00Z')), ['start', 'finish']);
   assert.equal(correctionValidation('2026-11-04T18:00:00Z', '2026-11-04T09:00:00Z', []), 'Start must be before finish.');
-  assert.match(correctionValidation('2026-11-04T08:00:00Z', '2026-11-04T17:00:00Z', ['2026-11-04T07:00:00Z']), /recorded breaks/);
+  assert.match(correctionValidation('2026-11-04T08:00:00Z', '2026-11-04T17:00:00Z', ['2026-11-04T07:00:00Z'], Date.parse('2026-11-05T00:00:00Z')), /recorded breaks/);
   assert.equal(correctionValidation('2026-11-04T08:00:00Z', '2026-11-04T17:00:00Z', ['2026-11-04T12:00:00Z'], Date.parse('2026-11-05T00:00:00Z')), null);
 });
