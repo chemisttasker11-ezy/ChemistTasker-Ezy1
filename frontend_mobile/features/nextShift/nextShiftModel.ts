@@ -57,17 +57,18 @@ export function sanitizeConfirmedShifts(shifts: Shift[], userId?: number | strin
   if(!Number.isSafeInteger(shift?.id)||shift.id<=0)continue;
   const pharmacy=shift.pharmacyDetail;
   const address=[pharmacy?.streetAddress,pharmacy?.suburb,pharmacy?.state,pharmacy?.postcode].filter(Boolean).join(', ');
-  for(const slot of shift.slots||[]){
-   if(!Number.isSafeInteger(slot.id)||slot.id<=0)continue;
-   const date=slot.date||'',from=slot.startTime||'',to=slot.endTime||'';
+  // Source of truth is the worker-only assignment projection, never the recurring slot template.
+  for(const occurrence of shift.assignedOccurrences||[]){
+   if(!Number.isSafeInteger(occurrence.slotId)||occurrence.slotId<=0)continue;
+   const date=occurrence.date||'',from=occurrence.startTime||'',to=occurrence.endTime||'';
    if(!validDate(date)||!validTime(from)||!validTime(to)||from.slice(0,5)===to.slice(0,5))continue;
-   const zone=zoneFor(pharmacy?.state,slot.timezone);
+   const zone=zoneFor(pharmacy?.state,occurrence.timezone);
    if(!zone)continue;
    const endDate=to.slice(0,5)<from.slice(0,5)?nextDate(date):date;
    const start=zonedInstant(date,from,zone),end=zonedInstant(endDate,to,zone);
    if(!start||!end||Date.parse(end)<=Date.parse(start))continue;
    rows.push({
-    shiftId:shift.id,slotId:slot.id,pharmacy:String(pharmacy?.name||'Pharmacy').slice(0,120),
+    shiftId:shift.id,slotId:occurrence.slotId,pharmacy:String(pharmacy?.name||'Pharmacy').slice(0,120),
     address:address.slice(0,300),role:String(shift.roleLabel||shift.roleNeeded||'Shift').slice(0,100),
     start,end,wallStart:date+'T'+from.slice(0,5)+':00',wallEnd:endDate+'T'+to.slice(0,5)+':00',timeZone:zone
    });
@@ -75,7 +76,7 @@ export function sanitizeConfirmedShifts(shifts: Shift[], userId?: number | strin
  }
  const seen=new Set<string>();
  return rows.sort((a,b)=>a.start.localeCompare(b.start)).filter(row=>{
-  const key=row.shiftId+':'+row.slotId;if(seen.has(key))return false;seen.add(key);return true;
+  const key=row.shiftId+':'+row.slotId+':'+row.wallStart;if(seen.has(key))return false;seen.add(key);return true;
  }).slice(0,100);
 }
 export function upcomingShifts(rows:OfflineShift[],now=new Date()):OfflineShift[]{
