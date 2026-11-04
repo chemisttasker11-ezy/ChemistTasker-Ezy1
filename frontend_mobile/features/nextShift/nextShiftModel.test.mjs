@@ -5,7 +5,7 @@ import {runInNewContext} from 'node:vm';
 import ts from 'typescript';
 const source=readFileSync(new URL('./nextShiftModel.ts',import.meta.url),'utf8');
 const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-const scope={exports:{},Date,Intl,Set,Number,String,URLSearchParams,Object,Record,encodeURIComponent};
+const scope={exports:{},Date,Intl,Set,Number,String,URLSearchParams,Object,encodeURIComponent};
 runInNewContext(js,scope);
 const {sanitizeConfirmedShifts,upcomingShifts,calendarEditorUrl,directionsUrl}=scope.exports;
 const sample={id:5,roleNeeded:'PHARMACIST',pharmacyDetail:{name:'Test pharmacy',streetAddress:'10 Example St',suburb:'Brisbane',state:'QLD'},slots:[{id:9,date:'2027-01-08',startTime:'09:00:00',endTime:'17:00:00'},{id:10,date:'2027-01-10',startTime:'09:00',endTime:'17:00'}],hourlyRate:'999.99',lineItems:[{bankAccount:'PRIVATE'}]};
