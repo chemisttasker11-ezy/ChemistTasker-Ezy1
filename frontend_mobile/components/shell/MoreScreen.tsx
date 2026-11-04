@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import {
   BookOpen,
   CalendarDays,
+  CalendarCheck2,
   Newspaper,
   PenLine,
   Settings2,
@@ -159,6 +160,7 @@ export function MoreScreen({ children }: { children?: ReactNode }) {
         <Rows items={[
           { label: 'Scan a pharmacy or worker code', icon: ScanLine, route: '/share/scan' },
           { label: 'Saved QR contacts', icon: BookOpen, route: '/share/saved' },
+          { label: 'My next shifts and calendar', icon: CalendarCheck2, route: '/next-shifts' },
           { label: 'Security, notifications and permissions', icon: Settings2, route: '/settings/mobile' },
         ]} tone="blue" onItem={open} />
       </SectionCard>
