@@ -17,6 +17,11 @@ function nextPage(url: string | null): number | null {
 }
 
 export default function PublicHubFeed() {
+  const { user } = useAuth();
+  return <PublicHubFeedView key={String(user?.id ?? 'anonymous')} />;
+}
+
+function PublicHubFeedView() {
   const router = useRouter();
   const { user } = useAuth();
   const accountKey = String(user?.id ?? 'anonymous');
@@ -41,7 +46,6 @@ export default function PublicHubFeed() {
     const ticket = ++generation.current;
     setLoading(true); setError(''); setActionError(''); setMoreError('');
     setPosts([]); setPolls([]); setInfo(null); setNext(null); setMoreBusy(false);
-    setBusy(false); setBody(''); setAttachments([]); submitting.current = false;
     try {
       const [hubs, result, pollResult] = await Promise.all([
         chemistTaskerApi.publicContent.listHubs(),

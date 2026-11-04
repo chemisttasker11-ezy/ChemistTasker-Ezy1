@@ -11,6 +11,11 @@ import { publicWebUrl, safePublicUrl } from '@/features/explore/webLinks';
 import { colors, radius, space, touch } from '@/constants/tokens';
 
 export default function PublicHubPostDetail() {
+  const { user } = useAuth();
+  return <PublicHubPostView key={String(user?.id ?? 'anonymous')} />;
+}
+
+function PublicHubPostView() {
   const router = useRouter();
   const { user } = useAuth();
   const accountKey = String(user?.id ?? 'anonymous');
@@ -33,7 +38,7 @@ export default function PublicHubPostDetail() {
   const load = useCallback(async () => {
     const ticket = ++requestRef.current;
     setLoading(true); setError(''); setActionError('');
-    setPost(null); setComments([]); setComment(''); setReply(null); setEditing(null); setReportReason(''); setReporting(false);
+    setPost(null); setComments([]);
     try {
       if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Invalid post link.');
       const [current, replies] = await Promise.all([
