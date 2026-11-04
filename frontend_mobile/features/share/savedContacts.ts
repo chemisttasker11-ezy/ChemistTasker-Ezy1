@@ -15,7 +15,7 @@ function parseRows(raw:string|null):SavedContact[]{
   if(!Array.isArray(values))return [];
   return values.flatMap((row:any)=>{
    const parsed=typeof row?.url==='string'?parseChemistTaskerShareCode(row.url):null;
-   return parsed?[{...parsed,savedAt:typeof row.savedAt==='string'?row.savedAt:''}]:[];
+   return parsed?[{...parsed,savedAt:typeof row.savedAt==='string'?row.savedAt:'',synced:row.synced===true}]:[];
   }).slice(0,100);
  }catch{return [];}
 }
@@ -43,10 +43,19 @@ export async function listSavedContacts(accountId:number|string):Promise<SavedCo
  const saved=parseRows(plain);
  const invitations=saved.filter(row=>row.kind==='pharmacy-invitation');
  const publicLocal=saved.filter(row=>row.kind!=='pharmacy-invitation');
- if(invitations.length)await AsyncStorage.setItem(key(accountId),JSON.stringify(publicLocal));
- const protectedContacts=parseRows(protectedData).filter(row=>row.kind==='pharmacy-invitation');
+ let protectedContacts=parseRows(protectedData).filter(row=>row.kind==='pharmacy-invitation');
+ if(invitations.length){
+  // Migrate legacy bearer links into encrypted OS storage BEFORE deleting the plaintext copy.
+  const migrated=new Map<string,SavedContact>();
+  for(const row of [...invitations,...protectedContacts])migrated.set(row.url,row);
+  protectedContacts=[...migrated.values()].slice(-5);
+  await SecureStore.setItemAsync(secureKey(accountId),JSON.stringify(protectedContacts));
+  await AsyncStorage.setItem(key(accountId),JSON.stringify(publicLocal));
+ }
  const merged=new Map<string,SavedContact>();
- for(const row of publicLocal)merged.set(row.url,row);
+ // When online, the account API is authoritative for previously synced bookmarks,
+ // so deleting one on another device does not resurrect its stale local copy.
+ for(const row of publicLocal)if(!Array.isArray(cloud)||!row.synced)merged.set(row.url,row);
  if(Array.isArray(cloud)){
   for(const row of cloud){
    const item=fromRemote(row);
