@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
+  Building2,
   CalendarCheck,
   CalendarClock,
   CalendarDays,
@@ -43,6 +44,7 @@ const titles: Record<string, string> = {
   'shifts/[id]/applications': 'Applications',
   'post-shift': 'Post shift',
   'pharmacies/index': 'Pharmacies',
+  chain: 'My chain',
   'pharmacies/[id]': 'Pharmacy',
   'pharmacies/[id]/edit': 'Edit pharmacy',
   'pharmacies/[id]/staff': 'Staff',
@@ -86,6 +88,7 @@ const more: MoreGroup[] = [
     tone: 'cyan',
     items: [
       { label: 'Pharmacies', icon: Store, route: '/owner/pharmacies' },
+      { label: 'My chain', icon: Building2, route: '/owner/chain' },
       { label: 'Staff', icon: UsersRound, route: '/owner/staff' },
       { label: 'Locums & favourites', icon: HeartHandshake, route: '/owner/locums' },
       { label: 'Workforce & Payroll', icon: Wallet, route: '/workforce-settings' },
