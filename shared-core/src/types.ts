@@ -971,6 +971,8 @@ export interface ShiftEngagementOccurrenceApi {
 
 export interface ShiftEngagementTermsApi {
     version?: number;
+    /** Hash of the exact server-built terms; must be echoed when accepting. */
+    terms_version?: string;
     blocked?: boolean;
     error?: unknown;
     acceptance_required?: boolean;
@@ -1026,6 +1028,8 @@ export type ShiftEngagementTerms = CamelCasedPropertiesDeep<ShiftEngagementTerms
 export interface ShiftOfferAcceptancePayload {
     engagementTermsAccepted?: boolean;
     independentContractorStatusConfirmed?: boolean;
+    /** The termsVersion from this particular offer's reviewed preview. */
+    termsVersion?: string;
 }
 
 export interface ShiftOfferApi {
