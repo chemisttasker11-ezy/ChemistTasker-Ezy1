@@ -79,13 +79,21 @@ export default function PostShiftScreen() {
         params?.edit,
         params?.pharmacyId,
         params?.pharmacy_id,
+        params?.pharmacy,
         params?.dates,
+        params?.slot_dates,
         params?.date,
+        params?.slot_date,
         params?.role_needed,
         params?.role,
         params?.start_time,
+        params?.start,
         params?.end_time,
+        params?.end,
         params?.dedicated_user,
+        params?.dedicated_user_id,
+        params?.visibility,
+        params?.employment_type,
         params?.embedded,
     ]);
     const parsedParams = useMemo(() => parsePostShiftSearchParams(params), [paramsKey]);
@@ -550,6 +558,12 @@ export default function PostShiftScreen() {
 
         if (plan.applyRole && parsedParams.roleNeeded) {
             setRoleNeeded(parsedParams.roleNeeded);
+        }
+        if (plan.applyVisibility && parsedParams.visibility) {
+            setInitialAudience(parsedParams.visibility);
+        }
+        if (plan.applyEmploymentType && parsedParams.employmentType) {
+            setEmploymentType(parsedParams.employmentType);
         }
         if (plan.applyDedicatedUser && parsedParams.dedicatedUserId != null) {
             setDedicatedUserId(parsedParams.dedicatedUserId);

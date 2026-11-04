@@ -246,6 +246,14 @@ export type PostShiftRawParams = {
     embedded?: string | string[];
     pharmacyId?: string | string[];
     pharmacy_id?: string | string[];
+    pharmacy?: string | string[];
+    slot_date?: string | string[];
+    slot_dates?: string | string[];
+    start?: string | string[];
+    end?: string | string[];
+    visibility?: string | string[];
+    employment_type?: string | string[];
+    dedicated_user_id?: string | string[];
 };
 
 export type ParsedPostShiftParams = {
@@ -258,6 +266,8 @@ export type ParsedPostShiftParams = {
     hasStartTime: boolean;
     hasEndTime: boolean;
     dedicatedUserId: number | null;
+    visibility: VisibilityTier | null;
+    employmentType: 'LOCUM' | 'CASUAL' | 'FULL_TIME' | 'PART_TIME' | null;
     isEmbedded: boolean;
 };
 
@@ -273,14 +283,23 @@ export const toPositiveInt = (value: unknown): number | null => {
     return Number.isInteger(raw) && raw > 0 ? raw : null;
 };
 
+/** Strict calendar dates: Date.UTC is used only to validate components, never to display a date. */
+const isValidIsoDay = (value: string): boolean => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const [year, month, day] = value.split('-').map(Number);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return parsed.getUTCFullYear() === year && parsed.getUTCMonth() + 1 === month && parsed.getUTCDate() === day;
+};
+
 export function parsePostShiftSearchParams(
     params?: PostShiftRawParams | null,
     defaults?: { startTime?: string; endTime?: string },
 ): ParsedPostShiftParams {
     const editingId = toPositiveInt(params?.edit);
-    const routePharmacyId = toPositiveInt(params?.pharmacyId) ?? toPositiveInt(params?.pharmacy_id);
+    const routePharmacyId = toPositiveInt(params?.pharmacyId)
+        ?? toPositiveInt(params?.pharmacy_id) ?? toPositiveInt(params?.pharmacy);
 
-    const rawDates = params?.dates;
+    const rawDates = params?.dates ?? params?.slot_dates;
     let parsedDates: string[] = [];
     if (typeof rawDates === 'string') {
         parsedDates = rawDates.split(',').map((d) => d.trim()).filter(Boolean);
@@ -290,17 +309,25 @@ export function parsePostShiftSearchParams(
             .map((d) => d.trim())
             .filter(Boolean);
     }
-    const singleDate = firstParam(params?.date).trim();
-    const dates = Array.from(new Set(parsedDates.length > 0 ? parsedDates : singleDate ? [singleDate] : [])).sort();
+    const singleDate = firstParam(params?.date ?? params?.slot_date).trim();
+    const dates = Array.from(new Set((parsedDates.length > 0 ? parsedDates : singleDate ? [singleDate] : [])
+        .filter(isValidIsoDay))).sort();
 
     const roleNeeded =
         normalizePrefillRole(firstParam(params?.role_needed)) ||
         normalizePrefillRole(firstParam(params?.role));
 
-    const rawStart = firstParam(params?.start_time).trim().slice(0, 5);
-    const rawEnd = firstParam(params?.end_time).trim().slice(0, 5);
-    const hasStartTime = /^\d{2}:\d{2}$/.test(rawStart);
-    const hasEndTime = /^\d{2}:\d{2}$/.test(rawEnd);
+    const rawStart = firstParam(params?.start_time ?? params?.start).trim().slice(0, 5);
+    const rawEnd = firstParam(params?.end_time ?? params?.end).trim().slice(0, 5);
+    const validClock = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+    const hasStartTime = validClock.test(rawStart);
+    const hasEndTime = validClock.test(rawEnd);
+    const visibilityCandidate = firstParam(params?.visibility).trim().toUpperCase();
+    const visibility = Object.prototype.hasOwnProperty.call(VISIBILITY_LABELS, visibilityCandidate)
+        ? visibilityCandidate as VisibilityTier : null;
+    const employmentCandidate = firstParam(params?.employment_type).trim().toUpperCase();
+    const employmentType = ['LOCUM', 'CASUAL', 'FULL_TIME', 'PART_TIME'].includes(employmentCandidate)
+        ? employmentCandidate as 'LOCUM' | 'CASUAL' | 'FULL_TIME' | 'PART_TIME' : null;
 
     return {
         editingId,
@@ -311,7 +338,9 @@ export function parsePostShiftSearchParams(
         endTime: hasEndTime ? rawEnd : (defaults?.endTime ?? '17:00'),
         hasStartTime,
         hasEndTime,
-        dedicatedUserId: toPositiveInt(params?.dedicated_user),
+        dedicatedUserId: toPositiveInt(params?.dedicated_user ?? params?.dedicated_user_id),
+        visibility,
+        employmentType,
         isEmbedded: firstParam(params?.embedded) === '1',
     };
 }
@@ -469,6 +498,8 @@ export type AppliedPrefills = {
     timesKey?: string;
     roleKey?: string;
     dedicatedUserKey?: string;
+    visibilityKey?: string;
+    employmentTypeKey?: string;
 };
 
 export type PrefillPlan = {
@@ -476,6 +507,8 @@ export type PrefillPlan = {
     applyTimes: boolean;
     applyRole: boolean;
     applyDedicatedUser: boolean;
+    applyVisibility: boolean;
+    applyEmploymentType: boolean;
     nextApplied: AppliedPrefills;
 };
 
@@ -483,13 +516,15 @@ export function getStablePostShiftParamsKey(params?: PostShiftRawParams | null):
     if (!params) return '';
     return [
         firstParam(params.edit),
-        firstParam(params.pharmacyId ?? params.pharmacy_id),
-        Array.isArray(params.dates) ? params.dates.join(',') : firstParam(params.dates),
-        firstParam(params.date),
+        firstParam(params.pharmacyId ?? params.pharmacy_id ?? params.pharmacy),
+        Array.isArray(params.dates ?? params.slot_dates) ? (params.dates ?? params.slot_dates as string[]).join(',') : firstParam(params.dates ?? params.slot_dates),
+        firstParam(params.date ?? params.slot_date),
         firstParam(params.role_needed ?? params.role),
-        firstParam(params.start_time),
-        firstParam(params.end_time),
-        firstParam(params.dedicated_user),
+        firstParam(params.start_time ?? params.start),
+        firstParam(params.end_time ?? params.end),
+        firstParam(params.dedicated_user ?? params.dedicated_user_id),
+        firstParam(params.visibility),
+        firstParam(params.employment_type),
         firstParam(params.embedded),
     ].join('|');
 }
@@ -505,6 +540,8 @@ export function computePrefillPlan(
             applyTimes: false,
             applyRole: false,
             applyDedicatedUser: false,
+            applyVisibility: false,
+            applyEmploymentType: false,
             nextApplied: applied,
         };
     }
@@ -519,17 +556,25 @@ export function computePrefillPlan(
 
     const dedicatedUserKey = parsed.dedicatedUserId != null ? String(parsed.dedicatedUserId) : '';
     const applyDedicatedUser = Boolean(dedicatedUserKey) && applied.dedicatedUserKey !== dedicatedUserKey;
+    const visibilityKey = parsed.visibility ?? '';
+    const employmentTypeKey = parsed.employmentType ?? '';
+    const applyVisibility = Boolean(visibilityKey) && applied.visibilityKey !== visibilityKey;
+    const applyEmploymentType = Boolean(employmentTypeKey) && applied.employmentTypeKey !== employmentTypeKey;
 
     return {
         applyDates,
         applyTimes,
         applyRole,
         applyDedicatedUser,
+        applyVisibility,
+        applyEmploymentType,
         nextApplied: {
             datesKey: datesKey || applied.datesKey,
             timesKey: timesKey || applied.timesKey,
             roleKey: roleKey || applied.roleKey,
             dedicatedUserKey: dedicatedUserKey || applied.dedicatedUserKey,
+            visibilityKey: visibilityKey || applied.visibilityKey,
+            employmentTypeKey: employmentTypeKey || applied.employmentTypeKey,
         },
     };
 }

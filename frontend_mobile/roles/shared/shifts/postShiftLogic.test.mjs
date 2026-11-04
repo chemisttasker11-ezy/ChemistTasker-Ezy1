@@ -590,3 +590,30 @@ test('Australian date selection is local, not serialized through UTC', () => {
     else process.env.TZ = previous;
   }
 });
+
+test('W3b post-shift deep links preserve the web query contract and apply once', () => {
+  const parsed = plain(parsePostShiftSearchParams({
+    pharmacy: '8', slot_dates: '2026-11-16,2026-02-30,bad-date', slot_date: '2026-11-20',
+    role_needed: 'technician', start: '07:30', end: '16:30',
+    employment_type: 'CASUAL', visibility: 'PLATFORM', dedicated_user_id: '33',
+  }));
+  assert.equal(parsed.routePharmacyId, 8);
+  assert.deepEqual(parsed.dates, ['2026-11-16']);
+  assert.equal(parsed.visibility, 'PLATFORM');
+  assert.equal(parsed.employmentType, 'CASUAL');
+  assert.equal(parsed.dedicatedUserId, 33);
+  assert.equal(parsed.startTime, '07:30');
+  assert.equal(parsed.endTime, '16:30');
+  const initial = computePrefillPlan({}, parsed, false);
+  assert.equal(initial.applyVisibility, true);
+  assert.equal(initial.applyEmploymentType, true);
+  const repeated = computePrefillPlan(initial.nextApplied, parsed, false);
+  assert.equal(repeated.applyVisibility, false);
+  assert.equal(repeated.applyEmploymentType, false);
+  const editing = computePrefillPlan({}, parsed, true);
+  assert.equal(editing.applyVisibility, false);
+  assert.equal(editing.applyEmploymentType, false);
+  const changedKey = getStablePostShiftParamsKey({ visibility: 'LOCUM_CASUAL', employment_type: 'PART_TIME' });
+  assert.notEqual(changedKey, getStablePostShiftParamsKey({ visibility: 'PLATFORM', employment_type: 'CASUAL' }));
+  assert.equal(parsePostShiftSearchParams({ start: '25:99', end: '17:10' }).hasStartTime, false);
+});
