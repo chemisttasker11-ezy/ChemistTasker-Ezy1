@@ -45,7 +45,8 @@ export async function listSavedContacts(accountId:number|string):Promise<SavedCo
  const publicLocal=saved.filter(row=>row.kind!=='pharmacy-invitation');
  if(invitations.length)await AsyncStorage.setItem(key(accountId),JSON.stringify(publicLocal));
  const protectedContacts=parseRows(protectedData).filter(row=>row.kind==='pharmacy-invitation');
- const merged=new Map(publicLocal.map(row=>[row.url,row]));
+ const merged=new Map<string,SavedContact>();
+ for(const row of publicLocal)merged.set(row.url,row);
  if(Array.isArray(cloud)){
   for(const row of cloud){
    const item=fromRemote(row);
