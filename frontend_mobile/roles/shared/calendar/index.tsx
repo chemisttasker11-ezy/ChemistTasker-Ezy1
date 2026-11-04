@@ -74,6 +74,9 @@ export default function SharedCalendarScreen() {
   const [memberships, setMemberships] = useState<any[]>([]);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<number | null>(null);
   const [pharmacyMembers, setPharmacyMembers] = useState<any[]>([]);
+  const memberRequestGeneration = useRef(0);
+  const feedRequestGeneration = useRef(0);
+  const feedScopeRef = useRef('');
   const [membersLoading, setMembersLoading] = useState(false);
   const [items, setItems] = useState<CalendarItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -153,22 +156,25 @@ export default function SharedCalendarScreen() {
   }, []);
 
   useEffect(() => {
+    const request = ++memberRequestGeneration.current;
+    // Members from one pharmacy cannot be selected for another pharmacy's note.
+    setPharmacyMembers([]);
     if (!selectedPharmacyId) {
-      setPharmacyMembers([]);
-      return;
+      setMembersLoading(false);
+      return () => { memberRequestGeneration.current += 1; };
     }
-    const loadMembers = async () => {
-      try {
-        setMembersLoading(true);
-        const data = await fetchMembershipsByPharmacy(selectedPharmacyId);
-        setPharmacyMembers(data as any);
-      } catch {
-        // keep previous members list if fetch fails
-      } finally {
-        setMembersLoading(false);
-      }
-    };
-    void loadMembers();
+    setMembersLoading(true);
+    void fetchMembershipsByPharmacy(selectedPharmacyId)
+      .then((data) => {
+        if (request === memberRequestGeneration.current) setPharmacyMembers(data as any);
+      })
+      .catch(() => {
+        if (request === memberRequestGeneration.current) setPharmacyMembers([]);
+      })
+      .finally(() => {
+        if (request === memberRequestGeneration.current) setMembersLoading(false);
+      });
+    return () => { memberRequestGeneration.current += 1; };
   }, [selectedPharmacyId]);
 
   useEffect(() => {
@@ -192,8 +198,16 @@ export default function SharedCalendarScreen() {
   }, [currentMonth]);
 
   const loadFeed = useCallback(async () => {
+    const request = ++feedRequestGeneration.current;
+    const scopeKey = `${selectedPharmacyId ?? ''}:${dateRange.from}:${dateRange.to}`;
+    if (feedScopeRef.current !== scopeKey) {
+      // A previous pharmacy/month must never appear under the next selection.
+      feedScopeRef.current = scopeKey;
+      setItems([]);
+    }
     if (!selectedPharmacyId) {
       setItems([]);
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -261,17 +275,20 @@ export default function SharedCalendarScreen() {
       });
 
       const combined = [...mappedEvents, ...mappedNotes];
-      setItems(combined);
+      if (request === feedRequestGeneration.current) setItems(combined);
     } catch {
-      setError('Unable to load calendar data.');
-      setItems([]);
+      if (request === feedRequestGeneration.current) {
+        setError('Unable to load calendar data.');
+        // Retain successfully loaded results when a same-scope refresh fails.
+      }
     } finally {
-      setLoading(false);
+      if (request === feedRequestGeneration.current) setLoading(false);
     }
   }, [selectedPharmacyId, dateRange.from, dateRange.to]);
 
   useEffect(() => {
     void loadFeed();
+    return () => { feedRequestGeneration.current += 1; };
   }, [loadFeed]);
 
   useEffect(() => {
