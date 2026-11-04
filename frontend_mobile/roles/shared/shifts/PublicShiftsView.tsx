@@ -608,9 +608,6 @@ function PublicShiftsBoard({
                     />
                 ) : (
                         <View style={styles.offerWorkspace}>
-                            {payrollNotice ? (
-                                <Text style={styles.successText}>{payrollNotice}</Text>
-                            ) : null}
                             {offerShifts.length === 0 ? (
                                 <ContentState
                                     kind="empty"
