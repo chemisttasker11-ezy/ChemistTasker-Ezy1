@@ -1,10 +1,11 @@
-import React, { Fragment, type ReactNode, useState } from 'react';
+import React, { Fragment, type ReactNode, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   BookOpen,
   CalendarDays,
   Newspaper,
+  PenLine,
   Users,
   ChevronRight,
   Clock,
@@ -19,6 +20,8 @@ import {
 } from 'lucide-react-native';
 import { ConfirmDialog, IconTile, ScalePressable, SectionCard, type Tone } from '@/components/ui';
 import { usePlatformTools } from '@/components/ParityToolsCard';
+import { chemistTaskerApi } from '@/config/api';
+import { openWebPage } from '@/features/explore/webLinks';
 import { useAuth } from '@/context/AuthContext';
 import { colors, font, radius, space, type } from '@/constants/tokens';
 import { type MoreItem, useShell } from './ShellContext';
@@ -92,7 +95,18 @@ export function MoreScreen({ children }: { children?: ReactNode }) {
   const shell = useShell();
   const tools = usePlatformTools();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const [canPublish, setCanPublish] = useState(false);
+  const [publisherError, setPublisherError] = useState('');
+  useEffect(() => {
+    let active = true;
+    setCanPublish(false);
+    if (!user) return () => { active = false; };
+    void chemistTaskerApi.contentManagement.getMe().then(response => {
+      if (active) setCanPublish(Boolean(response.administrator || Object.keys(response.areas || {}).length));
+    }).catch(() => { if (active) setCanPublish(false); });
+    return () => { active = false; };
+  }, [user?.id]);
   // Sign out sits just above the tab bar, so a stray tap asks first.
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -129,6 +143,13 @@ export function MoreScreen({ children }: { children?: ReactNode }) {
       <SectionCard title="Explore" flush dense>
         <Rows items={exploreItems} tone="blue" onItem={open} />
       </SectionCard>
+      {canPublish ? <SectionCard title="Publishing" flush dense>
+        <Rows items={[{ label: 'Publishing workspace (web sign-in required)', icon: PenLine, onPress: () => {
+          setPublisherError('');
+          void openWebPage('/content').catch(() => setPublisherError('Publishing workspace could not open. Try again.'));
+        } }]} tone="blue" onItem={open} />
+        {publisherError ? <Text accessibilityRole="alert" style={styles.publisherError}>{publisherError}</Text> : null}
+      </SectionCard> : null}
       {children}
       <SectionCard title="Account" flush dense>
         <Rows items={account} tone="violet" onItem={open} />
@@ -180,6 +201,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.status.red.bg,
   },
   dangerLabel: { color: colors.status.red.fg },
+  publisherError: { padding: space.md, color: colors.status.red.fg },
   // Inset to the label edge so each row's tile stays one column.
   divider: {
     height: StyleSheet.hairlineWidth,
