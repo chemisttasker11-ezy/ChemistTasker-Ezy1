@@ -65,6 +65,26 @@ class ExplorerVisibilityTests(TestCase):
         rows = body["results"] if isinstance(body, dict) else body
         self.assertEqual(sorted(r["headline"] for r in rows), ["fulltime", "live", "undated"])
 
+    def test_public_qr_reference_lookup_excludes_hidden_and_expired(self):
+        self.live.reference_code = "PUBLICLIVE12"
+        self.live.save(update_fields=['reference_code'])
+        self.expired.reference_code = "EXPIREDWORK12"
+        self.expired.save(update_fields=['reference_code'])
+        hidden = post_for(self.author, "hidden", reference_code="HIDDENWORK12", hidden_at=timezone.now())
+        for code, expected in (
+            ("PUBLICLIVE12", ["live"]),
+            ("EXPIREDWORK12", []),
+            ("HIDDENWORK12", []),
+            ("UNKNOWNWORK12", []),
+        ):
+            with self.subTest(code=code):
+                response = client_for().get(URL + "public-feed/", {'reference_code': code})
+                self.assertEqual(response.status_code, 200, response.data)
+                body = response.data
+                rows = body['results'] if isinstance(body, dict) else body
+                self.assertEqual([row['headline'] for row in rows], expected)
+        self.assertEqual(client_for().get(URL + "public-feed/", {'reference_code': "A" * 101}).status_code, 400)
+
     def test_plain_list_uses_the_feed_visibility_rule(self):
         self.assertEqual(self._headlines(""), ["fulltime", "live", "undated"])
 
