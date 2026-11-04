@@ -1,3 +1,4 @@
+@import '../landing_next/shared/mobile-install-prompt.css';
 /* src/index.css */
 
 @tailwind base;
@@ -76,3 +77,4 @@ button, input, select, textarea {
   font: 500 1rem/1.6 var(--ct-font-body, sans-serif);
   color: inherit;
 }
+

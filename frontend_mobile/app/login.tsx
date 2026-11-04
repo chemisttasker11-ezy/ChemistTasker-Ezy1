@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Linking, StyleSheet, Text, type TextInputInstance, View } from 'react-native';
+import { Alert, StyleSheet, Text, type TextInputInstance, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Fingerprint } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout, { AuthLink, AuthNotice, AuthPrompt } from '../components/AuthLayout';
 import { Button, TextField } from '@/components/ui';
 import { colors, font, space, type } from '@/constants/tokens';
+import { openWebPage } from '@/features/explore/webLinks';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
 import { hasOrganizationAccess, resolveInitialWorkspace, selectRolePersona } from '../utils/mobilePersona';
 import {
@@ -205,8 +206,8 @@ export default function LoginScreen() {
           <Text style={styles.terms}>By using ChemistTasker, you agree to the</Text>
           {/* 44pt AuthLinks: inline Text links are too small to tap. */}
           <View style={styles.legalLinks}>
-            <AuthLink label="Terms of Service" onPress={() => void Linking.openURL(TERMS_URL).catch(() => {})} disabled={busy} />
-            <AuthLink label="Privacy Policy" onPress={() => void Linking.openURL(PRIVACY_URL).catch(() => {})} disabled={busy} />
+            <AuthLink label="Terms of Service" onPress={() => void openWebPage('/terms-of-service').catch(() => {})} disabled={busy} />
+            <AuthLink label="Privacy Policy" onPress={() => void openWebPage('/privacy-policy').catch(() => {})} disabled={busy} />
           </View>
         </>
       }
@@ -284,9 +285,6 @@ export default function LoginScreen() {
     </AuthLayout>
   );
 }
-
-const TERMS_URL = 'https://www.chemisttasker.com.au/terms-of-service';
-const PRIVACY_URL = 'https://www.chemisttasker.com.au/privacy-policy';
 
 const styles = StyleSheet.create({
   passwordBlock: {

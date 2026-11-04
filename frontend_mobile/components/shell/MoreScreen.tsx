@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Newspaper,
   PenLine,
+  Settings2,
   Users,
   ChevronRight,
   Clock,
@@ -153,6 +154,9 @@ export function MoreScreen({ children }: { children?: ReactNode }) {
         {publisherError ? <Text accessibilityRole="alert" style={styles.publisherError}>{publisherError}</Text> : null}
       </SectionCard> : null}
       {children}
+      <SectionCard title="Mobile settings" flush dense>
+        <Rows items={[{ label: 'Security, notifications and permissions', icon: Settings2, route: '/settings/mobile' }]} tone="blue" onItem={open} />
+      </SectionCard>
       <SectionCard title="Account" flush dense>
         <Rows items={account} tone="violet" onItem={open} />
         {account.length ? <View style={styles.divider} /> : null}

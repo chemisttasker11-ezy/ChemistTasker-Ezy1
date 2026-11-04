@@ -17,8 +17,9 @@ import './index.css';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 import App from './App';
+import MobileInstallPrompt from './components/MobileInstallPrompt';
 import PublicRouteBridge from './components/PublicRouteBridge';
-function WebRoot(){return <PublicRouteBridge><App/></PublicRouteBridge>;}
+function WebRoot(){return <PublicRouteBridge><App/><MobileInstallPrompt path={window.location.pathname} /></PublicRouteBridge>;}
 import RouteLoadingState from './components/ui/RouteLoadingState';
 import RouteErrorState from './components/RouteErrorState';
 // Fetch home graphics alongside the session check, without loading them on app routes.
