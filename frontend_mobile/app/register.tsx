@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Text,
   type TextInputInstance,
-  Linking,
   Modal,
 } from 'react-native';
 import {
@@ -27,6 +26,7 @@ import { WebView } from 'react-native-webview';
 import { DatePickerModal } from 'react-native-paper-dates';
 import { NEWCOMER_MINIMUM_AGE, NEWCOMER_TYPES, ageFromBirthDate } from '@chemisttasker/shared-core';
 import { useAuth } from '../context/AuthContext';
+import { openWebPage } from '@/features/explore/webLinks';
 import AuthLayout, { AuthLink, AuthNotice, AuthPrompt } from '../components/AuthLayout';
 import { Button, ScalePressable, TextField } from '@/components/ui';
 import { sizeIcon } from '@/components/ui/icon';
@@ -39,8 +39,6 @@ const ROLE_OPTIONS = [
   { label: 'Pharmacy team', description: 'Assistant · Technician · Intern · Student', value: 'OTHER_STAFF', icon: <Users /> },
 ];
 
-const TERMS_URL = 'https://www.chemisttasker.com.au/terms-of-service';
-const PRIVACY_URL = 'https://www.chemisttasker.com.au/privacy-policy';
 // AuthContext.register throws exactly this for a taken email; web then offers Log in / Reset password.
 const DUPLICATE_EMAIL_MESSAGE =
   'There is already an account registered with this email. Please log in or reset your password.';
@@ -182,9 +180,9 @@ export default function RegisterScreen() {
     `;
   }, [recaptchaSiteKey]);
 
-  const openLink = async (url: string) => {
+  const openLink = async (path: string) => {
     try {
-      await Linking.openURL(url);
+      await openWebPage(path);
     } catch {
       setError('Unable to open link');
     }
@@ -432,8 +430,8 @@ export default function RegisterScreen() {
       </View>
       {/* 44pt AuthLinks: inline Text links inside the checkbox label were too small to tap. */}
       <View style={styles.legalLinks}>
-        <AuthLink label="Terms of Service" onPress={() => void openLink(TERMS_URL)} disabled={loading} />
-        <AuthLink label="Privacy Policy" onPress={() => void openLink(PRIVACY_URL)} disabled={loading} />
+        <AuthLink label="Terms of Service" onPress={() => void openLink('/terms-of-service')} disabled={loading} />
+        <AuthLink label="Privacy Policy" onPress={() => void openLink('/privacy-policy')} disabled={loading} />
       </View>
 
       {!recaptchaSiteKey ? (

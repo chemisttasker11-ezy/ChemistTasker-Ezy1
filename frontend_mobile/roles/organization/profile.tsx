@@ -1,7 +1,8 @@
 import { createFriendPillReferralService } from '@chemisttasker/shared-core';
 import { fetchPillBalanceService } from '@chemisttasker/shared-core';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { openWebPage } from '@/features/explore/webLinks';
 import {
   Avatar,
   Button,
@@ -208,14 +209,14 @@ export default function OrganizationProfileScreen() {
               title="Terms of Service"
               left={(props) => <List.Icon {...props} icon="file-document" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => Linking.openURL(`${webBaseUrl}/terms-of-service`)}
+              onPress={() => openWebPage('/terms-of-service').catch(() => Alert.alert('Website unavailable', 'Please try again.'))}
             />
             <Divider />
             <List.Item
               title="Privacy Policy"
               left={(props) => <List.Icon {...props} icon="shield-check" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => Linking.openURL(`${webBaseUrl}/privacy-policy`)}
+              onPress={() => openWebPage('/privacy-policy').catch(() => Alert.alert('Website unavailable', 'Please try again.'))}
             />
           </Surface>
         </View>

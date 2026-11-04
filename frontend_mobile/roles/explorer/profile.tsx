@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert, Linking } from 'react-native';
+import { ScrollView, StyleSheet, View, Alert } from 'react-native';
+import { openWebPage } from '@/features/explore/webLinks';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Avatar,
@@ -32,7 +33,6 @@ export default function ExplorerProfileScreen() {
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const appVersion = typeof Constants?.expoConfig?.version === 'string' ? Constants.expoConfig.version : '';
-  const webBaseUrl = 'https://www.chemisttasker.com.au';
   const imageMediaTypes = (ImagePicker as any).MediaType?.Images ?? ImagePicker.MediaTypeOptions.Images;
   const menuItems = [
     { title: 'Basic Info', description: 'Personal and contact details', icon: 'account-edit-outline', route: '/explorer/profile-basic-info' },
@@ -235,14 +235,14 @@ export default function ExplorerProfileScreen() {
               title="Terms of Service"
               left={(props) => <List.Icon {...props} icon="file-document" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => Linking.openURL(`${webBaseUrl}/terms-of-service`)}
+              onPress={() => openWebPage('/terms-of-service').catch(() => Alert.alert('Website unavailable', 'Please try again.'))}
             />
             <Divider />
             <List.Item
               title="Privacy Policy"
               left={(props) => <List.Icon {...props} icon="shield-check" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => Linking.openURL(`${webBaseUrl}/privacy-policy`)}
+              onPress={() => openWebPage('/privacy-policy').catch(() => Alert.alert('Website unavailable', 'Please try again.'))}
             />
           </Surface>
         </View>

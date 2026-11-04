@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { openWebPage } from '@/features/explore/webLinks';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -11,8 +12,6 @@ import { colors, font, radius, space, tokens, touch, type } from '@/constants/to
 import { durations, easings } from '@/constants/motion';
 import type { RegisterRole } from '@/utils/registerRole';
 
-const TERMS_URL = 'https://www.chemisttasker.com.au/terms-of-service';
-const PRIVACY_URL = 'https://www.chemisttasker.com.au/privacy-policy';
 const heroPhoto = require('../assets/images/landing/pharmacist-priya.jpg');
 // The light sheet rides up over the band by this much (same as AuthLayout).
 const SHEET_OVERLAP = 24;
@@ -237,8 +236,8 @@ export default function WelcomeScreen() {
                             {/* Links are 44pt AuthLinks on their own row; inline Text links are too small to tap. */}
                             <Text style={styles.footerText}>By continuing, you agree to our</Text>
                             <View style={styles.legalLinks}>
-                                <AuthLink label="Terms of Service" onPress={() => void Linking.openURL(TERMS_URL).catch(() => {})} />
-                                <AuthLink label="Privacy Policy" onPress={() => void Linking.openURL(PRIVACY_URL).catch(() => {})} />
+                                <AuthLink label="Terms of Service" onPress={() => void openWebPage('/terms-of-service').catch(() => {})} />
+                                <AuthLink label="Privacy Policy" onPress={() => void openWebPage('/privacy-policy').catch(() => {})} />
                             </View>
                         </View>
                     </View>

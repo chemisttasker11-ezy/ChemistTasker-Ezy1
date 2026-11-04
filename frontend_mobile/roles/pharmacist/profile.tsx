@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Linking } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { openWebPage } from '@/features/explore/webLinks';
 import { Card, Text, Button, Divider, Avatar, IconButton, List, Surface, Switch, Portal, Dialog, TextInput } from 'react-native-paper';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'expo-router';
@@ -19,7 +20,6 @@ export default function PharmacistProfileScreen() {
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const appVersion = typeof Constants?.expoConfig?.version === 'string' ? Constants.expoConfig.version : '';
-  const webBaseUrl = 'https://www.chemisttasker.com.au';
   const imageMediaTypes = (ImagePicker as any).MediaType?.Images ?? ImagePicker.MediaTypeOptions.Images;
 
   // Seed local photo from user profile (including onboarding photo) when available
@@ -185,14 +185,14 @@ export default function PharmacistProfileScreen() {
       title: 'Terms of Service',
       icon: 'file-document',
       onPress: () => {
-        Linking.openURL(`${webBaseUrl}/terms-of-service`);
+        openWebPage('/terms-of-service').catch(() => Alert.alert('Website unavailable', 'Please try again.'));
       },
     },
     {
       title: 'Privacy Policy',
       icon: 'shield-check',
       onPress: () => {
-        Linking.openURL(`${webBaseUrl}/privacy-policy`);
+        openWebPage('/privacy-policy').catch(() => Alert.alert('Website unavailable', 'Please try again.'));
       },
     },
   ];

@@ -1,6 +1,7 @@
 import { createFriendPillReferralService } from '@chemisttasker/shared-core';
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Linking, Share } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Share } from 'react-native';
+import { openWebPage } from '@/features/explore/webLinks';
 import { Text, Avatar, List, Button, Surface, Divider, Switch, IconButton, Card, Portal, Dialog, TextInput } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -280,7 +281,7 @@ export default function OwnerProfileScreen() {
               left={props => <List.Icon {...props} icon="file-document" />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
               onPress={() => {
-                Linking.openURL(`${webBaseUrl}/terms-of-service`);
+                openWebPage('/terms-of-service').catch(() => Alert.alert('Website unavailable', 'Please try again.'));
               }}
             />
             <Divider />
@@ -289,7 +290,7 @@ export default function OwnerProfileScreen() {
               left={props => <List.Icon {...props} icon="shield-check" />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
               onPress={() => {
-                Linking.openURL(`${webBaseUrl}/privacy-policy`);
+                openWebPage('/privacy-policy').catch(() => Alert.alert('Website unavailable', 'Please try again.'));
               }}
             />
           </Surface>
