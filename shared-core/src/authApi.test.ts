@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { configureApi, logoutSession, skipMobileOverseas } from './api';
+import { configureApi, logoutSession, skipMobileOverse } from './api';
+import { API_ENDPOINTS } from './constants/endpoints';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -93,7 +94,13 @@ function mobileClient() {
   const source = readFileSync(new URL('../../frontend_mobile/utils/apiClient.ts', import.meta.url), 'utf8');
   const mocks: Record<string, any> = {
     axios: { default: { create: () => client, CanceledError: Error } },
-    '@chemisttasker/shared-core': { reportAhpraError: () => undefined },
+    // This VM runs the real mobile API client against the canonical endpoint contract.
+    // A partial mock without API_ENDPOINTS crashed at import time, before any session assertion.
+    '@chemisttasker/shared-core': {
+      reportAhpraError: () => undefined,
+      API_ENDPOINTS,
+      AHPRA_UNREADABLE_MESSAGE: 'AHPRA registration information could not be read.',
+    },
     'react-native': { Platform: { OS: 'ios' } },
     './authSession': env.session,
     './browserAuth': {},
