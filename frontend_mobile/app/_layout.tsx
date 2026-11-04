@@ -306,7 +306,8 @@ function AuthGate() {
     const second = segmentList[1];
     const third = segmentList[2];
     const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
-    const isPublic = publicRoutes.has(top ?? '') || (top === 'membership' && second === 'apply' && Boolean(third));
+    const isExploreRoute = top === 'explore';
+    const isPublic = isExploreRoute || publicRoutes.has(top ?? '') || (top === 'membership' && second === 'apply' && Boolean(third));
 
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
     // It is never included in normal startup or navigation menus.
@@ -356,7 +357,7 @@ function AuthGate() {
         return;
       }
 
-      if (user && isPublic && !isSharedAuthenticatedRoute) {
+      if (user && isPublic && !isSharedAuthenticatedRoute && !isExploreRoute) {
         if (hasOrganizationAccess(user) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(String(user.role || '').toUpperCase())) {
           router.replace('/organization/dashboard' as any);
           return;
@@ -435,7 +436,7 @@ function AuthGate() {
         }
 
         if (hasOrganizationAccess(user)) {
-          if (top === 'organization') return;
+          if (top === 'organization' || isExploreRoute) return;
           if (isPublicShiftRoute(segments)) return;
           if (!['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(normalizedRole)) {
             router.replace('/organization/dashboard' as any);
@@ -463,7 +464,7 @@ function AuthGate() {
             return;
           }
 
-          if (isPublicShiftRoute(segments)) {
+          if (isPublicShiftRoute(segments) || isExploreRoute) {
             return;
           }
 
@@ -480,7 +481,7 @@ function AuthGate() {
           return;
         }
 
-        if (isPublicShiftRoute(segments)) {
+        if (isPublicShiftRoute(segments) || isExploreRoute) {
             return;
           }
 

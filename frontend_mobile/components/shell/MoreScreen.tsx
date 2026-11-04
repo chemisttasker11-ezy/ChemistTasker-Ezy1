@@ -2,7 +2,10 @@ import React, { Fragment, type ReactNode, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  BookOpen,
   CalendarDays,
+  Newspaper,
+  Users,
   ChevronRight,
   Clock,
   Gift,
@@ -32,6 +35,12 @@ const toolIcons: Record<string, LucideIcon> = {
 };
 
 const TILE = 36;
+
+const exploreItems: MoreItem[] = [
+  { label: 'Learning', icon: BookOpen, route: '/explore/learning' },
+  { label: 'Blog and news', icon: Newspaper, route: '/explore/blog' },
+  { label: 'Public community', icon: Users, route: '/explore/hubs' },
+];
 
 function Row({
   item,
@@ -117,6 +126,9 @@ export function MoreScreen({ children }: { children?: ReactNode }) {
           <Rows items={group.items} tone={group.tone} onItem={open} />
         </SectionCard>
       ))}
+      <SectionCard title="Explore" flush dense>
+        <Rows items={exploreItems} tone="blue" onItem={open} />
+      </SectionCard>
       {children}
       <SectionCard title="Account" flush dense>
         <Rows items={account} tone="violet" onItem={open} />

@@ -25,8 +25,12 @@ export default function LoginScreen() {
     referral_code?: string | string[];
     referral_event_id?: string | string[];
     referral_shift_id?: string | string[];
+    returnTo?: string | string[];
   }>();
 
+  const returnParam = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
+  // Preserve only first-party native public content routes, never arbitrary redirects.
+  const returnTo = typeof returnParam === 'string' && /^\/explore(?:\/[a-zA-Z0-9_%-]+)*$/.test(returnParam) ? returnParam : null;
   const referralParams: Record<string, string> = {};
   const refCode = Array.isArray(params.referral_code) ? params.referral_code[0] : params.referral_code;
   const refEventId = Array.isArray(params.referral_event_id) ? params.referral_event_id[0] : params.referral_event_id;
@@ -70,6 +74,11 @@ export default function LoginScreen() {
     // A fresh sign-in always starts in the account's original persona.
     await selectRolePersona(userData);
 
+    if (String(userData.role).toUpperCase() === 'OWNER') {
+      const setup = await getOwnerSetupStatus(userData);
+      if (setup.nextPath) { router.replace(setup.nextPath as never); return; }
+    }
+    if (returnTo) { router.replace(returnTo as never); return; }
     if (hasOrganizationAccess(userData) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(userData.role)) {
       router.replace('/organization/dashboard' as never);
     } else if (userData.role === 'OWNER') {

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeInUp, useReducedMotion } from 'react-native-reanimated';
-import { Building2, Check, LogIn, Search, ShieldCheck, Smartphone, UserPlus, Users } from 'lucide-react-native';
+import { BookOpen, Building2, Check, LogIn, Search, ShieldCheck, Smartphone, UserPlus, Users } from 'lucide-react-native';
 import { Button, IconTile, ScalePressable, type Tone } from '@/components/ui';
 import { AuthLink, BrandBand, BrandStatusStrip, useBrandTopRow } from '@/components/AuthLayout';
 import { colors, font, radius, space, tokens, touch, type } from '@/constants/tokens';
@@ -227,6 +227,13 @@ export default function WelcomeScreen() {
                                 ))}
                             </View>
 
+                            <View style={styles.section}>
+                                <Text accessibilityRole="header" style={styles.sectionTitle}>Explore ChemistTasker</Text>
+                                <ScalePressable pressBg onPress={() => router.push('/explore' as any)} accessibilityRole="button" accessibilityLabel="Explore learning, community, blog and news" style={styles.exploreLink}>
+                                    <BookOpen size={22} color={colors.primary} />
+                                    <Text style={styles.exploreText}>Learning, community, blog and news</Text>
+                                </ScalePressable>
+                            </View>
                             {/* Links are 44pt AuthLinks on their own row; inline Text links are too small to tap. */}
                             <Text style={styles.footerText}>By continuing, you agree to our</Text>
                             <View style={styles.legalLinks}>
@@ -348,6 +355,8 @@ const styles = StyleSheet.create({
     },
     sheetColumn: { gap: space['2xl'] },
     section: { gap: space.md },
+    exploreLink: { minHeight: touch.min, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.card, backgroundColor: colors.surfaceBg, borderColor: colors.border, borderWidth: 1 },
+    exploreText: { flex: 1, flexShrink: 1, color: colors.textPrimary, fontFamily: font.inter.semiBold, fontSize: 15 },
     sectionTitle: {
         color: colors.textPrimary,
         fontFamily: type.titleMedium.fontFamily,
