@@ -238,6 +238,11 @@ function PublicShiftsBoard({
     }, [loadSaved, userId]);
 
     useEffect(() => {
+        // Identity changes revoke the previous worker's verification and cached offers immediately.
+        let current = true;
+        setIsVerified(false);
+        setOffers([]);
+        setPayrollActivationOffers([]);
         const fetchVerification = async () => {
             try {
                 if (!user) return;
@@ -253,13 +258,14 @@ function PublicShiftsBoard({
                     onboarding?.verified ??
                     onboarding?.data?.verified ??
                     (roleKey === 'pharmacist' ? onboarding?.ahpra_verified : undefined);
-                setIsVerified(coerceVerified(verifiedFlag));
+                if (current) setIsVerified(coerceVerified(verifiedFlag));
             } catch (err) {
-                console.warn('Failed to fetch onboarding verification', err);
+                if (current) console.warn('Failed to fetch onboarding verification', err);
             }
         };
-        fetchVerification();
-    }, [user, user?.role]);
+        void fetchVerification();
+        return () => { current = false; };
+    }, [user?.id, user?.role]);
 
     useEffect(() => {
         const handle = setTimeout(() => setDebouncedFilters(filters), 350);
