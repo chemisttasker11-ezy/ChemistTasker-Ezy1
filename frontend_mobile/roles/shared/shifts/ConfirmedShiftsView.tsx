@@ -19,22 +19,9 @@ import { colors, radius, space } from '@/constants/tokens';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
 import { useShiftSurface } from './useShiftSurface';
 import { WorkerProfileDialog } from './WorkerProfileDialog';
-
-export type DeferredPayrollOffer = {
-    id: number;
-    paymentPreferenceSnapshot?: string;
-    settlementChannel?: string;
-    engagementKind?: string;
-    payrollActivatedAt?: string | null;
-    engagementTermsSnapshot?: {
-        payrollActivationRequired?: boolean;
-        pharmacyId?: number | string;
-        pharmacyName?: string;
-        workerName?: string;
-        awardClassification?: string;
-        payBasis?: string;
-    };
-};
+import { filterDeferredPayrollOffers, type DeferredPayrollOffer } from './confirmedPayroll';
+export { filterDeferredPayrollOffers } from './confirmedPayroll';
+export type { DeferredPayrollOffer } from './confirmedPayroll';
 
 export function filterShiftsByPharmacy(shifts: Shift[], scopedPharmacyId: number | null): Shift[] {
     if (!Array.isArray(shifts)) return [];
@@ -47,26 +34,6 @@ export function filterShiftsByPharmacy(shifts: Shift[], scopedPharmacyId: number
             (shift as any).pharmacyId ??
             (shift as any).pharmacy;
         const identity = typeof raw === 'object' && raw !== null ? raw.id : raw;
-        const id = identity == null || identity === '' ? NaN : Number(identity);
-        return Number.isSafeInteger(id) && id > 0 && id === scopedPharmacyId;
-    });
-}
-
-export function filterDeferredPayrollOffers(
-    offers: DeferredPayrollOffer[],
-    scopedPharmacyId: number | null,
-): DeferredPayrollOffer[] {
-    if (!Array.isArray(offers)) return [];
-    return offers.filter((offer) => {
-        const terms = offer.engagementTermsSnapshot;
-        const pref = String(offer.paymentPreferenceSnapshot || '').toUpperCase();
-        const kind = String(offer.engagementKind || '').toUpperCase();
-        if (pref === 'ABN') return false;
-        const isTfn = pref === 'TFN' || pref === 'PAYROLL' || kind === 'EMPLOYEE' || Boolean(terms?.payrollActivationRequired);
-        const pending = !offer.payrollActivatedAt;
-        if (!isTfn || !pending) return false;
-        if (scopedPharmacyId == null) return true;
-        const identity = terms?.pharmacyId;
         const id = identity == null || identity === '' ? NaN : Number(identity);
         return Number.isSafeInteger(id) && id > 0 && id === scopedPharmacyId;
     });
