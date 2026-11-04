@@ -59,6 +59,7 @@ const titles: Record<string, string> = {
   'invoice/new': 'New invoice',
   'invoice/[id]': 'Invoice',
   'messages/[id]': 'Chat',
+  chat: 'Chat',
   profile: 'Profile',
   'profile-detail': 'Profile details',
   'subscription-seats': 'Subscription',

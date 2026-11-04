@@ -12,6 +12,7 @@ import { colors } from '@/constants/tokens';
 import { PersonaShell, useWorkerShell } from '@/components/shell';
 
 const titles: Record<string, string> = {
+  index: 'Home',
   dashboard: 'Home',
   'shifts/index': 'Shifts',
   'shifts/[id]': 'Shift',
