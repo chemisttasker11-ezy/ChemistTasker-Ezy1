@@ -18,7 +18,6 @@ import {
     fetchSavedShifts,
     fetchShiftInterests,
     acceptShiftOfferService,
-    activateShiftOfferPayrollService,
     declineShiftOfferService,
     saveShift,
     submitShiftCounterOfferService,
@@ -133,8 +132,6 @@ function PublicShiftsBoard({
     const [offersError, setOffersError] = useState(false);
     const [termsState, setTermsState] = useState<TermsAcceptanceState>(() => createTermsAcceptanceState());
     const [termsConfirming, setTermsConfirming] = useState(false);
-    const [payrollActivatingId, setPayrollActivatingId] = useState<number | null>(null);
-    const [payrollNotice, setPayrollNotice] = useState('');
 
     useEffect(() => {
         if (activeTabOverride) {
@@ -389,8 +386,8 @@ function PublicShiftsBoard({
                         offer.paymentPreferenceSnapshot === 'TFN'
                         && offer.engagementKind === 'SHIFT_EMPLOYMENT'
                         && !offer.payrollActivatedAt
-                        && offer.settlementChannel !== 'PAYROLL'
-                        && Boolean(preview?.payrollEnabled)
+                        && offer.settlementChannel === 'TIMESHEET_ONLY'
+                        && preview?.payrollActivationRequired === true
                     );
                 })
             );
@@ -582,24 +579,6 @@ function PublicShiftsBoard({
         }
     };
 
-    const handleActivatePayroll = async (offer: ShiftOffer) => {
-        setPayrollActivatingId(offer.id);
-        setPayrollNotice('');
-        try {
-            await activateShiftOfferPayrollService(offer.id);
-            setPayrollNotice('ChemistTasker Payroll is now active for this confirmed shift.');
-            await loadOffers();
-        } catch (err) {
-            showError(errorMessage(
-                err,
-                'Payroll could not be activated yet. Complete your private TFN/super profile and try again.'
-            ));
-        } finally {
-            setPayrollActivatingId(null);
-        }
-    };
-
-
     const slotFilterMode =
         boardTab === 'interested' ? 'interested' : boardTab === 'rejected' ? 'rejected' : 'all';
     const boardTabForBoard = boardTab === 'saved' ? 'saved' : 'browse';
@@ -693,7 +672,7 @@ function PublicShiftsBoard({
                                                 <View style={styles.chipRow}>
                                                     <Pill label="TFN" tone="violet" />
                                                     <Pill
-                                                        label={ready ? 'Ready to activate payroll' : 'Timesheet only · setup required'}
+                                                        label={ready ? 'Ready for pharmacy activation' : 'Timesheet only · setup required'}
                                                         tone={ready ? 'green' : 'amber'}
                                                     />
                                                 </View>
@@ -726,11 +705,7 @@ function PublicShiftsBoard({
                                                             onPress={openPrivatePaymentProfile}
                                                         />
                                                     ) : null}
-                                                    <KitButton
-                                                        label={payrollActivatingId === offer.id ? 'Activating...' : 'Activate payroll'}
-                                                        disabled={!ready || payrollActivatingId === offer.id}
-                                                        onPress={() => void handleActivatePayroll(offer)}
-                                                    />
+                                                    <Text style={styles.placeholderText}>Your pharmacy manager activates payroll after confirming the requirements.</Text>
                                                 </View>
                                             </View>
                                         );
