@@ -40,6 +40,7 @@ export default function ExplorerProfileScreen() {
     { title: "What you're looking for", description: 'Placement, work experience or a first job', icon: 'heart-outline', route: '/explorer/profile-interests' },
     { title: 'References', description: 'Optional · earns the References badge', icon: 'account-group-outline', route: '/explorer/profile-referees' },
     { title: 'Bio', description: 'Short bio and resume', icon: 'file-account-outline', route: '/explorer/profile-bio' },
+    { title: 'App preferences', description: 'Notifications and communication settings', icon: 'cog-outline', route: '/app-preferences' },
   ];
 
   useEffect(() => {
