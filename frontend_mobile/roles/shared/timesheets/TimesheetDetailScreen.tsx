@@ -21,9 +21,8 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   const [success, setSuccess] = useState('');
   const [comment, setComment] = useState('');
   const [workerVisible, setWorkerVisible] = useState(true);
-  const [reason, setReason] = useState('');
+  const [reasonsByCheck, setReasonsByCheck] = useState<Record<number, string>>({});
   const [reopenReason, setReopenReason] = useState('');
-  const [checkBusy, setCheckBusy] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const request = ++generation.current;
@@ -74,16 +73,12 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
       setError('Fix this check at its attendance source. It cannot be waived.');
       return;
     }
-    const notes = reason.trim();
+    const notes = (reasonsByCheck[check.id] ?? '').trim();
     if (decision !== 'REOPENED' && !notes) {
       setError('A reason is required to resolve or waive this check.');
       return;
     }
-    setCheckBusy(check.id);
-    void run('check', () => workforce.decideTimesheetCheck(check.id, decision, notes || 'Reopened for review'), 'Timesheet check updated.').finally(() => {
-      setReason('');
-      setCheckBusy(null);
-    });
+    void run('check', () => workforce.decideTimesheetCheck(check.id, decision, notes || 'Reopened for review'), 'Timesheet check updated.').then(() => setReasonsByCheck(previous => ({ ...previous, [check.id]: '' })));
   };
 
   const approve = () => {
@@ -151,11 +146,11 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
                   <Button mode="outlined" onPress={() => router.push(check.code === 'UNRESOLVED_PROVISIONAL_ATTENDANCE' ? '/attendance/reviews' : `/attendance/corrections/new?timesheetId=${timesheetId}&sessionId=${data.snapshot.days.find(day => day.date === check.work_date)?.session_id ?? ''}` as any)}>Fix attendance</Button>
                 </> : null}
                 {managerMode && !sourceRequired ? <>
-                  <TextInput mode="outlined" dense label={resolved ? 'Reason to reopen (optional)' : 'Reason to resolve or waive'} value={reason} onChangeText={setReason} multiline disabled={busy !== ''} />
+                  <TextInput mode="outlined" dense label={resolved ? 'Reason to reopen (optional)' : 'Reason to resolve or waive'} value={reasonsByCheck[check.id] ?? ''} onChangeText={value => setReasonsByCheck(previous => ({ ...previous, [check.id]: value }))} multiline disabled={busy !== ''} />
                   <View style={styles.actions}>
                     {resolved ? <Button mode="outlined" disabled={busy !== ''} onPress={() => decideCheck(check, 'REOPENED')}>Reopen check</Button> : <>
-                      <Button mode="outlined" disabled={!reason.trim() || busy !== ''} onPress={() => decideCheck(check, 'RESOLVED')}>Resolve</Button>
-                      <Button mode="outlined" disabled={!reason.trim() || busy !== ''} onPress={() => decideCheck(check, 'WAIVED')}>Waive</Button>
+                      <Button mode="outlined" disabled={!(reasonsByCheck[check.id] ?? '').trim() || busy !== ''} onPress={() => decideCheck(check, 'RESOLVED')}>Resolve</Button>
+                      <Button mode="outlined" disabled={!(reasonsByCheck[check.id] ?? '').trim() || busy !== ''} onPress={() => decideCheck(check, 'WAIVED')}>Waive</Button>
                     </>}
                   </View>
                 </> : null}
