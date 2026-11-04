@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, Text } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
-import { listSavedContacts, removeContact, type SavedContact } from '@/features/share/savedContacts';
+import { listSavedContacts, removeContact, saveContact, type SavedContact } from '@/features/share/savedContacts';
 import { safeShareCodeLabel } from '@/features/share/shareCode';
 import { colors, radius, space } from '@/constants/tokens';
 
@@ -13,6 +13,7 @@ export default function SavedQrContacts() {
   const { user } = useAuth();
   const [contacts, setContacts] = useState<SavedContact[]>([]);
   const [error, setError] = useState('');
+  const [syncing, setSyncing] = useState(false);
   const generation = useRef(0);
   const id = user?.id;
   const reload = useCallback(async () => {
@@ -45,6 +46,27 @@ export default function SavedQrContacts() {
       if (ticket === generation.current) setContacts(rows);
     } catch { if (ticket === generation.current) setError('Could not remove this saved contact.'); }
   };
+  const syncDrafts = async () => {
+    if (id == null || syncing) return;
+    const ticket=++generation.current;
+    setSyncing(true); setError('');
+    try {
+      for (const contact of contacts) {
+        if (contact.kind === 'pharmacy-invitation' || contact.synced) continue;
+        await saveContact(id, contact);
+        if (ticket !== generation.current) return;
+      }
+      const rows=await listSavedContacts(id);
+      if (ticket === generation.current) {
+        setContacts(rows);
+        if (rows.some(row=>row.kind!=='pharmacy-invitation'&&!row.synced)) setError('Some saved contacts remain local. Check your connection and retry.');
+      }
+    } catch {
+      if (ticket===generation.current) setError('Some contacts could not sync. Your local drafts remain available.');
+    } finally {
+      if (ticket===generation.current) setSyncing(false);
+    }
+  };
   return <SafeAreaView style={styles.page} edges={['top','left','right','bottom']}>
     <ScrollView contentContainerStyle={styles.content}>
       <Button icon="arrow-left" onPress={() => router.back()}>Back</Button>
@@ -59,6 +81,8 @@ export default function SavedQrContacts() {
           <Button mode="outlined" onPress={() => void remove(contact.url)}>Remove</Button>
         </View>
       </Card.Content></Card>) : <Text style={styles.muted}>No saved QR contacts yet.</Text>}
+      {contacts.some(contact => contact.kind !== 'pharmacy-invitation' && !contact.synced) ?
+        <Button mode="contained" onPress={() => void syncDrafts()} disabled={syncing} loading={syncing}>Sync local drafts to my account</Button> : null}
       <Button mode="outlined" onPress={() => router.push('/share/scan' as any)}>Scan another code</Button>
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     </ScrollView>
