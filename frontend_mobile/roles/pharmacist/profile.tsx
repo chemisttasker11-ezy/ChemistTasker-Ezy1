@@ -259,6 +259,9 @@ export default function PharmacistProfileScreen() {
           </LinearGradient>
         </Card>
 
+        <Button mode="outlined" icon="qrcode" onPress={() => router.push('/share/worker' as any)} style={{ marginHorizontal: 16, marginVertical: 8 }}>
+          Show my public worker QR
+        </Button>
         <ProfileVerificationCard roleKey="pharmacist" role="PHARMACIST" routes={{ mobile: '/mobile-verify', ahpra: '/pharmacist/profile-basic-info', gov_id: '/pharmacist/profile-identity', referees: '/pharmacist/profile-referees' }} />
 
         <View style={styles.menuContainer}>

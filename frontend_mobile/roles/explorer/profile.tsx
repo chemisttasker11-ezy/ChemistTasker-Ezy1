@@ -198,6 +198,9 @@ export default function ExplorerProfileScreen() {
           </LinearGradient>
         </Card>
 
+        <Button mode="outlined" icon="qrcode" onPress={() => router.push('/share/worker' as any)} style={{ marginHorizontal: 16, marginVertical: 8 }}>
+          Show my public worker QR
+        </Button>
         <ProfileVerificationCard roleKey="explorer" role="EXPLORER" routes={{ mobile: '/mobile-verify', gov_id: '/explorer/profile-identity', referees: '/explorer/profile-referees' }} />
 
         <View style={styles.menuContainer}>
