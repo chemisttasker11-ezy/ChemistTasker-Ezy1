@@ -30,6 +30,7 @@ export default function WorkerPublishedRosterScreen() {
     const generation = ++request.current;
     setLoading(true);
     setError(null);
+    setShifts([]);
     try {
       const response = await rosterV2.getWorkerRoster({});
       const rows = Array.isArray((response as any)?.shifts) ? (response as any).shifts : [];
