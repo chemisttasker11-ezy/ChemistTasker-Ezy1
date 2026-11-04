@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import * as DocumentPicker from 'expo-document-picker';
 import { ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Button, Card, Text, TextInput } from 'react-native-paper';
@@ -33,6 +34,7 @@ export default function PublicHubFeed() {
   const [moreError, setMoreError] = useState('');
   const [actionError, setActionError] = useState('');
   const [body, setBody] = useState('');
+  const [attachments, setAttachments] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
 
   const load = useCallback(async () => {
     const ticket = ++generation.current;
@@ -73,6 +75,16 @@ export default function PublicHubFeed() {
     } finally { if (ticket === generation.current) setMoreBusy(false); }
   };
 
+  const chooseAttachments = async () => {
+    setActionError('');
+    try {
+      const selection = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true, type: '*/*' });
+      if (selection.canceled) return;
+      const large = selection.assets.find(asset => asset.size != null && asset.size > 15 * 1024 * 1024);
+      if (large) { setActionError(`${large.name} exceeds the 15 MB per-file limit.`); return; }
+      setAttachments(existing => [...existing, ...selection.assets].slice(0, 8));
+    } catch (failure: any) { setActionError(failure?.message || 'Unable to select attachments.'); }
+  };
   const create = async () => {
     if (!user || !info?.can_interact || submitting.current || !body.trim()) return;
     const ticket = generation.current;
@@ -82,8 +94,12 @@ export default function PublicHubFeed() {
       request.append('scope', 'platform');
       request.append('platform_hub', hub);
       request.append('body', body.trim());
+      for (const asset of attachments) {
+        if (asset.size != null && asset.size > 15 * 1024 * 1024) throw new Error('Attachment is too large (15 MB maximum).');
+        request.append('attachments', { uri: asset.uri, name: asset.name, type: asset.mimeType || 'application/octet-stream' } as any);
+      }
       await chemistTaskerApi.publicContent.createCommunityPost(request);
-      if (ticket === generation.current) { setBody(''); setBusy(false); submitting.current = false; await load(); }
+      if (ticket === generation.current) { setBody(''); setAttachments([]); setBusy(false); submitting.current = false; await load(); }
     } catch (failure: any) {
       if (ticket === generation.current) setActionError(failure?.message || 'Post could not be published. Your draft is retained.');
     } finally { submitting.current = false; if (ticket === generation.current) setBusy(false); }
@@ -112,6 +128,8 @@ export default function PublicHubFeed() {
           {info?.can_interact && user ? <Card mode="outlined" style={styles.card}><Card.Content style={styles.inner}>
             <Text variant="titleMedium">Share an update</Text>
             <TextInput mode="outlined" multiline label="Post to this community" maxLength={4000} value={body} onChangeText={setBody} disabled={busy} />
+            <Button mode="outlined" icon="paperclip" disabled={busy} onPress={() => void chooseAttachments()}>Attach files (15 MB each)</Button>
+            {attachments.map((file, index) => <Button key={file.uri + '-' + index} mode="text" disabled={busy} onPress={() => setAttachments(existing => existing.filter((_, i) => i !== index))}>{file.name} · remove</Button>)}
             <Button mode="contained" disabled={busy || !body.trim()} loading={busy} onPress={() => void create()}>Post</Button>
           </Card.Content></Card> : <Text style={styles.muted}>This community is readable publicly. Posting is available to eligible members.</Text>}
           {polls.map(poll => <Card key={poll.id} mode="outlined" style={styles.card}><Card.Content style={styles.inner}>

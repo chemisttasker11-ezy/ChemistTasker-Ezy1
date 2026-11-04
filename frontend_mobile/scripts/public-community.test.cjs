@@ -24,3 +24,12 @@ test('public hub details guard mutating operations with current post permissions
   assert.match(post, /publicContent\.reportPost/);
   assert.match(post, /publicContent\.deleteCommunityComment/);
 });
+
+test('community uploads use native document picker with 15 MB limit and server upload operation', () => {
+ const src = read('app/explore/hubs/[hub].tsx');
+ assert.match(src, /DocumentPicker\.getDocumentAsync/);
+ assert.match(src, /15 \* 1024 \* 1024/);
+ assert.match(src, /request\.append\('attachments',/);
+ assert.match(src, /createCommunityPost\(request\)/);
+ assert.match(src, /setAttachments\(\[\]\)/);
+});
