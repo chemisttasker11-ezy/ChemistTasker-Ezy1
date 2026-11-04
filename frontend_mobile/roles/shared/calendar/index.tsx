@@ -20,6 +20,7 @@ import {
 import { DatePickerModal, TimePickerModal } from 'react-native-paper-dates';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 import {
   addDays,
   addMonths,
@@ -65,6 +66,8 @@ import {
 export default function SharedCalendarScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
+  const membershipGenerationRef = useRef(0);
   const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{ date?: string; pharmacy_id?: string; note_id?: string }>();
 
@@ -137,23 +140,30 @@ export default function SharedCalendarScreen() {
     Array.isArray(value) ? value[0] : value ?? null;
 
   useEffect(() => {
+    const request = ++membershipGenerationRef.current;
+    setMemberships([]);
+    setSelectedPharmacyId(null);
+    setPharmacyMembers([]);
+    setItems([]);
     const loadMemberships = async () => {
+      if (!user?.id) return;
       try {
         const raw = await fetchMyMemberships({ page_size: 200 } as any);
+        if (request !== membershipGenerationRef.current) return;
         const list = normalizeList(raw);
         setMemberships(list);
-        if (list.length > 0 && selectedPharmacyId === null) {
-          const paramPharmacy = getParamString(params?.pharmacy_id);
-          const parsed = paramPharmacy ? Number(paramPharmacy) : null;
-          const initialId = Number.isFinite(parsed as number) ? (parsed as number) : getPharmacyId(list[0]);
-          setSelectedPharmacyId(Number.isFinite(initialId) ? initialId : getPharmacyId(list[0]));
-        }
+        const allowedIds = list.map((membership: any) => Number(
+          membership?.pharmacyId ?? membership?.pharmacy_id ?? membership?.pharmacyDetail?.id ?? membership?.pharmacy?.id
+        )).filter((id: number) => Number.isInteger(id) && id > 0);
+        const requested = Number(getParamString(params?.pharmacy_id));
+        setSelectedPharmacyId(allowedIds.includes(requested) ? requested : allowedIds[0] ?? null);
       } catch {
-        setError('Unable to load your pharmacy memberships.');
+        if (request === membershipGenerationRef.current) setError('Unable to load your pharmacy memberships.');
       }
     };
     void loadMemberships();
-  }, []);
+    return () => { membershipGenerationRef.current += 1; };
+  }, [user?.id]);
 
   useEffect(() => {
     const request = ++memberRequestGeneration.current;
@@ -328,11 +338,12 @@ export default function SharedCalendarScreen() {
     const pharmacyParam = getParamString(params?.pharmacy_id);
     if (pharmacyParam) {
       const nextPharmacyId = Number(pharmacyParam);
-      if (Number.isFinite(nextPharmacyId) && nextPharmacyId !== selectedPharmacyId) {
+      const authorized = memberships.some((membership) => Number(getPharmacyId(membership)) === nextPharmacyId);
+      if (authorized && Number.isInteger(nextPharmacyId) && nextPharmacyId > 0 && nextPharmacyId !== selectedPharmacyId) {
         setSelectedPharmacyId(nextPharmacyId);
       }
     }
-  }, [params, items, selectedPharmacyId]);
+  }, [params, items, selectedPharmacyId, memberships]);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
