@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { DeviceEventEmitter, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Divider, SegmentedButtons, Switch, Text } from 'react-native-paper';
@@ -7,7 +7,7 @@ import * as Notifications from 'expo-notifications';
 import { Camera } from 'expo-camera';
 import { useAuth } from '@/context/AuthContext';
 import { colors, radius, space } from '@/constants/tokens';
-import { getAppLockPreference, setAppLockPreference, validDelay, type AppLockDelay } from '@/utils/appLock';
+import { APP_LOCK_CHANGED, getAppLockPreference, setAppLockPreference, validDelay, type AppLockDelay } from '@/utils/appLock';
 import { fetchMobileAppConfig, getInstalledAppVersion, decideAppUpdate } from '@/utils/appUpdates';
 import {
   authenticateWithDeviceLock, disableBiometricLogin, enableBiometricLogin,
@@ -70,6 +70,7 @@ export default function MobileSettings() {
         return;
       }
       await setAppLockPreference(userId, { enabled, delaySeconds: delay });
+      DeviceEventEmitter.emit(APP_LOCK_CHANGED, userId);
       setAppLockEnabled(enabled);
       setAppLockDelay(delay);
       setMessage('App lock preference saved. The new setting applies the next time the app opens.');

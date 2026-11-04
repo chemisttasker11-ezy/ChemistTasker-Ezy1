@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export const APP_LOCK_CHANGED = 'ct-app-lock-preference-changed';
 export type AppLockDelay = 0 | 30 | 60 | 300;
 export type AppLockPreference = { enabled: boolean; delaySeconds: AppLockDelay };
 const DEFAULT: AppLockPreference = { enabled: false, delaySeconds: 60 };

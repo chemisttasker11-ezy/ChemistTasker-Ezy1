@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, Platform, StyleSheet, View } from 'react-native';
+import { AppState, DeviceEventEmitter, Platform, StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { authenticateWithDeviceLock } from '@/utils/biometricAuth';
-import { getAppLockPreference, needsUnlock, type AppLockPreference } from '@/utils/appLock';
+import { APP_LOCK_CHANGED, getAppLockPreference, needsUnlock, type AppLockPreference } from '@/utils/appLock';
 import { colors, space } from '@/constants/tokens';
 
 function ScopedLock({userId}:{userId:number}) {
@@ -28,6 +28,13 @@ function ScopedLock({userId}:{userId:number}) {
    setHidden(false);
   });
   return ()=>{alive=false;};
+ },[userId]);
+ useEffect(()=>{
+  const prefSubscription=DeviceEventEmitter.addListener(APP_LOCK_CHANGED,(changedId:number)=>{
+   if(changedId!==userId)return;
+   void getAppLockPreference(userId).then(value=>{prefRef.current=value;setPref(value);});
+  });
+  return ()=>prefSubscription.remove();
  },[userId]);
  useEffect(()=>{
   if(Platform.OS==='web')return;
