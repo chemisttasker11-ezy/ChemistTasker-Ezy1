@@ -48,10 +48,12 @@ export function AnonymousShiftBoardScreen() {
   const { user, hasCapability } = useAuth();
   const { isLoading: workspaceLoading, selectedPharmacyId } = useWorkspace();
 
-  const searchParams = useLocalSearchParams<{ referral_code?: string; referral_event_id?: string; referral_shift_id?: string }>();
+  const searchParams = useLocalSearchParams<{ referral_code?: string; referral_event_id?: string; referral_shift_id?: string; organization?: string }>();
   const referralCode = searchParams.referral_code ?? null;
   const referralEventId = searchParams.referral_event_id ?? null;
   const referralShiftId = searchParams.referral_shift_id ?? null;
+  const organizationId = Number(searchParams.organization);
+  const validOrganizationId = Number.isSafeInteger(organizationId) && organizationId > 0 ? organizationId : null;
 
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +77,7 @@ export function AnonymousShiftBoardScreen() {
 
     try {
       const payload: any = { page: 1 };
+      if (validOrganizationId) payload.organization = validOrganizationId;
       if (search.trim()) payload.search = search.trim();
       if (selectedRole !== 'ALL') payload.roles = [selectedRole];
 
@@ -99,7 +102,7 @@ export function AnonymousShiftBoardScreen() {
         setLoadingMore(false);
       }
     }
-  }, [search, selectedRole]);
+  }, [search, selectedRole, validOrganizationId]);
 
   const loadMoreShifts = useCallback(async () => {
     if (!nextPage || loadingMore || loading || refreshing) return;
@@ -109,6 +112,7 @@ export function AnonymousShiftBoardScreen() {
 
     try {
       const payload: any = { page: nextPage };
+      if (validOrganizationId) payload.organization = validOrganizationId;
       if (search.trim()) payload.search = search.trim();
       if (selectedRole !== 'ALL') payload.roles = [selectedRole];
 
@@ -132,7 +136,7 @@ export function AnonymousShiftBoardScreen() {
         setLoadingMore(false);
       }
     }
-  }, [nextPage, loadingMore, loading, refreshing, search, selectedRole]);
+  }, [nextPage, loadingMore, loading, refreshing, search, selectedRole, validOrganizationId]);
 
   useEffect(() => {
     const handle = setTimeout(() => { void loadShifts(false); }, 250);

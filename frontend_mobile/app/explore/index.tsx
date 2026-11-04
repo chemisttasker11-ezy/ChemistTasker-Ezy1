@@ -11,6 +11,7 @@ const items = [
   { title: 'Blog', description: 'Perspectives, stories and career advice.', route: '/explore/blog' },
   { title: 'News', description: 'Industry news and pharmacy updates.', route: '/explore/news' },
   { title: 'Community hubs', description: 'Public discussions and community updates.', route: '/explore/hubs' },
+  { title: 'Find talent', description: 'Read public pharmacy talent profiles.', route: '/explore/talent-board' },
 ];
 
 export default function ExploreIndex() {
@@ -38,6 +39,7 @@ export default function ExploreIndex() {
         <Button mode="outlined" icon="open-in-new" onPress={() => void visit(openCalculatorWebsite)}>Open website</Button>
       </Card.Content></Card>
       <Button mode="text" onPress={() => void visit(() => openWebPage('/pricing'))}>Pricing</Button>
+      <Button mode="text" onPress={() => void visit(() => openWebPage('/pricing/organization'))}>Organisation pricing</Button>
       <Button mode="text" onPress={() => void visit(() => openWebPage('/terms-of-service'))}>Terms of Service</Button>
       <Button mode="text" onPress={() => void visit(() => openWebPage('/privacy-policy'))}>Privacy Policy</Button>
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}

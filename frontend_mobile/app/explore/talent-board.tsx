@@ -29,6 +29,8 @@ function nextPage(url: string | null | undefined): number | null {
 export default function PublicTalentBoard() {
   const router = useRouter();
   const { user } = useAuth();
+  const role = String(user?.role || '').toUpperCase();
+  const workspace = role === 'OWNER' ? '/owner/talent-board' : ['ORGANIZATION','ORG_OWNER','ORG_ADMIN','ORG_STAFF','CHIEF_ADMIN','REGION_ADMIN'].includes(role) ? '/organization/talent-board' : role === 'PHARMACIST' ? '/pharmacist/talent-board' : role === 'OTHER_STAFF' ? '/otherstaff/talent-board' : '/explorer/talent-board';
   const generation = useRef(0);
   const busyRef = useRef(false);
   const [rows, setRows] = useState<Talent[]>([]);
@@ -82,7 +84,7 @@ export default function PublicTalentBoard() {
           {item.location_state || item.location_suburb ? <Text style={styles.muted}>{[item.location_suburb, item.location_state].filter(Boolean).join(', ')}</Text> : null}
           {item.availability_summary ? <Text style={styles.muted}>{item.availability_summary}</Text> : null}
           {item.work_types?.length ? <Text style={styles.muted}>{item.work_types.join(' · ')}</Text> : null}
-          <Button mode="outlined" contentStyle={styles.button} onPress={() => router.push(user ? '/explorer/talent-board' as any : { pathname: '/login', params: { returnTo: '/explore/talent-board' } } as any)}>
+          <Button mode="outlined" contentStyle={styles.button} onPress={() => router.push(user ? workspace as any : { pathname: '/login', params: { returnTo: '/explore/talent-board' } } as any)}>
             {user ? 'Open talent workspace' : 'Sign in to contact talent'}
           </Button>
         </Card.Content></Card>) : <Text>No public talent listings are available yet.</Text>}

@@ -93,7 +93,7 @@ export function ArticleDetail({ slug }: { slug: string }) {
     try {
       const summary = article.reactions.mine
         ? await chemistTaskerApi.publicContent.removeArticleReaction(slug)
-        : await chemistTaskerApi.publicContent.reactToArticle(slug, { kind: 'LIKE' });
+        : await chemistTaskerApi.publicContent.reactToArticle(slug, { kind: 'like' });
       if (ticket === generation.current) setArticle(old => old ? { ...old, reactions: summary } : null);
     } catch (failure: any) {
       if (ticket === generation.current) setActionError(failure?.message || 'Could not update reaction.');

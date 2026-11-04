@@ -83,7 +83,7 @@ export default function PublicHubFeed() {
       request.append('platform_hub', hub);
       request.append('body', body.trim());
       await chemistTaskerApi.publicContent.createCommunityPost(request);
-      if (ticket === generation.current) { setBody(''); await load(); }
+      if (ticket === generation.current) { setBody(''); setBusy(false); submitting.current = false; await load(); }
     } catch (failure: any) {
       if (ticket === generation.current) setActionError(failure?.message || 'Post could not be published. Your draft is retained.');
     } finally { submitting.current = false; if (ticket === generation.current) setBusy(false); }

@@ -54,7 +54,7 @@ export default function PublicHubPostDetail() {
     setBusy(true); setActionError('');
     try {
       await perform();
-      if (ticket === requestRef.current && reload) await load();
+      if (ticket === requestRef.current && reload) { setBusy(false); await load(); }
     } catch (failure: any) {
       if (ticket === requestRef.current) setActionError(failure?.message || 'This action failed. Please retry.');
     } finally { if (ticket === requestRef.current) setBusy(false); }
@@ -90,12 +90,12 @@ export default function PublicHubPostDetail() {
             {user && post.can_interact ? <>
               <Button mode="outlined" disabled={busy} onPress={() => void act(() => chemistTaskerApi.publicContent.reactToCommunityPost(id, 'LIKE'))}>Like</Button>
               <Button mode="outlined" disabled={busy} onPress={() => void act(() => chemistTaskerApi.publicContent.removeCommunityPostReaction(id))}>Remove reaction</Button>
-            </> : <Button mode="outlined" onPress={signIn} disabled={!!user}>Sign in to react</Button>}
+            </> : user ? <Text style={styles.muted}>Reactions require an eligible community membership.</Text> : <Button mode="outlined" onPress={signIn}>Sign in to react</Button>}
             <Button mode="outlined" onPress={() => void Share.share({ message: publicWebUrl('/hubs/posts/' + id) }).catch(() => setActionError('Sharing unavailable.'))}>Share</Button>
           </View>
           {user && post.can_edit ? <View style={styles.block}>
             <Button mode="outlined" onPress={() => { setEditing('post'); setEditBody(post.body); }}>Edit my post</Button>
-            <Button mode="outlined" disabled={busy} onPress={() => void act(() => chemistTaskerApi.publicContent.deleteCommunityPost(id))}>Delete my post</Button>
+            <Button mode="outlined" disabled={busy} onPress={() => void act(async () => { await chemistTaskerApi.publicContent.deleteCommunityPost(id); router.replace(('/explore/hubs/' + encodeURIComponent(post.platform_hub)) as any); }, false)}>Delete my post</Button>
           </View> : null}
         </Card.Content></Card>
         {editing !== null ? <Card mode="outlined" style={styles.card}><Card.Content style={styles.block}>
