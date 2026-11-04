@@ -150,6 +150,7 @@ export {
   acceptShiftCounterOfferService,
   rejectShiftCounterOfferService,
   fetchShiftOffersService,
+  fetchDeferredPayrollOffersService,
   acceptShiftOfferService,
   activateShiftOfferPayrollService,
   declineShiftOfferService,
