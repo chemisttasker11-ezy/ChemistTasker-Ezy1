@@ -1,4 +1,4 @@
-import React,{useCallback,useEffect,useMemo,useState}from'react';
+import React,{useCallback,useEffect,useMemo,useRef,useState}from'react';
 import{View}from'react-native';
 import{Button,Chip,IconButton}from'react-native-paper';
 import{DatePickerInput}from'react-native-paper-dates';
@@ -16,21 +16,40 @@ export function EthicalMarketplaceScreen({screen}:{screen:EthicalScreen}){
  const router=useRouter();const params=useLocalSearchParams<{id?:string}>();const id=String(params.id||'');
  const workspace=useWorkspace();const pharmacyId=workspace.selectedPharmacyId;
  const[access,setAccess]=useState<any>(null),[approval,setApproval]=useState<any>(null),[grants,setGrants]=useState<any>(null),[lots,setLots]=useState<any[]>([]),[listings,setListings]=useState<any[]>([]),[transfers,setTransfers]=useState<any[]>([]),[transfer,setTransfer]=useState<any>(null),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[error,setError]=useState('');
- const context=useMemo(()=>asArray<any>(access?.contexts).find(x=>Number(x.pharmacy_id)===Number(pharmacyId)),[access,pharmacyId]);
- const load=useCallback(async()=>{setError('');try{
-   const a=await api.getAccess();setAccess(a);
-   if(screen==='access'){setLoading(false);return;}
-   if(!pharmacyId){setLoading(false);return;}
-   if(screen==='pharmacy')setApproval(await api.getPharmacyApproval(pharmacyId));
-   if(screen==='grants')setGrants(await api.getPharmacyGrants(pharmacyId));
-   if(['inventory','scan','lot','listing-new','listing-s8'].includes(screen))setLots(asArray(await api.getLots({pharmacy:pharmacyId})));
-   if(screen==='listings'){const r=await api.getMyListings({pharmacy:pharmacyId});setListings(asArray((r as any).results));}else if(screen==='requests'){const r=await api.listListings({pharmacy:pharmacyId});setListings(asArray((r as any).results));}
-   if(['requests','transfers','transfer','documents','complete'].includes(screen)){setTransfers(asArray(await api.listTransfers({pharmacy:pharmacyId})));if(['transfer','documents','complete'].includes(screen)&&id)setTransfer(await api.getTransfer(id));}
- }catch(e){setError(errorMessage(e,'Unable to load Ethical Marketplace.'));}finally{setLoading(false);setRefreshing(false);}},[screen,pharmacyId,id]);
- useEffect(()=>{void load();},[load]);
+ const requestRef=useRef(0);
+ const context=useMemo(()=>pharmacyId?asArray<any>(access?.contexts).find(x=>Number(x.pharmacy_id)===Number(pharmacyId)):undefined,[access,pharmacyId]);
+ const load=useCallback(async()=>{
+   const request=++requestRef.current;
+   setLoading(true);setError('');setAccess(null);setApproval(null);setGrants(null);setLots([]);setListings([]);setTransfers([]);setTransfer(null);
+   try{
+     const a=await api.getAccess();
+     if(request!==requestRef.current)return;
+     setAccess(a);
+     if(screen==='access'||!pharmacyId)return;
+     const admitted=asArray<any>((a as any)?.contexts).find(x=>Number(x.pharmacy_id)===Number(pharmacyId));
+     // Do not request or display protected ethical data before server-admitted pharmacy scope is known.
+     if(!admitted||(screen!=='pharmacy'&&!admitted.admitted))return;
+     if(screen==='pharmacy'){const response=await api.getPharmacyApproval(pharmacyId);if(request===requestRef.current)setApproval(response);}
+     if(screen==='grants'){const response=await api.getPharmacyGrants(pharmacyId);if(request===requestRef.current)setGrants(response);}
+     if(['inventory','scan','lot','listing-new','listing-s8'].includes(screen)){const response=await api.getLots({pharmacy:pharmacyId});if(request===requestRef.current)setLots(asArray(response));}
+     if(screen==='listings'){const response=await api.getMyListings({pharmacy:pharmacyId});if(request===requestRef.current)setListings(asArray((response as any)?.results));}
+     else if(screen==='requests'){const response=await api.listListings({pharmacy:pharmacyId});if(request===requestRef.current)setListings(asArray((response as any)?.results));}
+     if(['requests','transfers','transfer','documents','complete'].includes(screen)){
+       const response=await api.listTransfers({pharmacy:pharmacyId});
+       if(request===requestRef.current)setTransfers(asArray(response));
+       if(['transfer','documents','complete'].includes(screen)&&id){
+         const detail=await api.getTransfer(id);
+         if(request===requestRef.current)setTransfer(detail);
+       }
+     }
+   }catch(e){if(request===requestRef.current)setError(errorMessage(e,'Unable to load Ethical Marketplace.'));}
+   finally{if(request===requestRef.current){setLoading(false);setRefreshing(false);}}
+ },[screen,pharmacyId,id]);
+ useEffect(()=>{void load();return()=>{requestRef.current+=1;};},[load]);
 
  if(screen==='access')return <Access access={access} loading={loading} error={error}/>;
  if(!pharmacyId)return <ParityPage title="Ethical Marketplace" subtitle="Verified pharmacy context required."><PharmacyRequired onOpen={()=>router.push('/owner/dashboard' as any)}/></ParityPage>;
+ if(screen!=='pharmacy'&&!loading&&!error&&(!access||!context))return <ParityPage title="Ethical Marketplace access" subtitle="This pharmacy is not currently available for private medicine exchange."><InfoNote title="Verified pharmacy required" tone="warning">Choose a current authorized pharmacy context from Ethical Marketplace access.</InfoNote><Button mode="outlined" onPress={()=>router.replace('/marketplace/ethical/access' as any)}>Review pharmacy access</Button></ParityPage>;
  if(screen!=='pharmacy'&&context&&!context.admitted)return <ParityPage title="Ethical Marketplace access" subtitle="Private medicine exchange is gated by verified pharmacy approval." loading={loading} error={error}><InfoNote title="Access required" tone="warning">{context.blockers?.map((b:any)=>b.message||b.code).join(' · ')||'Complete pharmacy approval before using Ethical Marketplace.'}</InfoNote><Button mode="contained" onPress={()=>router.push('/marketplace/ethical/pharmacy' as any)}>Open pharmacy approval</Button></ParityPage>;
  if(screen==='pharmacy')return <Approval approval={approval} context={context} loading={loading} error={error} onReload={load}/>;
  if(screen==='grants')return <Grants data={grants} context={context} loading={loading} error={error} onReload={load}/>;
