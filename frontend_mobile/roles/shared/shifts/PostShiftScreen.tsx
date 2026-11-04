@@ -550,11 +550,11 @@ export default function PostShiftScreen() {
         applyBookingPrefillFromParams();
     }, [applyBookingPrefillFromParams]);
 
-    const runInitLoad = useCallback(async () => {
+    const runInitLoad = useCallback(async (preserveDraft = false) => {
         const gen = ++loadGenRef.current;
         setLoadError(null);
         setLoading(true);
-        if (!editingId) {
+        if (!editingId && !preserveDraft) {
             resetForm({ preservePrefills: true });
         }
 
@@ -606,7 +606,12 @@ export default function PostShiftScreen() {
                 pharmacies: pharmacyList,
             });
             if (nextPharmacy !== '') {
-                setPharmacyId(nextPharmacy);
+                setPharmacyId(current => preserveDraft && pharmacyList.some(p => String(p.id) === current)
+                    ? current
+                    : nextPharmacy);
+            } else if (preserveDraft) {
+                // A previously selected pharmacy can disappear after permissions change.
+                setPharmacyId(current => pharmacyList.some(p => String(p.id) === current) ? current : '');
             }
             applyBookingPrefillFromParams();
             setLoading(false);
@@ -635,9 +640,9 @@ export default function PostShiftScreen() {
     }, [currentInitScope, runInitLoad]);
 
     const retryInitialLoad = useCallback(() => {
-        appliedPrefillsRef.current = {};
+        // Retrying the same scope must not erase the user's unsaved form edits or replay URL prefills.
         prevInitScopeRef.current = currentInitScope;
-        void runInitLoad();
+        void runInitLoad(true);
     }, [currentInitScope, runInitLoad]);
 
 
