@@ -352,26 +352,48 @@ export default function SetAvailabilityScreen() {
     return null;
   }, [user?.role]);
 
+  const [availabilityLoadError, setAvailabilityLoadError] = useState(false);
+  const [availabilityReloadKey, setAvailabilityReloadKey] = useState(0);
+  const [availabilityLoading, setAvailabilityLoading] = useState(true);
+
   useEffect(() => {
+    let current = true;
+    // A different signed-in worker must never see the previous worker's availability.
+    setAvailabilityEntries([]);
+    setNotifyNewShifts(false);
+    setAvailabilityLoading(true);
+    setAvailabilityLoadError(false);
     const fetchAvailability = async () => {
       try {
         const entries = await fetchUserAvailabilityService();
+        if (!current) return;
         setAvailabilityEntries(entries as AvailabilityEntry[]);
         setNotifyNewShifts(
           (entries as any[]).some((entry) => Boolean(entry?.notifyNewShifts ?? entry?.notify_new_shifts))
         );
       } catch {
-        showSnackbar('Failed to load availability', 'error');
+        if (current) setAvailabilityLoadError(true);
+      } finally {
+        if (current) setAvailabilityLoading(false);
       }
     };
-    void fetchAvailability();
-  }, []);
+    if (user?.id) void fetchAvailability();
+    else setAvailabilityLoading(false);
+    return () => { current = false; };
+  }, [user?.id, availabilityReloadKey]);
 
   useEffect(() => {
+    let current = true;
+    // Clear personal travel details before loading a different account.
+    setLocationForm({
+      streetAddress: '', suburb: '', state: '', postcode: '', openToTravel: false,
+      travelStates: [], latitude: null, longitude: null, googlePlaceId: '', coverageRadiusKm: 30,
+    });
     const fetchLocation = async () => {
-      if (!onboardingRole) return;
+      if (!onboardingRole || !user?.id) return;
       try {
         const onboarding: any = await getOnboarding(onboardingRole as any);
+        if (!current) return;
         setLocationForm({
           streetAddress: onboarding?.street_address || '',
           suburb: onboarding?.suburb || '',
@@ -385,11 +407,12 @@ export default function SetAvailabilityScreen() {
           coverageRadiusKm: onboarding?.coverage_radius_km || 30,
         });
       } catch {
-        showSnackbar('Failed to load location from onboarding', 'error');
+        if (current) showSnackbar('Failed to load location from onboarding', 'error');
       }
     };
     void fetchLocation();
-  }, [onboardingRole]);
+    return () => { current = false; };
+  }, [onboardingRole, user?.id]);
 
   const handleNativePlaceSelected = (place: {
     address: string;
@@ -539,6 +562,13 @@ export default function SetAvailabilityScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text variant="headlineMedium" style={styles.title}>Set Your Availability</Text>
+        {availabilityLoading ? <Text style={styles.hint}>Loading your saved availability...</Text> : null}
+        {availabilityLoadError ? (
+          <Surface style={styles.card} elevation={0}>
+            <Text style={styles.hint}>Saved availability could not be loaded. Please retry before making changes.</Text>
+            <Button mode="outlined" onPress={() => setAvailabilityReloadKey((v) => v + 1)}>Retry availability</Button>
+          </Surface>
+        ) : null}
 
         <Surface style={styles.notifyCard} elevation={1}>
           <View style={styles.checkboxRowPlain}>
