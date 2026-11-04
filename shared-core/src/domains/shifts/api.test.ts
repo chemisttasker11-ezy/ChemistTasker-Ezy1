@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { configureApi } from '../../transport/application';
+import { deleteShiftDescriptionTemplate } from './descriptionTemplates';
 import { getActiveShiftDetail, getCommunityShiftDetail, getPublicShiftDetail, getActiveShiftsPage, getConfirmedShiftsPage, fetchAllActiveShifts, fetchAllConfirmedShifts, acceptShiftOfferService } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -73,4 +74,15 @@ it('echoes the version of each reviewed shift offer while preserving no-consent 
         engagement_terms_accepted: false,
         independent_contractor_status_confirmed: false,
     });
+});
+
+it('deletes a scoped shift-description template through the shared SDK', async () => {
+    const requests: Array<{ url: string; method: string }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({url: String(input), method: init?.method ?? 'GET'});
+        return new Response(null, { status: 204 });
+    }) as unknown as typeof fetch;
+    configureApi({baseURL: 'https://dashboard.example.test/api/v1', getToken: async () => null, fetchImpl});
+    await deleteShiftDescriptionTemplate(31);
+    expect(requests).toEqual([{url: 'https://dashboard.example.test/api/v1/shift-description-templates/31/', method: 'DELETE'}]);
 });
