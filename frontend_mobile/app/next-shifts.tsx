@@ -6,13 +6,17 @@ import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
 import { fetchMyConfirmedShifts } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { colors, radius, space } from '@/constants/tokens';
-import { calendarEditorUrl, directionsUrl, upcomingShifts, type OfflineShift } from '@/features/nextShift/nextShiftModel';
+import { calendarEditorUrl, directionsUrl, sanitizeConfirmedShifts, upcomingShifts, type OfflineShift } from '@/features/nextShift/nextShiftModel';
 import { readConfirmedShiftSnapshot, saveConfirmedShiftSnapshot } from '@/features/nextShift/offlineConfirmedShifts';
 
 export default function NextShiftScreen() {
+ const { user } = useAuth();
+ // A persona switch must remount all state, not briefly display another account's cached shifts.
+ return <ScopedNextShifts key={user?.id ?? 'signed-out'} userId={user?.id} />;
+}
+
+function ScopedNextShifts({userId}:{userId?:number}) {
  const router=useRouter();
- const {user}=useAuth();
- const userId=user?.id;
  const generation=useRef(0);
  const [rows,setRows]=useState<OfflineShift[]>([]);
  const [cachedAt,setCachedAt]=useState('');
@@ -30,9 +34,10 @@ export default function NextShiftScreen() {
    if(saved){setRows(saved.rows);setCachedAt(saved.savedAt);setOffline(true);}
    const current=await fetchMyConfirmedShifts();
    if(gen!==generation.current)return;
-   const snapshot=await saveConfirmedShiftSnapshot(userId,current);
-   if(gen!==generation.current)return;
-   setRows(snapshot.rows);setCachedAt(snapshot.savedAt);setOffline(false);
+   const liveRows=sanitizeConfirmedShifts(current,userId);
+   setRows(liveRows);setCachedAt(new Date().toISOString());setOffline(false);
+   // Cache failure must not hide valid freshly fetched shifts.
+   void saveConfirmedShiftSnapshot(userId,current).catch(()=>undefined);
   }catch{
    if(gen===generation.current)setMessage('Live shifts could not be verified. Saved details may have changed or been cancelled.');
   }finally{
