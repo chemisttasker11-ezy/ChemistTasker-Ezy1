@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Divider, Icon, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
 import { usePathname, useRouter } from 'expo-router';
-import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOwnerDashboard, getPharmacistDashboard, getOtherStaffDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
+import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOwnerDashboard, getPharmacistDashboard, getOtherStaffDashboard, getExplorerDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useUnsavedChangesRegistry } from '@/roles/shared/forms/UnsavedChangesRegistryProvider';
@@ -233,11 +233,22 @@ export function useScopedDashboard(roleOverride?: string | null) {
       return payload as DashboardPayload;
     } catch (error: any) {
       if ((error?.response?.status ?? error?.status) === 403 && isCurrentDashboardRequest(request, dashboardRequest.current)) {
-        const firstPharmacy = pharmacies[0];
-        if (firstPharmacy && scopedWorkspace === 'internal') {
-          selectPharmacy(firstPharmacy);
-        } else if (canSelectPlatform) {
-          selectPlatform();
+        const worker = role === 'PHARMACIST' || role === 'OTHER_STAFF';
+        // Match the existing web dashboard: a worker who cannot load this
+        // scope can still see their permitted Explorer-level opportunities.
+        // Never expose another pharmacy's restricted dashboard or change the
+        // selected pharmacy implicitly just to hide the failed request.
+        if (worker) {
+          try {
+            const fallback = await getExplorerDashboard();
+            if (isCurrentDashboardRequest(request, dashboardRequest.current)) {
+              return fallback as DashboardPayload;
+            }
+            return null;
+          } catch {
+            // Preserve the original 403 and explicit Retry rather than
+            // silently switching workspaces after a failed fallback.
+          }
         }
       }
       throw error;
