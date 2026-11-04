@@ -296,7 +296,7 @@ export default function SharedMessageDetailScreen() {
             if (generation !== roomGenerationRef.current) return;
             const rows = Array.isArray((data as any)?.results) ? (data as any).results
                 : Array.isArray(data) ? data : [];
-            setMessages(mergeOlderMessages([], rows.map((msg: any, idx: number) => mapMessage(msg, roomId, idx))));
+            setMessages(current => mergeOlderMessages(current, rows.map((msg: any, idx: number) => mapMessage(msg, roomId, idx))));
             const next = (data as any)?.next ?? null;
             setNextHistoryUrl(isNextPageForRoom(next, roomId) ? next : null);
             if ((data as any)?.my_last_read_at) setLastReadAt((data as any).my_last_read_at);
