@@ -26,7 +26,6 @@ export default function OwnerProfileScreen() {
   const { logout, refreshUser, updateUserProfilePhoto } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -253,19 +252,15 @@ export default function OwnerProfileScreen() {
             <List.Item
               title="Notifications"
               left={props => <List.Icon {...props} icon="bell" />}
-              right={() => (
-                <Switch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
-                  color="#6366F1"
-                />
-              )}
+              right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => router.push('/notifications' as any)}
             />
             <Divider />
             <List.Item
               title="App Settings"
               left={props => <List.Icon {...props} icon="cog" />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => router.push('/app-preferences' as any)}
             />
           </Surface>
         </View>
