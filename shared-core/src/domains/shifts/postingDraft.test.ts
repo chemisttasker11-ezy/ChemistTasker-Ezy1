@@ -91,6 +91,13 @@ describe('shared posting payload', () => {
     expect(buildShiftPostingPayload({...draft(),employmentType:'FULL_TIME',ftptPayMode:'ANNUAL',minAnnual:'80000',maxAnnual:'100000',superPercent:'12'})).toMatchObject({min_hourly_rate:null,max_hourly_rate:null,min_annual_salary:'80000',max_annual_salary:'100000',super_percent:'12',payment_preference:null});
     expect(validateShiftPostingDraft({...draft(),slots:[]})).toBe('Add at least one date before posting.');
   });
+  it('rejects invalid and zero-duration shift windows without blocking legitimate overnight shifts', () => {
+    const base = draft();
+    expect(validateShiftPostingDraft({...base, slots:[{...base.slots[0],startTime:'09:00',endTime:'09:00'}]})).toMatch(/start and end time/);
+    expect(validateShiftPostingDraft({...base, slots:[{...base.slots[0],startTime:'25:00',endTime:'17:00'}]})).toMatch(/start and end time/);
+    expect(validateShiftPostingDraft({...base, slots:[{...base.slots[0],startTime:'22:00',endTime:'06:00'}]})).toBeNull();
+    expect(validateShiftPostingDraft(base)).toBeNull();
+  });
   it('adds super at the current guarantee rate when a locum post includes it', () => {
     expect(SUPER_GUARANTEE_PERCENT).toBe(12);
     expect(buildShiftPostingPayload({...draft(),locumSuperIncluded:true})).toHaveProperty('super_percent',12);
