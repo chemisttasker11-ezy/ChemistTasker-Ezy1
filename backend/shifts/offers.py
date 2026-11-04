@@ -380,9 +380,15 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             build_shift_engagement_terms,
             freeze_accepted_terms,
             require_acceptance_payload,
+            shift_engagement_terms_version,
         )
         try:
             engagement_terms = build_shift_engagement_terms(shift=shift, user=offer.user, offer=offer)
+            if engagement_terms.get("acceptance_required") and request.data.get("terms_version") != shift_engagement_terms_version(engagement_terms):
+                return Response({
+                    "code": "TERMS_CHANGED",
+                    "detail": "These terms changed since you reviewed them. Review the updated terms.",
+                }, status=status.HTTP_409_CONFLICT)
             require_acceptance_payload(terms=engagement_terms, data=request.data)
         except DjangoValidationError as exc:
             return Response(getattr(exc, 'message_dict', {'detail': exc.messages}), status=status.HTTP_400_BAD_REQUEST)
