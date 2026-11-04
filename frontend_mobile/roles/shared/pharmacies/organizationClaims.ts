@@ -2,7 +2,7 @@
 export function validatePharmacyClaimEmail(raw: string): string | null {
   const email = raw.trim();
   if (!email) return 'Enter the pharmacy email address.';
-  if (email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return 'Enter a valid pharmacy email address.';
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Enter a valid pharmacy email address.';
   return null;
 }
 
