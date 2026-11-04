@@ -4,6 +4,7 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Chip, Switch, Text, TextInput } from 'react-native-paper';
 import {
+  canManageKioskDevices,
   fetchPharmaciesService,
   type WorkforceEmploymentEngagement,
   type WorkforcePayrollConfiguration,
@@ -11,14 +12,19 @@ import {
   workforce,
 } from '@chemisttasker/shared-core';
 import { colors, font, radius, space, touch } from '@/constants/tokens';
+import { useAuth } from '@/context/AuthContext';
+import { orgCapabilities } from '@/roles/shared/dashboard/ManagerHome';
 
 const hours = (minutes?: number | null) => minutes == null ? '' : (minutes / 60).toFixed(2);
 const pretty = (value?: string | null) => String(value || '').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
 
 export default function WorkforceSettingsScreen() {
   const router = useRouter();
-  const [pharmacies, setPharmacies] = useState<{ id: number; name: string }[]>([]);
+  const { user, hasCapability } = useAuth();
+  const organizationRights = orgCapabilities(user);
+  const isOwner = user?.role === 'OWNER';
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
+  const [pharmacies, setPharmacies] = useState<{ id: number; name: string }[]>([]);
   const [payroll, setPayroll] = useState<WorkforcePayrollConfiguration | null>(null);
   const [staff, setStaff] = useState<WorkforceWorkSettings[]>([]);
   const [engagements, setEngagements] = useState<WorkforceEmploymentEngagement[]>([]);
@@ -30,6 +36,8 @@ export default function WorkforceSettingsScreen() {
   const requestGeneration = useRef(0);
   const currentPharmacy = useRef<number | null>(null);
   currentPharmacy.current = pharmacyId;
+  const canManageRoster = Boolean(pharmacyId && (isOwner || organizationRights.roster || hasCapability('MANAGE_ROSTER', pharmacyId)));
+  const canManageKiosk = Boolean(pharmacyId && canManageKioskDevices(user, pharmacyId));
 
   useEffect(() => {
     fetchPharmaciesService({})
@@ -174,18 +182,18 @@ export default function WorkforceSettingsScreen() {
             <Text variant="bodySmall" style={styles.subtitle}>
               These tools use your active pharmacy workspace. Check the pharmacy selector when opening them.
             </Text>
-            <Button mode="outlined" icon="calendar-check" contentStyle={styles.toolButton} onPress={() => router.push('/manager/roster/coverage' as any)}>
+            {canManageRoster ? <Button mode="outlined" icon="calendar-check" contentStyle={styles.toolButton} onPress={() => router.push('/manager/roster/coverage' as any)}>
               Coverage requirements
-            </Button>
+            </Button> : null}
             <Button mode="outlined" icon="file-document-edit-outline" contentStyle={styles.toolButton} onPress={() => router.push('/workforce/employment-engagements' as any)}>
               Edit employment terms
             </Button>
-            <Button mode="outlined" icon="cellphone-key" contentStyle={styles.toolButton} onPress={() => router.push('/attendance/kiosk-status' as any)}>
+            {canManageKiosk ? <Button mode="outlined" icon="cellphone-key" contentStyle={styles.toolButton} onPress={() => router.push('/attendance/kiosk-status' as any)}>
               Kiosk & device management
-            </Button>
-            <Button mode="outlined" icon="file-export-outline" contentStyle={styles.toolButton} onPress={() => router.push('/workforce/payroll-export' as any)}>
+            </Button> : null}
+            {canManageRoster ? <Button mode="outlined" icon="file-export-outline" contentStyle={styles.toolButton} onPress={() => router.push('/workforce/payroll-export' as any)}>
               Payroll-ready export
-            </Button>
+            </Button> : null}
           </Card.Content>
         </Card>
 
