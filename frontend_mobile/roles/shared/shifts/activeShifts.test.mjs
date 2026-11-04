@@ -263,3 +263,13 @@ test('W3 Shift Centre notification links select only valid shift-owned slots', (
   assert.equal(getDeepLinkedShiftSlotId(shift, null), 101);
   assert.equal(getDeepLinkedShiftSlotId({ id: 9, slots: [] }, 102), null);
 });
+
+test('W3d poster Post Shift action stays in the correct persona shell', () => {
+  const { getPosterPostShiftPath } = runtime;
+  assert.equal(getPosterPostShiftPath('owner', null), '/owner/post-shift');
+  assert.equal(getPosterPostShiftPath('organization', 9), '/organization/post-shift');
+  assert.equal(getPosterPostShiftPath('admin', 9), '/admin/9/post-shift');
+  assert.equal(getPosterPostShiftPath('admin', null), null);
+  assert.equal(getPosterPostShiftPath('pharmacist', 9), null);
+  assert.equal(getPosterPostShiftPath('explorer', null), null);
+});

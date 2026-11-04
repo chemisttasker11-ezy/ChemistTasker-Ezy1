@@ -35,6 +35,14 @@ export const getDeepLinkedShiftSlotId = (shift: Shift, requestedSlotId: number |
         ? requestedSlotId : slotIds[0] ?? null;
 };
 
+/** Keep Post Shift inside the worker's authorized owner/organization/admin shell. */
+export const getPosterPostShiftPath = (persona: string | null, pharmacyId: number | null): string | null => {
+    if (persona === 'owner') return '/owner/post-shift';
+    if (persona === 'organization') return '/organization/post-shift';
+    if (persona === 'admin' && pharmacyId != null) return `/admin/${pharmacyId}/post-shift`;
+    return null;
+};
+
 export const slotHasAwaitingPayment = (slot: any): boolean => {
     return Boolean(slot?.awaitingPayment ?? slot?.awaiting_payment);
 };

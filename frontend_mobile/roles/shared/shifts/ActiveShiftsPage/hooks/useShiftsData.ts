@@ -11,9 +11,10 @@ interface UseShiftsDataParams {
     selectedPharmacyId: number | null;
     shiftId?: number | null;
     scopeKey?: string;
+    notificationKey?: string | null;
 }
 
-export function useShiftsData({ selectedPharmacyId, shiftId, scopeKey }: UseShiftsDataParams) {
+export function useShiftsData({ selectedPharmacyId, shiftId, scopeKey, notificationKey }: UseShiftsDataParams) {
     const [shifts, setShifts] = useState<Shift[]>(EMPTY_SHIFTS);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function useShiftsData({ selectedPharmacyId, shiftId, scopeKey }: UseShif
                 setLoading(false);
             }
         }
-    }, [selectedPharmacyId, shiftId, scopeKey]);
+    }, [selectedPharmacyId, shiftId, scopeKey, notificationKey]);
 
     useEffect(() => {
         loadShifts();
