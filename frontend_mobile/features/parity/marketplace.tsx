@@ -31,7 +31,7 @@ export function MarketplaceParityScreen({screen}:{screen:MarketplaceScreen}){
  }catch(e){if(request===requestRef.current){setError(errorMessage(e,'Unable to load Marketplace.'));if(screen==='browse'||screen==='filters'){setListings([]);setListingCount(null);}}}finally{if(request===requestRef.current){setLoading(false);setRefreshing(false);}}},[screen,id,query,categoryFilter,modeFilter,draftScope]);
  useEffect(()=>{void load();return()=>{requestRef.current+=1;};},[load]);
 
- if(screen==='seller')return <SellerStep draft={draft} options={options} loading={loading} error={error}/>;
+ if(screen==='seller')return <SellerStep draft={draft} options={options} loading={loading} error={error} onReload={load}/>;
  if(screen==='category')return <CategoryStep draft={draft} options={options} loading={loading} error={error}/>;
  if(screen==='details')return <DetailsStep draft={draft} options={options} loading={loading} error={error}/>;
  if(screen==='photos')return <PhotosStep draft={draft} loading={loading} error={error}/>;
@@ -125,7 +125,28 @@ function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing
 }
 
 function useDraftStep(initial:MarketplaceMobileDraft){const{user}=useAuth();const scope=String(user?.id??user?.email??user?.username??'anonymous');const[value,setValue]=useState(initial);useEffect(()=>setValue(initial),[initial]);const patch=async(p:Partial<MarketplaceMobileDraft>)=>{const next={...value,...p};setValue(next);await patchMarketplaceDraft(scope,p);return next;};return{value,patch,scope};}
-function SellerStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string}){const router=useRouter();const{value,patch}=useDraftStep(draft);const pharmacies=asArray<any>(options?.eligible_pharmacies);const changeContext=(v:string)=>void patch({seller_context:v as MarketplaceMobileDraft['seller_context'],pharmacy:v==='PERSONAL'?null:value.pharmacy,category:null,category_name:'',mode:'SELL',allowed_buyer_roles:[],current_circle:'OWNED_CHAIN'});return <ParityPage title="Who is selling?" subtitle="Choose personal or pharmacy seller context." loading={loading} error={error}><ChoiceChips value={value.seller_context} onChange={changeContext} options={[{value:'PERSONAL',label:'Personal'},{value:'PHARMACY',label:'Pharmacy'}]}/>{value.seller_context==='PHARMACY'?<Section title="Eligible pharmacies"><View style={{gap:8}}>{pharmacies.map(p=><Chip key={p.id} selected={value.pharmacy===p.id} onPress={()=>void patch({pharmacy:p.id})}>{p.label}</Chip>)}</View></Section>:null}<Button mode="contained" disabled={value.seller_context==='PHARMACY'&&!value.pharmacy} onPress={()=>router.push('/marketplace/new/category' as any)}>Continue</Button></ParityPage>;}
+function SellerStep({draft,options,loading,error,onReload}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string;onReload:()=>Promise<void>}){
+ const router=useRouter();const{value,patch}=useDraftStep(draft);
+ const pharmacies=asArray<any>(options?.eligible_pharmacies);
+ const canSell=Boolean(options&&(options.can_trade_personally||options.can_trade_for_pharmacy));
+ const changeContext=(next:string)=>void patch({
+   seller_context:next as MarketplaceMobileDraft['seller_context'],
+   pharmacy:next==='PERSONAL'?null:value.pharmacy,
+   category:null,category_name:'',mode:'SELL',allowed_buyer_roles:[],current_circle:'OWNED_CHAIN',
+ });
+ return <ParityPage title="Who is selling?" subtitle="Select the authorized personal or pharmacy seller context." loading={loading} error={error} onRetry={onReload}>
+  {options&&!canSell?<View style={{gap:12}}>
+    <InfoNote title="Trading permission required" tone="warning">{options.blockers.map(blocker=>blocker.message||blocker.detail||blocker.code).join(' · ')||'Complete the current marketplace verification and terms checks before selling.'}</InfoNote>
+    <MarketplaceAccessResolution access={options} onUpdated={onReload}/>
+  </View>:null}
+  {canSell?<><ChoiceChips value={value.seller_context} onChange={changeContext} disabled={loading} options={[
+    ...(options?.can_trade_personally?[{value:'PERSONAL',label:'Personal'}]:[]),
+    ...(options?.can_trade_for_pharmacy?[{value:'PHARMACY',label:'Pharmacy'}]:[]),
+  ]}/>
+  {value.seller_context==='PHARMACY'?<Section title="Eligible pharmacies"><View style={{gap:8}}>{pharmacies.map(pharmacy=><Chip key={pharmacy.id} selected={value.pharmacy===pharmacy.id} onPress={()=>void patch({pharmacy:pharmacy.id})}>{pharmacy.label}</Chip>)}</View></Section>:null}
+  <Button mode="contained" disabled={!canSell||(value.seller_context==='PERSONAL'&&!options?.can_trade_personally)||(value.seller_context==='PHARMACY'&&(!options?.can_trade_for_pharmacy||!value.pharmacy))} onPress={()=>router.push('/marketplace/new/category' as any)}>Continue</Button></>:null}
+ </ParityPage>;
+}
 function CategoryStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string}){const router=useRouter();const{value,patch}=useDraftStep(draft);const categories=categoriesForSellerContext(options,value.seller_context);const choose=(category:MarketplaceCategory)=>{const modes=permittedModesForCategory(category);const roles=permittedBuyerRolesForCategory(category,value.seller_context);void patch({category:category.id,category_name:category.name,mode:modes.includes(value.mode)?value.mode:modes[0],allowed_buyer_roles:roles,current_circle:'OWNED_CHAIN'});};return <ParityPage title="Choose category" subtitle="Only categories permitted for the selected seller context are shown." loading={loading} error={error}><Section title="Categories">{categories.map(category=><DataRow key={category.id} title={category.name} subtitle={category.description} status={value.category===category.id?'Selected':undefined} onPress={()=>choose(category)}/>)}</Section><Button mode="contained" disabled={!value.category} onPress={()=>router.push('/marketplace/new/details' as any)}>Continue</Button></ParityPage>;}
 function DetailsStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string}){
  const router=useRouter();const{value,patch}=useDraftStep(draft);const categories=categoriesForSellerContext(options,value.seller_context);const selectedCategory=categories.find(category=>category.id===value.category);const modeOptions=permittedModesForCategory(selectedCategory).map(mode=>({value:mode,label:mode==='SELL'?'Sell':mode==='FREE'?'Free':'Swap'}));
