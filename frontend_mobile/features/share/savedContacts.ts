@@ -46,7 +46,7 @@ export async function listSavedContacts(accountId:number|string):Promise<SavedCo
  let protectedContacts=parseRows(protectedData).filter(row=>row.kind==='pharmacy-invitation');
  if(invitations.length){
   // Migrate legacy bearer links into encrypted OS storage BEFORE deleting the plaintext copy.
-  const migrated=new Map<string,SavedContact>();
+  const migrated=new Map<string,(typeof protectedContacts)[number]>();
   for(const row of [...invitations,...protectedContacts])migrated.set(row.url,row);
   protectedContacts=[...migrated.values()].slice(-5);
   await SecureStore.setItemAsync(secureKey(accountId),JSON.stringify(protectedContacts));
