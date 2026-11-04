@@ -91,7 +91,7 @@ export default function MyHoursScreen() {
                 {row.needs_rebuild && <Chip compact>Recalculation pending</Chip>}
               </View>
               <Button mode="outlined" onPress={() => router.push(`/my-hours/${row.id}` as any)} disabled={submitting != null}>View days & checks</Button>
-              <Button mode="contained" loading={submitting === row.id} disabled={!row.revision_number || row.needs_rebuild || row.status === 'APPROVED' || row.status === 'SUBMITTED' || submitting != null} onPress={() => submit(row)}>
+              <Button mode="contained" loading={submitting === row.id} disabled={!row.revision_number || row.needs_rebuild || row.status === 'APPROVED' || row.status === 'SUBMITTED' || row.status === 'LOCKED' || submitting != null} onPress={() => submit(row)}>
                 Submit reviewed hours
               </Button>
             </Card.Content>
