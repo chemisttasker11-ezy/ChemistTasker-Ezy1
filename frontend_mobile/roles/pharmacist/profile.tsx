@@ -167,12 +167,11 @@ export default function PharmacistProfileScreen() {
       title: 'Notifications',
       icon: 'bell-outline',
       onPress: () => router.push('/notifications' as any),
-      right: () => <Switch value />
     },
     {
       title: 'App Settings',
       icon: 'cog',
-      onPress: () => {},
+      onPress: () => router.push('/app-preferences' as any),
     },
   ];
 
