@@ -352,3 +352,13 @@ export const buildActiveShiftsScopeKey = (
         return shiftId != null ? `${scopeKey}:shift:${shiftId}` : `${scopeKey}:all`;
 };
 
+
+/** Only a measured row from the currently authorized workspace can be scrolled into view. */
+export const getLinkedShiftScrollY = (
+    measurement: { shiftId: number; scopeKey: string; y: number } | null,
+    shiftId: number | null,
+    scopeKey: string,
+): number | null => {
+    if (shiftId == null || !measurement || measurement.shiftId !== shiftId || measurement.scopeKey !== scopeKey) return null;
+    return Number.isFinite(measurement.y) ? Math.max(0, measurement.y - 16) : null;
+};
