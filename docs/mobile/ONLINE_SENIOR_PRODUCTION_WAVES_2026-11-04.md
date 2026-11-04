@@ -61,3 +61,26 @@ PR #248 strict architecture gate rejected `fetchApi` for active and confirmed sh
 
 ## Constraints and handoff verdict
 At this checkpoint the PR is **DRAFT — NOT MERGE READY**. This remote-only session can inspect GitHub and push commits, but does not have a cloned working tree, installed dependencies, Android/iOS emulators, native screenshot capture, or independent Codex/Claude review. No claim of direct local tests or native screenshots is made. Continue on PR #249 and update this ledger after each wave; keep original PR #248 unchanged.
+
+
+## 4 November 2026 — next-session W3 closeout checkpoint
+
+**Live branch checked before writes:** exactly `26cae2d6250c6b6dd474dc0c6e3bd3d4daefa14b`, eight commits, draft/unmerged; PR conversation initially had no comments. No concurrent branch update was visible before the first write.
+
+**Exact handover-head CI evidence** (Shared Core Consolidation run `41793324680`, shared-core job `126451833988`): 447 Vitest cases passed and 1 failed. The older missing `API_ENDPOINTS` VM-mock problem had been resolved; the newly exposed failure was `ReferenceError: skipMobileOverseas is not defined` at `shared-core/src/authApi.test.ts:295`. The import misspelled the exported name `skipMobileOverse`. Shared-core typecheck and boundary inventory passed before this test failed. The mobile, Vite and Next dependent jobs were skipped due to the failed upstream gate. Architecture-audit, boundary-audit, kiosk and PostgreSQL concurrency jobs had succeeded at inspection; backend was still running. The named Static/Lint, Public Repository Security and E2E Runner Smoke workflows passed. Other deep acceptance workflows were skipped. Results are **not** a substitute for release acceptance.
+
+**Commits added in this session** (on the same PR, no merge or release):
+- `0384a3d5` corrects the *test-only* import to `skipMobileOverseas`, leaving authentication and mobile identity behaviour unchanged.
+- `b43355b4` changes W3b Post Shift initial load to retain local draft edits and applied URL prefill markers when a same-scope pharmacy/network retry is requested, instead of resetting all fields.
+- `3763d6fb` adds a small pure helper to enforce authorised pharmacy retention on retry.
+- `281eef70` aligns that helper with the screen's `number | ''` pharmacy ID type.
+- `f6ad7408` integrates the helper with the actual Post Shift screen, clearing revoked selections or choosing a valid fallback from the refreshed list.
+- `55b4f5be` adds positive/negative Node regression cases to the existing Post Shift helper tests (valid manual selection, revoked selection, no authorised pharmacy and first-load default).
+
+**Protected invariants:** same-scope load failure/retry must not erase a user's unsaved draft or reapply route defaults over edited fields; a previously selected pharmacy must not survive a newly restricted pharmacy list. Initial scope changes still reset as before. There is no new API/domain transport, payment, booking, payroll, pricing or permission rule.
+
+**Evidence limits:** Changes were reviewed as GitHub source diffs. The execution container could not resolve github.com and had no authenticated GitHub CLI, so it could not clone the repository or execute its dependency-based test suite. GitHub connector writes were used with current content blob SHAs. **The new commits have not been locally tested; exact-head CI must pass before W3b is closed.** This includes typecheck, lint, Node regression, backend and shared-core tests, and native acceptance.
+
+**New D2 code tracing:** `backend/shifts/engagement.py:739` checks consent booleans but does not validate a reviewed snapshot identifier; `backend/shifts/offers.py:386` rebuilds terms on acceptance, while `shared-core/src/domains/shifts/api.ts` currently sends consent booleans only. This path differs from `backend/attendance/cover_terms.py`, which already fingerprints `terms_version` and enforces it. Do not copy only the UI test or declare D2 fixed. The immutable offer-term snapshot/version needs a carefully scoped backend + shared-core + mobile/web implementation with tests demonstrating concurrent changes and permitted unchanged acceptance.
+
+**Status:** W3 remains OPEN. D2 remains OPEN. W4–W8 and physical Android/iOS visual/device acceptance remain OPEN. The PR stays draft and MUST NOT be merged or deployed based on these commits alone.
