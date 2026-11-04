@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, Button, Card, Chip, Text, TextInput } from 'react-native-paper';
@@ -44,16 +44,26 @@ export default function LearningScreen() {
   const [error, setError] = useState<string | null>(null);
   const [moreError, setMoreError] = useState(false);
   const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [kind, setKind] = useState<Kind>('all');
   const [openError, setOpenError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAppliedQuery(query.trim().slice(0, 200)), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const load = useCallback(async () => {
     const request = ++generation.current;
     setLoading(true);
     setError(null);
     setMoreError(false);
+    setArticles([]);
+    setNextPage(null);
     try {
-      const page = await chemistTaskerApi.publicContent.listArticles({ topic: 'learning' });
+      const page = await chemistTaskerApi.publicContent.listArticles({
+        topic: 'learning', q: appliedQuery || undefined, kind: kind === 'all' ? undefined : kind,
+      });
       if (request !== generation.current) return;
       setArticles(page.results ?? []);
       setNextPage(getNextPage(page.next));
@@ -62,7 +72,7 @@ export default function LearningScreen() {
     } finally {
       if (request === generation.current) setLoading(false);
     }
-  }, []);
+  }, [appliedQuery, kind]);
 
   useFocusEffect(useCallback(() => {
     void load();
@@ -75,7 +85,10 @@ export default function LearningScreen() {
     setLoadingMore(true);
     setMoreError(false);
     try {
-      const page = await chemistTaskerApi.publicContent.listArticles({ topic: 'learning', page: nextPage });
+      const page = await chemistTaskerApi.publicContent.listArticles({
+        topic: 'learning', page: nextPage, q: appliedQuery || undefined,
+        kind: kind === 'all' ? undefined : kind,
+      });
       if (request !== generation.current) return;
       setArticles(previous => {
         const ids = new Set(previous.map(item => item.id));
@@ -87,13 +100,10 @@ export default function LearningScreen() {
     } finally {
       if (request === generation.current) setLoadingMore(false);
     }
-  }, [nextPage, loadingMore]);
+  }, [nextPage, loadingMore, appliedQuery, kind]);
 
-  const visible = useMemo(() => articles.filter(article => {
-    if (kind !== 'all' && article.kind !== kind) return false;
-    const text = query.trim().toLowerCase();
-    return !text || [article.title, article.excerpt, article.author_name].some(value => String(value || '').toLowerCase().includes(text));
-  }), [articles, kind, query]);
+  // Results already reflect server-side query/kind across every page.
+  const visible = articles;
   const roleCode = String(user?.role || '').toUpperCase();
   const pathway = rolePath[roleCode];
 
@@ -110,13 +120,18 @@ export default function LearningScreen() {
         <Text style={styles.subtitle}>Discover pharmacy learning, industry news and career development resources.</Text>
       </View>
       {pathway ? <Card mode="outlined" style={styles.pathway}><Card.Content><Text style={styles.eyebrow}>YOUR PATHWAY</Text><Text style={styles.pathwayText}>{pathway}</Text></Card.Content></Card> : null}
+      <TextInput mode="outlined" placeholder="Search all resources" value={query} onChangeText={setQuery} left={<TextInput.Icon icon="magnify" />} accessibilityLabel="Search learning resources" />
+      <View style={styles.filters}>
+        {(['all', 'blog', 'news'] as const).map(value => <Chip key={value} selected={kind === value} onPress={() => setKind(value)} style={kind === value ? styles.selectedChip : undefined}>{value === 'all' ? 'All' : value === 'blog' ? 'Articles' : 'News'}</Chip>)}
+      </View>
       {loading ? <View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /><Text style={styles.subtitle}>Loading resources…</Text></View> :
         error ? <ContentState kind="error" title="Learning resources are unavailable" description={error} actionLabel="Try again" onAction={() => void load()} /> :
-        articles.length === 0 ? <ContentState kind="empty" title="No learning resources yet" description="Learning articles and industry news will appear here when published." actionLabel="Refresh" onAction={() => void load()} /> : <>
-          <TextInput mode="outlined" placeholder="Search resources" value={query} onChangeText={setQuery} left={<TextInput.Icon icon="magnify" />} accessibilityLabel="Search learning resources" />
-          <View style={styles.filters}>
-            {(['all', 'blog', 'news'] as const).map(value => <Chip key={value} selected={kind === value} onPress={() => setKind(value)} style={kind === value ? styles.selectedChip : undefined}>{value === 'all' ? 'All' : value === 'blog' ? 'Articles' : 'News'}</Chip>)}
-          </View>
+        articles.length === 0 ? <ContentState kind="empty"
+          title={appliedQuery || kind !== 'all' ? 'No matching resources' : 'No learning resources yet'}
+          description={appliedQuery || kind !== 'all' ? 'Try another search or resource type.' : 'Learning articles and industry news will appear here when published.'}
+          actionLabel={appliedQuery || kind !== 'all' ? 'Clear filters' : 'Refresh'}
+          onAction={appliedQuery || kind !== 'all' ? () => { setQuery(''); setAppliedQuery(''); setKind('all'); } : () => void load()}
+        /> : <>
           {openError ? <Text accessibilityRole="alert" style={styles.error}>{openError}</Text> : null}
           {visible.length === 0 ? <ContentState kind="empty" title="No matching resources" description="Try a different search or resource type." actionLabel="Clear filters" onAction={() => { setQuery(''); setKind('all'); }} /> :
             visible.map(article => {
