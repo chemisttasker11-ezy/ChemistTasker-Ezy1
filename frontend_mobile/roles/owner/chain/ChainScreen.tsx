@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Building2, ChevronRight, Link2, Trash2, Unlink2 } from 'lucide-react-native';
+import { Building2, ChevronRight } from 'lucide-react-native';
 import {
   addPharmacyToChain, createChainService, deleteChainService, fetchChainPharmaciesService,
   fetchChainsService, fetchMembershipsByPharmacy, fetchPharmaciesService,
@@ -23,6 +23,7 @@ const memberName = (row: MembershipSummary) =>
 export default function ChainScreen() {
   const router = useRouter();
   const generation = useRef(0);
+  const selectedChainRef = useRef<number | null>(null);
   const [chains, setChains] = useState<Chain[]>([]);
   const [chainId, setChainId] = useState<number | null>(null);
   const [allPharmacies, setAllPharmacies] = useState<PharmacySummary[]>([]);
@@ -45,7 +46,8 @@ export default function ChainScreen() {
     try {
       const [nextChains, pharmacies] = await Promise.all([fetchChainsService(), fetchPharmaciesService({})]);
       if (generation.current !== request) return;
-      const selected = nextChains.find((item) => item.id === (preferredId ?? chainId)) ?? nextChains[0] ?? null;
+      const selected = nextChains.find((item) => item.id === (preferredId ?? selectedChainRef.current)) ?? nextChains[0] ?? null;
+      selectedChainRef.current = selected?.id ?? null;
       setChains(nextChains);
       setChainId(selected?.id ?? null);
       setAllPharmacies(pharmacies as PharmacySummary[]);
@@ -71,7 +73,7 @@ export default function ChainScreen() {
     } finally {
       if (generation.current === request) setLoading(false);
     }
-  }, [chainId]);
+  }, []);
 
   useFocusEffect(useCallback(() => {
     void load();
@@ -161,7 +163,7 @@ export default function ChainScreen() {
               <Text style={styles.section}>Choose chain</Text>
               <View style={styles.pills}>
                 {chains.map((item) => <Chip key={item.id} selected={item.id === chainId} onPress={() => {
-                  setChainId(item.id); void load(item.id);
+                  selectedChainRef.current = item.id; setChainId(item.id); void load(item.id);
                 }}>{item.name}</Chip>)}
               </View>
             </View>
@@ -223,7 +225,7 @@ export default function ChainScreen() {
                   <Divider />
                   {members[pharmacy.id] === 'error' ? (
                     <Button mode="text" onPress={() => void load(chain.id)}>Retry staff load</Button>
-                  ) : (members[pharmacy.id] ?? []).slice(0, 5).map((member) => (
+                  ) : (Array.isArray(members[pharmacy.id]) ? members[pharmacy.id] : []).slice(0, 5).map((member) => (
                     <Text key={member.id} style={styles.memberText}>{memberName(member)}{member.role ? ' · ' + member.role.replaceAll('_', ' ').toLowerCase() : ''}</Text>
                   ))}
                   <Button mode="text" textColor={colors.status.red.fg} disabled={busy} onPress={() => requestRemove(pharmacy)}>
