@@ -59,9 +59,14 @@ function ScopedNextShifts({userId}:{userId?:number}) {
  };
  const upcoming=upcomingShifts(rows);
  const dates=(row:OfflineShift)=>{
-  const a=new Date(row.wallStart),b=new Date(row.wallEnd);
-  return a.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})+' · '+
-   a.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+'–'+b.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+  // The booked wall clock belongs to the pharmacy. Never re-interpret it using device time zone.
+  const formatDate=(wall:string)=>new Date(wall.slice(0,10)+'T12:00:00Z').toLocaleDateString('en-AU',{
+   weekday:'short',day:'numeric',month:'short',timeZone:'UTC'
+  });
+  const formatTime=(wall:string)=>wall.slice(11,16);
+  const dayStart=row.wallStart.slice(0,10),dayEnd=row.wallEnd.slice(0,10);
+  return formatDate(row.wallStart)+' · '+formatTime(row.wallStart)+'–'+
+   (dayEnd!==dayStart ? formatDate(row.wallEnd)+' ' : '')+formatTime(row.wallEnd);
  };
  return <SafeAreaView edges={['top','left','right','bottom']} style={styles.page}>
   <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={loading} onRefresh={()=>void load()}/>}>
