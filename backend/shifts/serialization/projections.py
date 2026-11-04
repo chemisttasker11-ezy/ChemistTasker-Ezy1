@@ -3,6 +3,7 @@ from rest_framework import serializers
 from shifts.access import _user_can_perform_shift_role
 from shifts.models import Shift
 from organizations.serializers import PharmacySerializer
+from organizations.timezone import get_pharmacy_timezone
 from .shifts import ShiftSerializer
 from .slots import ShiftSlotSerializer
 from shifts.rate_visibility import project_published_rates
@@ -24,6 +25,8 @@ class MyShiftSerializer(serializers.ModelSerializer):
 
     # only return the slots that this user is actually assigned to
     slots = serializers.SerializerMethodField()
+    # Additive worker-only date-specific view. Legacy slots remain unchanged for web callers.
+    assigned_occurrences = serializers.SerializerMethodField()
 
     # Lineitems from service.py
     line_items = serializers.SerializerMethodField()
@@ -43,6 +46,7 @@ class MyShiftSerializer(serializers.ModelSerializer):
             'workload_tags',
             'support_on_shift',
             'slots',
+            'assigned_occurrences',
             'line_items',
             'owner_adjusted_rate',
             'published_rates_visible',
@@ -69,6 +73,42 @@ class MyShiftSerializer(serializers.ModelSerializer):
         qs = obj.slots.filter(id__in=slot_ids)
 
         return ShiftSlotSerializer(qs, many=True).data
+    def get_assigned_occurrences(self, obj):
+        """Only this worker's booked occurrences, not recurring template dates or other workers' data."""
+        user = getattr(self.context.get('request'), 'user', None)
+        if not user or not user.is_authenticated:
+            return []
+        time_zone = get_pharmacy_timezone(obj.pharmacy).key
+        assignments = obj.slot_assignments.filter(
+            user_id=user.pk, slot__unpublished_at__isnull=True,
+        ).select_related('slot', 'source_offer').order_by('slot_date', 'pk')
+        result = []
+        for assignment in assignments:
+            slot = assignment.slot
+            work_date = assignment.slot_date or slot.date
+            start, end = slot.start_time, slot.end_time
+            offer = assignment.source_offer
+            if offer and offer.slot_id == slot.id and (
+                offer.offered_slot_date is None or offer.offered_slot_date == work_date
+            ):
+                start = offer.offered_start_time or start
+                end = offer.offered_end_time or end
+            snapshot = assignment.engagement_terms_snapshot or {}
+            occurrences = snapshot.get('occurrences', []) if isinstance(snapshot, dict) else []
+            for occurrence in occurrences if isinstance(occurrences, list) else []:
+                if not isinstance(occurrence, dict):
+                    continue
+                if str(occurrence.get('slot_id')) != str(slot.pk) or str(occurrence.get('date')) != str(work_date):
+                    continue
+                start = occurrence.get('start_time') or start
+                end = occurrence.get('end_time') or end
+                break
+            result.append({
+                'slot_id': slot.id, 'date': str(work_date),
+                'start_time': str(start), 'end_time': str(end), 'timezone': time_zone,
+            })
+        return result
+
     def get_line_items(self, obj):
         user = self.context['request'].user
         from invoicing.services import generate_preview_invoice_lines
