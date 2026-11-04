@@ -1,5 +1,6 @@
 """In-app notifications delivered to users (task, message, alert, work-note), with read state."""
 from django.db import models
+from datetime import time
 from django.conf import settings
 from django.utils import timezone
 
@@ -59,7 +60,7 @@ class NotificationPushPreference(models.Model):
     push_work_notes = models.BooleanField(default=True)
     push_alerts = models.BooleanField(default=True)
     quiet_hours_enabled = models.BooleanField(default=False)
-    quiet_start = models.TimeField(default=__import__('datetime').time(22, 0))
-    quiet_end = models.TimeField(default=__import__('datetime').time(7, 0))
+    quiet_start = models.TimeField(default=time(22, 0))
+    quiet_end = models.TimeField(default=time(7, 0))
     time_zone = models.CharField(max_length=64, default="Australia/Brisbane")
     updated_at = models.DateTimeField(auto_now=True)

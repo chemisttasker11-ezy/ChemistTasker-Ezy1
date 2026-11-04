@@ -1,6 +1,6 @@
 """Serializers for the notifications and device-token APIs."""
 from rest_framework import serializers
-from notifications.models import Notification
+from notifications.models import Notification, NotificationPushPreference
 from users.models import DeviceToken
 
 
@@ -40,7 +40,7 @@ class NotificationPushPreferenceSerializer(serializers.ModelSerializer):
     }
 
     class Meta:
-        model = __import__('notifications.models', fromlist=['NotificationPushPreference']).NotificationPushPreference
+        model = NotificationPushPreference
         fields = (
             'push_messages', 'push_tasks', 'push_work_notes', 'push_alerts',
             'quiet_hours_enabled', 'quiet_start', 'quiet_end', 'time_zone',
