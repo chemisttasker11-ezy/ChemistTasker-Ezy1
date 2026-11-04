@@ -96,17 +96,19 @@ export function MoreScreen({ children }: { children?: ReactNode }) {
   const tools = usePlatformTools();
   const router = useRouter();
   const { logout, user } = useAuth();
-  const [canPublish, setCanPublish] = useState(false);
+  const publisherId = user?.id == null ? null : String(user.id);
+  const [publisherAccess, setPublisherAccess] = useState<{ id: string; allowed: boolean } | null>(null);
+  const canPublish = publisherId !== null && publisherAccess?.id === publisherId && publisherAccess.allowed;
   const [publisherError, setPublisherError] = useState('');
   useEffect(() => {
     let active = true;
-    setCanPublish(false);
-    if (!user) return () => { active = false; };
+    if (publisherId === null) return () => { active = false; };
+    // Results are scoped to the account ID; a previous account never reveals its editor link.
     void chemistTaskerApi.contentManagement.getMe().then(response => {
-      if (active) setCanPublish(Boolean(response.administrator || Object.keys(response.areas || {}).length));
-    }).catch(() => { if (active) setCanPublish(false); });
+      if (active) setPublisherAccess({ id: publisherId, allowed: Boolean(response.administrator || Object.keys(response.areas || {}).length) });
+    }).catch(() => { if (active) setPublisherAccess({ id: publisherId, allowed: false }); });
     return () => { active = false; };
-  }, [user?.id]);
+  }, [publisherId]);
   // Sign out sits just above the tab bar, so a stray tap asks first.
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);

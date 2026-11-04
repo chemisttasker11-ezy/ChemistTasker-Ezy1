@@ -55,7 +55,12 @@ export function ArticleDetail({ slug }: { slug: string }) {
     }
   }, [slug]);
 
-  useEffect(() => { void load(); return () => { generation.current += 1; }; }, [load]);
+  useEffect(() => {
+    let active = true;
+    // Defer initial load until after effects subscribe; stale generations cannot overwrite state.
+    void Promise.resolve().then(() => { if (active) void load(); });
+    return () => { active = false; generation.current += 1; };
+  }, [load]);
 
   const requiresSignIn = () => {
     router.push({ pathname: '/login', params: { returnTo: '/explore/article/' + encodeURIComponent(slug) } } as any);
@@ -172,7 +177,7 @@ export function ArticleDetail({ slug }: { slug: string }) {
               <TextInput mode="outlined" label={replyTo !== null ? 'Write reply' : 'Add a comment'} multiline value={message} onChangeText={setMessage} maxLength={3000} disabled={busy} />
               <Button mode="contained" disabled={busy || !message.trim()} loading={busy} onPress={() => void sendComment()}>{replyTo !== null ? 'Post reply' : 'Post comment'}</Button>
             </> : <Button mode="outlined" onPress={requiresSignIn}>Sign in to join the discussion</Button>}
-          </Card.Content></Card>}
+          </Card.Content></Card>
           {actionError ? <View style={styles.warning}><Text style={styles.error} accessibilityRole="alert">{actionError}</Text><Button onPress={() => void load()}>Retry loading</Button></View> : null}
         </>}
     </ScrollView>

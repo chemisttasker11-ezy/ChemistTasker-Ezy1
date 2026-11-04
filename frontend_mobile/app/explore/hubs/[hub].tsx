@@ -55,7 +55,12 @@ export default function PublicHubFeed() {
       if (ticket === generation.current) setError(failure?.message || 'Public community could not load.');
     } finally { if (ticket === generation.current) setLoading(false); }
   }, [hub]);
-  useEffect(() => { void load(); return () => { generation.current += 1; }; }, [load]);
+  useEffect(() => {
+    let active = true;
+    // Defer initial load until after effects subscribe; stale generations cannot overwrite state.
+    void Promise.resolve().then(() => { if (active) void load(); });
+    return () => { active = false; generation.current += 1; };
+  }, [load]);
 
   const loadMore = async () => {
     if (next === null || moreBusy) return;

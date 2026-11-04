@@ -23,7 +23,12 @@ export default function PublicHubIndex() {
       if (request === requestRef.current) setError(failure?.message || 'Public hubs could not load.');
     } finally { if (request === requestRef.current) setLoading(false); }
   }, []);
-  useEffect(() => { void load(); return () => { requestRef.current += 1; }; }, [load]);
+  useEffect(() => {
+    let active = true;
+    // Defer initial load until after effects subscribe; stale generations cannot overwrite state.
+    void Promise.resolve().then(() => { if (active) void load(); });
+    return () => { active = false; requestRef.current += 1; };
+  }, [load]);
   return <SafeAreaView style={styles.page} edges={['top', 'left', 'right', 'bottom']}>
     <ScrollView contentContainerStyle={styles.content}>
       <Button icon="arrow-left" mode="text" onPress={() => router.canGoBack() ? router.back() : router.replace('/explore' as any)}>Explore</Button>

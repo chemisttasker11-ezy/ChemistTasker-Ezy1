@@ -29,7 +29,12 @@ export default function PublicOrganizationScreen() {
       if (request === generation.current) setError(failure?.message || 'Public organisation could not load.');
     } finally { if (request === generation.current) setLoading(false); }
   }, [slug]);
-  useEffect(() => { void load(); return () => { generation.current += 1; }; }, [load]);
+  useEffect(() => {
+    let active = true;
+    // Defer initial load until after effects subscribe; stale generations cannot overwrite state.
+    void Promise.resolve().then(() => { if (active) void load(); });
+    return () => { active = false; generation.current += 1; };
+  }, [load]);
 
   const photo = safePublicUrl(organization?.cover_image_url, true);
   return <SafeAreaView style={styles.page} edges={['top','left','right','bottom']}>

@@ -52,7 +52,12 @@ export default function PublicTalentBoard() {
       if (request === generation.current) setError(failure?.message || 'Public talent could not load.');
     } finally { if (request === generation.current) setLoading(false); }
   }, []);
-  useEffect(() => { void load(); return () => { generation.current += 1; }; }, [load]);
+  useEffect(() => {
+    let active = true;
+    // Defer initial load until after effects subscribe; stale generations cannot overwrite state.
+    void Promise.resolve().then(() => { if (active) void load(); });
+    return () => { active = false; generation.current += 1; };
+  }, [load]);
 
   const loadMore = async () => {
     if (next === null || busyRef.current) return;

@@ -45,7 +45,12 @@ export default function PublicHubPostDetail() {
       if (ticket === requestRef.current) setError(failure?.message || 'Post could not load.');
     } finally { if (ticket === requestRef.current) setLoading(false); }
   }, [id]);
-  useEffect(() => { void load(); return () => { requestRef.current += 1; }; }, [load]);
+  useEffect(() => {
+    let active = true;
+    // Defer initial load until after effects subscribe; stale generations cannot overwrite state.
+    void Promise.resolve().then(() => { if (active) void load(); });
+    return () => { active = false; requestRef.current += 1; };
+  }, [load]);
 
   const signIn = () => router.push({ pathname: '/login', params: { returnTo: '/explore/hubs/post/' + id } } as any);
   const act = async (perform: () => Promise<unknown>, reload = true) => {
