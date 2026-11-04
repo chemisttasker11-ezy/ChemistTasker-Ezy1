@@ -472,6 +472,14 @@ export default function PublicShiftsPage({
       setTermsOffers([]);
       await loadOffers();
     } catch (err) {
+      const errorCode = (err as any)?.payload?.code ?? (err as any)?.response?.data?.code ?? (err as any)?.code;
+      if (errorCode === 'TERMS_CHANGED') {
+        // Never leave a stale consent sheet open. Re-open from freshly fetched previews.
+        setTermsOffers([]);
+        await loadOffers();
+        showError('Shift engagement terms changed. Please reopen the offer and review the updated terms.');
+        return;
+      }
       showError(errorMessage(err, 'Failed to confirm the shift offer.'));
       throw err;
     } finally {
