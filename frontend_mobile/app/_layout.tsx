@@ -289,7 +289,8 @@ function AuthGate() {
   const ahpraPath = user?.role === 'PHARMACIST' ? '/pharmacist/profile-basic-info' : '/otherstaff/profile-regulatory';
   const onAhpraStep = `/${segments.join('/')}` === ahpraPath;
   // Invitations are never blocked by AHPRA.
-  const onInvitePage = ['/pharmacist/memberships', '/otherstaff/memberships', '/admin-invitations'].includes(`/${segments.join('/')}`);
+  const onInvitePage = ['/pharmacist/memberships', '/otherstaff/memberships', '/admin-invitations'].includes(`/${segments.join('/')}`)
+    || (segments[0] === 'membership' && segments[1] === 'apply' && Boolean(segments[2]));
 
   useEffect(() => {
     if (isLoading || ahpraLoading) return;
@@ -302,7 +303,7 @@ function AuthGate() {
     const segmentList = segments as readonly string[];
     const second = segmentList[1];
     const third = segmentList[2];
-    const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
+    const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact', 'membership']);
     const isPublic = publicRoutes.has(top ?? '');
 
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
