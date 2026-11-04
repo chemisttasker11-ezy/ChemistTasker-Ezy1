@@ -9,6 +9,7 @@ import { finance, financeStatus, financeToday, type FinanceCustomer, type Financ
 import FinanceInvoiceEditor from './FinanceInvoiceEditor';
 import { receivedInvoiceActions } from './receivedInvoicePolicy';
 import { nativeFileBytes } from '@/features/parity/nativeFileBytes';
+import { colors, font, radius, space, touch } from '@/constants/tokens';
 
 const money = (value: string | number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 // Idempotency identity only; no secrets or authentication use.
@@ -103,7 +104,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const afterSave = async () => { try { await load(); } catch { setError('Saved. Pull to refresh to update the list.'); } };
   const ask = (title: string, message: string, action: () => Promise<unknown>) => Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Confirm', onPress: () => void run(action) }]);
   const matches = (...values: string[]) => values.join(' ').toLowerCase().includes(search.toLowerCase());
-  const panel = { padding: 16, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.outlineVariant, marginBottom: 12 };
+  const panel = { padding: space.lg, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceBg, marginBottom: space.md };
   const customerForm = (initial?: FinanceCustomer) => {
     const value: FinanceCustomerInput = initial || { name: '', legal_name: '', abn: '', contact_name: '', email: '', phone: '', address: '', payment_terms_days: 14, notes: '', active: true };
     setFormError(''); setForm({ title: initial ? 'Edit customer' : 'Create customer', fields: { name: value.name, legal_name: value.legal_name, abn: value.abn, contact_name: value.contact_name, email: value.email, phone: value.phone, address: value.address, payment_terms_days: String(value.payment_terms_days), notes: value.notes }, booleans: { active: value.active }, save: (fields, flags) => finance.saveCustomer({ ...value, ...fields, ...flags, payment_terms_days: Number(fields.payment_terms_days) }, initial?.id) });
@@ -141,17 +142,23 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const fieldOptions: Record<string, string[]> = { tax_code: ['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'], ...(form?.title.toLowerCase().includes('item') ? { category: ['ProfessionalServices', 'Superannuation', 'Transportation', 'Accommodation', 'Miscellaneous'] } : {}) };
   const labels: Record<string, string> = { name: 'Name', legal_name: 'Legal entity name', abn: 'ABN', contact_name: 'Accounts contact', email: 'Invoice email', phone: 'Phone', address: 'Billing address', payment_terms_days: 'Payment terms (days)', notes: 'Notes', active: 'Active', code: 'Item code (optional)', category: 'Category', unit: 'Unit', unit_price: 'Unit price (AUD)', tax_code: 'Tax treatment', super_eligible: 'Include in reviewed super base', supplier: 'Supplier', description: 'Description', incurred_on: 'Incurred date (YYYY-MM-DD)', paid_on: 'Paid date (YYYY-MM-DD, optional)', amount: 'Amount (AUD)', gst_amount: 'Actual GST (AUD)', business_use_percent: 'Business use %', reference: 'Reference', gst_registered: 'I am registered for GST for this acquisition', evidence_confirmed: 'I hold the required tax invoice / evidence', reimbursable: 'Potentially reimbursable', fund_payment_confirmed: 'Payment went to the super fund', date: 'Payment date (YYYY-MM-DD)' };
   return <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: theme.colors.background }}>
-    <View style={{ padding: 16, flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleLarge" style={{ fontWeight: '700' }}>{receivedMode ? 'Received invoices' : 'Invoices & finances'}</Text><Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>{receivedMode ? 'Review contractor invoices, request corrections and record payment status.' : 'Create, revise, send and track invoices.'}</Text></View>{!receivedMode ? <IconButton icon="plus" accessibilityLabel="Create invoice" disabled={loading || busy} onPress={() => setEditor({ key: key() })} /> : null}</View>
+    <View style={{ padding: 16, flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleLarge" style={{ fontFamily: font.outfit.medium, color: colors.textPrimary }}>{receivedMode ? 'Received invoices' : 'Invoices & finances'}</Text><Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>{receivedMode ? 'Review contractor invoices, request corrections and record payment status.' : 'Create, revise, send and track invoices.'}</Text></View>{!receivedMode ? <IconButton icon="plus" accessibilityLabel="Create invoice" disabled={loading || busy} onPress={() => setEditor({ key: key() })} /> : null}</View>
     <View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}>{tabs.filter(t => t !== 'Existing tools' || existingTools).map(t => <Chip key={t} selected={tab === t} onPress={() => { setTab(t); setSearch(''); }}>{t}</Chip>)}</ScrollView></View>
     {tab === 'Existing tools' ? existingTools : <ScrollView keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void run(load)} />} contentContainerStyle={{ padding: 16 }}>
-      {!!error && <Text accessibilityRole="alert" style={{ color: theme.colors.error, marginBottom: 16 }}>{error}</Text>}
+      {!!error && <Surface elevation={0} style={[panel, { backgroundColor: colors.status.red.bg, borderColor: colors.status.red.fg }]}>
+        <Text accessibilityRole="alert" variant="titleSmall" style={{ color: colors.status.red.fg }}>Could not refresh this workspace</Text>
+        <Text style={{ color: colors.textPrimary, marginTop: space.sm, marginBottom: space.md }}>{error}</Text>
+        <Button mode="outlined" disabled={busy} loading={busy} contentStyle={{ minHeight: touch.min }} onPress={() => void run(load)}>
+          Try again
+        </Button>
+      </Surface>}
       {loading ? <ActivityIndicator accessibilityLabel="Loading finance records" /> : <>
-      {tab !== 'GST / BAS' && <Searchbar placeholder={`Search ${tab.toLowerCase()}`} value={search} onChangeText={setSearch} style={{ borderRadius: 8, marginBottom: 16 }} />}
+      {tab !== 'GST / BAS' && <Searchbar placeholder={`Search ${tab.toLowerCase()}`} value={search} onChangeText={setSearch} style={{ borderRadius: radius.control, marginBottom: space.lg, backgroundColor: colors.surfaceBg }} />}
       {tab === 'Invoices' && <>
         <View style={{ flexDirection: 'row', gap: 24, marginBottom: 20 }}><View><Text variant="labelMedium">Balance due</Text><Text variant="titleLarge">{money(invoices.filter(i => !i.voided && i.kind === 'invoice').reduce((sum, i) => sum + Number(i.balance), 0))}</Text></View><View><Text variant="labelMedium">Saved</Text><Text variant="titleLarge">{invoices.filter(i => financeStatus(i) === 'Saved').length}</Text></View></View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 16 }}>{['All', 'Saved', 'Sent', 'Approved for payment', 'Revision requested', 'Overdue', 'Part paid', 'Paid'].map(s => <Chip key={s} selected={status === s} onPress={() => setStatus(s)}>{s}</Chip>)}</ScrollView>
         {invoices.filter(i => (status === 'All' || financeStatus(i) === status) && matches(i.number, i.payload.customer?.name || '', i.payload.reference)).map(i => <Surface key={i.id} elevation={0} style={panel}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleMedium">{i.number}</Text><Text>{i.payload.customer?.name}</Text></View><Chip compact>{financeStatus(i)}</Chip></View><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 16 }}><Text variant="bodySmall">Due {i.payload.due_date}</Text><Text variant="titleMedium">{money(i.balance)}</Text></View><Button mode="outlined" onPress={() => { setHistoryDocument(null); setHistoryError(''); setSelected(i); }}>View invoice</Button></Surface>)}
-        {!invoices.length && <View style={{ padding: 24, alignItems: 'center', gap: 12 }}><Text variant="titleMedium">Create your first invoice</Text><Text>Save a customer and an item, then bill your work.</Text><Button mode="contained" onPress={() => setEditor({ key: key() })}>Create invoice</Button></View>}
+        {!error && !invoices.length && <View style={{ padding: space['2xl'], alignItems: 'center', gap: space.md }}><Text variant="titleMedium">Create your first invoice</Text><Text>Save a customer and an item, then bill your work.</Text><Button mode="contained" onPress={() => setEditor({ key: key() })}>Create invoice</Button></View>}
       </>}
       {tab === 'Received' && <>
         <Text style={{ marginBottom: 12, color: theme.colors.onSurfaceVariant }}>Sent internal ABN invoices appear here. Request a revision when hours, finish time, rate, tax treatment or another detail needs correction.</Text>
@@ -161,7 +168,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
           {i.last_review_note ? <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 8 }}>{i.last_review_note}</Text> : null}
           <Button mode="outlined" onPress={() => { setHistoryDocument(null); setHistoryError(''); setSelected(i); }}>Review invoice</Button>
         </Surface>)}
-        {!receivedInvoices.length && <View style={{ padding: 24, alignItems: 'center' }}><Text variant="titleMedium">No received invoices yet</Text><Text>Internal invoices will appear after the contractor sends them.</Text></View>}
+        {!error && !receivedInvoices.length && <View style={{ padding: space['2xl'], alignItems: 'center' }}><Text variant="titleMedium">No received invoices yet</Text><Text>Internal invoices will appear after the contractor sends them.</Text></View>}
       </>}
       {tab === 'Customers' && <><Button icon="plus" onPress={() => customerForm()} style={{ marginBottom: 16 }}>Create customer</Button>{customers.filter(c => matches(c.name, c.abn)).map(c => <Surface key={c.id} elevation={0} style={panel}><Text variant="titleMedium">{c.name}</Text><Text>{c.email || 'No invoice email'}</Text><Text variant="bodySmall">{c.payment_terms_days}-day terms · ABN {c.abn || 'not supplied'}</Text><View style={{ flexDirection: 'row' }}><Button onPress={() => customerForm(c)}>Edit</Button><Button disabled={busy || !c.abn} onPress={() => void run(async () => { await finance.lookupAbn(c.id); await load(); })}>Check ABN</Button></View></Surface>)}</>}
       {tab === 'Items' && <><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}><Button icon="plus" onPress={() => itemForm()}>Create item</Button><Button disabled={busy} onPress={() => void run(async () => { await finance.seedItems(); await load(); })}>Starter items</Button></View>{items.filter(i => matches(i.code, i.name)).map(i => <Surface key={i.id} elevation={0} style={panel}><Text variant="titleMedium">{i.name}</Text><Text>{i.code} · {money(i.unit_price)} / {i.unit}</Text><Text variant="bodySmall">{i.tax_code.replaceAll('_', ' ')}</Text><Button onPress={() => itemForm(i)}>Edit item</Button></Surface>)}</>}
@@ -215,9 +222,14 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
             </Surface>}
             {receivedMode ? <View style={{ gap: 8 }}>
               <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected, true))}>Share delivered PDF</Button>
-              <Button mode="contained" disabled={busy || !receivedInvoiceActions(selected).approve} onPress={() => reviewForm(selected, 'approve')}>Approve for payment</Button>
-              <Button mode="outlined" disabled={busy || !receivedInvoiceActions(selected).revise} textColor={theme.colors.error} onPress={() => reviewForm(selected, 'revise')}>Request revision</Button>
-              <Button mode="outlined" disabled={busy || !receivedInvoiceActions(selected).paid} onPress={() => reviewForm(selected, 'paid')}>Mark paid</Button>
+              <Button mode="contained" contentStyle={{ minHeight: touch.min }} disabled={busy || !receivedInvoiceActions(selected).approve} onPress={() => reviewForm(selected, 'approve')}>Approve for payment</Button>
+              <Button mode="outlined" contentStyle={{ minHeight: touch.min }} disabled={busy || !receivedInvoiceActions(selected).revise} textColor={theme.colors.error} onPress={() => reviewForm(selected, 'revise')}>Request revision</Button>
+              <Button mode="outlined" contentStyle={{ minHeight: touch.min }} disabled={busy || !receivedInvoiceActions(selected).paid} onPress={() => reviewForm(selected, 'paid')}>Mark paid</Button>
+              {!receivedInvoiceActions(selected).approve && (selected.status === 'paid' || selected.review_status === 'APPROVED_FOR_PAYMENT') ? (
+                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+                  {selected.status === 'paid' ? 'Payment is already recorded for this invoice.' : 'This invoice is already approved for payment.'}
+                </Text>
+              ) : null}
             </View> : <>
               <Button mode="contained" onPress={() => { setEditor({ invoice: selected, key: selected.request_key }); setSelected(null); }}>Edit invoice</Button>
               <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected))}>Share PDF</Button>
