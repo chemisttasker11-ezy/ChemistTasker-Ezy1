@@ -49,3 +49,17 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notification #{self.pk} to user {self.user_id} ({self.type})"
+
+
+class NotificationPushPreference(models.Model):
+    """User-scoped push transport preferences. Durable in-app notifications are never removed."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="push_preference")
+    push_messages = models.BooleanField(default=True)
+    push_tasks = models.BooleanField(default=True)
+    push_work_notes = models.BooleanField(default=True)
+    push_alerts = models.BooleanField(default=True)
+    quiet_hours_enabled = models.BooleanField(default=False)
+    quiet_start = models.TimeField(default=__import__('datetime').time(22, 0))
+    quiet_end = models.TimeField(default=__import__('datetime').time(7, 0))
+    time_zone = models.CharField(max_length=64, default="Australia/Brisbane")
+    updated_at = models.DateTimeField(auto_now=True)
