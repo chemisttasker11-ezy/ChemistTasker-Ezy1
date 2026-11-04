@@ -2,7 +2,7 @@
 
 **Scope:** The real implementation in `frontend_web/shared/postShift`, `frontend_web/src/pages/dashboard/{shiftCenter,sidebar/ActiveShiftsPage}` versus `frontend_mobile/roles/shared/shifts`, the native screen wrappers and shared-core. This is **job and permission parity**, not duplicate layout or pixel mirroring.
 
-**Review baseline:** PR #248 head `c98cf2ef`; other agent's PR #249 head at review start `cf8b245c`. Targeted senior fixes in this review advanced PR #249 through `2df30dee`; see commit history. **No actual native device visual approval or fully green exact-head release gate at the time of this review.**
+**Review baseline:** PR #248 head `c98cf2ef`; other agent's PR #249 head at review start `cf8b245c`. Targeted senior fixes in this review advanced PR #249 through `43ee30f2`; see commit history. **No actual native device visual approval or fully green exact-head release gate at the time of this review.**
 
 Legend: **present** = matching operation and reachable UI observed in source, but device acceptance still required. **partial** = operation exists but meaningful UX/edge case remains. **extra** = beyond the current web UI. **pending acceptance** = source implementation present, final end-to-end tests not yet proven.
 
@@ -35,7 +35,7 @@ Legend: **present** = matching operation and reachable UI observed in source, bu
 |---|---|---|
 | Active / Confirmed / History sections | **Present** | `shiftCenter/ShiftCenterPage.tsx` vs `ShiftsScreen.tsx`, `ShiftSectionTabs.tsx`; persona scope and capability matter |
 | Load all active/confirmed pages, detail links | **Present** | Named paginated shared-core operations; scoped generation and failure handling |
-| Open specific `?shift_id` + `?slot_id` | **Partial** | Native now validates both IDs, expands the shift, selects only an owned slot; unlike web `scrollIntoView`, **no automatic scroll-to-card** yet |
+| Open specific `?shift_id` + `?slot_id` | **Present in source, pending device acceptance** | Native validates IDs, expands the shift, selects only a slot belonging to it and scrolls the measured card into view once; test at both screen sizes and repeated notifications |
 | New `notification_id` or `_ntf` for same shift refreshes candidate status | **Present in source** | Native `useShiftsData` now depends on notification key; device push/deep-link acceptance pending |
 | One-tap Post Shift even when list empty | **Present** | New capability-scoped native action in active header and empty state, links to owner/org/admin route |
 | Candidate cards by eligible escalation level and slot | **Present** | `ActiveShiftCards.tsx`, `useTabData.ts`, `isCandidateLevelVisible`; backend has final permission authority |
@@ -49,7 +49,7 @@ Legend: **present** = matching operation and reachable UI observed in source, bu
 | Worker history invoice / rating-pharmacy handoff | **Present** | `WorkerHistoryShiftsView.tsx` invoice-route, rating; new/legacy invoice integration still needs acceptance |
 
 ### Shift Centre issues still open
-- **P1 device behavior:** deep-linked shift expands/sets slot but does not scroll itself into view in a long list; web does.
+- **P1 device acceptance:** the new on-layout + content-size guarded native scroll-to-card is implemented, but must be checked on a long list, repeated links and manual scroll interactions on both platforms.
 - **P1 UX polish:** `ActiveShiftCards.tsx` and much of the 323-line ActiveShift styles still use older hard-coded colors, heavy elevation and dense cards. Header and Post Shift action now use canonical brand tokens, but full native premium polish requires screenshot signoff.
 - **P1 concurrency/financial:** entitlement/permissions, paid checkout recovery, frozen roster, slot assignment and post-payment conditions must pass the full Senior Package Test; static presence is not proof.
 - Candidate/error and payroll list failure retries need role-specific, real backend network-interruption tests, including scope changes while requests are pending.
@@ -71,6 +71,6 @@ Source-only review was possible through the connected GitHub repository, not a l
 
 ### Recommended next wave
 1. Review latest exact-head CI and fix only reproducible failures without weakening business invariants.
-2. Implement Shift Centre scroll-to-target for `shift_id` using native row measurement + guarded scroll, retain manual scroll/selection.
+2. Verify Shift Centre scroll-to-target on actual Android/iOS long lists and repeated links; confirm it never overrides later manual scroll/slot selection.
 3. Independent source review of candidate/reveal/payment and all payroll actions with positive and negative account controls; finish W3 screenshots for Post Shift and Shift Centre.
 4. Then move to W4 validation and next waves, keeping user-facing feature parity ledger current.
