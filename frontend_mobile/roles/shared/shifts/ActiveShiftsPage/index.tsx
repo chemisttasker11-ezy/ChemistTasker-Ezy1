@@ -3,7 +3,10 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Alert, View, ScrollView, Linking } from 'react-native';
+import { Plus } from 'lucide-react-native';
 import { Text, Snackbar } from 'react-native-paper';
+import { ScalePressable } from '@/components/ui';
+import { colors } from '@/constants/tokens';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -56,6 +59,7 @@ import {
     getSlotIds,
     positiveShiftLinkId,
     getDeepLinkedShiftSlotId,
+    getPosterPostShiftPath,
     findInterestForMember,
     buildPublicSlotSignature,
     buildMemberSlotSignature,
@@ -76,13 +80,19 @@ type ActiveShiftsCentreProps = {
     surface: ShiftSurface;
     shiftId: number | null;
     routeSlotId: number | null;
+    notificationKey: string | null;
     title: string;
 };
 
-const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftId, routeSlotId, title }) => {
+const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftId, routeSlotId, notificationKey, title }) => {
     const router = useRouter();
     const { user } = useAuth();
     const selectedPharmacyId = surface.scopedPharmacyId;
+    const postShiftPath = getPosterPostShiftPath(surface.persona, selectedPharmacyId);
+    const handlePostShift = useCallback(() => {
+        if (!postShiftPath || !surface.canManageShifts) return;
+        router.push({ pathname: postShiftPath as any, params: selectedPharmacyId != null ? { pharmacyId: String(selectedPharmacyId) } : {} });
+    }, [postShiftPath, router, selectedPharmacyId, surface.canManageShifts]);
 
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -131,6 +141,7 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
         selectedPharmacyId,
         shiftId,
         scopeKey: surface.scopeKey,
+        notificationKey,
     });
     const { tabData, setTabData, loadTabDataForShift } = useTabData(shifts, selectedLevelByShift, getTabKey);
 
@@ -911,6 +922,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                     kind="empty"
                     title="No active shifts found"
                     description="When you post shifts or receive candidates, they will appear here."
+                    actionLabel={postShiftPath ? 'Post shift' : undefined}
+                    onAction={postShiftPath ? handlePostShift : undefined}
                     style={styles.stateCard}
                 />
             </SafeAreaView>
@@ -923,6 +936,19 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                 <View style={styles.pageHeader}>
                     <Text style={styles.title}>{title}</Text>
                     <Text style={styles.subtitle}>Manage and track your live shifts</Text>
+                    {postShiftPath ? (
+                        <ScalePressable
+                            static
+                            pressBg
+                            onPress={handlePostShift}
+                            accessibilityRole="button"
+                            accessibilityLabel="Post a new shift"
+                            style={styles.postShiftAction}
+                        >
+                            <Plus size={18} color={colors.surfaceBg} strokeWidth={2} />
+                            <Text style={styles.postShiftActionText}>Post shift</Text>
+                        </ScalePressable>
+                    ) : null}
                 </View>
                 <ActiveShiftCards
                     data={{
@@ -1038,9 +1064,10 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
 // GAP 1 FIX: Key the whole centre by surface.scopeKey + shiftId so cards and dialogs never survive scope/shift changes
 const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, title = 'Active Shifts' }) => {
     const surface = useShiftSurface();
-    const params = useLocalSearchParams<{ shift_id?: string; slot_id?: string }>();
+    const params = useLocalSearchParams<{ shift_id?: string; slot_id?: string; notification_id?: string; _ntf?: string }>();
     const activeShiftId = positiveShiftLinkId(params.shift_id) ?? shiftId;
     const slotId = positiveShiftLinkId(params.slot_id);
+    const notificationKey = params.notification_id ?? params._ntf ?? null;
     const centreKey = buildActiveShiftsScopeKey(surface.scopeKey, activeShiftId);
 
     return (
@@ -1049,6 +1076,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
             surface={surface}
             shiftId={activeShiftId}
             routeSlotId={slotId}
+            notificationKey={notificationKey}
             title={title}
         />
     );

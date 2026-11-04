@@ -1,29 +1,49 @@
 import { StyleSheet } from 'react-native';
 import { customTheme } from './theme';
+import { colors, font, radius, space, touch, type } from '@/constants/tokens';
 
 export const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: colors.pageBg,
     },
     content: {
         padding: customTheme.spacing.lg,
         gap: customTheme.spacing.md,
     },
     pageHeader: {
-        gap: 4,
-        marginBottom: customTheme.spacing.sm,
+        gap: space.sm,
+        marginBottom: space.sm,
     },
     title: {
-        fontSize: 24,
-        fontWeight: '900',
-        color: '#111827',
-        letterSpacing: -0.4,
+        fontSize: type.headlineLarge.fontSize,
+        lineHeight: type.headlineLarge.lineHeight,
+        fontFamily: font.outfit.medium,
+        color: colors.textPrimary,
     },
     subtitle: {
-        color: '#64748B',
-        fontSize: 14,
-        fontWeight: '600',
+        color: colors.textSecondary,
+        fontSize: type.bodySmall.fontSize,
+        lineHeight: type.bodySmall.lineHeight,
+        fontFamily: font.inter.regular,
+    },
+    postShiftAction: {
+        flexDirection: 'row',
+        gap: space.sm,
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'flex-start',
+        minHeight: touch.min,
+        paddingHorizontal: space.lg,
+        borderRadius: radius.control,
+        backgroundColor: colors.primary,
+        marginTop: space.xs,
+    },
+    postShiftActionText: {
+        color: colors.surfaceBg,
+        fontFamily: font.inter.semiBold,
+        fontSize: type.labelLarge.fontSize,
+        lineHeight: type.labelLarge.lineHeight,
     },
     sectionTitle: {
         fontSize: 12,
