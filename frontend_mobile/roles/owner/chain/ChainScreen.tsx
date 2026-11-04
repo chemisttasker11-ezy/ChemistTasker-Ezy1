@@ -14,6 +14,7 @@ import { ActivityIndicator, Button, Chip, Divider, Snackbar, Surface, Text, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ContentState } from '@/components/ui';
 import { colors, font, radius, space, touch, type } from '@/constants/tokens';
+import { resolveApiBaseUrl } from '@/utils/apiUrl';
 
 type MemberRows = Record<number, MembershipSummary[] | 'error'>;
 type Editor = 'create' | 'edit' | null;
@@ -41,6 +42,16 @@ export default function ChainScreen() {
   const [logoFile, setLogoFile] = useState<{uri: string; name: string; type: string} | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const chain = chains.find((item) => item.id === chainId) ?? null;
+  const logoUrl = (() => {
+    if (!chain?.logo) return null;
+    try {
+      const base = resolveApiBaseUrl();
+      const resolved = new URL(chain.logo, base ? new URL(base).origin : undefined);
+      return resolved.protocol === 'https:' || resolved.protocol === 'http:' ? resolved.toString() : null;
+    } catch {
+      return null;
+    }
+  })();
 
   const load = useCallback(async (preferredId?: number | null) => {
     const request = ++generation.current;
@@ -218,9 +229,7 @@ export default function ChainScreen() {
           ) : (
             <>
               <Surface style={styles.card} elevation={0}>
-                {chain.logo && (chain.logo.startsWith('https://') || chain.logo.startsWith('http://'))
-                  ? <Image source={{ uri: chain.logo }} style={styles.logo} contentFit="contain" accessibilityLabel="Chain logo" />
-                  : null}
+                {logoUrl ? <Image source={{ uri: logoUrl }} style={styles.logo} contentFit="contain" accessibilityLabel="Chain logo" /> : null}
                 <Text style={styles.section}>{chain.name}</Text>
                 <Text style={styles.subtext}>{chain.primaryContactEmail || 'No contact email'}</Text>
                 <View style={styles.actions}>
