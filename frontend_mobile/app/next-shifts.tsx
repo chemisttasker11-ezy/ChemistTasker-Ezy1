@@ -34,6 +34,10 @@ function ScopedNextShifts({userId}:{userId?:number}) {
    if(saved){setRows(saved.rows);setCachedAt(saved.savedAt);setOffline(true);}
    const current=await fetchMyConfirmedShifts();
    if(gen!==generation.current)return;
+   if(current.some(shift=>!Array.isArray(shift.assignedOccurrences))) {
+    setMessage('Confirmed shift dates cannot be verified until the service is updated. Please use your main shift page.');
+    return;
+   }
    const liveRows=sanitizeConfirmedShifts(current,userId);
    setRows(liveRows);setCachedAt(new Date().toISOString());setOffline(false);
    // Cache failure must not hide valid freshly fetched shifts.
@@ -69,7 +73,7 @@ function ScopedNextShifts({userId}:{userId?:number}) {
    </Text>:null}
    {message?<Text accessibilityRole="alert" style={styles.warning}>{message}</Text>:null}
    {loading&&!rows.length?<ActivityIndicator accessibilityLabel="Loading confirmed shifts"/>:null}
-   {upcoming.length===0&&!loading?<Card mode="outlined"><Card.Content>
+   {upcoming.length===0&&!loading&&!message?<Card mode="outlined"><Card.Content>
      <Text variant="titleMedium">No upcoming confirmed shifts</Text>
      <Text style={styles.muted}>Shifts will appear here once confirmed.</Text>
    </Card.Content></Card>:null}
