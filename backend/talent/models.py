@@ -179,3 +179,18 @@ class UserAvailability(models.Model):
     def __str__(self):
         times = "All Day" if self.is_all_day else f"{self.start_time}-{self.end_time}"
         return f"{self.user.username} available {times} on {self.date}"
+
+
+class SavedProfessionalContact(models.Model):
+    """Private account-scoped bookmark of a public talent/org identity; never a membership."""
+    class Kind(models.TextChoices):
+        WORKER_LISTING = "WORKER_LISTING", "Worker listing"
+        ORGANIZATION = "ORGANIZATION", "Organisation"
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_professional_contacts")
+    kind = models.CharField(max_length=24, choices=Kind.choices)
+    reference = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "kind", "reference"], name="talent_saved_contact_unique")]
+        indexes = [models.Index(fields=["user", "-created_at"], name="talent_saved_contact_user_date")]
