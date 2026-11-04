@@ -147,10 +147,10 @@ function ScopedLegacyRoster({ pharmacyId, pharmacyName }: { pharmacyId: number |
     )
   );
   const matchingMember = members.find((member) => member.user === memberId);
-  const validClock = (text: string) => /^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(text);
+  const validClock = (text: string) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(text);
   const canCreate =
     !busy && !membersLoading && !membersError && Boolean(memberId)
-    && /^\\d{4}-\\d{2}-\\d{2}$/.test(createDate)
+    && /^\d{4}-\d{2}-\d{2}$/.test(createDate)
     && validClock(startTime) && validClock(endTime) && startTime !== endTime;
 
   const submitAssignment = async () => {
