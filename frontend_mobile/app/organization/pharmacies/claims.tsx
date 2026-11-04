@@ -122,7 +122,7 @@ export default function OrganizationPharmacyClaimsScreen() {
             <>
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <Button mode="text" onPress={() => void load()} disabled={loading}>Refresh requests</Button>
-              {loading ? <ActivityIndicator color={colors.brandPrimary} /> : error ? (
+              {loading ? <ActivityIndicator color={colors.primary} /> : error ? (
                 <Button mode="outlined" onPress={() => void load()}>Try again</Button>
               ) : claims.length === 0 ? (
                 <Text style={styles.subtitle}>No claim requests yet.</Text>
@@ -158,8 +158,8 @@ const styles = StyleSheet.create({
   label: { color: colors.textPrimary, fontWeight: '700' },
   button: { minHeight: 48 },
   counts: { flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' },
-  error: { color: colors.error },
-  success: { color: colors.brandPrimary },
+  error: { color: colors.status.red.fg },
+  success: { color: colors.primary },
   claim: { borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border, paddingTop: space.md, gap: space.xs },
   claimTitle: { color: colors.textPrimary, fontWeight: '700', flexShrink: 1 },
 });
