@@ -195,7 +195,7 @@ async function mount(platform, { rows = [cover], loadError = false, acceptError 
       active = instances.get(path); active.cursor = 0;
       return expand(node.type(node.props), `${path}/render`);
     }
-    return { ...node, props: { ...node.props, children: expand(node.props?.children, `${path}/children`), control: expand(node.props?.control, `${path}/control`), action: expand(node.props?.action, `${path}/action`) } };
+    return { ...node, props: { ...node.props, children: expand(node.props?.children, `${path}/children`), control: expand(node.props?.control, `${path}/control`), action: expand(node.props?.action, `${path}/action`), footer: expand(node.props?.footer, `${path}/footer`) } };
   }
   async function flush() {
     for (let index = 0; index < 35; index++) {
