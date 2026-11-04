@@ -19,6 +19,7 @@ function nextPage(url: string | null): number | null {
 export default function PublicHubFeed() {
   const router = useRouter();
   const { user } = useAuth();
+  const accountKey = String(user?.id ?? 'anonymous');
   const { hub: routeHub } = useLocalSearchParams<{ hub: string }>();
   const hub = String(routeHub || '');
   const generation = useRef(0);
@@ -40,6 +41,7 @@ export default function PublicHubFeed() {
     const ticket = ++generation.current;
     setLoading(true); setError(''); setActionError(''); setMoreError('');
     setPosts([]); setPolls([]); setInfo(null); setNext(null); setMoreBusy(false);
+    setBusy(false); setBody(''); setAttachments([]); submitting.current = false;
     try {
       const [hubs, result, pollResult] = await Promise.all([
         chemistTaskerApi.publicContent.listHubs(),
@@ -54,7 +56,7 @@ export default function PublicHubFeed() {
     } catch (failure: any) {
       if (ticket === generation.current) setError(failure?.message || 'Public community could not load.');
     } finally { if (ticket === generation.current) setLoading(false); }
-  }, [hub]);
+  }, [hub, accountKey]);
   useEffect(() => {
     let active = true;
     // Defer initial load until after effects subscribe; stale generations cannot overwrite state.

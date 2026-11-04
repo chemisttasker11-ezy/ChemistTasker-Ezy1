@@ -18,6 +18,7 @@ const displayDate = (value: string) => {
 export function ArticleDetail({ slug }: { slug: string }) {
   const router = useRouter();
   const { user } = useAuth();
+  const accountKey = String(user?.id ?? 'anonymous');
   const generation = useRef(0);
   const submitting = useRef(false);
   const [article, setArticle] = useState<Article | null>(null);
@@ -53,7 +54,7 @@ export function ArticleDetail({ slug }: { slug: string }) {
     } finally {
       if (ticket === generation.current) { setLoading(false); setCommentsLoading(false); }
     }
-  }, [slug]);
+  }, [slug, accountKey]);
 
   useEffect(() => {
     let active = true;

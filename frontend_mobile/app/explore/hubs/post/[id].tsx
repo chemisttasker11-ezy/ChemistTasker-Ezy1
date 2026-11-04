@@ -13,6 +13,7 @@ import { colors, radius, space, touch } from '@/constants/tokens';
 export default function PublicHubPostDetail() {
   const router = useRouter();
   const { user } = useAuth();
+  const accountKey = String(user?.id ?? 'anonymous');
   const { id: rawId } = useLocalSearchParams<{ id: string }>();
   const id = Number(rawId);
   const requestRef = useRef(0);
@@ -32,7 +33,7 @@ export default function PublicHubPostDetail() {
   const load = useCallback(async () => {
     const ticket = ++requestRef.current;
     setLoading(true); setError(''); setActionError('');
-    setPost(null); setComments([]);
+    setPost(null); setComments([]); setComment(''); setReply(null); setEditing(null); setReportReason(''); setReporting(false);
     try {
       if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Invalid post link.');
       const [current, replies] = await Promise.all([
@@ -44,7 +45,7 @@ export default function PublicHubPostDetail() {
     } catch (failure: any) {
       if (ticket === requestRef.current) setError(failure?.message || 'Post could not load.');
     } finally { if (ticket === requestRef.current) setLoading(false); }
-  }, [id]);
+  }, [id, accountKey]);
   useEffect(() => {
     let active = true;
     // Defer initial load until after effects subscribe; stale generations cannot overwrite state.

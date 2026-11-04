@@ -5,10 +5,13 @@ import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { PublicHubSummary } from '@chemisttasker/shared-core';
 import { chemistTaskerApi } from '@/config/api';
+import { useAuth } from '@/context/AuthContext';
 import { colors, radius, space, touch } from '@/constants/tokens';
 
 export default function PublicHubIndex() {
   const router = useRouter();
+  const { user } = useAuth();
+  const accountKey = String(user?.id ?? 'anonymous');
   const requestRef = useRef(0);
   const [hubs, setHubs] = useState<PublicHubSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +25,7 @@ export default function PublicHubIndex() {
     } catch (failure: any) {
       if (request === requestRef.current) setError(failure?.message || 'Public hubs could not load.');
     } finally { if (request === requestRef.current) setLoading(false); }
-  }, []);
+  }, [accountKey]);
   useEffect(() => {
     let active = true;
     // Defer initial load until after effects subscribe; stale generations cannot overwrite state.
