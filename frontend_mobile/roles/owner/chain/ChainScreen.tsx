@@ -218,7 +218,7 @@ export default function ChainScreen() {
           ) : (
             <>
               <Surface style={styles.card} elevation={0}>
-                {chain.logo && /^https?:\\/\\//.test(chain.logo)
+                {chain.logo && (chain.logo.startsWith('https://') || chain.logo.startsWith('http://'))
                   ? <Image source={{ uri: chain.logo }} style={styles.logo} contentFit="contain" accessibilityLabel="Chain logo" />
                   : null}
                 <Text style={styles.section}>{chain.name}</Text>
