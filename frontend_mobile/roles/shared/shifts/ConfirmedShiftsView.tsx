@@ -8,18 +8,16 @@ import {
 } from 'react-native-paper';
 import {
     activateShiftOfferPayrollService,
+    fetchAllConfirmedShifts,
     fetchShiftOffers,
 
-    type ShiftApi,
     type ShiftOfferApi,
-    shiftsDomain,
 
     type Shift,
     type ShiftUser,
     viewAssignedShiftProfileService,
 } from '@chemisttasker/shared-core';
-import { type ApiList, camelCaseKeysDeep, fetchAllPages } from '@chemisttasker/shared-core/dist/utils/serialization';
-import { fetchApi } from '@chemisttasker/shared-core/dist/transport/application';
+import { camelCaseKeysDeep, fetchAllPages } from '@chemisttasker/shared-core/dist/utils/serialization';
 import { ContentState } from '@/components/ui';
 import { colors, radius, space } from '@/constants/tokens';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
@@ -102,11 +100,8 @@ export default function ConfirmedShiftsView() {
         setLoading(true);
         setError(null);
         try {
-            const raw = await fetchAllPages<ShiftApi>((page) =>
-                fetchApi<ApiList<ShiftApi>>(`/shifts/confirmed/?page=${page}`)
-            );
+            const data = await fetchAllConfirmedShifts();
             if (gen !== loadGenRef.current) return;
-            const data = raw.map(shiftsDomain.mapShift);
             const filtered = filterShiftsByPharmacy(data, scopedPharmacyId);
             setShifts((prev) => (filtered.length === 0 && prev.length === 0 ? prev : filtered));
         } catch (err: any) {

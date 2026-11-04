@@ -33,8 +33,14 @@ export function getPublicShifts(params?: Record<string, unknown>) {
 export function getActiveShifts() {
     return fetchApi<Collection<ShiftApi>>('/shifts/active/');
 }
+export function getActiveShiftsPage(page: number) {
+    return fetchApi<Collection<ShiftApi>>(`/shifts/active/?page=${page}`);
+}
 export function getConfirmedShifts() {
     return fetchApi<Collection<ShiftApi>>('/shifts/confirmed/');
+}
+export function getConfirmedShiftsPage(page: number) {
+    return fetchApi<Collection<ShiftApi>>(`/shifts/confirmed/?page=${page}`);
 }
 export function getHistoryShifts(params?: Record<string, unknown>) {
     return fetchApi<Collection<ShiftApi>>(`/shifts/history/${buildQuery(params)}`);
@@ -263,6 +269,10 @@ export async function fetchActiveShifts() {
     const data = await getActiveShifts();
     return asList(data).map(mapShift);
 }
+/** Returns all pages of the active shifts list, owned by the shared-core domain. */
+export async function fetchAllActiveShifts() {
+    return (await fetchAllPages((page) => getActiveShiftsPage(page))).map(mapShift);
+}
 export async function fetchActiveShiftDetailService(shiftId: number | string) {
     const data = await getActiveShiftDetail(shiftId);
     return mapShift(data);
@@ -286,6 +296,9 @@ export async function fetchPublicShiftDetailService(shiftId: number | string) {
 export async function fetchConfirmedShifts() {
     const data = await getConfirmedShifts();
     return asList(data).map(mapShift);
+}
+export async function fetchAllConfirmedShifts() {
+    return (await fetchAllPages((page) => getConfirmedShiftsPage(page))).map(mapShift);
 }
 export async function fetchConfirmedShiftDetailService(shiftId: number | string) {
     const data = await getConfirmedShiftDetail(shiftId);
