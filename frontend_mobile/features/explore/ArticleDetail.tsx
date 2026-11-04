@@ -37,7 +37,7 @@ export function ArticleDetail({ slug }: { slug: string }) {
   const load = useCallback(async () => {
     const ticket = ++generation.current;
     setLoading(true); setError(''); setActionError('');
-    setArticle(null); setComments([]); setPage(null); setPaging(false); setReplyTo(null);
+    setArticle(null); setComments([]); setPage(null); setPaging(false); setReplyTo(null); setReportId(null); setReason('');
     try {
       const result = await chemistTaskerApi.publicContent.getArticle(slug);
       if (ticket !== generation.current) return;
