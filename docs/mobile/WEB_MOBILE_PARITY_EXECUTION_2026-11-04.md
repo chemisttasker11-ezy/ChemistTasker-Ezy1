@@ -11,6 +11,7 @@
 | Organization owner claim status/history | Existing owner accept/reject untouched; organization sees pending/accepted/rejected and owner response | Permission boundary by active organization id added client-side; backend remains authority |
 | Learning resources (was placeholder or missing) | One native branded resource screen for pharmacist, other staff, owner, organization, Explorer; searchable article/news listing, pagination and retry; open published article on web | Compare editorial content/feed and links in QA; test Android/iOS, offline network failures, 1.6x text and keyboard |
 | Legacy invoice PDF open/share | Owner, organization, pharmacist and other-staff list/detail now use `downloadInvoicePdf` + `nativeFileBytes` + Expo cache and native share sheet instead of unauthenticated `Linking.openURL(getInvoicePdfUrl(...))`. | Source/UI contract test wired into CI; authenticated staging/device PDF, recipient authorization and secure cleanup acceptance required |
+| Worker published roster acknowledgement | `/attendance/published-roster` uses server-published shifts and `rosterV2.acknowledge` per week with retry | Source contract in CI; real worker and manager-counter verification remains |
 | Documentation/test discipline | New organization membership/email tests; active shift deep-link scope test wired to mobile CI | **Require fully green exact-head CI**, not an intermediate green build |
 
 ## Status caveats
@@ -23,7 +24,7 @@
 ## Next high-impact source and acceptance work
 1. Finish green latest-head CI (Expo lint/typecheck, shared core, web, PostgreSQL concurrency), then verify the custom shift deep-link scroll on physical iOS/Android.
 2. Compare Post Shift/Shift Centre field-by-field with web source and real network behavior: rates, per-slot dates, counter-offers, reveal permissions, Stripe/Pills settlement, payroll gating and deep-link retry. Update `W3_WEB_TO_EXPO_FUNCTIONAL_PARITY_REVIEW_2026-11-04.md` on acceptance, not just source existence.
-3. W5: worker published-roster acknowledgement; manager timesheet detail, corrections, attendance timezone; validate role restrictions and protection of booked/paid records.
+3. W5: finish worker published-roster acknowledgment device/server verification; then manager timesheet detail, corrections and attendance timezone; validate role restrictions and protected records.
 4. W6: modern-vs-legacy invoice detail, authenticated PDF download/share, approve/paid gating; chat older-message pagination and canonical pharmacy team rooms.
 5. W7/W8: Explorer board and dashboard parity, native content and learning, marketplace/ethical marketplace, profile/comms; categorize browser-first external forms rather than duplicate them.
 6. Premium design review on representative small and large screens, 1.6x accessibility text, native loading/error/empty/success, native keyboard, reduced motion, secure links, and clear one-handed actions.
