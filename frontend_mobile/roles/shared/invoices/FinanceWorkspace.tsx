@@ -2,10 +2,12 @@ import React, { useCallback, useEffect, useRef, useState, type ReactNode } from 
 import { Alert, Modal, RefreshControl, ScrollView, View, KeyboardAvoidingView, Platform } from 'react-native';
 import { ActivityIndicator, Button, Checkbox, Chip, IconButton, List, Searchbar, Surface, Text, TextInput, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { finance, financeStatus, financeToday, type FinanceCustomer, type FinanceCustomerInput, type FinanceItem, type FinanceItemInput, type FinanceInvoice, type FinanceExpense, type FinanceExpenseInput, type FinanceWorksheet } from '@chemisttasker/shared-core';
 import FinanceInvoiceEditor from './FinanceInvoiceEditor';
+import { receivedInvoiceActions } from './receivedInvoicePolicy';
 import { nativeFileBytes } from '@/features/parity/nativeFileBytes';
 
 const money = (value: string | number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
@@ -17,6 +19,12 @@ type Form = { title: string; fields: Record<string, string>; booleans: Record<st
 
 export default function FinanceWorkspace({ existingTools, receivedMode = false }: { existingTools?: ReactNode; receivedMode?: boolean }) {
   const theme = useTheme();
+  const router = useRouter();
+  const { invoice: invoiceParam } = useLocalSearchParams<{ invoice?: string | string[] }>();
+  const linkedId = Array.isArray(invoiceParam) ? invoiceParam[0] : invoiceParam;
+  const requestedInvoiceId = typeof linkedId === 'string' && /^[1-9]\d*$/.test(linkedId)
+    ? Number(linkedId) : null;
+  const handledLink = useRef('');
   const tabs = receivedMode ? ownerTabs : workerTabs;
   const [tab, setTab] = useState(receivedMode ? 'Received' : 'Invoices'); const [search, setSearch] = useState(''); const [status, setStatus] = useState('All');
   const [customers, setCustomers] = useState<FinanceCustomer[]>([]); const [items, setItems] = useState<FinanceItem[]>([]);
@@ -39,6 +47,27 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     setCustomers(c); setItems(i); setInvoices(inv); setExpenses(e);
   }, [receivedMode]);
   useEffect(() => { load().catch(e => setError(e.message)).finally(() => setLoading(false)); }, [load]);
+  // Consume ?invoice= only after the authorized finance list has loaded. A
+  // re-fetch or screen re-render must not reopen a dismissed review modal.
+  useEffect(() => {
+    if (requestedInvoiceId == null) { handledLink.current = ''; return; }
+    if (loading || !Number.isSafeInteger(requestedInvoiceId)) return;
+    const linkKey = (receivedMode ? 'received:' : 'issued:') + requestedInvoiceId;
+    if (handledLink.current === linkKey) return;
+    handledLink.current = linkKey;
+    const found = (receivedMode ? receivedInvoices : invoices).find(row => row.id === requestedInvoiceId);
+    if (!found) {
+      setError('Invoice ' + requestedInvoiceId + ' is not available in this finance workspace.');
+      return;
+    }
+    setTab(receivedMode ? 'Received' : 'Invoices');
+    setHistoryDocument(null);
+    setHistoryError('');
+    setSelected(found);
+  }, [requestedInvoiceId, receivedMode, receivedInvoices, invoices, loading]);
+  const clearInvoiceLink = () => {
+    if (requestedInvoiceId != null) router.setParams({ invoice: undefined });
+  };
   const run = async (action: () => Promise<unknown>) => { if (running.current) return; running.current = true; setBusy(true); setError(''); try { await action(); } catch (e: any) { setError(e.message || 'Unable to complete this action.'); } finally { running.current = false; setBusy(false); } };
   const openHistoricalRevision = async (invoice: FinanceInvoice, version: number) => {
     if (historyLoading || running.current) return;
@@ -89,7 +118,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   };
   const paymentForm = (invoice: FinanceInvoice) => { const requestKey = key(); setSelected(null); setFormError(''); setForm({ title: `Record payment · ${invoice.number}`, fields: { amount: invoice.balance, date: financeToday(), reference: '' }, booleans: invoice.kind === 'super_request' ? { fund_payment_confirmed: false } : {}, save: (fields, flags) => finance.payment(invoice.id, { request_key: requestKey, date: fields.date, amount: fields.amount, reference: fields.reference, fund_payment_confirmed: !!flags.fund_payment_confirmed }) }); };
   const reviewForm = (invoice: FinanceInvoice, kind: 'approve' | 'revise' | 'paid') => {
-    setSelected(null); setFormError('');
+    setSelected(null); clearInvoiceLink(); setFormError('');
     const needsFundConfirmation = kind === 'paid' && invoice.kind === 'super_request';
     setForm({ title: kind === 'revise' ? 'Request invoice revision' : kind === 'paid' ? 'Mark invoice paid' : 'Approve for payment', fields: { note: '' }, booleans: needsFundConfirmation ? { fund_payment_confirmed: false } : {}, save: async (fields, flags) => {
       const note = fields.note.trim();
@@ -101,7 +130,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     }});
   };
   const markPaidForm = (invoice: FinanceInvoice) => {
-    setSelected(null); setFormError('');
+    setSelected(null); clearInvoiceLink(); setFormError('');
     setForm({ title: `Mark ${invoice.number} paid`, fields: {}, booleans: { fund_payment_confirmed: false }, save: async (_fields, flags) => {
       if (!flags.fund_payment_confirmed) throw new Error('Confirm the payment went to the super fund.');
       return finance.markPaid(invoice.id, invoice.version, flags.fund_payment_confirmed);
@@ -140,10 +169,10 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       {tab === 'GST / BAS' && <View style={{ gap: 16 }}><Text variant="titleMedium">GST worksheet</Text><Text>Estimate only. Legacy invoices and unsupported adjustments are excluded; this is not a complete BAS.</Text><TextInput mode="outlined" label="Start (YYYY-MM-DD)" value={start} onChangeText={v => { setStart(v); setWorksheet(null); }} /><TextInput mode="outlined" label="End (YYYY-MM-DD)" value={end} onChangeText={v => { setEnd(v); setWorksheet(null); }} /><View style={{ flexDirection: 'row', gap: 8 }}>{(['cash', 'accrual'] as const).map(b => <Chip key={b} selected={basis === b} onPress={() => { setBasis(b); setWorksheet(null); }}>{b === 'cash' ? 'Cash' : 'Accrual'}</Chip>)}</View><Button mode="contained" disabled={busy} onPress={() => void run(async () => setWorksheet(await finance.worksheet(start, end, basis)))}>Calculate worksheet</Button>{worksheet && <Surface elevation={0} style={panel}>{[['G1 · Sales', worksheet.G1], ['1A · GST on sales', worksheet['1A']], ['1B · GST credits', worksheet['1B']], ['Estimated net GST', worksheet.estimated_gst_net]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }}><Text>{label}</Text><Text>{money(amount)}</Text></View>)}{worksheet.warnings.map(w => <Text key={w} variant="bodySmall">{w}</Text>)}<Text>Excluded legacy invoices: {worksheet.excluded_legacy_invoice_count}</Text></Surface>}</View>}
       </>}
     </ScrollView>}
-    <Modal visible={!!selected} animationType="slide" onRequestClose={() => { if (!historyLoading) { setHistoryDocument(null); setSelected(null); } }}>
+    <Modal visible={!!selected} animationType="slide" onRequestClose={() => { if (!historyLoading) { setHistoryDocument(null); setSelected(null); clearInvoiceLink(); } }}>
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
         <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
-          <Button icon="arrow-left" disabled={historyLoading} onPress={() => { if (historyDocument) setHistoryDocument(null); else setSelected(null); }}>
+          <Button icon="arrow-left" disabled={historyLoading} onPress={() => { if (historyDocument) setHistoryDocument(null); else { setSelected(null); clearInvoiceLink(); } }}>
             {historyDocument ? 'Back to invoice' : 'Back to invoices'}
           </Button>
           {historyError ? <Text accessibilityRole="alert" style={{ color: theme.colors.error }}>{historyError}</Text> : null}
@@ -186,9 +215,9 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
             </Surface>}
             {receivedMode ? <View style={{ gap: 8 }}>
               <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected, true))}>Share delivered PDF</Button>
-              <Button mode="contained" disabled={selected.is_current === false} onPress={() => reviewForm(selected, 'approve')}>Approve for payment</Button>
-              <Button mode="outlined" disabled={selected.is_current === false} textColor={theme.colors.error} onPress={() => reviewForm(selected, 'revise')}>Request revision</Button>
-              <Button mode="outlined" disabled={selected.is_current === false || selected.status === 'paid'} onPress={() => reviewForm(selected, 'paid')}>Mark paid</Button>
+              <Button mode="contained" disabled={busy || !receivedInvoiceActions(selected).approve} onPress={() => reviewForm(selected, 'approve')}>Approve for payment</Button>
+              <Button mode="outlined" disabled={busy || !receivedInvoiceActions(selected).revise} textColor={theme.colors.error} onPress={() => reviewForm(selected, 'revise')}>Request revision</Button>
+              <Button mode="outlined" disabled={busy || !receivedInvoiceActions(selected).paid} onPress={() => reviewForm(selected, 'paid')}>Mark paid</Button>
             </View> : <>
               <Button mode="contained" onPress={() => { setEditor({ invoice: selected, key: selected.request_key }); setSelected(null); }}>Edit invoice</Button>
               <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected))}>Share PDF</Button>

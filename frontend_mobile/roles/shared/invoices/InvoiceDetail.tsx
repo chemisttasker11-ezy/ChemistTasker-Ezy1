@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import {
+  finance,
   getInvoiceDetail,
   reportInvoiceIssue,
   sendInvoiceEmail,
@@ -102,32 +103,50 @@ export default function InvoiceDetail({ basePath }: Props) {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [snackbar, setSnackbar] = useState('');
 
-  const load = useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
-    try {
-      const data = (await getInvoiceDetail(Number(id))) as Invoice;
-      setInvoice(data);
-      const items = Array.isArray(data.line_items) ? data.line_items : [];
-      setLineItems(
-        items.map(li => ({
-          ...li,
-          quantity: Number(li.quantity ?? 0),
-          unit_price: Number(li.unit_price ?? 0),
-          discount: Number(li.discount ?? 0),
-          total: Number(li.total ?? 0),
-        })),
-      );
-    } catch (err: any) {
-      setSnackbar(err?.message || 'Failed to load invoice');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    let live = true;
+    setInvoice(null);
+    setLineItems([]);
+    setSnackbar('');
+    setLoading(true);
+    // A managed finance invoice must open the same revision-aware workspace as web.
+    // The legacy detail editor remains for genuinely legacy invoices only.
+    const numericId = typeof id === 'string' && /^[1-9]\d*$/.test(id) ? Number(id) : NaN;
+    if (!Number.isSafeInteger(numericId)) {
+      setSnackbar('Invalid invoice link.');
+      setLoading(false);
+      return;
+    }
+    const openInvoice = async () => {
+      try {
+        if (isReceivedMode) await finance.receivedInvoice(numericId);
+        else await finance.invoice(numericId);
+        if (live) router.replace(`\${resolvedBase}?invoice=\${numericId}` as any);
+      } catch {
+        // A managed lookup may return 404 for an old-format invoice. Do not
+        // remove the legacy path or interpret that miss as permission to edit.
+        try {
+          const data = (await getInvoiceDetail(numericId)) as Invoice;
+          if (!live) return;
+          setInvoice(data);
+          const items = Array.isArray(data.line_items) ? data.line_items : [];
+          setLineItems(items.map(li => ({
+            ...li,
+            quantity: Number(li.quantity ?? 0),
+            unit_price: Number(li.unit_price ?? 0),
+            discount: Number(li.discount ?? 0),
+            total: Number(li.total ?? 0),
+          })));
+        } catch (err: any) {
+          if (live) setSnackbar(err?.message || 'Failed to load invoice');
+        }
+      } finally {
+        if (live) setLoading(false);
+      }
+    };
+    void openInvoice();
+    return () => { live = false; };
+  }, [id, isReceivedMode, resolvedBase, router]);
 
   const recalc = useCallback((li: LineItem) => {
     const total =
