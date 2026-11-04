@@ -15,7 +15,6 @@ import {
   fetchSavedShifts,
   fetchShiftInterests,
   acceptShiftOfferService,
-  activateShiftOfferPayrollService,
   declineShiftOfferService,
   saveShift,
   PaginatedResponse,
@@ -118,8 +117,6 @@ export default function PublicShiftsPage({
   const [offersLoading, setOffersLoading] = useState(false);
   const [termsOffers, setTermsOffers] = useState<ShiftOffer[]>([]);
   const [termsConfirming, setTermsConfirming] = useState(false);
-  const [payrollActivatingId, setPayrollActivatingId] = useState<number | null>(null);
-  const [payrollNotice, setPayrollNotice] = useState('');
 
   useEffect(() => {
     if (activeTabOverride) {
@@ -385,8 +382,8 @@ export default function PublicShiftsPage({
             offer.paymentPreferenceSnapshot === 'TFN'
             && offer.engagementKind === 'SHIFT_EMPLOYMENT'
             && !offer.payrollActivatedAt
-            && offer.settlementChannel !== 'PAYROLL'
-            && Boolean(preview?.payrollEnabled)
+            && offer.settlementChannel === 'TIMESHEET_ONLY'
+            && preview?.payrollActivationRequired === true
           );
         }),
       );
@@ -533,20 +530,6 @@ export default function PublicShiftsPage({
     await loadOffers();
   };
 
-  const handleActivatePayroll = async (offer: ShiftOffer) => {
-    setPayrollActivatingId(offer.id);
-    setPayrollNotice('');
-    try {
-      await activateShiftOfferPayrollService(offer.id);
-      setPayrollNotice('ChemistTasker Payroll is now active for this confirmed shift.');
-      await loadOffers();
-    } catch (err) {
-      showError(errorMessage(err, 'Payroll could not be activated yet. Complete your private TFN/super profile and try again.'));
-    } finally {
-      setPayrollActivatingId(null);
-    }
-  };
-
   const renderContent = () => {
     if (boardTab === 'accepted') {
       return (
@@ -562,8 +545,7 @@ export default function PublicShiftsPage({
             <Typography color="text.secondary">Loading offers...</Typography>
           ) : (
             <Stack spacing={3}>
-              {payrollNotice && <Alert severity="success">{payrollNotice}</Alert>}
-              {offerShifts.length === 0 ? (
+                            {offerShifts.length === 0 ? (
                 <Box>
                   <Typography variant="h6" gutterBottom>Offers</Typography>
                   <Typography color="text.secondary">No pending offers.</Typography>
@@ -619,7 +601,7 @@ export default function PublicShiftsPage({
                             <Box sx={{ flex: 1 }}>
                               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 0.75 }}>
                                 <Chip size="small" label="TFN" color="primary" />
-                                <Chip size="small" label={ready ? 'Ready to activate payroll' : 'Timesheet only · setup required'} color={ready ? 'success' : 'warning'} variant="outlined" />
+                                <Chip size="small" label={ready ? 'Ready for pharmacy activation' : 'Timesheet only · setup required'} color={ready ? 'success' : 'warning'} variant="outlined" />
                               </Stack>
                               <Typography fontWeight={800}>{pharmacyName}</Typography>
                               <Typography variant="body2" color="text.secondary">
@@ -643,13 +625,7 @@ export default function PublicShiftsPage({
                                   Complete private profile
                                 </Button>
                               )}
-                              <Button
-                                variant="contained"
-                                disabled={!ready || payrollActivatingId === offer.id}
-                                onClick={() => void handleActivatePayroll(offer)}
-                              >
-                                {payrollActivatingId === offer.id ? 'Activating…' : 'Activate payroll'}
-                              </Button>
+                              <Typography variant="caption" color="text.secondary">Your pharmacy manager activates payroll after confirming the requirements.</Typography>
                             </Stack>
                           </Stack>
                         </Paper>
