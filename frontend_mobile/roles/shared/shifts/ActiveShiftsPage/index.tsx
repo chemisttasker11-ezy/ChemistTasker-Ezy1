@@ -114,6 +114,9 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
     const reviewLoadingId: number | null = null;
     const candidateReviewRequest = useRef(0);
     const appliedShiftLinkRef = useRef<string | null>(null);
+    const scrollRef = useRef<ScrollView>(null);
+    const targetOffsetRef = useRef<number | null>(null);
+    const scrolledLinkRef = useRef<string | null>(null);
     useEffect(() => () => { candidateReviewRequest.current += 1; }, []);
 
     const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<DeleteConfirmDialogState>({
@@ -137,6 +140,17 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
         [user?.id]
     );
 
+    const linkedShiftSignature = shiftId == null ? null : `${shiftId}:${routeSlotId ?? 'default'}:${notificationKey ?? 'none'}`;
+    const handleShiftLayout = useCallback((renderedShiftId: number, y: number) => {
+        if (shiftId == null || renderedShiftId !== shiftId) return;
+        targetOffsetRef.current = y;
+    }, [shiftId]);
+    const scrollToLinkedShift = useCallback(() => {
+        if (!linkedShiftSignature || scrolledLinkRef.current === linkedShiftSignature) return;
+        if (targetOffsetRef.current == null) return;
+        scrolledLinkRef.current = linkedShiftSignature;
+        scrollRef.current?.scrollTo({ y: Math.max(0, targetOffsetRef.current - 16), animated: true });
+    }, [linkedShiftSignature]);
     const { shifts, setShifts, loading: shiftsLoading, error: shiftsError, loadShifts } = useShiftsData({
         selectedPharmacyId,
         shiftId,
@@ -932,7 +946,11 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
 
     return (
         <SafeAreaView style={styles.container} edges={['left', 'right']}>
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView
+                ref={scrollRef}
+                contentContainerStyle={styles.content}
+                onContentSizeChange={() => scrollToLinkedShift()}
+            >
                 <View style={styles.pageHeader}>
                     <Text style={styles.title}>{title}</Text>
                     <Text style={styles.subtitle}>Manage and track your live shifts</Text>
@@ -988,6 +1006,7 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                         loadTabDataForShift,
                         loadCounterOffers,
                         loadShifts,
+                        onShiftLayout: handleShiftLayout,
                         handleRevealInterest,
                         handleSlotSelection,
                         handleReviewOffer,

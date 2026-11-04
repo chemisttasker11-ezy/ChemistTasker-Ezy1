@@ -100,6 +100,7 @@ type ActionProps = {
   loadTabDataForShift: (shift: Shift, level: EscalationLevelKey) => Promise<any>;
   loadCounterOffers: (shiftId: number) => Promise<void>;
   loadShifts: () => Promise<any>;
+  onShiftLayout?: (shiftId: number, y: number) => void;
   handleRevealInterest: (shift: Shift, interest: ShiftInterest) => Promise<void>;
   handleSlotSelection: (shiftId: number, slotId: number) => void;
   handleReviewOffer: (shift: Shift, offer: any, tabDataState: any, slotId: number | null) => Promise<void>;
@@ -156,6 +157,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
     loadTabDataForShift,
     loadCounterOffers,
     loadShifts,
+    onShiftLayout,
     handleRevealInterest,
     handleSlotSelection,
     handleReviewOffer,
@@ -368,6 +370,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                             )}
                             <Card
                                 style={styles.shiftCard}
+                                onLayout={(event) => onShiftLayout?.(shift.id, event.nativeEvent.layout.y)}
                             >
                             <View style={[styles.cardAccent, { backgroundColor: cardBorderColor }]} />
 
