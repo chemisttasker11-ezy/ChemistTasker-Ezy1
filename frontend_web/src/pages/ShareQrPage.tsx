@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 
 /** Only internal published listing and pre-existing server invitation endpoints are QR-encoded. */
