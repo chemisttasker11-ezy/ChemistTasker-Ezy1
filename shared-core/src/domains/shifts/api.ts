@@ -100,6 +100,7 @@ export function acceptShiftOffer(offerId: number | string, data: ShiftOfferAccep
     const body = {
         engagement_terms_accepted: data?.engagementTermsAccepted ?? data?.engagement_terms_accepted ?? false,
         independent_contractor_status_confirmed: data?.independentContractorStatusConfirmed ?? data?.independent_contractor_status_confirmed ?? false,
+        ...(data?.termsVersion ? { terms_version: data.termsVersion } : {}),
     };
     return fetchApi(`/shift-offers/${offerId}/accept/`, {
         method: 'POST',
