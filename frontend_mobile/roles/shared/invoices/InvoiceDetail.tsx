@@ -121,7 +121,7 @@ export default function InvoiceDetail({ basePath }: Props) {
       try {
         if (isReceivedMode) await finance.receivedInvoice(numericId);
         else await finance.invoice(numericId);
-        if (live) router.replace(`\${resolvedBase}?invoice=\${numericId}` as any);
+        if (live) router.replace(`${resolvedBase}?invoice=${numericId}` as any);
       } catch {
         // A managed lookup may return 404 for an old-format invoice. Do not
         // remove the legacy path or interpret that miss as permission to edit.
