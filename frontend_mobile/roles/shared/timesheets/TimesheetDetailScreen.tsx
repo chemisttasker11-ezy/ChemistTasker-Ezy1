@@ -5,11 +5,13 @@ import { ActivityIndicator, Button, Card, Chip, Switch, Text, TextInput } from '
 import { type WorkforceTimesheetDetail, type WorkforceTimesheetCheck, workforce } from '@chemisttasker/shared-core';
 import { colors, font, radius, space, touch } from '@/constants/tokens';
 import { ContentState } from '@/components/ui/ContentState';
+import { useAuth } from '@/context/AuthContext';
 import { canApproveTimesheet, formatPharmacyClock, formatTimesheetMinutes, isSourceCorrectionRequired } from './timesheetDetailPolicy';
 
 export default function TimesheetDetailScreen({ managerMode }: { managerMode: boolean }) {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
+  const { hasCapability } = useAuth();
   const timesheetId = Number(id);
   const valid = Number.isSafeInteger(timesheetId) && timesheetId > 0;
   const generation = useRef(0);
@@ -73,7 +75,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   };
 
   const decideCheck = (check: WorkforceTimesheetCheck, decision: 'RESOLVED' | 'WAIVED' | 'REOPENED') => {
-    if (!managerMode || writeRef.current) return;
+    if (!managerAllowed || writeRef.current) return;
     if (isSourceCorrectionRequired(check)) {
       setError('Fix this check at its attendance source. It cannot be waived.');
       return;
@@ -87,7 +89,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   };
 
   const saveMissingPunch = () => {
-    if (!managerMode || !missingPunchCheck || writeRef.current) return;
+    if (!managerAllowed || !missingPunchCheck || writeRef.current) return;
     const sessionId = Number(missingPunchCheck.details?.session_id);
     const when = missingPunchAt.trim();
     const note = missingPunchReason.trim();
@@ -101,7 +103,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   };
 
   const approve = () => {
-    if (!managerMode || !data || !canApproveTimesheet(data, false) || writeRef.current) return;
+    if (!managerAllowed || !data || !canApproveTimesheet(data, false) || writeRef.current) return;
     const revision = data.revision_number!;
     Alert.alert('Approve timesheet?', `Approve reviewed hours for version ${revision}? Reopening later requires an audit reason.`, [
       { text: 'Cancel', style: 'cancel' },
@@ -110,6 +112,10 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   };
 
   const timeZone = data?.snapshot?.period?.timezone || 'Australia/Brisbane';
+  const managerAllowed = Boolean(managerMode && data?.snapshot?.pharmacy?.id && hasCapability('MANAGE_ROSTER', data.snapshot.pharmacy.id));
+  if (managerMode && data && !managerAllowed) {
+    return <ContentState kind="forbidden" title="Timesheet management unavailable" description="You do not have roster management permission for this pharmacy." />;
+  }
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -160,11 +166,11 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
                 <View style={styles.headingRow}><Text style={styles.day}>{check.severity}</Text><Chip compact>{check.decision?.decision || 'Open'}</Chip></View>
                 <Text style={styles.value}>{check.message}</Text>
                 {check.work_date ? <Text style={styles.small}>{check.work_date}</Text> : null}
-                {managerMode && sourceRequired && !resolved ? <>
+                {managerAllowed && sourceRequired && !resolved ? <>
                   <Text style={styles.warningText}>This exception requires correcting the source attendance. It cannot be waived.</Text>
                   <Button mode="outlined" onPress={() => check.code === 'UNRESOLVED_PROVISIONAL_ATTENDANCE' ? router.push('/attendance/reviews' as any) : (setMissingPunchCheck(check), setMissingPunchAt(''), setMissingPunchReason(''))}>Fix attendance</Button>
                 </> : null}
-                {managerMode && !sourceRequired ? <>
+                {managerAllowed && !sourceRequired ? <>
                   <TextInput mode="outlined" dense label={resolved ? 'Reason to reopen (optional)' : 'Reason to resolve or waive'} value={reasonsByCheck[check.id] ?? ''} onChangeText={value => setReasonsByCheck(previous => ({ ...previous, [check.id]: value }))} multiline disabled={busy !== ''} />
                   <View style={styles.actions}>
                     {resolved ? <Button mode="outlined" disabled={busy !== ''} onPress={() => decideCheck(check, 'REOPENED')}>Reopen check</Button> : <>
@@ -177,7 +183,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
             })}
         </Card.Content></Card>
 
-        {managerMode && missingPunchCheck ? <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
+        {managerAllowed && missingPunchCheck ? <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
           <Text style={styles.sectionTitle}>Add missing {missingPunchCheck.code === 'MISSING_CLOCK_IN' ? 'clock-in' : 'clock-out'}</Text>
           <Text style={styles.subtitle}>Enter the worker's confirmed time in {timeZone}. This appends a manager correction without erasing original attendance.</Text>
           <TextInput mode="outlined" label="Local date and time (YYYY-MM-DDTHH:mm)" placeholder="2026-11-04T09:00" value={missingPunchAt} onChangeText={setMissingPunchAt} autoCapitalize="none" disabled={busy !== ''} />
@@ -189,17 +195,17 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
         </Card.Content></Card> : null}
         <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
           <Text style={styles.sectionTitle}>Comments</Text>
-          {data.comments.length === 0 ? <Text style={styles.subtitle}>No comments yet.</Text> : data.comments.filter(row => managerMode || row.worker_visible).map(row =>
-            <View key={row.id} style={styles.record}><Text style={styles.day}>{row.author_name}{managerMode && !row.worker_visible ? ' · Managers only' : ''}</Text><Text style={styles.value}>{row.body}</Text><Text style={styles.small}>{new Date(row.created_at).toLocaleString('en-AU')}</Text></View>)}
+          {data.comments.length === 0 ? <Text style={styles.subtitle}>No comments yet.</Text> : data.comments.filter(row => managerAllowed || row.worker_visible).map(row =>
+            <View key={row.id} style={styles.record}><Text style={styles.day}>{row.author_name}{managerAllowed && !row.worker_visible ? ' · Managers only' : ''}</Text><Text style={styles.value}>{row.body}</Text><Text style={styles.small}>{new Date(row.created_at).toLocaleString('en-AU')}</Text></View>)}
           <TextInput mode="outlined" label="Add a comment" multiline value={comment} onChangeText={setComment} maxLength={2000} disabled={busy !== ''} />
-          {managerMode ? <View style={styles.headingRow}><Text style={styles.small}>Worker can see this comment</Text><Switch value={workerVisible} onValueChange={setWorkerVisible} disabled={busy !== ''} /></View> : null}
+          {managerAllowed ? <View style={styles.headingRow}><Text style={styles.small}>Worker can see this comment</Text><Switch value={workerVisible} onValueChange={setWorkerVisible} disabled={busy !== ''} /></View> : null}
           <Button mode="outlined" disabled={!comment.trim() || busy !== ''} onPress={() => void run('comment', async () => {
-            await workforce.addTimesheetComment(timesheetId, comment.trim(), managerMode ? workerVisible : true);
+            await workforce.addTimesheetComment(timesheetId, comment.trim(), managerAllowed ? workerVisible : true);
             setComment('');
           }, 'Comment added.')}>Add comment</Button>
         </Card.Content></Card>
 
-        {managerMode ? <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
+        {managerAllowed ? <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
           <Text style={styles.sectionTitle}>Manager decisions</Text>
           {data.status === 'APPROVED' ? <>
             <Text style={styles.subtitle}>A reason is required to reopen approved hours. The audit history is preserved.</Text>
