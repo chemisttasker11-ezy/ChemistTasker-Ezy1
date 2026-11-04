@@ -1,9 +1,9 @@
 // The worker's Shift Centre: History (native). Same content and actions as web MyHistoryShiftsPage: create an invoice,
 // rate the pharmacy, see its details.
-import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Button, Dialog, Portal, Snackbar, Text, TextInput } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Receipt, Star, Store } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import {
   createRatingService,
@@ -13,83 +13,220 @@ import {
   type Shift,
   type ShiftRatingSummary,
 } from '@chemisttasker/shared-core';
+import { ContentState } from '@/components/ui';
+import { colors, radius, space } from '@/constants/tokens';
+import { useWorkspace } from '@/context/WorkspaceContext';
+import { filterWorkerShiftsByWorkspace } from './HistoryShiftsView';
+import {
+  createInitialRatingState,
+  isRatingSaveDisabled,
+  shouldApplyRatingResponse,
+} from './shiftsScreenLogic';
+import { useShiftSurface } from './useShiftSurface';
 import { BookedShiftsState, PharmacyDetailsDialog, WorkerBookedShiftCard } from './WorkerBookedShifts';
 
 const STAR_WORDS = ['', 'Poor', 'Below expectations', 'Good', 'Very good', 'Excellent'];
 
+export function buildWorkerInvoicePath(
+  invoiceRoute: string | undefined,
+  shiftId: number,
+  pharmacyId?: number | null,
+): string | null {
+  if (!invoiceRoute) return null;
+  const pId = pharmacyId != null ? String(pharmacyId) : '';
+  return `${invoiceRoute}?shiftId=${shiftId}&pharmacyId=${pId}`;
+}
+
 export default function WorkerHistoryShiftsView({ invoiceRoute }: { invoiceRoute?: string }) {
   const router = useRouter();
+  const surface = useShiftSurface();
+  const { selectedPharmacyId } = useWorkspace();
+
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [ratings, setRatings] = useState<Record<number, ShiftRatingSummary>>({});
   const [pharmacy, setPharmacy] = useState<Shift['pharmacyDetail'] | null>(null);
-  const [rateTarget, setRateTarget] = useState<{ id: number; name: string } | null>(null);
-  const [stars, setStars] = useState(0);
-  const [comment, setComment] = useState('');
-  const [loadingExisting, setLoadingExisting] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  const loadRating = (id: number) =>
+  const [ratingState, setRatingState] = useState(() => createInitialRatingState<{ id: number; name: string }>(null));
+  const rateTargetRef = useRef<{ id: number; name: string } | null>(null);
+
+  const loadGenRef = useRef(0);
+  const ratingGenRef = useRef(0);
+  const saveGenRef = useRef(0);
+
+  const loadRating = useCallback((id: number, gen = loadGenRef.current) =>
     fetchRatingsSummaryService({ targetType: 'pharmacy', targetId: id })
-      .then(summary => setRatings(prev => ({ ...prev, [id]: summary })))
-      .catch(() => undefined);
+      .then((summary) => {
+        if (gen !== loadGenRef.current) return;
+        setRatings((prev) => ({ ...prev, [id]: summary }));
+      })
+      .catch(() => undefined), []);
+
+  const loadShifts = useCallback(async (isRefresh = false) => {
+    const gen = ++loadGenRef.current;
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchMyHistoryShifts();
+      if (gen !== loadGenRef.current) return;
+      const list = Array.isArray(data) ? data : [];
+      setShifts((prev) => (prev.length === 0 && list.length === 0 ? prev : list));
+      new Set(list.map((shift) => shift.pharmacyDetail?.id).filter((id): id is number => typeof id === 'number'))
+        .forEach((id) => void loadRating(id, gen));
+    } catch (err: any) {
+      if (gen !== loadGenRef.current) return;
+      const msg = err?.response?.data?.detail || err?.message || 'We could not load your past shifts. Try again in a moment.';
+      setError(msg);
+      setMessage(msg);
+    } finally {
+      if (gen === loadGenRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, [loadRating]);
 
   useEffect(() => {
-    fetchMyHistoryShifts()
-      .then(data => {
-        const list = Array.isArray(data) ? data : [];
-        setShifts(list);
-        new Set(list.map(shift => shift.pharmacyDetail?.id).filter((id): id is number => typeof id === 'number')).forEach(id => void loadRating(id));
-      })
-      .catch(() => setMessage('We could not load your past shifts. Try again in a moment.'))
-      .finally(() => setLoading(false));
+    void loadShifts();
+  }, [loadShifts]);
+
+  const closeRating = useCallback(() => {
+    ratingGenRef.current++;
+    saveGenRef.current++;
+    rateTargetRef.current = null;
+    setRatingState(createInitialRatingState<{ id: number; name: string }>(null));
   }, []);
 
+  useEffect(() => {
+    return () => {
+      loadGenRef.current++;
+      ratingGenRef.current++;
+      saveGenRef.current++;
+      rateTargetRef.current = null;
+    };
+  }, [surface.scopeKey]);
+
   const openRating = async (id: number, name: string) => {
-    setRateTarget({ id, name });
-    setLoadingExisting(true);
+    const gen = ++ratingGenRef.current;
+    const target = { id, name };
+    rateTargetRef.current = target;
+    setRatingState(createInitialRatingState(target));
+
     try {
       const existing = await fetchMyRatingForTargetService({ targetType: 'pharmacy', targetId: id });
-      setStars(existing?.stars || 0);
-      setComment(existing?.comment || '');
-    } catch {
-      setStars(0);
-      setComment('');
-    } finally {
-      setLoadingExisting(false);
+      if (!shouldApplyRatingResponse(ratingGenRef.current, gen, rateTargetRef.current?.id ?? null, id)) return;
+      setRatingState((prev) => ({
+        ...prev,
+        loading: false,
+        stars: existing?.stars || 0,
+        comment: existing?.comment || '',
+        error: null,
+      }));
+    } catch (err: any) {
+      if (!shouldApplyRatingResponse(ratingGenRef.current, gen, rateTargetRef.current?.id ?? null, id)) return;
+      const msg = err?.response?.data?.detail || err?.message || 'Failed to load existing rating';
+      setRatingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: msg,
+        stars: 0,
+        comment: '',
+      }));
     }
   };
 
   const saveRating = async () => {
-    if (!rateTarget) return;
-    setSaving(true);
+    const target = rateTargetRef.current;
+    if (!target || isRatingSaveDisabled({ loading: ratingState.loading, saving: ratingState.saving, stars: ratingState.stars, hasError: Boolean(ratingState.error) })) return;
+    const gen = ++saveGenRef.current;
+    setRatingState((prev) => ({ ...prev, saving: true }));
     try {
-      await createRatingService({ direction: 'WORKER_TO_PHARMACY', ratee_pharmacy: rateTarget.id, stars, comment });
-      await loadRating(rateTarget.id);
+      await createRatingService({ direction: 'WORKER_TO_PHARMACY', ratee_pharmacy: target.id, stars: ratingState.stars, comment: ratingState.comment });
+      if (saveGenRef.current !== gen || rateTargetRef.current?.id !== target.id) return;
+      await loadRating(target.id, loadGenRef.current);
+      if (saveGenRef.current !== gen || rateTargetRef.current?.id !== target.id) return;
       setMessage('Thanks. Your rating is saved.');
-      setRateTarget(null);
+      closeRating();
     } catch {
+      if (saveGenRef.current !== gen || rateTargetRef.current?.id !== target.id) return;
       setMessage('Your rating could not be saved. Try again.');
     } finally {
-      setSaving(false);
+      if (saveGenRef.current === gen) {
+        setRatingState((prev) => ({ ...prev, saving: false }));
+      }
     }
   };
 
+  const displayedShifts = filterWorkerShiftsByWorkspace(shifts, surface.workspace, selectedPharmacyId);
+
+  if (!loading && error && shifts.length === 0) {
+    return (
+      <ContentState
+        kind="error"
+        title="Could not load shift history"
+        description={error}
+        onAction={() => void loadShifts()}
+      />
+    );
+  }
+
   return (
     <View style={{ flex: 1 }}>
-      {loading || !shifts.length ? <BookedShiftsState mode="history" loading={loading} /> : (
-        <ScrollView contentContainerStyle={styles.list}>
-          {shifts.map(shift => {
+      {loading && shifts.length === 0 ? (
+        <ContentState kind="loading" />
+      ) : displayedShifts.length === 0 ? (
+        <BookedShiftsState mode="history" loading={false} />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadShifts(true)} />}
+        >
+          {displayedShifts.map((shift) => {
             const p = shift.pharmacyDetail;
+            const invoicePath = buildWorkerInvoicePath(invoiceRoute, shift.id, p?.id);
             return (
-              <WorkerBookedShiftCard key={shift.id} shift={shift} mode="history" rating={p?.id ? ratings[p.id] : undefined}
-                actions={<>
-                  {/* Explorers have no invoices on web, so no route = no button. */}
-                  {invoiceRoute ? <Button mode="contained" icon="receipt" onPress={() => router.push({ pathname: invoiceRoute as any, params: { shiftId: shift.id, pharmacyId: p?.id ?? '' } })}>Create invoice</Button> : null}
-                  <Button mode="outlined" icon="star-outline" disabled={!p?.id} onPress={() => p?.id && void openRating(p.id, p.name ?? 'Pharmacy')}>Rate pharmacy</Button>
-                  <Button mode="text" icon="storefront-outline" disabled={!p} onPress={() => setPharmacy(p)}>Details</Button>
-                </>} />
+              <WorkerBookedShiftCard
+                key={shift.id}
+                shift={shift}
+                mode="history"
+                rating={p?.id ? ratings[p.id] : undefined}
+                actions={
+                  <>
+                    {invoicePath ? (
+                      <Button
+                        mode="contained"
+                        icon={({ size, color }) => <Receipt size={size} color={color} />}
+                        onPress={() => router.push(invoicePath as any)}
+                        style={styles.actionBtn}
+                      >
+                        Create invoice
+                      </Button>
+                    ) : null}
+                    <Button
+                      mode="outlined"
+                      icon={({ size, color }) => <Star size={size} color={color} />}
+                      disabled={!p?.id}
+                      onPress={() => p?.id && void openRating(p.id, p.name ?? 'Pharmacy')}
+                      style={styles.actionBtn}
+                    >
+                      Rate pharmacy
+                    </Button>
+                    <Button
+                      mode="text"
+                      icon={({ size, color }) => <Store size={size} color={color} />}
+                      disabled={!p}
+                      onPress={() => setPharmacy(p)}
+                      style={styles.actionBtn}
+                    >
+                      Details
+                    </Button>
+                  </>
+                }
+              />
             );
           })}
         </ScrollView>
@@ -98,28 +235,64 @@ export default function WorkerHistoryShiftsView({ invoiceRoute }: { invoiceRoute
       <PharmacyDetailsDialog pharmacy={pharmacy ?? null} onDismiss={() => setPharmacy(null)} />
 
       <Portal>
-        <Dialog visible={Boolean(rateTarget)} onDismiss={() => !saving && setRateTarget(null)}>
-          <Dialog.Title>Rate {rateTarget?.name}</Dialog.Title>
-          <Dialog.Content style={{ gap: 12 }}>
-            {loadingExisting ? <ActivityIndicator /> : (
+        <Dialog visible={Boolean(rateTargetRef.current)} onDismiss={closeRating} style={{ borderRadius: radius.card }}>
+          <Dialog.Title>Rate {rateTargetRef.current?.name}</Dialog.Title>
+          <Dialog.Content style={{ gap: space.sm }}>
+            {ratingState.loading ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : ratingState.error ? (
+              <ContentState
+                kind="error"
+                title="Could not load rating"
+                description={ratingState.error}
+                actionLabel="Try again"
+                onAction={() => rateTargetRef.current && void openRating(rateTargetRef.current.id, rateTargetRef.current.name)}
+              />
+            ) : (
               <>
                 <Text style={styles.muted}>Your rating helps other workers choose where to work.</Text>
                 <View style={styles.stars} accessibilityRole="radiogroup" accessibilityLabel="Star rating">
-                  {[1, 2, 3, 4, 5].map(value => (
-                    <Pressable key={value} onPress={() => setStars(value)} accessibilityRole="radio" accessibilityState={{ checked: stars === value }}
-                      accessibilityLabel={`${value} ${value === 1 ? 'star' : 'stars'}`} hitSlop={6} style={styles.star}>
-                      <MaterialCommunityIcons name={value <= stars ? 'star' : 'star-outline'} size={32} color={value <= stars ? '#F59E0B' : '#8A97AD'} />
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <Pressable
+                      key={value}
+                      onPress={() => setRatingState((prev) => ({ ...prev, stars: value }))}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: ratingState.stars === value }}
+                      accessibilityLabel={`${value} ${value === 1 ? 'star' : 'stars'}`}
+                      hitSlop={8}
+                      style={styles.star}
+                    >
+                      <Star
+                        size={30}
+                        color={value <= ratingState.stars ? colors.status.amber.solid : colors.textMuted}
+                        fill={value <= ratingState.stars ? colors.status.amber.solid : 'transparent'}
+                      />
                     </Pressable>
                   ))}
-                  <Text style={styles.word}>{STAR_WORDS[stars]}</Text>
+                  <Text style={styles.word}>{STAR_WORDS[ratingState.stars]}</Text>
                 </View>
-                <TextInput mode="outlined" label="Comment (optional)" multiline numberOfLines={3} value={comment} onChangeText={setComment} />
+                <TextInput
+                  mode="outlined"
+                  label="Comment (optional)"
+                  multiline
+                  numberOfLines={3}
+                  value={ratingState.comment}
+                  onChangeText={(text) => setRatingState((prev) => ({ ...prev, comment: text }))}
+                />
               </>
             )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setRateTarget(null)} disabled={saving}>Cancel</Button>
-            <Button mode="contained" onPress={saveRating} loading={saving} disabled={saving || stars === 0}>Save rating</Button>
+            <Button onPress={closeRating} disabled={ratingState.saving} style={styles.actionBtn}>Cancel</Button>
+            <Button
+              mode="contained"
+              onPress={saveRating}
+              loading={ratingState.saving}
+              disabled={isRatingSaveDisabled({ loading: ratingState.loading, saving: ratingState.saving, stars: ratingState.stars, hasError: Boolean(ratingState.error) })}
+              style={styles.actionBtn}
+            >
+              Save rating
+            </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -130,9 +303,10 @@ export default function WorkerHistoryShiftsView({ invoiceRoute }: { invoiceRoute
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 16, gap: 16, paddingBottom: 40 },
-  muted: { fontSize: 13.5, lineHeight: 20, color: '#445474' },
-  stars: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  list: { padding: space.md, gap: space.md, paddingBottom: 40 },
+  muted: { fontSize: 13.5, lineHeight: 20, color: colors.textSecondary },
+  stars: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   star: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  word: { marginLeft: 8, fontWeight: '600', color: '#06214A' },
+  word: { marginLeft: space.sm, fontWeight: '600', color: colors.textPrimary },
+  actionBtn: { minHeight: 44, justifyContent: 'center' },
 });

@@ -47,3 +47,35 @@ export function shiftSectionSubtitle(section: ShiftSection | null, persona: Shif
       return '';
   }
 }
+
+/** Whether Save Rating is disabled. */
+export function isRatingSaveDisabled(params: {
+  loading: boolean;
+  saving: boolean;
+  stars: number;
+  hasError?: boolean;
+}): boolean {
+  return params.loading || params.saving || params.stars === 0 || Boolean(params.hasError);
+}
+
+/** Whether a rating fetch response matches the current dialog generation and target. */
+export function shouldApplyRatingResponse(
+  currentGen: number,
+  requestGen: number,
+  currentTargetId: number | null,
+  requestTargetId: number | null,
+): boolean {
+  return currentGen === requestGen && currentTargetId === requestTargetId && currentTargetId != null;
+}
+
+/** Clean initial state for opening or closing a rating dialog. */
+export function createInitialRatingState<T>(target: T | null) {
+  return {
+    target,
+    stars: 0,
+    comment: '',
+    loading: true,
+    error: null as string | null,
+    saving: false,
+  };
+}
