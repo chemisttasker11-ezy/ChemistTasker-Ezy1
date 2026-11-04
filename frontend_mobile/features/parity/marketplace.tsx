@@ -11,6 +11,7 @@ import{ActionButtons,ChoiceChips,DataRow,EmptyState,Field,InfoNote,MetricGrid,Pa
 import{asArray,dateLabel,errorMessage,idempotencyKey,money,replaceUnderscore,toNumber}from'./utils';
 import{clearMarketplaceDraft,emptyMarketplaceDraft,loadMarketplaceDraft,patchMarketplaceDraft,type MarketplaceMobileDraft}from'./marketplaceDraft';
 import{browseModes,browseQuery,categorySlug,normalizeBrowseMode,enquiryValidation,type BrowseMode}from'./marketplaceBrowseModel';
+import { MarketplaceAccessResolution } from './MarketplaceAccessResolution';
 
 type MarketplaceScreen='browse'|'filters'|'item'|'seller'|'category'|'details'|'photos'|'audience'|'review'|'mine'|'mine-detail'|'exchanges'|'exchange-detail'|'report';
 const api=chemistTaskerApi.marketplace;
@@ -93,7 +94,7 @@ function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing
    </Section>
    {user==null?<InfoNote title="Sign in to enquire">You can browse approved items without signing in. Sign in with an eligible verified account to contact the seller.</InfoNote>:
      accessLoading?<InfoNote title="Checking eligibility">Checking current marketplace trading permissions.</InfoNote>:
-     access&&!canTrade?<InfoNote title="Trading access required">{access.blockers.map(b=>b.message||b.detail||b.code).join(' · ')||'Complete account verification and accept applicable marketplace terms to contact a seller.'}</InfoNote>:null}
+     access&&!canTrade?<View style={{gap:12}}><InfoNote title="Trading access required" tone="warning">{access.blockers.map(b=>b.message||b.detail||b.code).join(' · ')||'Complete account verification and accept applicable marketplace terms to contact a seller.'}</InfoNote><MarketplaceAccessResolution access={access} onUpdated={async()=>{setAccess(await api.getAccess());}} /></View>:null}
    {localError?<InfoNote title="Marketplace needs attention" tone="warning">{localError}</InfoNote>:null}
    {contactOpen&&!submitted&&canTrade?<Section title="Enquire with seller" description="No purchase is committed by sending this enquiry.">
      <Field label="Message to seller" value={message} onChangeText={setMessage} multiline placeholder="Ask about condition, pickup or delivery arrangements." disabled={busy}/>
