@@ -10,6 +10,7 @@ import {
   type WorkforceWorkSettings,
   workforce,
 } from '@chemisttasker/shared-core';
+import { colors, font, radius, space, touch } from '@/constants/tokens';
 
 const hours = (minutes?: number | null) => minutes == null ? '' : (minutes / 60).toFixed(2);
 const pretty = (value?: string | null) => String(value || '').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
@@ -150,6 +151,27 @@ export default function WorkforceSettingsScreen() {
           <Text variant="bodySmall" style={styles.subtitle}>Current terms shown here are the same dated EmploymentEngagement records used by roster/timesheet payroll snapshots.</Text>
         </View>
 
+        <Card style={styles.toolCard}>
+          <Card.Content style={styles.toolContent}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>Related workforce tools</Text>
+            <Text variant="bodySmall" style={styles.subtitle}>
+              These tools use your active pharmacy workspace. Check the pharmacy selector when opening them.
+            </Text>
+            <Button mode="outlined" icon="calendar-check" contentStyle={styles.toolButton} onPress={() => router.push('/manager/roster/coverage' as any)}>
+              Coverage requirements
+            </Button>
+            <Button mode="outlined" icon="file-document-edit-outline" contentStyle={styles.toolButton} onPress={() => router.push('/workforce/employment-engagements' as any)}>
+              Edit employment terms
+            </Button>
+            <Button mode="outlined" icon="cellphone-key" contentStyle={styles.toolButton} onPress={() => router.push('/attendance/kiosk-status' as any)}>
+              Kiosk & device management
+            </Button>
+            <Button mode="outlined" icon="file-export-outline" contentStyle={styles.toolButton} onPress={() => router.push('/workforce/payroll-export' as any)}>
+              Payroll-ready export
+            </Button>
+          </Card.Content>
+        </Card>
+
         {!loading && staff.length === 0 && <Card><Card.Content><Text>No eligible staff are available for this pharmacy.</Text></Card.Content></Card>}
 
         {staff.map(row => {
@@ -195,18 +217,21 @@ export default function WorkforceSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F7FAFF' },
+  safe: { flex: 1, backgroundColor: colors.pageBg },
   content: { padding: 18, gap: 14, paddingBottom: 48 },
-  title: { fontWeight: '900', color: '#06214A' },
-  subtitle: { color: '#52617A', marginTop: 4 },
-  sectionTitle: { fontWeight: '800', color: '#06214A' },
+  title: { fontFamily: font.outfit.medium, color: colors.brandNavy },
+  subtitle: { color: colors.textSecondary, marginTop: space.xs },
+  sectionTitle: { fontFamily: font.outfit.medium, color: colors.brandNavy },
   chips: { gap: 8, paddingVertical: 4 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   strong: { fontWeight: '800' },
   hoursRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
-  termBox: { marginTop: 14, padding: 12, borderRadius: 10, backgroundColor: '#F8FAFC' },
+  termBox: { marginTop: space.md, padding: space.md, borderRadius: radius.nested, backgroundColor: colors.subtleBg },
   rateGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 12 },
-  warning: { marginTop: 12, backgroundColor: '#FFF7ED' },
-  error: { backgroundColor: '#FFF1F0' },
-  errorText: { color: '#B42318' },
+  warning: { marginTop: space.md, backgroundColor: colors.status.amber.bg },
+  error: { backgroundColor: colors.status.red.bg },
+  errorText: { color: colors.status.red.fg },
+  toolCard: { borderRadius: radius.card, backgroundColor: colors.surfaceBg },
+  toolContent: { gap: space.sm },
+  toolButton: { minHeight: touch.min },
 });
