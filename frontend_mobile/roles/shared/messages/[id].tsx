@@ -837,7 +837,7 @@ const pinnedMessage = useMemo(() => {
                             <Text style={styles.historyHint}>Earlier conversation history</Text>
                             <IconButton icon={loadingHistory ? 'loading' : 'history'} accessibilityLabel="Load older messages" disabled={loadingHistory} onPress={() => void loadOlderMessages()} />
                         </View>
-                    ) : null}
+                    ) : undefined}
                     renderItem={renderMessage}
                     keyExtractor={(item, index) => `${item.id ?? 'msg'}-${item.created_at ?? index}`}
                     contentContainerStyle={[styles.listContent, { paddingBottom: 24 + insets.bottom }]}
