@@ -1,10 +1,11 @@
-import React, { useCallback, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { Alert, View, StyleSheet } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { fetchPharmaciesService, deletePharmacy, PharmacyDTO, getPharmacyClaims, updatePharmacyClaim } from '@chemisttasker/shared-core';
 import { fetchMembershipsForPharmacy } from '@/roles/shared/pharmacies/membershipApi';
 import PharmaciesListView from '@/roles/shared/pharmacies/PharmaciesListView';
 import { Button, Dialog, Portal, Snackbar, Text, TextInput } from 'react-native-paper';
+import { ContentState } from '@/components/ui';
 
 type ClaimStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
 
@@ -52,9 +53,13 @@ const initialOwnerClaimDialog: OwnerClaimDialogState = {
 
 export default function PharmaciesListScreen() {
   const router = useRouter();
+  const pharmacyRequestRef = useRef(0);
+  const claimRequestRef = useRef(0);
   const [pharmacies, setPharmacies] = useState<PharmacyDTO[]>([]);
   const [staffCounts, setStaffCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [deletingPharmacyId, setDeletingPharmacyId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState('');
   const [ownerClaims, setOwnerClaims] = useState<OwnerClaimRequest[]>([]);
   const [ownerClaimsLoading, setOwnerClaimsLoading] = useState(false);
@@ -64,37 +69,46 @@ export default function PharmaciesListScreen() {
   const [respondingToClaim, setRespondingToClaim] = useState(false);
 
   const loadPharmacies = useCallback(async () => {
+    const request = ++pharmacyRequestRef.current;
     setLoading(true);
+    setLoadError(false);
     try {
       const data: any = await fetchPharmaciesService({});
       // Normalize data
       const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
       const normalized: PharmacyDTO[] = list.map((item: any) => ({ ...item, id: String(item.id ?? item.pharmacy_id ?? ''), can_edit: item.can_edit ?? item.canEdit }));
 
+      if (request !== pharmacyRequestRef.current) return;
       setPharmacies(normalized);
 
       // Load counts
       const counts: Record<string, number> = {};
-      await Promise.all(
-        normalized.map(async (p) => {
+      // Limit parallel member requests across large pharmacy chains.
+      for (let start = 0; start < normalized.length; start += 5) {
+        await Promise.all(normalized.slice(start, start + 5).map(async (pharmacy) => {
           try {
-            const memberships: any = await fetchMembershipsForPharmacy(p.id);
-            counts[p.id] = Array.isArray(memberships) ? memberships.length : 0;
+            const memberships = await fetchMembershipsForPharmacy(pharmacy.id);
+            counts[pharmacy.id] = Array.isArray(memberships) ? memberships.length : 0;
           } catch {
-            counts[p.id] = 0;
+            counts[pharmacy.id] = 0;
           }
-        })
-      );
-      setStaffCounts(counts);
+        }));
+        if (request !== pharmacyRequestRef.current) return;
+      }
+      if (request === pharmacyRequestRef.current) setStaffCounts(counts);
     } catch (err: any) {
-      console.error(err);
-      setSnackbar('Failed to load pharmacies');
+      if (request === pharmacyRequestRef.current) {
+        console.error(err);
+        setLoadError(true);
+        setSnackbar('Failed to load pharmacies');
+      }
     } finally {
-      setLoading(false);
+      if (request === pharmacyRequestRef.current) setLoading(false);
     }
   }, []);
 
   const loadOwnerClaims = useCallback(async () => {
+    const request = ++claimRequestRef.current;
     setOwnerClaimsLoading(true);
     try {
       const res = await getPharmacyClaims({ owned_by_me: true });
@@ -103,19 +117,24 @@ export default function PharmaciesListScreen() {
         : Array.isArray(res as any)
           ? (res as any)
           : [];
+      if (request !== claimRequestRef.current) return;
       setOwnerClaims(data);
       setOwnerClaimError(null);
     } catch (err: any) {
-      setOwnerClaimError(err?.response?.data?.detail || err?.message || 'Failed to load claim requests.');
+      if (request === claimRequestRef.current) setOwnerClaimError(err?.response?.data?.detail || err?.message || 'Failed to load claim requests.');
     } finally {
-      setOwnerClaimsLoading(false);
+      if (request === claimRequestRef.current) setOwnerClaimsLoading(false);
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadPharmacies();
-      loadOwnerClaims();
+      void loadPharmacies();
+      void loadOwnerClaims();
+      return () => {
+        pharmacyRequestRef.current += 1;
+        claimRequestRef.current += 1;
+      };
     }, [loadPharmacies, loadOwnerClaims])
   );
 
@@ -136,14 +155,29 @@ export default function PharmaciesListScreen() {
     accepted: ownerClaims.filter((item) => item.status === 'ACCEPTED').length,
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await deletePharmacy(id);
-      setSnackbar('Pharmacy deleted');
-      loadPharmacies();
-    } catch (e) {
-      setSnackbar('Failed to delete pharmacy');
-    }
+  const handleDelete = (id: string) => {
+    if (deletingPharmacyId) return;
+    const pharmacy = pharmacies.find((item) => String(item.id) === String(id));
+    Alert.alert(
+      'Delete pharmacy?',
+      'Deleting ' + (pharmacy?.name || 'this pharmacy') + ' may affect roster and historical records. Confirm only if the pharmacy should be permanently removed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete pharmacy', style: 'destructive',
+          onPress: () => {
+            setDeletingPharmacyId(id);
+            void deletePharmacy(id)
+              .then(async () => {
+                setSnackbar('Pharmacy deleted');
+                await loadPharmacies();
+              })
+              .catch(() => setSnackbar('Pharmacy could not be deleted. Existing records were not changed.'))
+              .finally(() => setDeletingPharmacyId(null));
+          },
+        },
+      ],
+    );
   };
 
   const handleOpenOwnerClaimDialog = (claim: OwnerClaimRequest, action: ClaimStatus) => {
@@ -175,7 +209,9 @@ export default function PharmaciesListScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <PharmaciesListView
+      {loadError && !loading ? (
+        <ContentState kind="error" title="Unable to load pharmacies" description="Check your connection and try again. Your records have not been changed." actionLabel="Retry" onAction={() => void loadPharmacies()} />
+      ) : <PharmaciesListView
         pharmacies={pharmacies}
         staffCounts={staffCounts}
         loading={loading}
@@ -191,7 +227,7 @@ export default function PharmaciesListScreen() {
         onEditPharmacy={(p) => router.push(`/owner/pharmacies/${p.id}/edit`)}
         onDeletePharmacy={handleDelete}
         onAddPharmacy={() => router.push('/owner/pharmacies/add')}
-      />
+      />}
       <Snackbar
         visible={!!snackbar}
         onDismiss={() => setSnackbar('')}
