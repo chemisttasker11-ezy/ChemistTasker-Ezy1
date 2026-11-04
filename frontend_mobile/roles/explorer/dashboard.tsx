@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Briefcase, CalendarCheck, Heart, Megaphone, Search, ShieldCheck, Sparkles, Store, UserRound } from 'lucide-react-native';
 import { fetchCommunityShifts, fetchPublicShifts, getExplorerDashboard, getExplorerPosts, getOnboardingDetail } from '@chemisttasker/shared-core';
 import { ContentState, SectionCard, ViewAllLink } from '@/components/ui';
@@ -75,10 +75,10 @@ export default function ExplorerOverviewScreen() {
     });
   }, []);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     void load();
     return () => { generation.current += 1; };
-  }, [load]);
+  }, [load]));
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -165,6 +165,15 @@ export default function ExplorerOverviewScreen() {
   return (
     <HomeScroll refreshing={refreshing} onRefresh={refresh}>
       <NextStepCard step={step} loading={loading} />
+
+      <SectionCard title="Quick actions" icon={<Heart />} flush>
+        <Rows>
+          <ItemRow icon={<UserRound />} tone="violet" label="My pharmacy profile" detail="Keep your contact details and experience up to date" onPress={() => go('/explorer/profile')} />
+          <ItemRow icon={<CalendarCheck />} tone="blue" label="My availability" detail="Choose when you can take part in opportunities" onPress={() => go('/explorer/availability')} />
+          <ItemRow icon={<Megaphone />} tone="violet" label="Create or edit my Talent Board post" detail="Let pharmacies know what you are looking for" onPress={() => go('/explorer/talent-board?compose=1')} />
+          <ItemRow icon={<Sparkles />} tone="blue" label="Learning resources" detail="Discover pharmacy learning and guidance" onPress={() => go('/explorer/learning')} />
+        </Rows>
+      </SectionCard>
 
       <SectionCard title="Recommended for you" icon={<Sparkles />} flush action={<ViewAllLink onPress={() => go('/explorer/shifts')}>Find more</ViewAllLink>}>
         {loading ? <BlockLoading rows={2} /> : data?.dashboard == null
