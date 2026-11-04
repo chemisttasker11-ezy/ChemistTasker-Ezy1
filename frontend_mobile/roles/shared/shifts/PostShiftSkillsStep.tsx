@@ -3,12 +3,13 @@ import type { Dispatch, SetStateAction } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, IconButton, Searchbar, SegmentedButtons, Surface, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Check, Plus, X } from 'lucide-react-native';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 import {
   claimModeLabel, popularShiftChoices, roleSkillGroups, setRequirementLevel, skillLabel, SOFTWARE_GROUP, softwareSubgroups,
   type SkillDefinition, type WorkerSkillRole,
 } from '@chemisttasker/shared-core';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { colors, radius, space, touch, type } from '@/constants/tokens';
 import { SkillIcon } from '../../../components/SkillIcon';
 import { styles as shared } from './PostShiftScreen.styles';
 
@@ -44,7 +45,13 @@ export default function PostShiftSkillsStep({ roleNeeded, mustHave, setMustHave,
   const toggle = (code: string) => set(code, selected.includes(code) ? null : 'preferred');
 
   if (!role) {
-    return <Surface style={shared.card} elevation={1}><Text>{roleNeeded === 'EXPLORER' ? 'Explorer shifts do not list professional skills.' : 'Choose the role needed in Shift Details first; the choices here depend on it.'}</Text></Surface>;
+    return (
+      <Surface style={shared.card} elevation={1}>
+        <Text style={{ color: colors.textSecondary }}>
+          {roleNeeded === 'EXPLORER' ? 'Explorer shifts do not list professional skills.' : 'Choose the role needed in Shift Details first; the choices here depend on it.'}
+        </Text>
+      </Surface>
+    );
   }
 
   const chip = (code: string, note?: string) => {
@@ -53,9 +60,13 @@ export default function PostShiftSkillsStep({ roleNeeded, mustHave, setMustHave,
       <Pressable key={code} onPress={() => toggle(code)} accessibilityRole="checkbox" accessibilityState={{ checked: on }}
         accessibilityLabel={skillLabel(reg, code)} style={[s.chip, on && s.chipOn]}>
         <SkillIcon skill={code} size={22} />
-        <Text style={[s.chipText, on && { fontWeight: '600' }]}>{skillLabel(reg, code)}</Text>
-        {note ? <Text style={s.note}>{note}</Text> : null}
-        <MaterialCommunityIcons name={on ? 'check' : 'plus'} size={18} color="#3C18A8" accessible={false} />
+        <Text style={[s.chipText, on && { fontWeight: '600', color: colors.primary }]}>{skillLabel(reg, code)}</Text>
+        {note ? <Text style={[s.note, on && s.noteOn]}>{note}</Text> : null}
+        {on ? (
+          <Check size={18} color={colors.primary} strokeWidth={2.5} />
+        ) : (
+          <Plus size={18} color={colors.textSecondary} strokeWidth={2} />
+        )}
       </Pressable>
     );
   };
@@ -81,11 +92,28 @@ export default function PostShiftSkillsStep({ roleNeeded, mustHave, setMustHave,
               <View style={s.rowTop}>
                 <SkillIcon skill={code} size={22} />
                 <Text style={s.rowLabel}>{skillLabel(reg, code)}</Text>
-                <IconButton icon="close" size={18} accessibilityLabel={`Remove ${skillLabel(reg, code)}`} onPress={() => set(code, null)} />
+                <IconButton icon={({ size, color }) => <X size={size} color={color} />} size={18} accessibilityLabel={`Remove ${skillLabel(reg, code)}`} onPress={() => set(code, null)} />
               </View>
               {unavailable ? <Text style={s.warn}>Not available for this role; remove before saving.</Text> : (
-                <SegmentedButtons value={level} onValueChange={value => { if (value !== level) set(code, value as 'required' | 'preferred'); }} density="small"
-                  buttons={[{ value: 'required', label: 'Required' }, { value: 'preferred', label: 'Preferred' }]} />
+                <SegmentedButtons
+                  value={level}
+                  onValueChange={value => { if (value !== level) set(code, value as 'required' | 'preferred'); }}
+                  style={{ minHeight: touch.min }}
+                  buttons={[
+                    {
+                      value: 'required',
+                      label: 'Required',
+                      style: { minHeight: touch.min },
+                      labelStyle: { minHeight: touch.min, textAlignVertical: 'center', lineHeight: touch.min },
+                    },
+                    {
+                      value: 'preferred',
+                      label: 'Preferred',
+                      style: { minHeight: touch.min },
+                      labelStyle: { minHeight: touch.min, textAlignVertical: 'center', lineHeight: touch.min },
+                    },
+                  ]}
+                />
               )}
             </View>
           );
@@ -96,12 +124,14 @@ export default function PostShiftSkillsStep({ roleNeeded, mustHave, setMustHave,
       <Text style={s.muted}>Mark Required only when someone cannot do the shift without it; required skills limit who can apply.</Text>
       <View style={s.wrap}>{popular.skills.map(code => chip(code))}</View>
 
-      {popular.software.length > 0 ? <>
-        <Text style={s.h3}>Software</Text>
-        <View style={s.wrap}>{popular.software.map(code => chip(code, pharmacySoftware.includes(code) ? 'Your pharmacy' : undefined))}</View>
-      </> : null}
+      {popular.software.length > 0 ? (
+        <>
+          <Text style={s.h3}>Software</Text>
+          <View style={s.wrap}>{popular.software.map(code => chip(code, pharmacySoftware.includes(code) ? 'Your pharmacy' : undefined))}</View>
+        </>
+      ) : null}
 
-      <Button mode="outlined" icon="magnify" onPress={() => setBrowsing(true)} style={s.browse} contentStyle={{ minHeight: 44 }}>
+      <Button mode="outlined" icon="magnify" onPress={() => setBrowsing(true)} style={s.browse} contentStyle={{ minHeight: touch.min }}>
         {`Browse all skills and software (${eligible.size})`}
       </Button>
 
@@ -109,18 +139,18 @@ export default function PostShiftSkillsStep({ roleNeeded, mustHave, setMustHave,
         <SafeAreaView style={s.modal}>
           <View style={s.modalHead}>
             <Text style={s.h2}>All skills and software</Text>
-            <IconButton icon="close" accessibilityLabel="Close" onPress={() => setBrowsing(false)} />
+            <IconButton icon={({ size, color }) => <X size={size} color={color} />} accessibilityLabel="Close" onPress={() => setBrowsing(false)} />
           </View>
-          <Searchbar placeholder="Search, e.g. Webster, ODT, Minfos" value={query} onChangeText={setQuery} style={{ marginHorizontal: 16 }}
+          <Searchbar placeholder="Search, e.g. Webster, ODT, Minfos" value={query} onChangeText={setQuery} style={{ marginHorizontal: space.md }}
             accessibilityLabel="Search skills or software" />
-          <ScrollView contentContainerStyle={{ padding: 16, gap: 18 }}>
+          <ScrollView contentContainerStyle={{ padding: space.md, gap: space.md }}>
             {groups.map(group => {
               const items = (group.key === SOFTWARE_GROUP
                 ? [...group.items].sort((a: any, b: any) => subgroups.indexOf(a.subgroup) - subgroups.indexOf(b.subgroup))
                 : group.items).filter(matches);
               if (!items.length) return null;
               return (
-                <View key={group.key} style={{ gap: 6 }}>
+                <View key={group.key} style={{ gap: space.xs }}>
                   <Text style={s.groupTitle}>{(group.key === SOFTWARE_GROUP ? 'Software' : group.label).toUpperCase()}</Text>
                   {items.map(item => {
                     const on = selected.includes(item.code);
@@ -132,10 +162,14 @@ export default function PostShiftSkillsStep({ roleNeeded, mustHave, setMustHave,
                         <View style={{ flex: 1 }}>
                           <Text style={s.rowLabel}>{item.label}</Text>
                           {mode || item.group !== SOFTWARE_GROUP ? (
-                            <Text style={s.muted} numberOfLines={2}>{[mode, item.group !== SOFTWARE_GROUP ? item.definition : null].filter(Boolean).join(' · ')}</Text>
+                            <Text style={[s.muted, on && s.mutedOn]} numberOfLines={2}>{[mode, item.group !== SOFTWARE_GROUP ? item.definition : null].filter(Boolean).join(' · ')}</Text>
                           ) : null}
                         </View>
-                        <MaterialCommunityIcons name={on ? 'check' : 'plus'} size={18} color="#3C18A8" accessible={false} />
+                        {on ? (
+                          <Check size={18} color={colors.primary} strokeWidth={2.5} />
+                        ) : (
+                          <Plus size={18} color={colors.textSecondary} strokeWidth={2} />
+                        )}
                       </Pressable>
                     );
                   })}
@@ -145,7 +179,7 @@ export default function PostShiftSkillsStep({ roleNeeded, mustHave, setMustHave,
           </ScrollView>
           <View style={s.modalFoot}>
             <Text style={s.muted}>{selected.length} selected</Text>
-            <Button mode="contained" onPress={() => setBrowsing(false)} contentStyle={{ minHeight: 44 }}>Done</Button>
+            <Button mode="contained" onPress={() => setBrowsing(false)} contentStyle={{ minHeight: touch.min }}>Done</Button>
           </View>
         </SafeAreaView>
       </Modal>
@@ -154,25 +188,27 @@ export default function PostShiftSkillsStep({ roleNeeded, mustHave, setMustHave,
 }
 
 const s = StyleSheet.create({
-  tray: { gap: 8, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 16 },
-  trayHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 },
-  h2: { fontSize: 18, fontWeight: '700', color: '#06214A' },
-  h3: { fontSize: 15, fontWeight: '700', color: '#06214A', marginTop: 4 },
-  muted: { fontSize: 13, color: '#4B5563' },
-  warn: { fontSize: 12, color: '#8A4B00' },
-  row: { gap: 6, padding: 8, borderRadius: 12 },
-  rowRequired: { backgroundColor: '#EFE9FD' },
-  rowTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowLabel: { flex: 1, fontSize: 14.5, fontWeight: '600', color: '#111827' },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 10 },
-  chip: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' },
-  chipOn: { borderColor: '#3C18A8', backgroundColor: '#EFE9FD' },
-  chipText: { color: '#111827', fontSize: 14 },
-  note: { fontSize: 11, fontWeight: '600', color: '#4B5563' },
-  browse: { marginTop: 8, borderRadius: 12 },
-  modal: { flex: 1, backgroundColor: '#FFFFFF' },
-  modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 16, paddingTop: 8 },
-  groupTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, color: '#4B5563' },
-  browseRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: 'transparent' },
-  modalFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
+  tray: { gap: space.xs, padding: space.md, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, marginBottom: space.md },
+  trayHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: space.xxs },
+  h2: { fontSize: type.titleMedium.fontSize, fontWeight: '700', color: colors.textPrimary },
+  h3: { fontSize: type.labelLarge.fontSize, fontWeight: '700', color: colors.textPrimary, marginTop: space.xxs },
+  muted: { fontSize: type.bodySmall.fontSize, color: colors.textSecondary },
+  warn: { fontSize: type.labelSmall.fontSize, color: colors.status.amber.fg },
+  row: { gap: space.xxs, padding: space.xs, borderRadius: radius.control },
+  rowRequired: { backgroundColor: colors.tone.violet.bg },
+  rowTop: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  rowLabel: { flex: 1, fontSize: type.bodyMedium.fontSize, fontWeight: '600', color: colors.textPrimary },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, marginVertical: space.xs },
+  chip: { minHeight: touch.min, flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingHorizontal: space.sm, borderRadius: radius.control, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceBg },
+  chipOn: { borderColor: colors.primary, backgroundColor: colors.tone.violet.bg },
+  chipText: { color: colors.textPrimary, fontSize: type.bodySmall.fontSize },
+  note: { fontSize: type.labelSmall.fontSize, fontWeight: '600', color: colors.textSecondary },
+  noteOn: { color: colors.tone.violet.fg },
+  mutedOn: { color: colors.tone.violet.fg },
+  browse: { marginTop: space.xs, borderRadius: radius.control },
+  modal: { flex: 1, backgroundColor: colors.pageBg },
+  modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: space.md, paddingTop: space.xs },
+  groupTitle: { fontSize: type.labelSmall.fontSize, fontWeight: '700', letterSpacing: 0.6, color: colors.textSecondary },
+  browseRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.sm, borderRadius: radius.control, borderWidth: 1, borderColor: 'transparent' },
+  modalFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: space.md, borderTopWidth: 1, borderTopColor: colors.border },
 });

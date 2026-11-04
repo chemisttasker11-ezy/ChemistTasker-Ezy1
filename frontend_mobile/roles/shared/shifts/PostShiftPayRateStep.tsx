@@ -16,6 +16,7 @@ import {
   getSlotDurationHours,
   type RateType,
 } from './PostShiftScreen.helpers';
+import { colors, touch, space } from '@/constants/tokens';
 import { styles } from './PostShiftScreen.styles';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
@@ -203,7 +204,7 @@ export default function PostShiftPayRateStep({
                 </Text>
               </View>
               {row.status === 'error' && row.error ? (
-                <Text style={{ color: '#B91C1C', fontSize: 12 }}>
+                <Text style={{ color: colors.status.red.fg, fontSize: 12 }}>
                   {row.error}
                 </Text>
               ) : null}
@@ -330,7 +331,7 @@ export default function PostShiftPayRateStep({
           </View>
 
           <TouchableOpacity
-            style={styles.checkboxRow}
+            style={[styles.checkboxRow, { minHeight: touch.min }]}
             onPress={() => setLocumSuperIncluded((value) => !value)}
           >
             <Checkbox
@@ -405,6 +406,7 @@ export default function PostShiftPayRateStep({
                 loading={savingPharmacyRates}
                 disabled={savingPharmacyRates || !pharmacyId}
                 style={styles.defaultRatesButton}
+                contentStyle={{ minHeight: touch.min }}
               >
                 Save as this pharmacy's usual rates
               </Button>
@@ -416,6 +418,7 @@ export default function PostShiftPayRateStep({
       ) : (
         <>
           <TouchableOpacity
+            style={{ minHeight: touch.min, justifyContent: 'center' }}
             onPress={() => Linking.openURL(GOVERNMENT_AWARD_GUIDE_URL)}
           >
             <Text style={styles.helper}>Rate is set by government award</Text>
@@ -441,7 +444,7 @@ export default function PostShiftPayRateStep({
           </View>
 
           <TouchableOpacity
-            style={styles.checkboxRow}
+            style={[styles.checkboxRow, { minHeight: touch.min }]}
             onPress={() => setLocumSuperIncluded((value) => !value)}
           >
             <Checkbox

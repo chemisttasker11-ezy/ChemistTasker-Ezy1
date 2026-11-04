@@ -5,7 +5,6 @@ import { TouchableOpacity, View } from 'react-native';
 import {
   Button,
   Chip,
-  IconButton,
   Menu,
   Surface,
   Text,
@@ -18,6 +17,8 @@ import {
   type PharmacyOption,
   type ShiftDescriptionTemplate,
 } from './PostShiftScreen.helpers';
+import { ChevronDown } from 'lucide-react-native';
+import { colors, touch, space } from '@/constants/tokens';
 import { styles } from './PostShiftScreen.styles';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
@@ -122,7 +123,7 @@ export default function PostShiftDetailsStep({
             anchor={
               <TouchableOpacity style={styles.selector} onPress={() => setPharmacyMenuVisible(true)}>
                 <Text style={styles.selectorText}>{pharmacyName || 'Select pharmacy'}</Text>
-                <IconButton icon="chevron-down" size={18} />
+                <ChevronDown size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             }
           >
@@ -149,7 +150,7 @@ export default function PostShiftDetailsStep({
       />
       <View style={styles.templateActions}>
         {descriptionTemplate?.description ? (
-          <Button mode="text" compact onPress={handleUseDescriptionTemplate} style={styles.templateButton}>Use saved description</Button>
+          <Button mode="text" compact onPress={handleUseDescriptionTemplate} style={styles.templateButton} contentStyle={{ minHeight: touch.min }}>Use saved description</Button>
         ) : null}
         <Button
           mode="text"
@@ -158,6 +159,7 @@ export default function PostShiftDetailsStep({
           disabled={descriptionTemplateLoading || descriptionTemplateSaving || !pharmacyId || !roleNeeded || !description.trim()}
           onPress={handleSaveDescriptionTemplate}
           style={styles.templateButton}
+          contentStyle={{ minHeight: touch.min }}
         >
           Save for future shifts
         </Button>
@@ -167,14 +169,14 @@ export default function PostShiftDetailsStep({
       <ShiftContextFields workload={workloadTags} support={supportOnShift}
         onWorkloadChange={setWorkloadTags} onSupportChange={setSupportOnShift} />
       <Text style={styles.label}>Extras</Text>
-      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
-        <Text>Travel provided</Text><Switch accessibilityLabel="Travel provided" value={hasTravel} onValueChange={setHasTravel} />
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',minHeight:touch.min,paddingVertical:space.xxs}}>
+        <Text style={{color:colors.textPrimary}}>Travel provided</Text><Switch accessibilityLabel="Travel provided" value={hasTravel} onValueChange={setHasTravel} />
       </View>
-      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
-        <Text>Accommodation provided</Text><Switch accessibilityLabel="Accommodation provided" value={hasAccommodation} onValueChange={setHasAccommodation} />
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',minHeight:touch.min,paddingVertical:space.xxs}}>
+        <Text style={{color:colors.textPrimary}}>Accommodation provided</Text><Switch accessibilityLabel="Accommodation provided" value={hasAccommodation} onValueChange={setHasAccommodation} />
       </View>
-      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
-        <Text>Urgent shift</Text><Switch accessibilityLabel="Urgent shift" value={isUrgent} onValueChange={setIsUrgent} />
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',minHeight:touch.min,paddingVertical:space.xxs}}>
+        <Text style={{color:colors.textPrimary}}>Urgent shift</Text><Switch accessibilityLabel="Urgent shift" value={isUrgent} onValueChange={setIsUrgent} />
       </View>
     </Surface>
   );
