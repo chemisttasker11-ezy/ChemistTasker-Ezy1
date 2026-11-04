@@ -11,7 +11,13 @@ const identityRoutes: Record<string, string> = {
   OWNER: '/owner/profile-detail',
   PHARMACIST: '/pharmacist/profile-identity',
   OTHER_STAFF: '/otherstaff/profile-identity',
+  INTERN: '/otherstaff/profile-identity',
+  TECHNICIAN: '/otherstaff/profile-identity',
+  ASSISTANT: '/otherstaff/profile-identity',
+  STUDENT: '/otherstaff/profile-identity',
   EXPLORER: '/explorer/profile-identity',
+  JUNIOR: '/explorer/profile-identity',
+  CAREER_SWITCHER: '/explorer/profile-identity',
   ORGANIZATION: '/organization/profile',
 };
 
