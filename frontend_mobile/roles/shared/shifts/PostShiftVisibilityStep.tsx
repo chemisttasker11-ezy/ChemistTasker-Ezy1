@@ -25,8 +25,10 @@ type Props = {
   initialAudience: string;
   setInitialAudience: Setter<string>;
   notifyPharmacyStaff: boolean;
+  showNotifyPharmacyStaff: boolean;
   setNotifyPharmacyStaff: Setter<boolean>;
   notifyFavoriteStaff: boolean;
+  showNotifyFavoriteStaff: boolean;
   setNotifyFavoriteStaff: Setter<boolean>;
   notifyChainMembers: boolean;
   showNotifyChainMembers: boolean;
@@ -59,7 +61,7 @@ const formatWhen = (value: string) => {
 
 export default function PostShiftVisibilityStep({
   isEmbedded, canPostAnonymously, hideName, setHideName, allowedVis, initialAudience, setInitialAudience,
-  notifyPharmacyStaff, setNotifyPharmacyStaff, notifyFavoriteStaff, setNotifyFavoriteStaff, notifyChainMembers,
+  notifyPharmacyStaff, showNotifyPharmacyStaff, setNotifyPharmacyStaff, notifyFavoriteStaff, showNotifyFavoriteStaff, setNotifyFavoriteStaff, notifyChainMembers,
   setNotifyChainMembers, showNotifyChainMembers, escalationDates, setEscalationDates, setEscalationPicker, setEscalationTimePicker,
   escalationPlan, setEscalationPlan,
 }: Props) {
@@ -79,8 +81,8 @@ export default function PostShiftVisibilityStep({
   };
 
   const notify = [
-    { key: 'pharmacy', visible: initialAudience !== 'FULL_PART_TIME', checked: notifyPharmacyStaff, label: 'Email and notify your pharmacy team', set: setNotifyPharmacyStaff },
-    { key: 'favourites', visible: ['LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN', 'PLATFORM'].includes(initialAudience), checked: notifyFavoriteStaff, label: 'Email and notify your favourite staff', set: setNotifyFavoriteStaff },
+    { key: 'pharmacy', visible: showNotifyPharmacyStaff, checked: notifyPharmacyStaff, label: 'Email and notify your pharmacy team', set: setNotifyPharmacyStaff },
+    { key: 'favourites', visible: showNotifyFavoriteStaff, checked: notifyFavoriteStaff, label: 'Email and notify your favourite staff', set: setNotifyFavoriteStaff },
     { key: 'chain', visible: showNotifyChainMembers, checked: notifyChainMembers, label: 'Email and notify your chain members', set: setNotifyChainMembers },
   ].filter(item => item.visible);
 

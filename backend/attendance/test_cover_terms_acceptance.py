@@ -454,8 +454,13 @@ class CoverTermsExistingControls(CoverTermsFixture, TestCase):
         self.assertTrue(refresh_verified(self.profile))
         self.profile.refresh_from_db()
         self.assertTrue(self.profile.verified)
+        # D2 requires echoing the same immutable terms version the worker was
+        # shown, including for the existing ABN invoice/consent positive path.
+        from shifts.engagement import build_shift_engagement_terms, shift_engagement_terms_version
+        reviewed_terms = build_shift_engagement_terms(shift=shift, user=self.worker, offer=offer)
+        accepted_payload = {**CONSENT, "terms_version": shift_engagement_terms_version(reviewed_terms)}
         with self.captureOnCommitCallbacks(execute=True):
-            response = client_for(self.worker).post(f"/api/v1/shift-offers/{offer.pk}/accept/", CONSENT, format="json")
+            response = client_for(self.worker).post(f"/api/v1/shift-offers/{offer.pk}/accept/", accepted_payload, format="json")
         self.assertEqual(response.status_code, 200, response.content[:300])
         offer.refresh_from_db()
         self.assertIsNotNone(offer.engagement_terms_accepted_at)

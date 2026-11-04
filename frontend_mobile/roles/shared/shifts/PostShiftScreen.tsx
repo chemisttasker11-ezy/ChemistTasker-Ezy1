@@ -354,6 +354,9 @@ export default function PostShiftScreen() {
         setNiceToHave(current => mergeSoftwareDefaults(current, mustHave, previous, next));
     }, [selectedPharmacy, roleNeeded, editingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Match the web Post Shift audience and one-time notification policy.
+    const showNotifyPharmacyStaff = !isPrivateBooking && !editingId && ['FULL_PART_TIME', 'LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN', 'PLATFORM'].includes(initialAudience);
+    const showNotifyFavoriteStaff = !isPrivateBooking && !editingId && ['LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN', 'PLATFORM'].includes(initialAudience);
     const showNotifyChainMembers = !isPrivateBooking && !editingId && canNotifyShiftChainMembers(allowedVis, initialAudience);
     const escalationTierKey = allowedVis.join(',');
     useEffect(() => {
@@ -363,8 +366,10 @@ export default function PostShiftScreen() {
         }
     }, [escalationTierKey, initialAudience, escalationPlan.mode, escalationPlan.everyHours, isPrivateBooking]); // eslint-disable-line react-hooks/exhaustive-deps
     useEffect(() => {
+        if (!showNotifyPharmacyStaff) setNotifyPharmacyStaff(false);
+        if (!showNotifyFavoriteStaff) setNotifyFavoriteStaff(false);
         if (!showNotifyChainMembers) setNotifyChainMembers(false);
-    }, [showNotifyChainMembers]);
+    }, [showNotifyPharmacyStaff, showNotifyFavoriteStaff, showNotifyChainMembers]);
 
     // Ensure initial audience stays within allowed tiers
     useEffect(() => {
@@ -1143,7 +1148,7 @@ export default function PostShiftScreen() {
         return fn(...args);
     };
 
-    const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff: !isPrivateBooking, showNotifyFavoriteStaff: !isPrivateBooking, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform }, slotsModified: areSlotsModified(), ratesModified: areRatesModified() });
+    const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff, showNotifyFavoriteStaff, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform }, slotsModified: areSlotsModified(), ratesModified: areRatesModified() });
 
     const handleSubmit = async () => {
         setError('');
@@ -1231,8 +1236,10 @@ export default function PostShiftScreen() {
                         initialAudience={initialAudience}
                         setInitialAudience={edited(setInitialAudience)}
                         notifyPharmacyStaff={notifyPharmacyStaff}
+                        showNotifyPharmacyStaff={showNotifyPharmacyStaff}
                         setNotifyPharmacyStaff={edited(setNotifyPharmacyStaff)}
                         notifyFavoriteStaff={notifyFavoriteStaff}
+                        showNotifyFavoriteStaff={showNotifyFavoriteStaff}
                         setNotifyFavoriteStaff={edited(setNotifyFavoriteStaff)}
                         notifyChainMembers={notifyChainMembers}
                         showNotifyChainMembers={showNotifyChainMembers}
