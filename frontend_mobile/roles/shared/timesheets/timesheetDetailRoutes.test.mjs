@@ -19,6 +19,7 @@ test('worker and manager timesheet routes share a native detail implementation b
   assert.match(detail, /managerMode && !sourceRequired/);
   assert.match(detail, /isSourceCorrectionRequired\(check\)/);
   assert.match(detail, /workforce\.addMissingPunch/);
+  assert.match(detail, /session_id: sessionId, event_type: eventType, occurred_at_local: when/);
   assert.match(detail, /workforce\.addTimesheetComment/);
   assert.match(detail, /workerVisible/);
 });
