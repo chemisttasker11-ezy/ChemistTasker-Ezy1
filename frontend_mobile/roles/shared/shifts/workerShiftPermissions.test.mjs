@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 test('workers see payroll readiness but cannot call the manager-only activation endpoint', () => {
   const mobile = readFileSync(new URL('./PublicShiftsView.tsx', import.meta.url), 'utf8');
-  const web = readFileSync(new URL('../../../../../frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx', import.meta.url), 'utf8');
+  const web = readFileSync(new URL('../../../../frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx', import.meta.url), 'utf8');
   for (const [label, source] of [['mobile', mobile], ['web', web]]) {
     assert.doesNotMatch(source, /activateShiftOfferPayrollService|handleActivatePayroll/,
       label + ' worker offer board must not send manager-only payroll mutations');
