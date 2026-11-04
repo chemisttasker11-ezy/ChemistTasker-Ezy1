@@ -238,7 +238,7 @@ export default function OrganizationLayout() {
         title: 'Pharmacies & people',
         tone: 'cyan',
         items: [
-          { label: 'My chain', icon: Building2, route: '/organization/chain', hidden: !can.pharmacies },
+          { label: 'My chain', icon: Building2, route: '/organization/chain', hidden: !can.chain },
           { label: 'Invite staff', icon: UserPlus, route: '/organization/invite', hidden: !can.invite },
           { label: 'Workforce & Payroll', icon: Wallet, route: '/workforce-settings', hidden: !can.staff },
           { label: 'Employment terms', icon: HardHat, route: '/workforce/employment-engagements', hidden: !(can.staff || can.roster) },
