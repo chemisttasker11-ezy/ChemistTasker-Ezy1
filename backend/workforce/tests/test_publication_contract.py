@@ -1,5 +1,8 @@
 """Actual HTTP contracts for one revision-aware roster publication authority."""
 from datetime import date, time, timedelta
+from types import SimpleNamespace
+from django.contrib.auth import get_user_model
+from django.utils import timezone
 from queue import Queue
 from threading import Barrier, Thread
 from unittest import mock, skipUnless
@@ -11,7 +14,7 @@ from rest_framework.test import APIClient
 
 from client_profile.characterization_support import make_owner_with_pharmacy
 from shifts.models import Shift, ShiftSlot
-from workforce.models import RosterOperation, RosterPeriod, RosterPublicationAudit, RosterRevisionState
+from workforce.models import RosterAcknowledgement, RosterOperation, RosterPeriod, RosterPublicationAudit, RosterRevisionState
 from workforce.roster.revisions import bump_roster_revision, get_revision_state, warning_key
 
 
@@ -42,6 +45,35 @@ class PublicationFixture:
 
 
 class PublicationHttpContracts(PublicationFixture, TestCase):
+    def test_worker_acknowledgement_expires_after_roster_republication(self):
+        worker = get_user_model().objects.create(
+            username="publication_ack_worker", email="publication-ack@example.invalid", role="PHARMACIST",
+        )
+        self.period.status = RosterPeriod.Status.PUBLISHED
+        self.period.published_at = timezone.now()
+        self.period.save(update_fields=["status", "published_at"])
+        assignment = SimpleNamespace(
+            id=907,
+            slot_date=self.period.week_start,
+            shift=SimpleNamespace(pharmacy_id=self.pharmacy.pk, pharmacy=self.pharmacy, role_needed="PHARMACIST"),
+            slot=SimpleNamespace(start_time=time(9, 0), end_time=time(17, 0)),
+        )
+        acknowledgement = RosterAcknowledgement.objects.create(roster_period=self.period, user=worker)
+        before = self.period.published_at - timedelta(hours=1)
+        RosterAcknowledgement.objects.filter(pk=acknowledgement.pk).update(acknowledged_at=before)
+        self.client.force_authenticate(worker)
+        with mock.patch("workforce.roster.v2_views.get_worker_published_roster", return_value=[assignment]):
+            response = self.client.get(BASES[1] + "worker/")
+            self.assertEqual(response.status_code, 200, response.data)
+            self.assertFalse(response.data["shifts"][0]["is_acknowledged"])
+            self.assertTrue(response.data["shifts"][0]["can_acknowledge"])
+            RosterAcknowledgement.objects.filter(pk=acknowledgement.pk).update(
+                acknowledged_at=self.period.published_at + timedelta(seconds=1),
+            )
+            refreshed = self.client.get(BASES[1] + "worker/")
+            self.assertTrue(refreshed.data["shifts"][0]["is_acknowledged"])
+
+
     def test_both_http_adapters_require_the_reviewed_revision_and_operation_id(self):
         for base in BASES:
             with self.subTest(base=base):

@@ -15,6 +15,7 @@ type PublishedShift = {
   end_time: string;
   role: string;
   is_acknowledged: boolean;
+  can_acknowledge: boolean;
 };
 
 export default function WorkerPublishedRosterScreen() {
@@ -66,7 +67,7 @@ export default function WorkerPublishedRosterScreen() {
   };
   const actionablePeriods = new Set<number>();
   for (const shift of shifts) {
-    if (shift.period_id != null && !shift.is_acknowledged) actionablePeriods.add(shift.period_id);
+    if (shift.period_id != null && shift.can_acknowledge && !shift.is_acknowledged) actionablePeriods.add(shift.period_id);
   }
   const seenPeriods = new Set<number>();
 

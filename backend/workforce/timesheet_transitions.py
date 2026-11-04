@@ -99,21 +99,29 @@ def reopen_timesheet(timesheet, user, reason: str):
 
 
 def decide_check(check, user, decision: str, reason: str):
-    timesheet = check.revision.timesheet
-    require_manage_pharmacy(user, timesheet.period.pharmacy)
-    source_required = {"MISSING_CLOCK_IN", "MISSING_CLOCK_OUT", "UNRESOLVED_PROVISIONAL_ATTENDANCE"}
-    if check.code in source_required and decision in {TimesheetCheckDecision.Decision.RESOLVED, TimesheetCheckDecision.Decision.WAIVED}:
-        raise ValidationError("This blocker must be corrected at the attendance source; it cannot be waived from the timesheet.")
-    if decision not in TimesheetCheckDecision.Decision.values:
-        raise ValidationError("Invalid check decision.")
-    if decision in {TimesheetCheckDecision.Decision.RESOLVED, TimesheetCheckDecision.Decision.WAIVED} and not (reason or "").strip():
-        raise ValidationError("A reason is required to resolve or waive a timesheet check.")
-    return TimesheetCheckDecision.objects.create(
-        timesheet_check=check,
-        decision=decision,
-        reason=(reason or "").strip(),
-        decided_by=user,
-    )
+    # Check decisions can change approval readiness. Lock the period before the
+    # timesheet, as all approval and period-freeze writers do.
+    with transaction.atomic():
+        timesheet, period = _locked_timesheet_and_period(check.revision.timesheet)
+        require_manage_pharmacy(user, period.pharmacy)
+        if period.status == TimesheetPeriod.Status.LOCKED:
+            raise ValidationError("Locked periods cannot change timesheet check decisions.")
+        current = _latest_revision(timesheet)
+        if not current or check.revision_id != current.pk:
+            raise ValidationError("This check belongs to an earlier revision. Refresh and review the current timesheet.")
+        source_required = {"MISSING_CLOCK_IN", "MISSING_CLOCK_OUT", "UNRESOLVED_PROVISIONAL_ATTENDANCE"}
+        if check.code in source_required and decision in {TimesheetCheckDecision.Decision.RESOLVED, TimesheetCheckDecision.Decision.WAIVED}:
+            raise ValidationError("This blocker must be corrected at the attendance source; it cannot be waived from the timesheet.")
+        if decision not in TimesheetCheckDecision.Decision.values:
+            raise ValidationError("Invalid check decision.")
+        if decision in {TimesheetCheckDecision.Decision.RESOLVED, TimesheetCheckDecision.Decision.WAIVED} and not (reason or "").strip():
+            raise ValidationError("A reason is required to resolve or waive a timesheet check.")
+        return TimesheetCheckDecision.objects.create(
+            timesheet_check=check,
+            decision=decision,
+            reason=(reason or "").strip(),
+            decided_by=user,
+        )
 
 
 def add_comment(timesheet, user, body: str, worker_visible=True):
