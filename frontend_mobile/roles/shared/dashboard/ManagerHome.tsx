@@ -39,6 +39,7 @@ export function orgCapabilities(user: any) {
     comms: caps.has('manage_communications'),
     invite: caps.has('invite_staff'),
     pharmacies,
+    chain: caps.has('view_all_pharmacies'),
     rosterScreen: pharmacies && roster,
     attendance: pharmacies && (staff || roster),
   };
