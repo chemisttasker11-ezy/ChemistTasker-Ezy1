@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Linking, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, Button, Card, Chip, Text, TextInput } from 'react-native-paper';
 import type { PublicArticle } from '@chemisttasker/shared-core';
@@ -23,7 +23,7 @@ const rolePath: Record<string, string> = {
 
 function getNextPage(next: string | null): number | null {
   if (!next) return null;
-  const match = /[?&]page=(\\d+)(?:[&#]|$)/.exec(next);
+  const match = /[?&]page=(\d+)(?:[&#]|$)/.exec(next);
   const page = match ? Number(match[1]) : null;
   return page != null && Number.isSafeInteger(page) && page > 1 ? page : null;
 }
@@ -31,7 +31,7 @@ function getNextPage(next: string | null): number | null {
 function articleHref(item: PublicArticle): string {
   const configured = process.env.EXPO_PUBLIC_WEB_URL?.trim();
   const origin = configured && /^https:\/\//i.test(configured) ? configured : 'https://app.chemisttasker.com';
-  return `${origin.replace(/\\/$/, '')}/${item.kind}/${encodeURIComponent(item.slug)}`;
+  return `${origin.replace(/\/$/, '')}/${item.kind}/${encodeURIComponent(item.slug)}`;
 }
 
 export default function LearningScreen() {
