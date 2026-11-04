@@ -20,13 +20,14 @@ type Claim = {
 
 export default function OrganizationPharmacyClaimsScreen() {
   const { user } = useAuth();
-  const organizations = getClaimableOrganizations(user);
+  const organizations = React.useMemo(() => getClaimableOrganizations(user), [user]);
   const [chosenOrganizationId, setChosenOrganizationId] = useState<number | null>(null);
-  // Multi-org accounts must choose deliberately; never silently send a claim
-  // for a different organisation from the one whose history is displayed.
-  const organizationId = organizations.length === 1
-    ? organizations[0].id
-    : (organizations.some(item => item.id === chosenOrganizationId) ? chosenOrganizationId : null);
+  // Stable memoized selection avoids re-creating the load callback on every render.
+  const organizationId = React.useMemo(() => (
+    organizations.length === 1
+      ? organizations[0].id
+      : (organizations.some(item => item.id === chosenOrganizationId) ? chosenOrganizationId : null)
+  ), [organizations, chosenOrganizationId]);
   const currentRequest = useRef(0);
   const submittingRef = useRef(false);
   const [claims, setClaims] = useState<Claim[]>([]);
