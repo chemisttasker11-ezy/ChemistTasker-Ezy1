@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { DeviceEventEmitter, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, Card, Divider, SegmentedButtons, Switch, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Card, Chip, Divider, SegmentedButtons, Switch, Text, TextInput } from 'react-native-paper';
 import * as Notifications from 'expo-notifications';
 import { Camera } from 'expo-camera';
 import { useAuth } from '@/context/AuthContext';
+import { getNotificationPushPreferences, updateNotificationPushPreferences, type NotificationPushPreferences } from '@chemisttasker/shared-core';
 import { colors, radius, space } from '@/constants/tokens';
 import { APP_LOCK_CHANGED, getAppLockPreference, setAppLockPreference, validDelay, type AppLockDelay } from '@/utils/appLock';
 import { fetchMobileAppConfig, getInstalledAppVersion, decideAppUpdate } from '@/utils/appUpdates';
@@ -29,6 +30,11 @@ export default function MobileSettings() {
   const [versionStatus, setVersionStatus] = useState('');
   const [appLockEnabled, setAppLockEnabled] = useState(false);
   const [appLockDelay, setAppLockDelay] = useState<AppLockDelay>(60);
+  const [pushPrefs, setPushPrefs] = useState<NotificationPushPreferences | null>(null);
+  const [pushLoading, setPushLoading] = useState(true);
+  const [pushError, setPushError] = useState('');
+  const [quietStart, setQuietStart] = useState('22:00');
+  const [quietEnd, setQuietEnd] = useState('07:00');
   const [message, setMessage] = useState('');
   const userId = user?.id;
 
@@ -60,6 +66,33 @@ export default function MobileSettings() {
     });
     return () => { active = false; };
   }, [userId]);
+
+  useEffect(() => {
+    let active = true;
+    setPushPrefs(null); setPushLoading(true); setPushError('');
+    if (userId == null) return () => { active = false; };
+    void getNotificationPushPreferences().then(value => {
+      if (!active) return;
+      setPushPrefs(value);
+      setQuietStart(String(value.quiet_start).slice(0,5));
+      setQuietEnd(String(value.quiet_end).slice(0,5));
+    }).catch(() => { if (active) setPushError('Could not load push preferences. Retry from this screen.'); })
+      .finally(() => { if (active) setPushLoading(false); });
+    return () => { active = false; };
+  }, [userId]);
+
+  const savePush = async (values: Partial<NotificationPushPreferences>) => {
+    if (userId == null || busy || !pushPrefs) return;
+    setBusy(true); setPushError('');
+    try {
+      const next = await updateNotificationPushPreferences(values);
+      setPushPrefs(next);
+      setQuietStart(String(next.quiet_start).slice(0,5));
+      setQuietEnd(String(next.quiet_end).slice(0,5));
+    } catch (failure: any) {
+      setPushError(failure?.response?.data?.detail || failure?.message || 'Push preference could not be saved.');
+    } finally { setBusy(false); }
+  };
 
   const updateAppLock = async (enabled: boolean, delay: AppLockDelay = appLockDelay) => {
     if (userId == null || busy || Platform.OS === 'web') return;
@@ -167,6 +200,48 @@ export default function MobileSettings() {
         <Button mode="outlined" onPress={() => void openSystemSettings()}>Manage notification permissions</Button>
       </Card.Content></Card>
       <Card mode="outlined" style={styles.card}><Card.Content style={styles.group}>
+        <Text variant="titleLarge" style={styles.heading}>Push notification preferences</Text>
+        <Text style={styles.muted}>These preferences control Expo push delivery for your account. Messages, shift tasks, work notes and alerts are saved separately on the server. In-app notifications remain available even when push is muted.</Text>
+        {pushLoading ? <ActivityIndicator accessibilityLabel="Loading push preferences" /> : null}
+        {pushError ? <Text accessibilityRole="alert" style={styles.warning}>{pushError}</Text> : null}
+        {pushPrefs ? <>
+          {([
+            ['push_messages', 'Messages'],
+            ['push_tasks', 'Shift and work tasks'],
+            ['push_work_notes', 'Work notes'],
+            ['push_alerts', 'Urgent and system alerts'],
+          ] as const).map(([field,label]) => (
+            <View style={styles.row} key={field}>
+              <Text style={styles.copy}>{label}</Text>
+              <Switch value={pushPrefs[field]} disabled={busy} onValueChange={value => void savePush({ [field]: value })} />
+            </View>
+          ))}
+          <Divider />
+          <View style={styles.row}>
+            <Text style={styles.copy}>Quiet hours (non-alert push only)</Text>
+            <Switch value={pushPrefs.quiet_hours_enabled} disabled={busy} onValueChange={value => void savePush({ quiet_hours_enabled: value })} />
+          </View>
+          {pushPrefs.quiet_hours_enabled ? <>
+            <Text style={styles.muted}>Quiet hours mute ordinary pushes immediately; they are not queued for later. Alerts remain exempt from quiet hours when enabled above.</Text>
+            <View style={styles.row}>
+              <TextInput mode="outlined" label="Start HH:mm" style={styles.copy} value={quietStart} onChangeText={setQuietStart} disabled={busy} maxLength={5} />
+              <TextInput mode="outlined" label="End HH:mm" style={styles.copy} value={quietEnd} onChangeText={setQuietEnd} disabled={busy} maxLength={5} />
+            </View>
+            <Text style={styles.muted}>Time zone: {pushPrefs.time_zone}</Text>
+            <View style={styles.zones}>
+              {['Australia/Brisbane','Australia/Sydney','Australia/Melbourne','Australia/Hobart','Australia/Adelaide','Australia/Perth','Australia/Darwin'].map(zone =>
+                <Chip key={zone} selected={pushPrefs.time_zone===zone} disabled={busy} onPress={() => void savePush({time_zone:zone})}>
+                  {zone.replace('Australia/','')}
+                </Chip>
+              )}
+            </View>
+            <Button mode="contained" disabled={busy || !/^\d{2}:\d{2}$/.test(quietStart) || !/^\d{2}:\d{2}$/.test(quietEnd) || quietStart===quietEnd} onPress={() => void savePush({quiet_start:quietStart,quiet_end:quietEnd})}>
+              Save quiet hours
+            </Button>
+          </> : null}
+        </> : null}
+      </Card.Content></Card>
+      <Card mode="outlined" style={styles.card}><Card.Content style={styles.group}>
         <Text variant="titleLarge" style={styles.heading}>Camera, location and kiosk</Text>
         <Text style={styles.muted}>Camera permission: {cameraStatus}. Camera access is requested at the attendance or QR scanning screen, never from this settings page.</Text>
         <Text style={styles.muted}>Location access is optional. QR kiosk attendance uses the scanned token and server-side eligibility, not continuous GPS tracking.</Text>
@@ -192,4 +267,6 @@ const styles = StyleSheet.create({
   group: { gap: space.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   copy: { flex: 1, gap: space.xs },
+  zones: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  warning: { color: colors.status.red.fg },
 });
