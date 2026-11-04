@@ -34,6 +34,7 @@ type Props = {
   escalationDates: VisibilityDates;
   setEscalationDates: Setter<VisibilityDates>;
   setEscalationPicker: Setter<EscalationPickerState>;
+  setEscalationTimePicker: Setter<EscalationPickerState>;
 };
 
 /** Same plain names as the web step, widest last. */
@@ -59,12 +60,14 @@ const formatWhen = (value: string) => {
 export default function PostShiftVisibilityStep({
   isEmbedded, canPostAnonymously, hideName, setHideName, allowedVis, initialAudience, setInitialAudience,
   notifyPharmacyStaff, setNotifyPharmacyStaff, notifyFavoriteStaff, setNotifyFavoriteStaff, notifyChainMembers,
-  setNotifyChainMembers, showNotifyChainMembers, escalationDates, setEscalationDates, setEscalationPicker,
+  setNotifyChainMembers, showNotifyChainMembers, escalationDates, setEscalationDates, setEscalationPicker, setEscalationTimePicker,
   escalationPlan, setEscalationPlan,
 }: Props) {
   const startIdx = allowedVis.indexOf(initialAudience as VisibilityTier);
   const later = startIdx > -1 ? allowedVis.slice(startIdx + 1) : [];
   const { mode, everyHours: autoHours } = escalationPlan;
+  const scheduled = later.map(tier => escalationDates[KEY[tier]]).filter((date): date is string => Boolean(date));
+  const outOfOrder = scheduled.some((date, index) => index > 0 && new Date(date).getTime() <= new Date(scheduled[index - 1]).getTime());
 
   const applyAuto = (hours: number) => {
     setEscalationPlan(current => ({ ...current, everyHours: hours }));
@@ -174,16 +177,28 @@ export default function PostShiftVisibilityStep({
                       <Text style={s.title}>{AUDIENCE[tier].label}</Text>
                       <Text style={s.muted}>{first ? 'As soon as you post' : when ? formatWhen(when) : 'Not scheduled'}</Text>
                       {!first && mode === 'custom' ? (
-                        <Button mode="outlined" compact icon="calendar" style={{ alignSelf: 'flex-start', marginTop: space.xxs }}
-                          contentStyle={{ minHeight: touch.min }}
-                          onPress={() => setEscalationPicker({ key: KEY[tier], open: true })}>
-                          {when ? 'Change date' : 'Pick a date'}
-                        </Button>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, marginTop: space.xxs }}>
+                          <Button mode="outlined" compact icon="calendar" contentStyle={{ minHeight: touch.min }}
+                            onPress={() => setEscalationPicker({ key: KEY[tier], open: true })}>
+                            {when ? 'Change date' : 'Pick a date'}
+                          </Button>
+                          {when ? (
+                            <Button mode="outlined" compact icon="clock-outline" contentStyle={{ minHeight: touch.min }}
+                              onPress={() => setEscalationTimePicker({ key: KEY[tier], open: true })}>
+                              Change time
+                            </Button>
+                          ) : null}
+                        </View>
                       ) : null}
                     </View>
                   </View>
                 );
               })}
+              {outOfOrder ? (
+                <Text accessibilityRole="alert" style={{ color: colors.status.red.fg, marginTop: space.md }}>
+                  Each group should open after the one before it. Check the dates and times above.
+                </Text>
+              ) : null}
             </View>
           ) : null}
         </View>

@@ -12,7 +12,7 @@ import {
     HelperText,
     Snackbar,
 } from 'react-native-paper';
-import { DatePickerModal } from 'react-native-paper-dates';
+import { DatePickerModal, TimePickerModal } from 'react-native-paper-dates';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
@@ -43,6 +43,9 @@ import {
     pharmacyHoursForDate,
     toIsoDate,
     toLocalIsoDate,
+    withEscalationDate,
+    withEscalationTime,
+    getEscalationClock,
     normalizePrefillRole,
     parsePostShiftSearchParams,
     pickScopedPharmacyId,
@@ -119,7 +122,7 @@ export default function PostShiftScreen() {
     const [rateType, setRateType] = useState<RateType>('FLEXIBLE');
     const [ownerBonus, setOwnerBonus] = useState('');
     const [slots, setSlots] = useState<SlotEntry[]>([]);
-    const [slotDate, setSlotDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [slotDate, setSlotDate] = useState<string>(() => toLocalIsoDate(new Date()));
     const [selectedDates, setSelectedDates] = useState<string[]>([]);
     const [selectedDateTimes, setSelectedDateTimes] = useState<Record<string, { startTime: string; endTime: string }>>({});
     const [slotStart, setSlotStart] = useState('09:00');
@@ -128,10 +131,11 @@ export default function PostShiftScreen() {
     liveTimesRef.current = { startTime: slotStart, endTime: slotEnd };
     const [slotRecurring, setSlotRecurring] = useState(false);
     const [slotRecurringDays, setSlotRecurringDays] = useState<number[]>([]);
-    const [slotRecurringEnd, setSlotRecurringEnd] = useState<string>(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+    const [slotRecurringEnd, setSlotRecurringEnd] = useState<string>(() => toLocalIsoDate(new Date(Date.now() + 7 * 86400000)));
     const [slotDatePickerOpen, setSlotDatePickerOpen] = useState(false);
     const [recurringEndPickerOpen, setRecurringEndPickerOpen] = useState(false);
     const [escalationPicker, setEscalationPicker] = useState<{ key: keyof VisibilityDates | null; open: boolean }>({ key: null, open: false });
+    const [escalationTimePicker, setEscalationTimePicker] = useState<{ key: keyof VisibilityDates | null; open: boolean }>({ key: null, open: false });
     const [escalationDates, setEscalationDates] = useState<VisibilityDates>({});
     const [description, setDescription] = useState('');
     const [descriptionTemplate, setDescriptionTemplate] = useState<ShiftDescriptionTemplate | null>(null);
@@ -209,7 +213,7 @@ export default function PostShiftScreen() {
     const resetForm = useCallback((options?: PostShiftFormResetOptions) => {
         const resetTimes = options?.times ?? liveTimesRef.current;
         const prefillState = computeResetFormPrefills(parsedParams, options, resetTimes);
-        const todayIso = new Date().toISOString().split('T')[0];
+        const todayIso = toLocalIsoDate(new Date());
         setCalendarMonthAnchor(new Date(`${prefillState.slotDate || todayIso}T00:00:00`));
         setPharmacyId('');
         setRoleNeeded(prefillState.roleNeeded);
@@ -237,7 +241,7 @@ export default function PostShiftScreen() {
         setSlotEnd(prefillState.slotEnd);
         setSlotRecurring(false);
         setSlotRecurringDays([]);
-        setSlotRecurringEnd(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+        setSlotRecurringEnd(toLocalIsoDate(new Date(Date.now() + 7 * 86400000)));
         setEscalationDates({});
         setEscalationPlan({ mode: 'off', everyHours: 24 });
         setToast('');
@@ -802,7 +806,7 @@ export default function PostShiftScreen() {
     ]);
 
     const mergeSelectedDates = useCallback((incomingDates: string[]) => {
-        const todayIso = new Date().toISOString().split('T')[0];
+        const todayIso = toLocalIsoDate(new Date());
         const valid = incomingDates.filter((d) => d && d >= todayIso);
         if (!valid.length) return;
         setSelectedDates((prev) => Array.from(new Set([...prev, ...valid])).sort());
@@ -988,7 +992,7 @@ export default function PostShiftScreen() {
         if (options?.resetRecurring) {
             setSlotRecurring(false);
             setSlotRecurringDays([]);
-            setSlotRecurringEnd(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+            setSlotRecurringEnd(toLocalIsoDate(new Date(Date.now() + 7 * 86400000)));
         }
 
         return true;
@@ -1070,7 +1074,7 @@ export default function PostShiftScreen() {
         setSlotEnd(slot.endTime);
         setSlotRecurring(slot.isRecurring);
         setSlotRecurringDays(slot.recurringDays || []);
-        setSlotRecurringEnd(slot.recurringEndDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+        setSlotRecurringEnd(slot.recurringEndDate || toLocalIsoDate(new Date(Date.now() + 7 * 86400000)));
         setSelectedDates((prev) => (prev.includes(slot.date) ? prev : [...prev, slot.date].sort()));
         setSelectedDateTimes((prev) => ({
             ...prev,
@@ -1236,6 +1240,7 @@ export default function PostShiftScreen() {
                         escalationDates={escalationDates}
                         setEscalationDates={edited(setEscalationDates)}
                         setEscalationPicker={setEscalationPicker}
+                        setEscalationTimePicker={setEscalationTimePicker}
                     />
                 );
             case 'timetable':
@@ -1467,9 +1472,9 @@ export default function PostShiftScreen() {
                             : [];
                     const pickedIsos = pickedDates
                         .filter(Boolean)
-                        .map((d) => d.toISOString().split('T')[0]);
+                        .map((d) => toLocalIsoDate(d));
                     // mergeSelectedDates only adds today-or-later dates, so the draft changes only for a new one.
-                    const todayIso = new Date().toISOString().split('T')[0];
+                    const todayIso = toLocalIsoDate(new Date());
                     if (pickedIsos.some((d) => d >= todayIso && !selectedDateSet.has(d))) markTouched();
                     mergeSelectedDates(pickedIsos);
                     setSlotDatePickerOpen(false);
@@ -1480,9 +1485,9 @@ export default function PostShiftScreen() {
                 locale="en"
                 visible={recurringEndPickerOpen}
                 onDismiss={() => setRecurringEndPickerOpen(false)}
-                date={new Date(slotRecurringEnd)}
+                date={toIsoDate(slotRecurringEnd) ?? new Date()}
                 onConfirm={({ date }) => {
-                    const iso = date?.toISOString().split('T')[0];
+                    const iso = date ? toLocalIsoDate(date) : undefined;
                     if (iso && iso !== slotRecurringEnd) {
                         markTouched();
                         setSlotRecurringEnd(iso);
@@ -1497,12 +1502,36 @@ export default function PostShiftScreen() {
                 onDismiss={() => setEscalationPicker({ key: null, open: false })}
                 date={escalationPicker.key && escalationDates[escalationPicker.key] ? new Date(escalationDates[escalationPicker.key] as string) : new Date()}
                 onConfirm={({ date }) => {
-                    const iso = date?.toISOString().split('T')[0];
-                    if (iso && escalationPicker.key && iso !== escalationDates[escalationPicker.key]) {
-                        markTouched();
-                        setEscalation(escalationPicker.key, iso);
+                    const key = escalationPicker.key;
+                    if (date && key) {
+                        const next = withEscalationDate(date, escalationDates[key]);
+                        if (next !== escalationDates[key]) {
+                            markTouched();
+                            setEscalation(key, next);
+                        }
+                        // Custom audience dates include a clock, as in the web datetime-local control.
+                        setEscalationTimePicker({ key, open: true });
                     }
                     setEscalationPicker({ key: null, open: false });
+                }}
+            />
+            <TimePickerModal
+                locale="en"
+                visible={escalationTimePicker.open}
+                onDismiss={() => setEscalationTimePicker({ key: null, open: false })}
+                hours={getEscalationClock(escalationTimePicker.key ? escalationDates[escalationTimePicker.key] : null).hours}
+                minutes={getEscalationClock(escalationTimePicker.key ? escalationDates[escalationTimePicker.key] : null).minutes}
+                use24HourClock
+                onConfirm={({ hours, minutes }) => {
+                    const key = escalationTimePicker.key;
+                    if (key) {
+                        const next = withEscalationTime(escalationDates[key], hours, minutes);
+                        if (next && next !== escalationDates[key]) {
+                            markTouched();
+                            setEscalation(key, next);
+                        }
+                    }
+                    setEscalationTimePicker({ key: null, open: false });
                 }}
             />
         </SafeAreaView>
