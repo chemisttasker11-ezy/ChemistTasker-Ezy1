@@ -58,8 +58,8 @@ export function MarketplaceAccessResolution({
     {needsProfile && identityRoute ? <Button mode="outlined" icon="account-check-outline" onPress={() => router.push(identityRoute as any)} contentStyle={styles.touch}>Complete role profile and verification</Button> : null}
     {needsTerms ? <View style={styles.terms}>
       <Text style={styles.body}>Marketplace participation requires acceptance of the current terms{terms ? ` (version ${terms.version})` : ''}.</Text>
-      <Button mode="outlined" icon="open-in-new" onPress={() => void Linking.openURL(termsUrl)} contentStyle={styles.touch}>Read marketplace terms</Button>
-      <Checkbox.Item label="I have read and agree to the current marketplace terms" status={agreed ? 'checked' : 'unchecked'} onPress={() => setAgreed(!agreed)} disabled={!terms || loading} mode="android" />
+      <Button mode="outlined" icon="open-in-new" onPress={() => void Linking.openURL(termsUrl).catch(() => setError('Unable to open terms. Check your connection or open ChemistTasker in a browser.'))} contentStyle={styles.touch}>Read marketplace terms</Button>
+      <Checkbox.Item label="I have read and agree to the current marketplace terms" status={agreed ? 'checked' : 'unchecked'} onPress={() => setAgreed(!agreed)} disabled={!terms || loading} />
       <Button mode="contained" disabled={!agreed || !terms || loading} loading={loading} onPress={() => void accept()} contentStyle={styles.touch}>Accept marketplace terms</Button>
     </View> : null}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
