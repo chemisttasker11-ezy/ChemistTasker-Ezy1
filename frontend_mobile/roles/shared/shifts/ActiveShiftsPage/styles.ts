@@ -63,6 +63,9 @@ export const styles = StyleSheet.create({
         fontSize: 16,
         color: customTheme.colors.textMuted,
     },
+    stateCard: {
+        margin: customTheme.spacing.lg,
+    },
     shiftCard: {
         position: 'relative',
         overflow: 'hidden',

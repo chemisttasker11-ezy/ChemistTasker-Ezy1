@@ -1,10 +1,11 @@
 // SlotSelector Component
-// Wrapped selector for multi-slot shifts
+// Wrapped selector for multi-slot shifts with W3a tokens and Lucide
 
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { IconButton, Surface, Text } from 'react-native-paper';
-import { customTheme } from '../../theme';
+import { Surface, Text } from 'react-native-paper';
+import { Users } from 'lucide-react-native';
+import { colors as tokenColors, font, radius, space } from '@/constants/tokens';
 
 interface SlotSelectorProps {
     slots: any[];
@@ -15,7 +16,14 @@ interface SlotSelectorProps {
     slotStatusCounts?: Record<number, { interested: number; assigned: number; rejected: number; noResponse: number }>;
 }
 
-export default function SlotSelector({ slots, selectedSlotId, onSelectSlot, slotHasUpdates, slotCandidateCounts, slotStatusCounts }: SlotSelectorProps) {
+export default function SlotSelector({
+    slots,
+    selectedSlotId,
+    onSelectSlot,
+    slotHasUpdates,
+    slotCandidateCounts,
+    slotStatusCounts,
+}: SlotSelectorProps) {
     const getSlotId = (slot: any): number | null =>
         (slot?.id ?? slot?.slotId ?? slot?.slot_id ?? null);
 
@@ -37,8 +45,14 @@ export default function SlotSelector({ slots, selectedSlotId, onSelectSlot, slot
             time: `${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}`,
         };
     };
+
     const getSlotCandidateCount = (slot: any) =>
-        slotCandidateCounts?.[slot._slotId] ?? slot?.candidateCount ?? slot?.candidate_count ?? slot?.assignedCount ?? slot?.assigned_count ?? 0;
+        slotCandidateCounts?.[slot._slotId] ??
+        slot?.candidateCount ??
+        slot?.candidate_count ??
+        slot?.assignedCount ??
+        slot?.assigned_count ??
+        0;
 
     return (
         <Surface style={styles.container} elevation={0}>
@@ -49,36 +63,60 @@ export default function SlotSelector({ slots, selectedSlotId, onSelectSlot, slot
                 </View>
             </View>
             <View style={styles.selectorGrid}>
-                    {normalizedSlots.map((slot) => {
-                        const parts = formatParts(slot);
-                        const selected = slot._slotId === selectedSlotId;
-                        return (
-                            <TouchableOpacity
-                                key={slot._slotId}
-                                onPress={() => onSelectSlot(slot._slotId!)}
-                                style={[styles.slotButton, selected && styles.slotButtonSelected]}
-                            >
-                                <Text style={styles.slotDay}>{parts.day}</Text>
-                                <Text style={styles.slotDate}>{parts.date}</Text>
-                                <Text style={styles.slotTime}>{parts.time}</Text>
-                                <View style={styles.slotFooter}>
-                                    <View style={styles.openDot} />
-                                    <Text style={styles.openText}>Open</Text>
+                {normalizedSlots.map((slot) => {
+                    const parts = formatParts(slot);
+                    const selected = slot._slotId === selectedSlotId;
+                    const hasNewActivity = Boolean(slotHasUpdates?.[slot._slotId]);
+                    const count = getSlotCandidateCount(slot);
+
+                    return (
+                        <TouchableOpacity
+                            key={slot._slotId}
+                            onPress={() => onSelectSlot(slot._slotId!)}
+                            accessible
+                            accessibilityRole="button"
+                            accessibilityState={{ selected }}
+                            accessibilityLabel={`${parts.day} ${parts.date}, ${parts.time}. ${count} candidates.${hasNewActivity ? ' Has new activity.' : ''}`}
+                            style={[styles.slotButton, selected && styles.slotButtonSelected]}
+                            activeOpacity={0.75}
+                        >
+                            {hasNewActivity && (
+                                <View style={styles.newActivityBadge} accessibilityLabel="New activity">
+                                    <Text style={styles.newActivityText}>New activity</Text>
                                 </View>
-                                <View style={styles.slotCandidateCount}>
-                                    <IconButton icon="account-group-outline" size={14} iconColor="#64748B" style={styles.slotCandidateIcon} />
-                                    <Text style={styles.slotCandidateText}>{getSlotCandidateCount(slot)}</Text>
-                                </View>
-                                <View style={styles.statusSummary}>
-                                    <Text style={[styles.statusPill, styles.interestedPill]}>Int {slotStatusCounts?.[slot._slotId]?.interested ?? 0}</Text>
-                                    <Text style={[styles.statusPill, styles.assignedPill]}>Asg {slotStatusCounts?.[slot._slotId]?.assigned ?? 0}</Text>
-                                    <Text style={[styles.statusPill, styles.rejectedPill]}>Rej {slotStatusCounts?.[slot._slotId]?.rejected ?? 0}</Text>
-                                    <Text style={[styles.statusPill, styles.noResponsePill]}>No {slotStatusCounts?.[slot._slotId]?.noResponse ?? 0}</Text>
-                                </View>
-                                {Boolean(slotHasUpdates?.[slot._slotId]) && <View style={styles.updateDot} />}
-                            </TouchableOpacity>
-                        );
-                    })}
+                            )}
+
+                            <Text style={styles.slotDay}>{parts.day}</Text>
+                            <Text style={styles.slotDate}>{parts.date}</Text>
+                            <Text style={styles.slotTime}>{parts.time}</Text>
+
+                            <View style={styles.slotFooter}>
+                                <View style={styles.openDot} />
+                                <Text style={styles.openText}>Open</Text>
+                            </View>
+
+                            <View style={styles.slotCandidateCount}>
+                                <Users size={12} color={tokenColors.textSecondary} />
+                                <Text style={styles.slotCandidateText}>{count}</Text>
+                            </View>
+
+                            <View style={styles.statusSummary}>
+                                <Text style={[styles.statusPill, styles.interestedPill]}>
+                                    Int {slotStatusCounts?.[slot._slotId]?.interested ?? 0}
+                                </Text>
+                                <Text style={[styles.statusPill, styles.assignedPill]}>
+                                    Asg {slotStatusCounts?.[slot._slotId]?.assigned ?? 0}
+                                </Text>
+                                <Text style={[styles.statusPill, styles.rejectedPill]}>
+                                    Rej {slotStatusCounts?.[slot._slotId]?.rejected ?? 0}
+                                </Text>
+                                <Text style={[styles.statusPill, styles.noResponsePill]}>
+                                    No {slotStatusCounts?.[slot._slotId]?.noResponse ?? 0}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    );
+                })}
             </View>
         </Surface>
     );
@@ -86,150 +124,160 @@ export default function SlotSelector({ slots, selectedSlotId, onSelectSlot, slot
 
 const styles = StyleSheet.create({
     container: {
-        paddingVertical: customTheme.spacing.sm,
-        paddingHorizontal: customTheme.spacing.xs,
-        marginBottom: customTheme.spacing.md,
-        backgroundColor: '#fff',
-        borderRadius: 16,
+        paddingVertical: space.sm,
+        paddingHorizontal: space.xs,
+        marginBottom: space.md,
+        backgroundColor: '#FFFFFF',
+        borderRadius: radius.card,
     },
     headerRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: customTheme.spacing.sm,
-        paddingHorizontal: customTheme.spacing.xs,
-        gap: customTheme.spacing.sm,
+        marginBottom: space.sm,
+        paddingHorizontal: space.xs,
+        gap: space.sm,
     },
     heading: {
         fontSize: 15,
-        fontWeight: '900',
-        color: '#111827',
+        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
+        color: tokenColors.textPrimary,
     },
     subheading: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#64748B',
+        fontFamily: font.inter.medium,
+        color: tokenColors.textSecondary,
         marginTop: 2,
-    },
-    selectorRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
     },
     selectorGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: customTheme.spacing.xs,
-    },
-    scrollContent: {
-        paddingHorizontal: customTheme.spacing.xs,
-        gap: customTheme.spacing.md,
-        alignItems: 'center',
-    },
-    scrollView: {
-        flex: 1,
+        gap: space.xs,
     },
     slotButton: {
         width: '31.5%',
-        minHeight: 112,
-        borderRadius: 12,
+        minHeight: 114,
+        borderRadius: radius.nested,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: tokenColors.border,
         backgroundColor: '#FFFFFF',
-        padding: customTheme.spacing.sm,
+        padding: space.sm,
         position: 'relative',
     },
     slotButtonSelected: {
-        borderColor: '#8B5CF6',
-        backgroundColor: '#FAF5FF',
+        borderColor: tokenColors.primary,
+        borderWidth: 2,
+        backgroundColor: '#F5F3FF',
     },
     slotDay: {
-        color: '#64748B',
+        color: tokenColors.textSecondary,
         fontSize: 11,
         fontWeight: '700',
+        fontFamily: font.inter.semiBold,
     },
     slotDate: {
-        color: '#111827',
+        color: tokenColors.textPrimary,
         fontSize: 13,
-        fontWeight: '900',
+        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
         marginTop: 2,
     },
     slotTime: {
         alignSelf: 'flex-start',
-        marginTop: customTheme.spacing.sm,
-        paddingHorizontal: customTheme.spacing.sm,
+        marginTop: space.xs,
+        paddingHorizontal: space.xs + 2,
         paddingVertical: 2,
-        borderRadius: 999,
+        borderRadius: radius.pill,
         overflow: 'hidden',
         backgroundColor: '#F3E8FF',
-        color: '#7C3AED',
+        color: '#6D28D9',
         fontSize: 10,
-        fontWeight: '800',
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
     },
     slotFooter: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 5,
-        marginTop: customTheme.spacing.sm,
+        marginTop: space.xs + 2,
     },
     openDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 4,
-        backgroundColor: '#16A34A',
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#15803D',
     },
     openText: {
-        color: '#475569',
+        color: tokenColors.textSecondary,
         fontSize: 11,
-        fontWeight: '700',
+        fontWeight: '600',
+        fontFamily: font.inter.medium,
     },
     slotCandidateCount: {
         position: 'absolute',
-        right: 7,
+        right: 6,
         bottom: 6,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 1,
-    },
-    slotCandidateIcon: {
-        margin: 0,
-        width: 16,
-        height: 16,
+        gap: 2,
     },
     slotCandidateText: {
-        color: '#64748B',
+        color: tokenColors.textSecondary,
         fontSize: 11,
-        fontWeight: '800',
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
     },
-    updateDot: {
+    newActivityBadge: {
         position: 'absolute',
-        top: 2,
-        right: 2,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#DC2626',
+        top: 4,
+        right: 4,
+        backgroundColor: '#FEE2E2',
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+        borderRadius: radius.pill,
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        zIndex: 2,
+    },
+    newActivityText: {
+        color: '#991B1B',
+        fontSize: 8,
+        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
+        textTransform: 'uppercase',
     },
     statusSummary: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 3,
-        marginTop: 5,
-        paddingRight: 26,
+        marginTop: 4,
+        paddingRight: 24,
     },
     statusPill: {
-        color: '#FFFFFF',
         fontSize: 8,
-        fontWeight: '900',
-        borderRadius: 999,
+        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
+        borderRadius: radius.pill,
         overflow: 'hidden',
         paddingHorizontal: 4,
         paddingVertical: 1,
     },
-    interestedPill: { backgroundColor: '#047857' },
-    assignedPill: { backgroundColor: '#0284C7' },
-    rejectedPill: { backgroundColor: '#B91C1C' },
-    noResponsePill: { backgroundColor: '#B45309' },
-    navButton: {
-        margin: 0,
+    interestedPill: {
+        backgroundColor: '#DCFCE7',
+        color: '#15803D',
+    },
+    assignedPill: {
+        backgroundColor: '#DBEAFE',
+        color: '#1D4ED8',
+    },
+    rejectedPill: {
+        backgroundColor: '#FEE2E2',
+        color: '#B91C1C',
+    },
+    noResponsePill: {
+        backgroundColor: '#FEF3C7',
+        color: '#B45309',
     },
 });
