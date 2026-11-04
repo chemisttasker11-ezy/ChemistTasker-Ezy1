@@ -48,6 +48,7 @@ const titles: Record<string, string> = {
   'shifts/[id]': 'Shift',
   'post-shift': 'Post shift',
   'pharmacies/index': 'Pharmacies',
+  'pharmacies/claims': 'Pharmacy claims',
   chain: 'My chain',
   'pharmacies/[id]': 'Pharmacy',
   'pharmacies/[id]/edit': 'Edit pharmacy',
