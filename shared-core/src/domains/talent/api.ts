@@ -73,3 +73,23 @@ export function updateExplorerPost(id: number | string, data: unknown) {
 export function deleteExplorerPost(id: number | string) {
     return fetchApi(`/explorer-posts/${id}/`, { method: 'DELETE' });
 }
+
+
+export type SavedProfessionalContact = {
+ id: number;
+ kind: 'WORKER_LISTING' | 'ORGANIZATION';
+ reference: string;
+ saved_at: string;
+};
+export function listSavedProfessionalContacts() {
+ return fetchApi<SavedProfessionalContact[]>('/saved-professional-contacts/');
+}
+export function saveProfessionalContact(payload: Pick<SavedProfessionalContact, 'kind'|'reference'>) {
+ return fetchApi<SavedProfessionalContact>('/saved-professional-contacts/',{
+  method:'POST',body:JSON.stringify(payload),
+ });
+}
+export function deleteSavedProfessionalContact(id: number) {
+ if(!Number.isSafeInteger(id)||id<=0)throw new Error('Invalid saved contact ID.');
+ return fetchApi('/saved-professional-contacts/'+id+'/',{method:'DELETE'});
+}

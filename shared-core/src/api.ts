@@ -285,6 +285,9 @@ export {
   createUserAvailabilityService,
   updateUserAvailabilityService,
   deleteUserAvailabilityService,
+  listSavedProfessionalContacts,
+  saveProfessionalContact,
+  deleteSavedProfessionalContact,
   getExplorerPosts,
   getExplorerPostDetail,
   getExplorerPostFeed,
@@ -297,6 +300,7 @@ export {
   updateExplorerPost,
   deleteExplorerPost,
 } from './domains/talent/api';
+export type { SavedProfessionalContact } from './domains/talent/api';
 export {
   fetchPillBalanceService,
   fetchPillRewardRulesService,
