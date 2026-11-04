@@ -36,7 +36,7 @@ if __name__ == '__main__':
         if json.loads(DESTINATION.read_text()) != result:
             # Emit exact source-derived ledger in bounded chunks for a targeted CI repair.
             # No Python/Django application imports are executed by this inventory.
-            produced = json.dumps(result, indent=2) + '\\n'
+            produced = json.dumps(result, separators=(',', ':'))
             for index in range(0, len(produced), 1500):
                 print('RUNTIME_LEDGER_PART:' + produced[index:index + 1500])
             raise AssertionError('Runtime ledger differs from source; regenerate it.')
