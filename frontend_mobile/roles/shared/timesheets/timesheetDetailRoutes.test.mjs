@@ -22,6 +22,13 @@ test('worker and manager timesheet routes share a native detail implementation b
   assert.match(detail, /session_id: sessionId, event_type: eventType, occurred_at_local: when/);
   assert.match(detail, /workforce\.addTimesheetComment/);
   assert.match(detail, /workerVisible/);
+  assert.match(detail, /TimesheetAdjustTimesSheet/);
+  assert.match(detail, /managerCanChange && data\.status !== 'APPROVED'/);
+  const adjustment = read('./TimesheetAdjustTimesSheet.tsx');
+  assert.match(adjustment, /attendance\.getManagerTimeline/);
+  assert.match(adjustment, /attendance\.correct/);
+  assert.match(adjustment, /workforce\.recalculateTimesheet/);
+  assert.match(adjustment, /correctionValidation/);
   assert.match(detail, /hasCapability\('MANAGE_ROSTER'/);
   assert.match(detail, /data\?\.period_status === 'LOCKED'/);
   assert.match(detail, /managerAllowed && !periodLocked/);

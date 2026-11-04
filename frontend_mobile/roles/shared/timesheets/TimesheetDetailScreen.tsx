@@ -2,11 +2,12 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Button, Card, Chip, Switch, Text, TextInput } from 'react-native-paper';
-import { type WorkforceTimesheetDetail, type WorkforceTimesheetCheck, workforce } from '@chemisttasker/shared-core';
+import { type WorkforceTimesheetDetail, type WorkforceTimesheetCheck, type WorkforceTimesheetDay, workforce } from '@chemisttasker/shared-core';
 import { colors, font, radius, space, touch } from '@/constants/tokens';
 import { ContentState } from '@/components/ui/ContentState';
 import { useAuth } from '@/context/AuthContext';
 import { canApproveTimesheet, formatPharmacyClock, formatTimesheetMinutes, isSourceCorrectionRequired } from './timesheetDetailPolicy';
+import TimesheetAdjustTimesSheet from './TimesheetAdjustTimesSheet';
 
 export default function TimesheetDetailScreen({ managerMode }: { managerMode: boolean }) {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -28,6 +29,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   const [missingPunchCheck, setMissingPunchCheck] = useState<WorkforceTimesheetCheck | null>(null);
   const [missingPunchAt, setMissingPunchAt] = useState('');
   const [missingPunchReason, setMissingPunchReason] = useState('');
+  const [adjustingDay, setAdjustingDay] = useState<WorkforceTimesheetDay | null>(null);
   const managerAllowed = Boolean(managerMode && data?.pharmacy?.id && hasCapability('MANAGE_ROSTER', data.pharmacy.id));
   const periodLocked = data?.period_status === 'LOCKED';
   const managerCanChange = managerAllowed && !periodLocked;
@@ -156,9 +158,18 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
               <View style={styles.compare}><Text style={styles.small}>Start</Text><Text style={styles.value}>{formatPharmacyClock(day.actual_start, timeZone)}</Text><Text style={styles.value}>{formatPharmacyClock(day.rostered_start, timeZone)}</Text></View>
               <View style={styles.compare}><Text style={styles.small}>Finish</Text><Text style={styles.value}>{formatPharmacyClock(day.actual_end, timeZone)}</Text><Text style={styles.value}>{formatPharmacyClock(day.rostered_end, timeZone)}</Text></View>
               <View style={styles.compare}><Text style={styles.small}>Break</Text><Text style={styles.value}>{day.recorded_break_minutes} min</Text><Text style={styles.value}>{day.planned_break_minutes} min</Text></View>
+              {managerCanChange && data.status !== 'APPROVED' && day.session_id != null ?
+                <Button mode="outlined" disabled={busy !== ''} onPress={() => setAdjustingDay(day)}>Adjust times</Button> : null}
             </View>)}
         </Card.Content></Card>
 
+        {managerCanChange && data.status !== 'APPROVED' && adjustingDay?.session_id != null ?
+          <TimesheetAdjustTimesSheet
+            timesheetId={timesheetId} sessionId={adjustingDay.session_id}
+            pharmacyId={data.pharmacy.id} workerId={data.worker.id}
+            timeZone={timeZone} onClose={() => setAdjustingDay(null)}
+            onSaved={load}
+          /> : null}
         <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
           <Text style={styles.sectionTitle}>Checks and exceptions</Text>
           {data.checks.length === 0 ? <Text style={styles.subtitle}>No checks on this revision.</Text> :
