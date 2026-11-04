@@ -42,5 +42,5 @@ export function ShiftSectionTabs({ sections, value, onChange, label = 'Shift sec
     icon: ICONS[section],
   }));
   if (tabs.length < 2) return null;
-  return <SegmentTabs tabs={tabs} value={value} onChange={onChange} label={label} idPrefix={idPrefix} style={style} />;
+  return <SegmentTabs tabs={tabs} value={value} onChange={onChange} label={label} idPrefix={idPrefix} mobileWrap={sections.length >= 5} style={style} />;
 }
