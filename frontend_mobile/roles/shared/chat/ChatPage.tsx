@@ -9,7 +9,8 @@ import NewChatModal from './NewChatModal';
 import NewGroupModal from './NewGroupModal';
 import GroupManageModal from './GroupManageModal';
 import { useChatRooms, useShiftContacts, startDirectChat } from './hooks';
-import { createOrUpdateGroupRoom, toggleRoomPinService, fetchChatParticipants, deleteRoomService } from '@chemisttasker/shared-core';
+import { createOrUpdateGroupRoom, toggleRoomPinService, fetchChatParticipants, deleteRoomService, fetchMyMemberships, getOrCreatePharmacyGroup } from '@chemisttasker/shared-core';
+import { pharmacyChatsFromMemberships } from './pharmacyChats';
 import type { ChatRoom } from './types';
 import { subscribeChatNavigation, subscribeUnreadBump, subscribeUnreadCount } from '@/utils/pushNotifications';
 import { fetchUnreadCount } from '@/utils/unread';
@@ -33,6 +34,9 @@ export default function ChatPage() {
   const { contacts: shiftContacts } = useShiftContacts();
   const role = (user?.role || '').toUpperCase();
   const [search, setSearch] = useState('');
+  const [pharmacyTeams, setPharmacyTeams] = useState<Array<{ id: number; name: string }>>([]);
+  const [openingPharmacyId, setOpeningPharmacyId] = useState<number | null>(null);
+  const teamOpeningRef = React.useRef(false);
   const [newChatVisible, setNewChatVisible] = useState(false);
   const [newGroupVisible, setNewGroupVisible] = useState(false);
   const [manageGroupRoom, setManageGroupRoom] = useState<ChatRoom | null>(null);
@@ -73,6 +77,17 @@ export default function ChatPage() {
     loadParticipants();
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    setPharmacyTeams([]);
+    void fetchMyMemberships({}).then(rows => {
+      if (alive) setPharmacyTeams(pharmacyChatsFromMemberships(rows));
+    }).catch(() => {
+      if (alive) setPharmacyTeams([]);
+    });
+    return () => { alive = false; };
+  }, [user?.id]);
+
   const canManageGroup = useCallback(
     (room: ChatRoom) => {
       if ((room as any)?.can_manage !== undefined) return Boolean((room as any).can_manage);
@@ -101,6 +116,22 @@ export default function ChatPage() {
       pathname: getMessageDetailRoute(routeRole, id) as any,
       params: { id: id.toString(), name: nameOverride || resolveName(room) },
     });
+  };
+
+  const openPharmacyTeam = async (pharmacyId: number) => {
+    if (teamOpeningRef.current || !pharmacyTeams.some(row => row.id === pharmacyId)) return;
+    teamOpeningRef.current = true;
+    setOpeningPharmacyId(pharmacyId);
+    try {
+      const existing = rooms.find(room => room.type === 'GROUP' && Number((room as any).pharmacy?.id ?? room.pharmacy) === pharmacyId);
+      const room = existing ?? await getOrCreatePharmacyGroup(pharmacyId);
+      openRoom(room as ChatRoom, pharmacyTeams.find(row => row.id === pharmacyId)?.name);
+    } catch (failure: any) {
+      setSnackbar(failure?.message || 'Unable to open the pharmacy team conversation.');
+    } finally {
+      teamOpeningRef.current = false;
+      setOpeningPharmacyId(null);
+    }
   };
 
   const handleChatCreated = (roomId: number, displayName?: string) => {
@@ -204,6 +235,9 @@ export default function ChatPage() {
         onRefresh={refresh}
         canCreate={canCreateChat}
         canPin={canPin}
+        pharmacyTeams={pharmacyTeams}
+        openingPharmacyId={openingPharmacyId}
+        onOpenPharmacyTeam={pharmacyId => { void openPharmacyTeam(pharmacyId); }}
         shiftContacts={shiftContacts}
         onSelectShiftContact={handleSelectShiftContact}
         onDeleteRoom={async (room) => {
