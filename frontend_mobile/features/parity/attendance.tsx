@@ -132,6 +132,7 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
       <ScreenLink title="Attendance correction" subtitle={manager?'Append an audited correction to a recorded event.':'Request a missing-punch correction through your timesheet.'} onPress={()=>router.push('/attendance/corrections/new' as any)}/>
       <ScreenLink title="Kiosk & PIN status" subtitle="Review pharmacies with worker PIN setup." onPress={()=>router.push('/attendance/kiosk-status' as any)}/>
       {manager?<ScreenLink title="Manager reviews" subtitle="Approve or reject provisional attendance." onPress={()=>router.push('/attendance/reviews' as any)}/>:null}
+      <ScreenLink title="Published shifts" subtitle="View this week's shifts and acknowledge your roster." onPress={()=>router.push('/attendance/published-roster' as any)}/>
       <ScreenLink title="My hours" subtitle="Review timesheet periods and recorded hours." onPress={()=>router.push('/my-hours' as any)}/>
     </Section>
   </ParityPage>;
