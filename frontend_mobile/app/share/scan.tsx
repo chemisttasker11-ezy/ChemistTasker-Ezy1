@@ -60,7 +60,7 @@ export default function ShareCodeScanner() {
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Button icon="arrow-left" onPress={() => router.back()}>Back</Button>
       <Text variant="headlineMedium" style={styles.title}>Scan a ChemistTasker code</Text>
-      <Text style={styles.muted}>Scan a worker's public listing, a pharmacy membership invitation or an organisation profile. You will review the result before opening or saving it.</Text>
+      <Text style={styles.muted}>Scan a worker&apos;s public listing, a pharmacy membership invitation or an organisation profile. You will review the result before opening or saving it.</Text>
       {scanning ? <View style={styles.scanner}>
         <CameraView style={StyleSheet.absoluteFill} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr'] }} onBarcodeScanned={processing ? undefined : scanned} />
         <Button mode="contained" onPress={() => setScanning(false)} style={styles.close}>Close camera</Button>

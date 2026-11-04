@@ -35,3 +35,10 @@ test('scanned tokens are not permissions and remain account scoped',()=>{
  assert.match(scan,/saveContact\(user\.id, code\)/);
  assert.doesNotMatch(scan,/approveMembership|createMembership|addFavorite|addFavourite/);
 });
+
+test('membership bearer invites use OS encrypted storage while public listing drafts remain local',()=>{
+ const source=readFileSync(new URL('./savedContacts.ts',import.meta.url),'utf8');
+ assert.match(source,/SecureStore\.setItemAsync\(secureKey\(accountId\)/);
+ assert.match(source,/contact\.kind === 'pharmacy-invitation'/);
+ assert.match(source,/storedPublic\.filter\(item => item\.kind !== 'pharmacy-invitation'\)/);
+});
