@@ -217,7 +217,7 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
             <Button mode="contained" disabled={busy !== '' || !canApproveTimesheet(data, false)} onPress={approve} contentStyle={styles.touch}>Approve reviewed hours</Button>
           </>}
         </Card.Content></Card> : <>
-          {data.status !== 'APPROVED' && data.status !== 'SUBMITTED' ? <Button mode="contained" disabled={!data.revision_number || data.needs_rebuild || busy !== ''} onPress={() => void run('submit', () => workforce.submitTimesheet(timesheetId, data.revision_number!), 'Timesheet submitted for review.')}>Submit reviewed hours</Button> : null}
+          {data.status !== 'APPROVED' && data.status !== 'SUBMITTED' && data.status !== 'LOCKED' ? <Button mode="contained" disabled={!data.revision_number || data.needs_rebuild || busy !== ''} onPress={() => void run('submit', () => workforce.submitTimesheet(timesheetId, data.revision_number!), 'Timesheet submitted for review.')}>Submit reviewed hours</Button> : null}
         </>}
       </> : null}
     </ScrollView>
