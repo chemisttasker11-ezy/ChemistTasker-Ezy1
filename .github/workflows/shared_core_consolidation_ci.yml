@@ -117,6 +117,9 @@ jobs:
       - name: WebSocket URL tests
         run: node --test scripts/ws-url.test.mjs
         working-directory: frontend_web
+      - name: First-party QR presentation contracts
+        run: node --test src/pages/ShareQrPage.test.mjs
+        working-directory: frontend_web
       - name: Attendance and kiosk tests
         run: node --test src/pages/attendance/KioskEvidenceReview.test.mjs src/pages/attendance/KioskPairingDialog.test.mjs src/pages/attendance/KioskDoubleClock.test.mjs src/pages/attendance/WorkerDoubleClock.test.mjs src/pages/attendance/WorkerAttendancePinGuidance.test.mjs src/pages/attendance/KioskLocumGuidance.test.mjs src/pages/attendance/ManagerLocumReview.test.mjs src/pages/attendance/WorkerCoverTerms.test.mjs
         working-directory: frontend_web
@@ -163,6 +166,9 @@ jobs:
       - name: Public landing route contract
         run: node --test lib/public-route-contract.test.mjs
         working-directory: frontend_web/landing_next
+      - name: Mobile public website install-choice contracts
+        run: node --test shared/mobile-store-links.test.mjs
+        working-directory: frontend_web/landing_next
       - run: npm run build
         working-directory: frontend_web/landing_next
 
@@ -203,6 +209,9 @@ jobs:
         working-directory: frontend_mobile
       - name: Mobile calendar, attendance, invoice and workspace contracts
         run: node --test scripts/admin-workspace-refresh.test.cjs scripts/calendar-request-budget.test.cjs scripts/attendance-double-clock.test.cjs scripts/attendance-pin-guidance.test.cjs scripts/invoice-generation.test.cjs scripts/native-file-bytes.test.cjs scripts/invoice-pdf-auth.test.cjs scripts/finance-revision-history.test.cjs scripts/marketplace-parity.test.cjs scripts/marketplace-terms.test.cjs scripts/ethical-scope.test.cjs features/parity/marketplaceBrowseModel.test.mjs features/support/contactModel.test.mjs scripts/worker-roster-ack.test.cjs scripts/timesheet-workspace-scope.test.cjs roles/shared/timesheets/timesheetDetailPolicy.test.mjs roles/shared/timesheets/timesheetDetailRoutes.test.mjs roles/shared/timesheets/timesheetAdjustmentPolicy.test.mjs roles/shared/messages/messageHistory.test.mjs roles/shared/messages/messageHistoryRoutes.test.mjs roles/shared/chat/pharmacyChats.test.mjs roles/explorer/explorerHomeModel.test.mjs roles/explorer/explorerDashboardRoutes.test.mjs roles/pharmacist/learningSearch.test.mjs features/parity/attendanceLocum.test.mjs features/parity/attendanceCoverTerms.test.mjs roles/shared/pharmacies/membershipApi.test.mjs roles/shared/pharmacies/organizationClaims.test.mjs roles/shared/calendar/calendarScope.test.mjs roles/shared/availability/availabilityModel.test.mjs roles/shared/shifts/activeShifts.test.mjs roles/shared/shifts/confirmedPayroll.test.mjs roles/shared/shifts/workerShiftPermissions.test.mjs roles/shared/memberships/magicApply.test.mjs
+        working-directory: frontend_mobile
+      - name: Mobile install, QR, security and next-shift regression contracts
+        run: node --test features/nextShift/nextShiftModel.test.mjs features/share/shareCode.test.mjs utils/appLock.test.mjs scripts/mobile-settings.test.cjs scripts/app-lock-settings.test.cjs scripts/next-shifts-access.test.cjs scripts/public-worker-qr.test.cjs scripts/public-articles.test.cjs scripts/public-community.test.cjs scripts/w8-legal-and-editorial.test.cjs
         working-directory: frontend_mobile
       - name: Verify patched runtime dependencies and reject new advisories
         run: npm run security:dependencies
