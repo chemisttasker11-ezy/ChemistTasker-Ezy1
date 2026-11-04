@@ -79,7 +79,7 @@ function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing
  const[accessLoading,setAccessLoading]=useState(false),[contactOpen,setContactOpen]=useState(false),[submitted,setSubmitted]=useState(false);
  const requestRef=useRef(0),submittingRef=useRef(false),requestIdRef=useRef(idempotencyKey('enquiry'));
  useEffect(()=>{
-   const request=++requestRef.current;setContactOpen(false);setSubmitted(false);setMessage('');setBuyingPharmacy(null);setAccess(null);setLocalError('');requestIdRef.current=idempotencyKey('enquiry');
+   const request=++requestRef.current;submittingRef.current=false;setBusy(false);setContactOpen(false);setSubmitted(false);setMessage('');setBuyingPharmacy(null);setAccess(null);setLocalError('');requestIdRef.current=idempotencyKey('enquiry');
    if(!listing||!user)return()=>{requestRef.current+=1;};
    setAccessLoading(true);
    void api.getAccess().then(value=>{if(request===requestRef.current)setAccess(value);}).catch(e=>{if(request===requestRef.current)setLocalError(errorMessage(e,'Trade eligibility could not be checked.'));}).finally(()=>{if(request===requestRef.current)setAccessLoading(false);});
@@ -93,9 +93,12 @@ function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing
    if(validation){setLocalError(validation);return;}
    if(buyingPharmacy!=null&&!selectedPharmacy){setLocalError('Choose a pharmacy you are authorized to represent.');return;}
    if(buyingPharmacy==null&&!access?.can_trade_personally){setLocalError('Select an eligible buying pharmacy for this enquiry.');return;}
+   const request=requestRef.current;
    submittingRef.current=true;setBusy(true);setLocalError('');
    try{
      const eligibility=await api.getEligibility(listing.id,buyingPharmacy!=null?{pharmacy:buyingPharmacy}:undefined);
+     // A user/listing switch invalidates the previous eligibility snapshot before any write.
+     if(request!==requestRef.current)return;
      if(!eligibility.can_enquire){
        const blocker=eligibility.blocker;
        const detail=typeof blocker==='string'?blocker:blocker&&typeof blocker==='object'?(blocker as any).message||(blocker as any).detail||(blocker as any).code:null;
@@ -107,8 +110,9 @@ function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing
        message:message.trim(),
        terms:{intent:'ENQUIRY'},
      });
+     if(request!==requestRef.current)return;
      setSubmitted(true);router.push('/marketplace/exchanges' as any);
-   }catch(e){setLocalError(errorMessage(e,'Unable to send enquiry.'));}finally{submittingRef.current=false;setBusy(false);}
+   }catch(e){if(request===requestRef.current)setLocalError(errorMessage(e,'Unable to send enquiry.'));}finally{if(request===requestRef.current){submittingRef.current=false;setBusy(false);}}
  };
  return <ParityPage title="Listing detail" subtitle="Approved ordinary goods with verified seller and buyer eligibility." loading={loading} error={error} onRetry={()=>router.replace('/marketplace' as any)}>
   {!listing?<EmptyState title="Listing not found" body="This listing may have been removed or withdrawn." actionLabel="Browse listings" onAction={()=>router.replace('/marketplace' as any)}/>:<>
@@ -122,7 +126,7 @@ function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing
    </Section>
    {user==null?<InfoNote title="Sign in to enquire">You can browse approved items without signing in. Sign in with an eligible verified account to contact the seller.</InfoNote>:
      accessLoading?<InfoNote title="Checking eligibility">Checking current marketplace trading permissions.</InfoNote>:
-     access&&!canTrade?<View style={{gap:12}}><InfoNote title="Trading access required" tone="warning">{access.blockers.map(b=>b.message||b.detail||b.code).join(' · ')||'Complete account verification and accept applicable marketplace terms to contact a seller.'}</InfoNote><MarketplaceAccessResolution access={access} onUpdated={async()=>{setAccess(await api.getAccess());}} /></View>:null}
+     access&&!canTrade?<View style={{gap:12}}><InfoNote title="Trading access required" tone="warning">{access.blockers.map(b=>b.message||b.detail||b.code).join(' · ')||'Complete account verification and accept applicable marketplace terms to contact a seller.'}</InfoNote><MarketplaceAccessResolution access={access} onUpdated={async()=>{const request=requestRef.current;const refreshed=await api.getAccess();if(request===requestRef.current)setAccess(refreshed);}} /></View>:null}
    {localError?<InfoNote title="Marketplace needs attention" tone="warning">{localError}</InfoNote>:null}
    {contactOpen&&!submitted&&canTrade?<Section title="Enquire with seller" description="No purchase is committed by sending this enquiry.">
      <Field label="Message to seller" value={message} onChangeText={setMessage} multiline placeholder="Ask about condition, pickup or delivery arrangements." disabled={busy}/>

@@ -38,6 +38,15 @@ test('every role can review real OS notification settings rather than a cosmetic
  }
 });
 
+test('marketplace account switch invalidates in-flight eligibility, enquiry and terms refresh',()=>{
+ const src=read('features/parity/marketplace.tsx');
+ assert.match(src,/const request=requestRef\.current;\s*submittingRef\.current=true/);
+ assert.match(src,/if\(request!==requestRef\.current\)return;\s*if\(!eligibility\.can_enquire\)/);
+ assert.match(src,/await api\.createEnquiry[\s\S]*?if\(request!==requestRef\.current\)return;\s*setSubmitted\(true\)/);
+ assert.match(src,/const refreshed=await api\.getAccess\(\);if\(request===requestRef\.current\)setAccess\(refreshed\)/);
+ assert.match(src,/if\(request===requestRef\.current\)\{submittingRef\.current=false;setBusy\(false\);\}/);
+});
+
 test('catalogue load-more honors backend pagination and abandons stale filter results',()=>{
  const src=read('features/parity/marketplace.tsx');
  assert.match(src,/api\.listListings\(\{\.\.\.browseQuery\(\{search:query,category:categoryFilter,mode:modeFilter\}\),page:pageNumber\}\)/);
