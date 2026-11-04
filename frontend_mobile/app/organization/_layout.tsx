@@ -3,6 +3,7 @@ import { Tabs, usePathname, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
   CalendarCheck,
+  BookOpen,
   Building2,
   CalendarClock,
   CalendarDays,
@@ -59,6 +60,7 @@ const titles: Record<string, string> = {
   pills: 'Pills',
   notifications: 'Notifications',
   calendar: 'Calendar',
+  learning: 'Learning',
   'talent-board': 'Talent Hub',
   invoice: 'Invoices',
   'invoice/new': 'New invoice',
@@ -262,6 +264,7 @@ export default function OrganizationLayout() {
         items: [
           { label: 'Talent Hub', icon: Search, route: '/organization/talent-board' },
           { label: 'Marketplace', icon: ShoppingBag, route: '/marketplace' },
+          { label: 'Learning materials', icon: BookOpen, route: '/organization/learning' },
           { label: 'Ethical Marketplace', icon: ShieldCheck, route: '/marketplace/ethical/access' },
         ],
       },
