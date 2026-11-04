@@ -116,8 +116,8 @@ export default function InviteFromWorkerQr({ referenceCode }: { referenceCode: s
 
   if (!user || (!roleMayManage && !pharmacies.length && !loading)) return null;
   return <View style={styles.group}>
-    <Text variant="titleMedium">Invite this professional to your pharmacy</Text>
-    <Text style={styles.muted}>Public worker reference: {referenceCode}. {verified ? workerLabel : 'Checking listing visibility…'} The link is not addressed to the worker. No email or private worker identity is revealed.</Text>
+    <Text variant="titleMedium">Create a pharmacy invitation link</Text>
+    <Text style={styles.muted}>Public worker reference: {referenceCode}. {verified ? workerLabel : 'Checking listing visibility…'} The QR identifies a public listing only. The invitation is not addressed to that worker, and does not reveal private contact information.</Text>
     {loading ? <Text style={styles.muted}>Loading authorised pharmacies…</Text> : null}
     {pharmacies.length && verified ? <>
       <Text style={styles.muted}>Select pharmacy</Text>
@@ -132,12 +132,12 @@ export default function InviteFromWorkerQr({ referenceCode }: { referenceCode: s
         <Chip selected={category === 'LOCUM_CASUAL'} onPress={() => {setCategory('LOCUM_CASUAL');setInviteUrl('');}}>Favourite / locum</Chip>
       </View>
       <Button mode="outlined" disabled={!verified || !pharmacyId || loading || sending} loading={sending} onPress={confirm}>
-        Generate review-required invitation
+        Create reusable application link
       </Button>
       {inviteUrl ? <>
         <Text selectable style={styles.muted}>{inviteUrl}</Text>
-        <Button mode="contained" onPress={() => void share()}>Share invitation with intended worker</Button>
-        <Text style={styles.muted}>The worker must submit the form. The pharmacy must still review and approve it.</Text>
+        <Button mode="contained" onPress={() => void share()}>Share link with a worker</Button>
+        <Text style={styles.muted}>This link is reusable for 14 days. Anyone who receives it can apply, but each application requires pharmacy approval. Scanning a profile never adds a member or favourite automatically.</Text>
       </> : null}
     </> : !loading && verified && !pharmacies.length ? <Text style={styles.muted}>No pharmacy with invitation access is currently available in your account.</Text> : null}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
