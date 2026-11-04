@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Button,
@@ -16,11 +16,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import {
   getInvoiceDetail,
-  getInvoicePdfUrl,
   reportInvoiceIssue,
   sendInvoiceEmail,
   updateInvoice,
 } from '@chemisttasker/shared-core';
+import { shareLegacyInvoicePdf } from './shareLegacyInvoicePdf';
 
 type LineItem = {
   id?: number | string;
@@ -257,10 +257,17 @@ export default function InvoiceDetail({ basePath }: Props) {
     }
   };
 
-  const handleOpenPdf = () => {
-    if (!invoice?.id) return;
-    const url = getInvoicePdfUrl(invoice.id);
-    Linking.openURL(url).catch(() => setSnackbar('Unable to open PDF'));
+  const [sharingPdf, setSharingPdf] = useState(false);
+  const handleOpenPdf = async () => {
+    if (!invoice?.id || sharingPdf) return;
+    setSharingPdf(true);
+    try {
+      await shareLegacyInvoicePdf(invoice.id);
+    } catch (err: any) {
+      setSnackbar(err?.message || 'Unable to open invoice PDF');
+    } finally {
+      setSharingPdf(false);
+    }
   };
 
   const handleReportIssue = async () => {
@@ -663,7 +670,7 @@ export default function InvoiceDetail({ basePath }: Props) {
               Mark as unpaid
             </Button>
           ) : null}
-          <Button mode="outlined" icon="file-pdf-box" onPress={handleOpenPdf} style={styles.actionBtn}>
+          <Button mode="outlined" icon="file-pdf-box" onPress={() => void handleOpenPdf()} loading={sharingPdf} disabled={sharingPdf} style={styles.actionBtn}>
             Open PDF
           </Button>
           {isReceivedMode ? (
