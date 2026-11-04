@@ -9,3 +9,11 @@ export async function fetchMembershipsForPharmacy(
 ): Promise<MembershipDTO[]> {
   return await fetchMembershipsByPharmacy(pharmacyId) as MembershipDTO[];
 }
+
+
+/** One classification for all owner and organization pharmacy staff/locum routes. */
+export function isLocumMembership(membership: MembershipDTO): boolean {
+  const row = membership as MembershipDTO & { employmentType?: string; employment_type?: string };
+  const employment = String(row.employmentType ?? row.employment_type ?? '').toUpperCase();
+  return employment === 'LOCUM' || employment === 'SHIFT_HERO';
+}
