@@ -98,6 +98,7 @@ type ActionProps = {
   handleLevelChange: (shift: Shift, level: EscalationLevelKey) => void;
   handleEscalate: (shiftId: number, level: EscalationLevelKey) => Promise<boolean>;
   loadTabDataForShift: (shift: Shift, level: EscalationLevelKey) => Promise<any>;
+  loadCounterOffers: (shiftId: number) => Promise<void>;
   loadShifts: () => Promise<any>;
   handleRevealInterest: (shift: Shift, interest: ShiftInterest) => Promise<void>;
   handleSlotSelection: (shiftId: number, slotId: number) => void;
@@ -123,6 +124,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
     tabData,
     counterOffersByShift,
     counterOffersLoadingByShift,
+    counterOffersErrorByShift = {},
   } = data;
   const {
     expandedShifts,
@@ -152,6 +154,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
     handleLevelChange,
     handleEscalate,
     loadTabDataForShift,
+    loadCounterOffers,
     loadShifts,
     handleRevealInterest,
     handleSlotSelection,
@@ -178,6 +181,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                     );
                     const communityLevelKeys = viewableLevelKeys.filter(level => level !== PUBLIC_LEVEL_KEY);
                     const communityTabData = communityLevelKeys.map(level => tabData[getTabKey(shift.id, level)]);
+                    const communityDataError = communityTabData.find((data) => data?.error)?.error as string | undefined;
                     const communityDataLoading = communityLevelKeys.some((level, index) => {
                         const data = communityTabData[index];
                         return !data || data.loading;
@@ -188,6 +192,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                     const offers = counterOffersByShift[shift.id];
                     const counterOffersLoaded = Object.prototype.hasOwnProperty.call(counterOffersByShift, shift.id);
                     const counterOffersLoading = counterOffersLoadingByShift[shift.id] ?? false;
+                    const counterOffersError = counterOffersErrorByShift[shift.id];
                     const slotIds = getSlotIds(shift);
                     const consolidatedMembersBySlot = slotIds.reduce<Record<number, ShiftMemberStatus[]>>((acc, slotId) => {
                         acc[slotId] = dedupeMembers(communityLevelKeys.flatMap((level, index) => (
@@ -610,9 +615,19 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
 
                                         {currentTabData.loading ? (
                                             <CandidatesSkeleton />
+                                        ) : currentTabData.error ? (
+                                            <View style={{ padding: space.md }}>
+                                                <Text>{String(currentTabData.error)}</Text>
+                                                <Button onPress={() => void loadTabDataForShift(shift, selectedLevel)}>Retry candidates</Button>
+                                            </View>
                                         ) : selectedLevel === PUBLIC_LEVEL_KEY ? (
                                             <>
-                                                {counterOffersLoading || !counterOffersLoaded ? (
+                                                {counterOffersError ? (
+                                                    <View style={{ padding: space.md }}>
+                                                        <Text>{counterOffersError}</Text>
+                                                        <Button onPress={() => void loadCounterOffers(shift.id)}>Retry counter offers</Button>
+                                                    </View>
+                                                ) : counterOffersLoading || !counterOffersLoaded ? (
                                                     <CandidatesSkeleton />
                                                 ) : (
                                                     <PublicLevelView
@@ -634,7 +649,14 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                                         buzzLoadingOfferId={buzzLoadingOfferId}
                                                     />
                                                 )}
-                                                {communityDataLoading ? (
+                                                {communityDataError ? (
+                                                    <View style={{ padding: space.md }}>
+                                                        <Text>{String(communityDataError)}</Text>
+                                                        <Button onPress={() => communityLevelKeys.forEach((level) => {
+                                                            if (tabData[getTabKey(shift.id, level)]?.error) void loadTabDataForShift(shift, level);
+                                                        })}>Retry member lists</Button>
+                                                    </View>
+                                                ) : communityDataLoading ? (
                                                     <CandidatesSkeleton />
                                                 ) : (
                                                     <CommunityLevelView
@@ -657,7 +679,14 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                                 )}
                                             </>
                                         ) : (
-                                            communityDataLoading ? (
+                                            communityDataError ? (
+                                                <View style={{ padding: space.md }}>
+                                                    <Text>{String(communityDataError)}</Text>
+                                                    <Button onPress={() => communityLevelKeys.forEach((level) => {
+                                                        if (tabData[getTabKey(shift.id, level)]?.error) void loadTabDataForShift(shift, level);
+                                                    })}>Retry member lists</Button>
+                                                </View>
+                                            ) : communityDataLoading ? (
                                                 <CandidatesSkeleton />
                                             ) : (
                                                 <CommunityLevelView

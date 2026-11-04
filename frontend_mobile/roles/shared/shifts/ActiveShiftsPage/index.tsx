@@ -195,7 +195,7 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
         rejectOffer,
         counterActionLoading,
         updateOfferCache,
-    } = useCounterOffers();
+    } = useCounterOffers(surface.scopeKey);
     const { revealInterest, revealingInterestId } = useRevealInterest(getTabKey, setTabData, showSnackbar);
     const {
         summary: workerRatingSummary,
@@ -939,6 +939,7 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                         handleLevelChange,
                         handleEscalate,
                         loadTabDataForShift,
+                        loadCounterOffers,
                         loadShifts,
                         handleRevealInterest,
                         handleSlotSelection,

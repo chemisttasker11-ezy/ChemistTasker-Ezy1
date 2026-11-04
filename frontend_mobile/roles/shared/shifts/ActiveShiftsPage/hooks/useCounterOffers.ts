@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
     acceptShiftCounterOfferService,
     fetchShiftCounterOffersService,
@@ -6,12 +6,22 @@ import {
 } from '@chemisttasker/shared-core';
 import { getNextGeneration, isLatestGeneration } from '../utils/activeShiftRuntime';
 
-export function useCounterOffers() {
+export function useCounterOffers(scopeKey?: string) {
     const [counterOffersByShift, setCounterOffersByShift] = useState<Record<number, any[]>>({});
     const [counterOffersLoadingByShift, setCounterOffersLoadingByShift] = useState<Record<number, boolean>>({});
     const [counterOffersErrorByShift, setCounterOffersErrorByShift] = useState<Record<number, string | null>>({});
     const [counterActionLoading, setCounterActionLoading] = useState<number | null>(null);
     const generationsRef = useRef<Record<string, number>>({});
+    useEffect(() => {
+        // Scope switch invalidates stale responses, previous pharmacy offers and errors.
+        Object.keys(generationsRef.current).forEach(key => { generationsRef.current[key] += 1; });
+        setCounterOffersByShift({});
+        setCounterOffersLoadingByShift({});
+        setCounterOffersErrorByShift({});
+        return () => {
+            Object.keys(generationsRef.current).forEach(key => { generationsRef.current[key] += 1; });
+        };
+    }, [scopeKey]);
 
     const resolveOfferSlotId = useCallback((offer: any): number | null => {
         const offerSlots = offer?.slots || offer?.offer_slots || [];
@@ -27,6 +37,7 @@ export function useCounterOffers() {
     const loadCounterOffers = useCallback(async (shiftId: number) => {
         const genKey = String(shiftId);
         const generation = getNextGeneration(generationsRef.current, genKey);
+        setCounterOffersByShift(prev => { const next = { ...prev }; delete next[shiftId]; return next; });
         setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: true }));
         setCounterOffersErrorByShift(prev => ({ ...prev, [shiftId]: null }));
         try {
