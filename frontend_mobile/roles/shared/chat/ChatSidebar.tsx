@@ -18,6 +18,9 @@ type Props = {
   onRefresh: () => void;
   canCreate: boolean;
   canPin: boolean;
+  pharmacyTeams?: Array<{ id: number; name: string }>;
+  onOpenPharmacyTeam?: (pharmacyId: number) => void;
+  openingPharmacyId?: number | null;
   shiftContacts?: any[];
   onSelectShiftContact?: (contact: any) => void;
   onDeleteRoom?: (room: ChatRoom) => void;
@@ -38,6 +41,9 @@ export default function ChatSidebar({
   onRefresh,
   canCreate,
   canPin,
+  pharmacyTeams = [],
+  onOpenPharmacyTeam,
+  openingPharmacyId = null,
   shiftContacts = [],
   onSelectShiftContact,
   onDeleteRoom,
@@ -165,7 +171,20 @@ export default function ChatSidebar({
         </Chip>
       </View>
 
-      {listForFilter.length === 0 ? (
+      {pharmacyTeams.length > 0 && (filter === 'all' || filter === 'group') ? (
+        <View style={styles.teamSection}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.onSurfaceVariant }]}>Pharmacy teams</Text>
+          <Text style={[styles.teamHint, { color: theme.colors.onSurfaceVariant }]}>Open your pharmacy’s shared team conversation</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamChips}>
+            {pharmacyTeams.map(pharmacy => (
+              <Chip key={pharmacy.id} mode="outlined" icon="account-group" disabled={openingPharmacyId != null} onPress={() => onOpenPharmacyTeam?.(pharmacy.id)} accessibilityLabel={`Open ${pharmacy.name} team chat`}>
+                {openingPharmacyId === pharmacy.id ? 'Opening…' : pharmacy.name}
+              </Chip>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+      {listForFilter.length === 0 && !(pharmacyTeams.length > 0 && (filter === 'all' || filter === 'group')) ? (
         <View style={styles.empty}>
           <Text>No conversations found</Text>
         </View>
@@ -279,6 +298,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 0,
   },
+  teamSection: { paddingVertical: 12, gap: 8 },
+  teamHint: { fontSize: 12 },
+  teamChips: { gap: 8, paddingVertical: 4 },
   section: { paddingVertical: 6 },
   sectionTitle: { fontWeight: '700' },
 });
