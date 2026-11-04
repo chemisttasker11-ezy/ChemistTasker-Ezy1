@@ -6,7 +6,7 @@ export function canApproveTimesheet(detail: WorkforceTimesheetDetail | null, per
   return !!detail
     && !periodLocked
     && detail.status !== 'APPROVED'
-    && detail.status !== 'LOCKED'
+    && String(detail.status) !== 'LOCKED'
     && !detail.needs_rebuild
     && !!detail.revision_number
     && (detail.effective_blocking_checks ?? detail.blocking_checks) === 0;
