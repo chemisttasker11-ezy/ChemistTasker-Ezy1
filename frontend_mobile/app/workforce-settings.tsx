@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +27,9 @@ export default function WorkforceSettingsScreen() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const requestGeneration = useRef(0);
+  const currentPharmacy = useRef<number | null>(null);
+  currentPharmacy.current = pharmacyId;
 
   useEffect(() => {
     fetchPharmaciesService({})
@@ -39,10 +42,21 @@ export default function WorkforceSettingsScreen() {
   }, []);
 
   const load = useCallback(async (pull = false) => {
+    // Save callbacks created for a previous pharmacy cannot replace the new
+    // pharmacy's visible state after a workspace selection change.
+    if (currentPharmacy.current !== pharmacyId) return;
+    const generation = ++requestGeneration.current;
+    const current = () => generation === requestGeneration.current && currentPharmacy.current === pharmacyId;
     if (!pharmacyId) {
-      setPayroll(null); setStaff([]); setEngagements([]); setLoading(false); return;
+      setPayroll(null); setStaff([]); setEngagements([]); setHoursDraft({});
+      setLoading(false); setRefreshing(false);
+      return;
     }
-    if (pull) setRefreshing(true); else setLoading(true);
+    if (pull) setRefreshing(true);
+    else {
+      setLoading(true);
+      setPayroll(null); setStaff([]); setEngagements([]); setHoursDraft({});
+    }
     setError('');
     try {
       const [nextPayroll, nextStaff, nextEngagements] = await Promise.all([
@@ -50,18 +64,22 @@ export default function WorkforceSettingsScreen() {
         workforce.listWorkSettings(pharmacyId),
         workforce.listEmploymentEngagements(pharmacyId),
       ]) as [WorkforcePayrollConfiguration, WorkforceWorkSettings[], WorkforceEmploymentEngagement[]];
+      if (!current()) return;
       setPayroll(nextPayroll);
       setStaff(nextStaff);
       setEngagements(nextEngagements);
       setHoursDraft(Object.fromEntries(nextStaff.map(row => [row.membership_id, hours(row.contracted_weekly_minutes)])));
     } catch (failure: any) {
-      setError(failure?.message || 'Unable to load workforce settings.');
+      if (current()) setError(failure?.message || 'Unable to load workforce settings.');
     } finally {
-      setLoading(false); setRefreshing(false);
+      if (current()) { setLoading(false); setRefreshing(false); }
     }
   }, [pharmacyId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => { requestGeneration.current += 1; };
+  }, [load]);
 
   const currentEngagementByMembership = useMemo(() => {
     const now = new Date();
@@ -89,9 +107,9 @@ export default function WorkforceSettingsScreen() {
         membership_id: row.membership_id,
         contracted_weekly_minutes: numeric == null ? null : Math.round(numeric * 60),
       });
-      await load();
+      if (currentPharmacy.current === pharmacyId) await load();
     } catch (failure: any) {
-      setError(failure?.message || 'Unable to save contracted hours.');
+      if (currentPharmacy.current === pharmacyId) setError(failure?.message || 'Unable to save contracted hours.');
     } finally {
       setBusyKey(null);
     }
@@ -105,10 +123,9 @@ export default function WorkforceSettingsScreen() {
         pharmacy_id: pharmacyId,
         use_chemisttasker_payroll: enabled,
       });
-      setPayroll(next);
-      await load();
+      if (currentPharmacy.current === pharmacyId) { setPayroll(next); await load(); }
     } catch (failure: any) {
-      setError(failure?.message || 'Unable to update payroll configuration.');
+      if (currentPharmacy.current === pharmacyId) setError(failure?.message || 'Unable to update payroll configuration.');
     } finally {
       setBusyKey(null);
     }
@@ -127,7 +144,7 @@ export default function WorkforceSettingsScreen() {
 
         <Text variant="labelLarge">Pharmacy</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {pharmacies.map(pharmacy => <Chip key={pharmacy.id} selected={pharmacyId === pharmacy.id} onPress={() => setPharmacyId(pharmacy.id)}>{pharmacy.name}</Chip>)}
+          {pharmacies.map(pharmacy => <Chip key={pharmacy.id} disabled={busyKey != null} selected={pharmacyId === pharmacy.id} onPress={() => setPharmacyId(pharmacy.id)}>{pharmacy.name}</Chip>)}
         </ScrollView>
 
         {loading ? <ActivityIndicator style={{ marginVertical: 24 }} /> : null}
@@ -172,7 +189,7 @@ export default function WorkforceSettingsScreen() {
           </Card.Content>
         </Card>
 
-        {!loading && staff.length === 0 && <Card><Card.Content><Text>No eligible staff are available for this pharmacy.</Text></Card.Content></Card>}
+        {!loading && !error && staff.length === 0 && <Card><Card.Content><Text>No eligible staff are available for this pharmacy.</Text></Card.Content></Card>}
 
         {staff.map(row => {
           const engagement = currentEngagementByMembership.get(row.membership_id);
