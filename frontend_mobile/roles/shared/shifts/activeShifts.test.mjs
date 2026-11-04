@@ -38,6 +38,7 @@ const {
   getNextGeneration,
   isLatestGeneration,
   buildActiveShiftsScopeKey,
+  getLinkedShiftScrollY,
 } = runtime;
 
 const { resolveShiftSurface } = surface;
@@ -272,4 +273,15 @@ test('W3d poster Post Shift action stays in the correct persona shell', () => {
   assert.equal(getPosterPostShiftPath('admin', null), null);
   assert.equal(getPosterPostShiftPath('pharmacist', 9), null);
   assert.equal(getPosterPostShiftPath('explorer', null), null);
+});
+
+// A deep-link must never reuse another shift/workspace's measured scroll position.
+test('linked shift scroll offset is isolated by shift and workspace', () => {
+  const offset = { shiftId: 41, scopeKey: 'pharmacy:7', y: 186 };
+  assert.equal(getLinkedShiftScrollY(offset, 41, 'pharmacy:7'), 170);
+  assert.equal(getLinkedShiftScrollY({ ...offset, y: 8 }, 41, 'pharmacy:7'), 0);
+  assert.equal(getLinkedShiftScrollY(offset, 42, 'pharmacy:7'), null);
+  assert.equal(getLinkedShiftScrollY(offset, 41, 'pharmacy:8'), null);
+  assert.equal(getLinkedShiftScrollY(null, 41, 'pharmacy:7'), null);
+  assert.equal(getLinkedShiftScrollY({ ...offset, y: NaN }, 41, 'pharmacy:7'), null);
 });
