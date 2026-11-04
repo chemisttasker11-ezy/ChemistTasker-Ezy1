@@ -52,20 +52,22 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   // re-fetch or screen re-render must not reopen a dismissed review modal.
   useEffect(() => {
     if (requestedInvoiceId == null) { handledLink.current = ''; return; }
-    if (loading || !Number.isSafeInteger(requestedInvoiceId)) return;
+    // A failed fetch or an active retry does not prove this invoice is absent.
+    // Keep the deep link eligible for selection after a successful reload.
+    if (loading || busy || error || !Number.isSafeInteger(requestedInvoiceId)) return;
     const linkKey = (receivedMode ? 'received:' : 'issued:') + requestedInvoiceId;
     if (handledLink.current === linkKey) return;
-    handledLink.current = linkKey;
     const found = (receivedMode ? receivedInvoices : invoices).find(row => row.id === requestedInvoiceId);
     if (!found) {
       setError('Invoice ' + requestedInvoiceId + ' is not available in this finance workspace.');
       return;
     }
+    handledLink.current = linkKey;
     setTab(receivedMode ? 'Received' : 'Invoices');
     setHistoryDocument(null);
     setHistoryError('');
     setSelected(found);
-  }, [requestedInvoiceId, receivedMode, receivedInvoices, invoices, loading]);
+  }, [requestedInvoiceId, receivedMode, receivedInvoices, invoices, loading, busy, error]);
   const clearInvoiceLink = () => {
     if (requestedInvoiceId != null) router.setParams({ invoice: undefined });
   };
