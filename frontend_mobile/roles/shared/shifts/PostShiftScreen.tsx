@@ -144,6 +144,8 @@ export default function PostShiftScreen() {
     const [recurringEndPickerOpen, setRecurringEndPickerOpen] = useState(false);
     const [escalationPicker, setEscalationPicker] = useState<{ key: keyof VisibilityDates | null; open: boolean }>({ key: null, open: false });
     const [escalationTimePicker, setEscalationTimePicker] = useState<{ key: keyof VisibilityDates | null; open: boolean }>({ key: null, open: false });
+    // A custom schedule is not applied until both the date and clock are confirmed.
+    const [pendingEscalationDate, setPendingEscalationDate] = useState<string | null>(null);
     const [escalationDates, setEscalationDates] = useState<VisibilityDates>({});
     const [description, setDescription] = useState('');
     const [descriptionTemplate, setDescriptionTemplate] = useState<ShiftDescriptionTemplate | null>(null);
@@ -1525,12 +1527,8 @@ export default function PostShiftScreen() {
                 onConfirm={({ date }) => {
                     const key = escalationPicker.key;
                     if (date && key) {
-                        const next = withEscalationDate(date, escalationDates[key]);
-                        if (next !== escalationDates[key]) {
-                            markTouched();
-                            setEscalation(key, next);
-                        }
-                        // Custom audience dates include a clock, as in the web datetime-local control.
+                        setPendingEscalationDate(withEscalationDate(date, escalationDates[key]));
+                        // Date and time are one decision. Cancel must never schedule a default 09:00 silently.
                         setEscalationTimePicker({ key, open: true });
                     }
                     setEscalationPicker({ key: null, open: false });
@@ -1539,19 +1537,23 @@ export default function PostShiftScreen() {
             <TimePickerModal
                 locale="en"
                 visible={escalationTimePicker.open}
-                onDismiss={() => setEscalationTimePicker({ key: null, open: false })}
-                hours={getEscalationClock(escalationTimePicker.key ? escalationDates[escalationTimePicker.key] : null).hours}
-                minutes={getEscalationClock(escalationTimePicker.key ? escalationDates[escalationTimePicker.key] : null).minutes}
+                onDismiss={() => {
+                    setPendingEscalationDate(null);
+                    setEscalationTimePicker({ key: null, open: false });
+                }}
+                hours={getEscalationClock(pendingEscalationDate ?? (escalationTimePicker.key ? escalationDates[escalationTimePicker.key] : null)).hours}
+                minutes={getEscalationClock(pendingEscalationDate ?? (escalationTimePicker.key ? escalationDates[escalationTimePicker.key] : null)).minutes}
                 use24HourClock
                 onConfirm={({ hours, minutes }) => {
                     const key = escalationTimePicker.key;
                     if (key) {
-                        const next = withEscalationTime(escalationDates[key], hours, minutes);
+                        const next = withEscalationTime(pendingEscalationDate ?? escalationDates[key], hours, minutes);
                         if (next && next !== escalationDates[key]) {
                             markTouched();
                             setEscalation(key, next);
                         }
                     }
+                    setPendingEscalationDate(null);
                     setEscalationTimePicker({ key: null, open: false });
                 }}
             />
