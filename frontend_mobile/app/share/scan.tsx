@@ -43,7 +43,11 @@ export default function ShareCodeScanner() {
   };
   const save = async () => {
     if (user?.id == null || !code) return;
-    try { await saveContact(user.id, code); setNotice('Saved privately on this device for this account. This does not send an application or add a staff member.'); }
+    try {
+      const rows=await saveContact(user.id, code);
+      const selected=rows.find(item=>item.url===code.url);
+      setNotice(selected?.synced ? 'Saved to your account for use across devices. No membership was created.' : 'Saved on this device. Public-contact sync is unavailable or pending; no membership was created.');
+    }
     catch { setError('Could not save this contact. Try again.'); }
   };
   const open = async () => {

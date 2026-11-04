@@ -40,6 +40,7 @@ export default function SavedQrContacts() {
       {contacts.length ? contacts.map(contact => <Card key={contact.url} mode="outlined" style={styles.card}><Card.Content style={styles.group}>
         <Text variant="titleMedium">{safeShareCodeLabel(contact)}</Text>
         <Text selectable style={styles.muted}>{contact.url}</Text>
+        <Text style={styles.muted}>{contact.kind==='pharmacy-invitation'?'Private invitation · this device only':contact.synced?'Synced to your account':'Local draft · not synced'}</Text>
         <View style={styles.actions}>
           <Button mode="contained" onPress={() => void open(contact)}>Open</Button>
           <Button mode="outlined" onPress={() => void remove(contact.url)}>Remove</Button>
