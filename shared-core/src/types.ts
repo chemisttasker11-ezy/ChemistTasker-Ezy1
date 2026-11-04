@@ -858,6 +858,14 @@ export interface ShiftApi {
     escalate_to_org_chain?: string | null;
     escalate_to_platform?: string | null;
     slots?: ShiftSlotApi[];
+    /** Authorised worker-specific assigned dates, distinct from recurring slot templates. */
+    assigned_occurrences?: Array<{
+        slot_id: number;
+        date: string;
+        start_time: string;
+        end_time: string;
+        timezone: string;
+    }>;
     slot_assignments?: ShiftAssignmentApi[];
     pending_payment_slot_ids?: number[];
     single_user_only?: boolean;
