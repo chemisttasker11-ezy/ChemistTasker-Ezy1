@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker';
 import {
     getRoomMessages,
+    fetchRoomMessagesByUrl,
     sendRoomMessageService,
     markRoomAsRead,
     reactToMessageService,
@@ -24,6 +25,7 @@ import { triggerUnreadBump } from '@/utils/pushNotifications';
 import { setActiveRoomId } from '../chat/activeRoomState';
 import { displayNameFromUser } from '../chat/displayName';
 import { resolveApiBaseUrl } from '@/utils/apiUrl';
+import { isNextPageForRoom, mergeOlderMessages, shouldAutoFollowMessage } from './messageHistory';
 
 type MessageDisplay = ChatMessage & { is_me: boolean };
 type ChatIdentity = {
@@ -138,6 +140,13 @@ export default function SharedMessageDetailScreen() {
     const [typingUsernames, setTypingUsernames] = useState<string[]>([]);
     const typingSentRef = useRef(0);
     const [lastReadAt, setLastReadAt] = useState<string | null>(null);
+    const [nextHistoryUrl, setNextHistoryUrl] = useState<string | null>(null);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [unseenMessages, setUnseenMessages] = useState(0);
+    const readerNearBottomRef = useRef(true);
+    const historyBusyRef = useRef(false);
+    const roomGenerationRef = useRef(0);
     const shouldScrollRef = useRef<boolean>(false);
 
     const parseRoomId = useCallback(() => {
@@ -147,6 +156,26 @@ export default function SharedMessageDetailScreen() {
     }, [id]);
 
     const flatListRef = useRef<FlatList<MessageDisplay>>(null);
+    const currentRoomId = parseRoomId();
+    const validRoomId = Number.isSafeInteger(currentRoomId) && currentRoomId > 0;
+
+    const mapMessage = useCallback((msg: any, roomId: number, index: number): MessageDisplay => {
+        const senderUserId = msg.sender?.user_details?.id ?? msg.sender?.user?.id ?? msg.sender?.id ?? msg.sender;
+        return {
+            id: msg.id ?? `${msg.created_at ?? ''}-${index}`,
+            sender: msg.sender,
+            conversation: msg.conversation ?? roomId,
+            body: msg.body ?? msg.content ?? '',
+            created_at: msg.created_at ?? new Date().toISOString(),
+            attachment_url: msg.attachment_url ?? null,
+            attachment_filename: msg.attachment_filename ?? null,
+            is_deleted: msg.is_deleted,
+            is_edited: msg.is_edited,
+            reactions: msg.reactions ?? [],
+            is_pinned: msg.is_pinned,
+            is_me: user?.id != null ? senderUserId === user.id : false,
+        };
+    }, [user?.id]);
 
     useEffect(() => {
         let mounted = true;
@@ -247,81 +276,76 @@ export default function SharedMessageDetailScreen() {
 
     const fetchMessages = useCallback(async () => {
         const roomId = parseRoomId();
-        if (!roomId) return;
+        const generation = ++roomGenerationRef.current;
+        setMessages([]);
+        setNextHistoryUrl(null);
+        setHistoryError(null);
+        setUnseenMessages(0);
+        setLoadingHistory(false);
+        historyBusyRef.current = false;
+        readerNearBottomRef.current = true;
+        shouldScrollRef.current = false;
+        setLoading(true);
+        if (!Number.isSafeInteger(roomId) || roomId <= 0) {
+            setSnackbar('This conversation link is invalid.');
+            setLoading(false);
+            return;
+        }
         try {
             const data = await getRoomMessages(roomId);
-            const list = Array.isArray((data as any)?.results)
-                ? (data as any).results
-                : Array.isArray(data)
-                    ? (data as any)
-                    : [];
-
-            if ((data as any)?.my_last_read_at) {
-                setLastReadAt((data as any).my_last_read_at);
-            }
-
-            const mapped: MessageDisplay[] = list.map((msg: any, idx: number) => {
-                const senderUserId =
-                    msg.sender?.user_details?.id ??
-                    msg.sender?.user?.id ??
-                    msg.sender?.id ??
-                    msg.sender;
-                return {
-                    id: msg.id ?? `${msg.created_at ?? ''}-${idx}`,
-                    sender: msg.sender,
-                    conversation: msg.conversation ?? roomId,
-                    body: msg.body ?? msg.content ?? '',
-                    created_at: msg.created_at ?? new Date().toISOString(),
-                    attachment_url: msg.attachment_url ?? null,
-                    attachment_filename: msg.attachment_filename ?? null,
-                    is_deleted: msg.is_deleted,
-                    is_edited: msg.is_edited,
-                    reactions: msg.reactions ?? [],
-                    is_pinned: msg.is_pinned,
-                    is_me: user?.id != null ? senderUserId === user.id : false,
-                };
-            });
-            const unique = new Map<string | number, MessageDisplay>();
-            for (const msg of mapped) {
-                unique.set(messageKey(msg), msg);
-            }
-            const sorted = Array.from(unique.values()).sort(
-                (a, b) => messageTime(a) - messageTime(b)
-            );
-            setMessages(sorted);
+            if (generation !== roomGenerationRef.current) return;
+            const rows = Array.isArray((data as any)?.results) ? (data as any).results
+                : Array.isArray(data) ? data : [];
+            setMessages(mergeOlderMessages([], rows.map((msg: any, idx: number) => mapMessage(msg, roomId, idx))));
+            const next = (data as any)?.next ?? null;
+            setNextHistoryUrl(isNextPageForRoom(next, roomId) ? next : null);
+            if ((data as any)?.my_last_read_at) setLastReadAt((data as any).my_last_read_at);
             shouldScrollRef.current = true;
-            const res = await markRoomAsRead(roomId);
-            if ((res as any)?.last_read_at) {
-                setLastReadAt((res as any).last_read_at);
+            // Read acknowledgement is best effort and must not overwrite a newer room's state.
+            try {
+                const receipt = await markRoomAsRead(roomId);
+                if (generation === roomGenerationRef.current && (receipt as any)?.last_read_at) {
+                    setLastReadAt((receipt as any).last_read_at);
+                }
+            } catch {
+                // Reading remains available even when receipt submission fails.
             }
         } catch (error) {
-            console.error('Error fetching messages:', error);
+            if (generation === roomGenerationRef.current) {
+                console.error('Error fetching messages:', error);
+                setSnackbar('Unable to load this conversation. Open it again to retry.');
+            }
         } finally {
-            setLoading(false);
+            if (generation === roomGenerationRef.current) setLoading(false);
         }
-    }, [user?.id, parseRoomId]);
+    }, [mapMessage, parseRoomId]);
 
     useEffect(() => {
         void fetchMessages();
+        return () => { roomGenerationRef.current += 1; historyBusyRef.current = false; };
     }, [fetchMessages]);
 
-    // After initial load/render, scroll to the bottom once the list is mounted
-    useEffect(() => {
-        if (!loading && messages.length > 0 && shouldScrollRef.current) {
-            requestAnimationFrame(() => {
-                scrollIfNeeded();
-            });
+    const loadOlderMessages = async () => {
+        const roomId = parseRoomId();
+        const generation = roomGenerationRef.current;
+        if (!validRoomId || loading || !isNextPageForRoom(nextHistoryUrl, roomId) || historyBusyRef.current) return;
+        historyBusyRef.current = true;
+        setLoadingHistory(true);
+        setHistoryError(null);
+        try {
+            const page = await fetchRoomMessagesByUrl(nextHistoryUrl!);
+            if (generation !== roomGenerationRef.current) return;
+            setMessages(current => mergeOlderMessages(current, page.messages.map((msg: any, idx: number) => mapMessage(msg, roomId, idx))));
+            setNextHistoryUrl(isNextPageForRoom(page.next, roomId) ? page.next : null);
+        } catch (error: any) {
+            if (generation === roomGenerationRef.current) setHistoryError(error?.message || 'Older messages could not be loaded.');
+        } finally {
+            if (generation === roomGenerationRef.current) {
+                historyBusyRef.current = false;
+                setLoadingHistory(false);
+            }
         }
-    }, [loading, messages.length]);
-
-    // Mirror web: whenever messages or room change, jump to bottom after layout frame.
-    useEffect(() => {
-        if (loading || messages.length === 0) return;
-        requestAnimationFrame(() => {
-            flatListRef.current?.scrollToEnd({ animated: false });
-            shouldScrollRef.current = false;
-        });
-    }, [messages.length, parseRoomId, loading]);
+    };
 
     useFocusEffect(
         useCallback(() => {
@@ -359,8 +383,10 @@ export default function SharedMessageDetailScreen() {
                 is_pinned: msg.is_pinned,
                 is_me: user?.id != null ? senderUserId === user.id : false,
             };
+            const shouldFollow = shouldAutoFollowMessage(mapped.is_me, readerNearBottomRef.current);
             setMessages((prev) => upsertSortedMessage(prev, mapped));
-            shouldScrollRef.current = true;
+            if (shouldFollow) shouldScrollRef.current = true;
+            else setUnseenMessages(value => value + 1);
         } else if (payload.type === 'message.updated') {
             const msg = payload.message || payload;
             if (msg?.id) {
@@ -503,11 +529,18 @@ export default function SharedMessageDetailScreen() {
     const debouncedTyping = useMemo(() => debounce(sendTyping, 300), [sendTyping]);
 
     const scrollIfNeeded = () => {
-        if (!shouldScrollRef.current) return;
+        if (!shouldScrollRef.current || loadingHistory) return;
         if (flatListRef.current) {
             flatListRef.current.scrollToEnd({ animated: false });
             shouldScrollRef.current = false;
+            readerNearBottomRef.current = true;
+            setUnseenMessages(0);
         }
+    };
+
+    const jumpToLatest = () => {
+        shouldScrollRef.current = true;
+        scrollIfNeeded();
     };
 
     const onReact = async (messageId: number, reaction: string) => {
@@ -781,6 +814,20 @@ const pinnedMessage = useMemo(() => {
                 <FlatList
                     ref={flatListRef}
                     data={messages}
+                    maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+                    onScroll={event => {
+                        const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+                        readerNearBottomRef.current = contentSize.height - contentOffset.y - layoutMeasurement.height < 140;
+                        if (readerNearBottomRef.current && unseenMessages) setUnseenMessages(0);
+                    }}
+                    scrollEventThrottle={100}
+                    ListHeaderComponent={nextHistoryUrl || loadingHistory || historyError ? (
+                        <View style={styles.historyHeader}>
+                            {historyError ? <Text accessibilityRole="alert" style={styles.historyError}>{historyError}</Text> : null}
+                            <Text style={styles.historyHint}>Earlier conversation history</Text>
+                            <IconButton icon={loadingHistory ? 'loading' : 'history'} accessibilityLabel="Load older messages" disabled={loadingHistory} onPress={() => void loadOlderMessages()} />
+                        </View>
+                    ) : null}
                     renderItem={renderMessage}
                     keyExtractor={(item, index) => `${item.id ?? 'msg'}-${item.created_at ?? index}`}
                     contentContainerStyle={[styles.listContent, { paddingBottom: 24 + insets.bottom }]}
@@ -790,6 +837,12 @@ const pinnedMessage = useMemo(() => {
                 {loading ? (
                     <View style={[StyleSheet.absoluteFill, styles.centerContainer]}>
                         <ActivityIndicator size="large" color="#6366F1" />
+                    </View>
+                ) : null}
+                {unseenMessages > 0 ? (
+                    <View style={styles.jumpRow}>
+                        <IconButton icon="arrow-down" accessibilityLabel={`Jump to ${unseenMessages} new messages`} onPress={jumpToLatest} />
+                        <Text onPress={jumpToLatest} accessibilityRole="button">New messages · ${unseenMessages}</Text>
                     </View>
                 ) : null}
             </View>
@@ -860,6 +913,10 @@ const styles = StyleSheet.create({
         padding: 12,
         paddingBottom: 24,
     },
+    historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap', paddingVertical: 8 },
+    historyHint: { fontSize: 12, color: '#52617A' },
+    historyError: { color: '#B42318', width: '100%', textAlign: 'center' },
+    jumpRow: { position: 'absolute', right: 16, bottom: 18, borderRadius: 22, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F0FF', borderColor: '#BBCDF9', borderWidth: 1 },
     messageContainer: {
         flexDirection: 'row',
         alignItems: 'flex-start',
