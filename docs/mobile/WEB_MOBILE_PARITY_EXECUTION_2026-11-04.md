@@ -10,6 +10,7 @@
 | Organization claims pharmacy via registered email | /organization/pharmacies/claims: validates email; scoped membership and history, submit, states, retry | Validate role-level permissions and actual request/owner decision on staging |
 | Organization owner claim status/history | Existing owner accept/reject untouched; organization sees pending/accepted/rejected and owner response | Permission boundary by active organization id added client-side; backend remains authority |
 | Learning resources (was placeholder or missing) | One native branded resource screen for pharmacist, other staff, owner, organization, Explorer; searchable article/news listing, pagination and retry; open published article on web | Compare editorial content/feed and links in QA; test Android/iOS, offline network failures, 1.6x text and keyboard |
+| Legacy invoice PDF open/share | Owner, organization, pharmacist and other-staff list/detail now use `downloadInvoicePdf` + `nativeFileBytes` + Expo cache and native share sheet instead of unauthenticated `Linking.openURL(getInvoicePdfUrl(...))`. | Source/UI contract test wired into CI; authenticated staging/device PDF, recipient authorization and secure cleanup acceptance required |
 | Documentation/test discipline | New organization membership/email tests; active shift deep-link scope test wired to mobile CI | **Require fully green exact-head CI**, not an intermediate green build |
 
 ## Status caveats
@@ -17,7 +18,7 @@
 - Changes made while CI runs may cancel outdated runs. Sign off the **final** commit only, not any superseded SHA.
 - This is a source/connector review. Native emulator/screenshots, real backend logins for all six personas, 44pt/48dp hit-area audits, actual app-store builds and Stripe/SMTP staging proof were **not performed**.
 - A static route does not prove feature parity. The accepted bar is a real worker/manager can complete the same web business action with an equal permission outcome and safe failure/recovery paths.
-- No payment, attendance or invoice business rules were intentionally changed in this continuation.
+- No payment, attendance or invoice financial business rules were intentionally changed; the legacy invoice **document delivery path** now uses authenticated native transport instead of a browser URL.
 
 ## Next high-impact source and acceptance work
 1. Finish green latest-head CI (Expo lint/typecheck, shared core, web, PostgreSQL concurrency), then verify the custom shift deep-link scroll on physical iOS/Android.
