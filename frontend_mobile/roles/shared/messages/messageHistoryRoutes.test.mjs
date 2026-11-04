@@ -10,6 +10,7 @@ test('chat history has native older-page loading without unconditional message-c
  assert.match(screen,/readerNearBottomRef\.current/);
  assert.match(screen,/unseenMessages > 0/);
  assert.match(screen,/isNextPageForRoom\(page\.next, roomId\)/);
+ assert.match(screen,/getActiveRoomId\(\) === roomId/);
  assert.doesNotMatch(screen,/whenever messages or room change, jump to bottom/);
 });
 test('mobile chat exposes canonical pharmacy conversations through shared-core',()=>{
