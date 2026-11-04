@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { configureApi, logoutSession, skipMobileOverse } from './api';
+import { configureApi, logoutSession, skipMobileOverseas } from './api';
 import { API_ENDPOINTS } from './constants/endpoints';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
