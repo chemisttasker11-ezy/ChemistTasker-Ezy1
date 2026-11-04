@@ -931,6 +931,57 @@ class BookingSafetyTests(ShiftActionFixture):
                 self.captureOnCommitCallbacks(execute=True):
             return client_for(offer.user).post(f'{API}shift-offers/{offer.id}/accept/', {}, format='json')
 
+    def test_offer_terms_version_requires_reviewed_snapshot_and_preserves_pending_on_stale(self):
+        """D2: missing and changed terms cannot reserve work; unchanged reviewed terms still can."""
+        from shifts.engagement import shift_engagement_terms_version
+        from billing.utils import BILLING_STATE_PAYMENT_REQUIRED
+
+        shift = self.shift(single_user_only=False)
+        worker = self.worker(employment_type=None, verified=True)
+        offer = self.offer(shift, worker, offered_slot_date=shift.slots.first().date)
+        terms = {
+            "version": 1, "acceptance_required": True,
+            "engagement_kind": "INDEPENDENT_CONTRACTOR",
+            "settlement_channel": "INVOICE", "payment_preference": "ABN",
+            "occurrences": [{"slot_id": offer.slot_id, "date": str(offer.offered_slot_date),
+                              "agreed_rate": "60.00"}],
+        }
+        reviewed_version = shift_engagement_terms_version(terms)
+        payload = {
+            "engagement_terms_accepted": True,
+            "independent_contractor_status_confirmed": True,
+        }
+        with mock.patch("shifts.engagement.build_shift_engagement_terms", side_effect=lambda **_kw: dict(terms)), \
+             mock.patch("billing.utils.get_billing_state_for_pharmacy", return_value=BILLING_STATE_PAYMENT_REQUIRED), \
+             mock.patch("shifts.offers.notify_shift_users"), mock.patch("shifts.offers.async_task"), \
+             mock.patch("shifts.offers.send_shift_payment_finalized_notifications"):
+            client = client_for(worker)
+            for rejected in (payload, {**payload, "terms_version": "outdated"}):
+                response = client.post(f"{API}shift-offers/{offer.pk}/accept/", rejected, format="json")
+                self.assertEqual((response.status_code, response.data.get("code")), (409, "TERMS_CHANGED"))
+                offer.refresh_from_db()
+                self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+                self.assertIsNone(offer.engagement_terms_accepted_at)
+                self.assertFalse(ShiftSlotAssignment.objects.filter(shift=shift).exists())
+
+            # The worker saw the old rate; server offer terms now show a different rate.
+            terms["occurrences"][0]["agreed_rate"] = "75.00"
+            changed = client.post(f"{API}shift-offers/{offer.pk}/accept/",
+                                  {**payload, "terms_version": reviewed_version}, format="json")
+            self.assertEqual((changed.status_code, changed.data.get("code")), (409, "TERMS_CHANGED"))
+            offer.refresh_from_db()
+            self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+
+            accepted = client.post(
+                f"{API}shift-offers/{offer.pk}/accept/",
+                {**payload, "terms_version": shift_engagement_terms_version(terms)}, format="json",
+            )
+            self.assertEqual(accepted.status_code, 200, accepted.data)
+            offer.refresh_from_db()
+            self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+            self.assertIsNotNone(offer.engagement_terms_accepted_at)
+            self.assertEqual(offer.engagement_terms_snapshot["occurrences"][0]["agreed_rate"], "75.00")
+
     def test_public_accept_preserves_onboarding_outcomes_with_enforcement_on_or_off(self):
         for enforcement in (True, False):
             with self.subTest(enforcement=enforcement), override_settings(AHPRA_ENFORCEMENT_ENABLED=enforcement):
