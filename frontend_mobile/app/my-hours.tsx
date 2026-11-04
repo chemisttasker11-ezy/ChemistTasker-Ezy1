@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Chip, Text } from 'react-native-paper';
 import { formatAttendanceMinutes, workforce } from '@chemisttasker/shared-core';
@@ -23,6 +24,7 @@ type Row = {
 
 
 export default function MyHoursScreen() {
+  const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,6 +90,7 @@ export default function MyHoursScreen() {
                 {row.warning_checks > 0 && <Chip compact>{row.warning_checks} warnings</Chip>}
                 {row.needs_rebuild && <Chip compact>Recalculation pending</Chip>}
               </View>
+              <Button mode="outlined" onPress={() => router.push(`/my-hours/${row.id}` as any)} disabled={submitting != null}>View days & checks</Button>
               <Button mode="contained" loading={submitting === row.id} disabled={!row.revision_number || row.needs_rebuild || row.status === 'APPROVED' || row.status === 'SUBMITTED' || submitting != null} onPress={() => submit(row)}>
                 Submit reviewed hours
               </Button>
