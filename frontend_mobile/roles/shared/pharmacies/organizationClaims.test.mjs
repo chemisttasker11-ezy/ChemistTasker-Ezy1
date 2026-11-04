@@ -38,7 +38,7 @@ test('multiple organisation claims must choose a specific eligible organisation'
       { role: 'ORG_ADMIN', organization_id: 25, is_active: false },
     ],
   });
-  assert.deepEqual(Array.from(organizations), [
+  assert.deepEqual(Array.from(organizations, ({ id, label }) => ({ id, label })), [
     { id: 10, label: 'First Group' },
     { id: 12, label: 'Second Group' },
   ]);
