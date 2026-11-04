@@ -45,6 +45,10 @@ const {
   computeResetFormPrefills,
   runPostShiftInitChain,
   shouldTriggerPostShiftInit,
+  toLocalIsoDate,
+  getEscalationClock,
+  withEscalationDate,
+  withEscalationTime,
 } = helpers;
 
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -567,4 +571,22 @@ test('init -> user edits time -> no reset', async () => {
     await runInitLoad();
   }
   assert.equal(initLoadCount, 3, 'retry must trigger init chain');
+});
+
+test('Australian date selection is local, not serialized through UTC', () => {
+  const previous = process.env.TZ;
+  try {
+    process.env.TZ = 'Australia/Brisbane';
+    const chosen = new Date(2026, 10, 10);
+    assert.equal(toLocalIsoDate(chosen), '2026-11-10');
+    assert.equal(chosen.toISOString().slice(0, 10), '2026-11-09', 'UTC lost one day for a Brisbane date picker');
+    assert.equal(withEscalationDate(chosen), '2026-11-10T09:00');
+    assert.equal(withEscalationTime('2026-11-10T09:00', 16, 45), '2026-11-10T16:45');
+    assert.deepEqual(plain(getEscalationClock('2026-11-10T16:45')), { hours: 16, minutes: 45 });
+    assert.equal(withEscalationTime('2026-11-10T09:00', 25, 0), null);
+    assert.equal(withEscalationDate(new Date(2026, 10, 12), '2026-11-10T16:45'), '2026-11-12T16:45');
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
 });

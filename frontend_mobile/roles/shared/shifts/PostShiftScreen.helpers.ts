@@ -133,6 +133,33 @@ export const toIsoDate = (value: string): Date | null => {
 export const toLocalIsoDate = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
+/** Native date/time picker adapters must preserve the local calendar day, not UTC. */
+export const getEscalationClock = (value?: string | null): { hours: number; minutes: number } => {
+    if (!value || value.length <= 10) return { hours: 9, minutes: 0 };
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+        ? { hours: 9, minutes: 0 }
+        : { hours: parsed.getHours(), minutes: parsed.getMinutes() };
+};
+
+const hhmm = (hours: number, minutes: number) =>
+    `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+
+export const withEscalationDate = (selected: Date, previous?: string | null): string => {
+    const { hours, minutes } = getEscalationClock(previous);
+    return `${toLocalIsoDate(selected)}T${hhmm(hours, minutes)}`;
+};
+
+export const withEscalationTime = (previous: string | null | undefined, hours: number, minutes: number): string | null => {
+    if (!previous || !Number.isInteger(hours) || !Number.isInteger(minutes)
+        || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+    const parsed = previous.length <= 10 ? null : new Date(previous);
+    const date = parsed && !Number.isNaN(parsed.getTime())
+        ? toLocalIsoDate(parsed)
+        : /^\d{4}-\d{2}-\d{2}$/.test(previous.slice(0, 10)) ? previous.slice(0, 10) : null;
+    return date ? `${date}T${hhmm(hours, minutes)}` : null;
+};
+
 export const formatAuDate = (value?: string) => {
     if (!value) return '';
     const date = new Date(`${value}T00:00:00`);
