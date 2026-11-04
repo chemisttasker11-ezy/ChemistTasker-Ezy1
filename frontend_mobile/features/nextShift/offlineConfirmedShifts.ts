@@ -15,7 +15,8 @@ export async function readConfirmedShiftSnapshot(userId: number | string): Promi
   const rows: OfflineShift[] = parsed.rows.filter((r: OfflineShift) =>
    Number.isSafeInteger(r?.shiftId) && Number.isSafeInteger(r?.slotId) &&
    typeof r.start==='string' && typeof r.end==='string' && typeof r.pharmacy==='string' &&
-   typeof r.address==='string' && typeof r.role==='string'
+   typeof r.address==='string' && typeof r.role==='string' &&
+   typeof r.wallStart==='string' && typeof r.wallEnd==='string' && typeof r.timeZone==='string'
   ).slice(0,100);
   return {savedAt:parsed.savedAt,rows};
  } catch {return null;}

@@ -55,7 +55,7 @@ function ScopedNextShifts({userId}:{userId?:number}) {
  };
  const upcoming=upcomingShifts(rows);
  const dates=(row:OfflineShift)=>{
-  const a=new Date(row.start),b=new Date(row.end);
+  const a=new Date(row.wallStart),b=new Date(row.wallEnd);
   return a.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})+' · '+
    a.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+'–'+b.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
  };
@@ -78,6 +78,7 @@ function ScopedNextShifts({userId}:{userId?:number}) {
       {index===0?<Text style={styles.marker}>NEXT SHIFT</Text>:null}
       <Text variant="titleMedium" style={styles.title}>{row.pharmacy} · {row.role}</Text>
       <Text>{dates(row)}</Text>
+      <Text style={styles.muted}>Pharmacy time zone: {row.timeZone}</Text>
       <Text style={styles.muted}>{row.address||'Pharmacy address not supplied'}</Text>
       <View style={styles.actions}>
        <Button mode="outlined" icon="calendar-plus" onPress={()=>void open(calendarEditorUrl(row))}>Add to calendar</Button>
