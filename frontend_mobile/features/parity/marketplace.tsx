@@ -223,19 +223,23 @@ function AudienceStep({draft,options,loading,error}:{draft:MarketplaceMobileDraf
 function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:boolean;error:string}){
  const router=useRouter();const{user}=useAuth();const scope=String(user?.id??user?.email??user?.username??'anonymous');const[busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
  const submittingRef=useRef(false);const scopeRef=useRef(scope);scopeRef.current=scope;
+ const submissionGeneration=useRef(0);
+ useEffect(()=>{submissionGeneration.current+=1;submittingRef.current=false;setBusy(false);setLocalError('');},[scope]);
  // A second tap must never start another create/update/upload/submission
  // while the first attempt is awaiting server responses.
- const complete=async(submitForReview:boolean)=>{if(submittingRef.current)return;submittingRef.current=true;const targetScope=scope;setBusy(true);setLocalError('');try{
+ const complete=async(submitForReview:boolean)=>{if(submittingRef.current)return;submittingRef.current=true;const targetScope=scope;const attempt=++submissionGeneration.current;const current=()=>scopeRef.current===targetScope&&submissionGeneration.current===attempt;setBusy(true);setLocalError('');try{
    const body:any={client_request_id:draft.create_request_id,seller_context:draft.seller_context,pharmacy:draft.pharmacy,category:draft.category,mode:draft.mode,title:draft.title,description:draft.description,condition:draft.condition,quantity:draft.quantity,unit:draft.unit,amount:draft.mode==='SELL'?draft.amount:'0',desired_swap:draft.desired_swap,suburb:draft.suburb,state:draft.state,postcode:draft.postcode,private_pickup_details:draft.private_pickup_details,allowed_buyer_roles:draft.allowed_buyer_roles,delivery:{method:draft.delivery_method,postage_payer:draft.postage_payer||undefined,postage_organiser:draft.postage_organiser||undefined,known_cost:draft.known_cost||null,quote_required:draft.quote_required}};
    let listingId=draft.created_listing_id;let expectedVersion=draft.created_listing_version;
-   if(listingId&&expectedVersion!=null){const updated=await api.updateListing(listingId,{...body,expected_version:expectedVersion});expectedVersion=updated.version;await patchMarketplaceDraft(scope,{created_listing_version:expectedVersion});}
-   else{const created=await api.createListing(body);listingId=String(created.id);expectedVersion=created.version;await patchMarketplaceDraft(scope,{created_listing_id:listingId,created_listing_version:expectedVersion});}
-   if(draft.seller_context==='PHARMACY'){const audience=await api.updateAudience(listingId,{expected_version:Number(expectedVersion),current_circle:'OWNED_CHAIN',maximum_circle:clampMaximumAudience(draft.maximum_circle)});expectedVersion=audience.version;await patchMarketplaceDraft(scope,{current_circle:'OWNED_CHAIN',created_listing_version:expectedVersion});}
-   let uploaded=[...draft.uploaded_image_uris];for(const uri of draft.image_uris){if(uploaded.includes(uri))continue;const blob=await(await fetch(uri)).blob();const data=new FormData();data.append('image',blob as any,'listing-'+Date.now()+'.jpg');await api.uploadImage(listingId,data);uploaded=[...uploaded,uri];await patchMarketplaceDraft(scope,{uploaded_image_uris:uploaded});}
+   if(listingId&&expectedVersion!=null){const updated=await api.updateListing(listingId,{...body,expected_version:expectedVersion});expectedVersion=updated.version;if(!current())return;await patchMarketplaceDraft(scope,{created_listing_version:expectedVersion});}
+   else{const created=await api.createListing(body);listingId=String(created.id);expectedVersion=created.version;if(!current())return;await patchMarketplaceDraft(scope,{created_listing_id:listingId,created_listing_version:expectedVersion});}
+   if(!current())return;
+   if(draft.seller_context==='PHARMACY'){const audience=await api.updateAudience(listingId,{expected_version:Number(expectedVersion),current_circle:'OWNED_CHAIN',maximum_circle:clampMaximumAudience(draft.maximum_circle)});expectedVersion=audience.version;if(!current())return;await patchMarketplaceDraft(scope,{current_circle:'OWNED_CHAIN',created_listing_version:expectedVersion});}
+   let uploaded=[...draft.uploaded_image_uris];for(const uri of draft.image_uris){if(!current())return;if(uploaded.includes(uri))continue;const blob=await(await fetch(uri)).blob();const data=new FormData();data.append('image',blob as any,'listing-'+Date.now()+'.jpg');await api.uploadImage(listingId,data);if(!current())return;uploaded=[...uploaded,uri];await patchMarketplaceDraft(scope,{uploaded_image_uris:uploaded});}
+   if(!current())return;
    if(submitForReview)await api.actOnListing(listingId,'submit',Number(expectedVersion));
    // Never clear a newly signed-in account's draft or navigate as another user.
-   if(scopeRef.current===targetScope){await clearMarketplaceDraft(targetScope);router.replace('/marketplace/mine' as any);}
- }catch(e){if(scopeRef.current===targetScope)setLocalError(errorMessage(e,submitForReview?'Unable to submit listing. Your existing draft will be resumed on retry.':'Unable to save listing draft. Your existing draft will be resumed on retry.'));}finally{submittingRef.current=false;if(scopeRef.current===targetScope)setBusy(false);}};
+   if(current()){await clearMarketplaceDraft(targetScope);if(current())router.replace('/marketplace/mine' as any);}
+ }catch(e){if(current())setLocalError(errorMessage(e,submitForReview?'Unable to submit listing. Your existing draft will be resumed on retry.':'Unable to save listing draft. Your existing draft will be resumed on retry.'));}finally{if(current()){submittingRef.current=false;setBusy(false);}}};
  const postage=draft.delivery_method!=='PICKUP';
  const disabled=busy||!draft.category||!draft.title||(postage&&(!draft.postage_payer||!draft.postage_organiser));
  return <ParityPage title="Review listing" subtitle="Confirm seller, item, audience and delivery details." loading={loading} error={error||localError}>
