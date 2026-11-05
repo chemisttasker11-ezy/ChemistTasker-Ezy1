@@ -52,12 +52,23 @@ export default function NotificationsScreen() {
   // Load on every focus (the first one included) and mark any unread as read.
   useFocusEffect(
     useCallback(() => {
-      void fetchNotifications(true, 1); // first visible page is considered read when the server confirms it
+      // Worker identity is part of the inbox scope: never display cached
+      // notifications or read receipts from a different signed-in account.
+      generation.current += 1;
+      locallyReadIds.current.clear();
+      moreLoadingRef.current = false;
+      setLoadingMore(false);
+      setNotifications([]);
+      setNextPage(null);
+      setReadError('');
+      if (user?.id != null) void fetchNotifications(true, 1);
+      else setLoading(false);
       return () => {
         generation.current += 1;
         moreLoadingRef.current = false;
+        setLoadingMore(false);
       };
-    }, [])
+    }, [user?.id])
   );
 
   const normalizeNotification = (raw: any): Notification => ({
@@ -81,6 +92,7 @@ export default function NotificationsScreen() {
       setOlderError('');
       setNextPage(null);
       moreLoadingRef.current = false;
+      setLoadingMore(false);
     } else {
       moreLoadingRef.current = true;
       setLoadingMore(true);
