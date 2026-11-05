@@ -105,6 +105,7 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
       };
       const saved = await finance.saveCustomer(input);
       setCustomerOptions(current => [...current, saved]);
+      draftEditGeneration.current += 1;
       setValue(current => ({
         ...current,
         customer_id: saved.id,
@@ -171,6 +172,7 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
         active: true,
       });
       setItemOptions(current => [...current, saved]);
+      draftEditGeneration.current += 1;
       setValue(current => ({ ...current, lines: [...current.lines, financeItemLine(saved)] }));
       setNewItemName('');
       setNewItemUnit('Item');
@@ -198,6 +200,9 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
         return;
       }
       draftEditGeneration.current += 1;
+      // Defaults are asynchronous. They must not override values imported
+      // from an accepted-shift snapshot after the prefill completes.
+      (Object.keys(draft) as Array<keyof FinanceDraft>).forEach(key => editedDefaults.current.add(key));
       setValue(draft);
       setSourceOpen(false);
     } catch (e: any) {
