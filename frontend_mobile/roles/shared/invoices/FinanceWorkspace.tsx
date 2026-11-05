@@ -10,6 +10,7 @@ import FinanceInvoiceEditor from './FinanceInvoiceEditor';
 import { receivedInvoiceActions } from './receivedInvoicePolicy';
 import { nativeFileBytes } from '@/features/parity/nativeFileBytes';
 import { colors, font, radius, space, touch } from '@/constants/tokens';
+import { useAuth } from '@/context/AuthContext';
 
 const money = (value: string | number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 // Idempotency identity only; no secrets or authentication use.
@@ -21,6 +22,11 @@ type Form = { title: string; fields: Record<string, string>; booleans: Record<st
 export default function FinanceWorkspace({ existingTools, receivedMode = false }: { existingTools?: ReactNode; receivedMode?: boolean }) {
   const theme = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
+  const ownerScope = `${user?.id ?? 'signed-out'}:${receivedMode ? 'received' : 'issued'}`;
+  const scopeRef = useRef(ownerScope);
+  scopeRef.current = ownerScope;
+  const loadGen = useRef(0);
   const { invoice: invoiceParam } = useLocalSearchParams<{ invoice?: string | string[] }>();
   const linkedId = Array.isArray(invoiceParam) ? invoiceParam[0] : invoiceParam;
   const requestedInvoiceId = typeof linkedId === 'string' && /^[1-9]\d*$/.test(linkedId)
@@ -40,14 +46,34 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const [start, setStart] = useState(`${financeToday().slice(0, 4)}-01-01`); const [end, setEnd] = useState(financeToday());
   const [basis, setBasis] = useState<'cash' | 'accrual'>('cash'); const [worksheet, setWorksheet] = useState<FinanceWorksheet | null>(null);
   const load = useCallback(async () => {
-    if (receivedMode) {
-      setReceivedInvoices(await finance.receivedInvoices());
-      return;
+    const request = ++loadGen.current;
+    const scope = ownerScope;
+    const current = () => request === loadGen.current && scopeRef.current === scope;
+    try {
+      if (receivedMode) {
+        const nextReceived = await finance.receivedInvoices();
+        if (current()) setReceivedInvoices(nextReceived);
+        return;
+      }
+      const [c, i, inv, e] = await Promise.all([finance.customers(), finance.items(), finance.invoices(), finance.expenses()]);
+      if (!current()) return;
+      setCustomers(c); setItems(i); setInvoices(inv); setExpenses(e);
+    } catch (failure: any) {
+      if (current()) setError(failure?.message || 'Could not refresh finance records.');
+      throw failure;
+    } finally {
+      if (current()) setLoading(false);
     }
-    const [c, i, inv, e] = await Promise.all([finance.customers(), finance.items(), finance.invoices(), finance.expenses()]);
-    setCustomers(c); setItems(i); setInvoices(inv); setExpenses(e);
-  }, [receivedMode]);
-  useEffect(() => { load().catch(e => setError(e.message)).finally(() => setLoading(false)); }, [load]);
+  }, [receivedMode, ownerScope]);
+  useEffect(() => {
+    // Never show a different account's or persona's finance records while
+    // refreshing the new authorized scope.
+    setInvoices([]); setReceivedInvoices([]); setCustomers([]); setItems([]); setExpenses([]);
+    setSelected(null); setHistoryDocument(null); setForm(null); setEditor(null);
+    setError(''); setLoading(true);
+    void load().catch(() => {});
+    return () => { loadGen.current += 1; };
+  }, [load]);
   // Consume ?invoice= only after the authorized finance list has loaded. A
   // re-fetch or screen re-render must not reopen a dismissed review modal.
   useEffect(() => {
