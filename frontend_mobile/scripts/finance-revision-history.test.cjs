@@ -12,3 +12,10 @@ test('finance history is read-only and uses exact authorized worker or received 
   assert.match(source, /Share this revision PDF/);
   assert.match(source, /Historical revisions cannot be edited, sent, approved or marked paid/);
 });
+
+test('historical financial reads and temporary PDF files remain within the active account', () => {
+  assert.match(source, /historyGen\.current === request && scopeRef\.current === requestedScope/);
+  assert.match(source, /const current = \(\) => scopeRef\.current === requestedScope/);
+  assert.match(source, /if \(!current\(\)\) return;\s*await Sharing\.shareAsync/);
+  assert.match(source, /file\.delete\(\)/);
+});
