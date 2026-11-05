@@ -105,6 +105,11 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
     const paymentContextRef = useRef(`${user?.id ?? 'anonymous'}:${surface.scopeKey}`);
     const paymentContext = `${user?.id ?? 'anonymous'}:${surface.scopeKey}`;
     paymentContextRef.current = paymentContext;
+    useEffect(() => () => {
+        // The keyed Shift Centre can unmount without a final render.
+        // Ignore completions from payment attempts and recovery dialogs.
+        paymentContextRef.current = 'disposed';
+    }, []);
 
     const showSnackbar = useCallback((msg: string) => {
         setSnackbarMessage(msg);

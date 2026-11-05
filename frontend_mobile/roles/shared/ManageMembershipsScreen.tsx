@@ -67,6 +67,9 @@ export default function ManageMembershipsScreen() {
   const generationRef = useRef(0);
   const currentAccountRef = useRef(user?.id ?? null);
   currentAccountRef.current = user?.id ?? null;
+  useEffect(() => () => {
+    currentAccountRef.current = null;
+  }, []);
   const actionBusyRef = useRef(false);
   const { refresh: refreshAhpra } = useAhpra();
   const theme = useTheme();

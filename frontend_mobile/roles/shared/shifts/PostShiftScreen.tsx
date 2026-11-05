@@ -158,6 +158,9 @@ export default function PostShiftScreen() {
     const postingBusyRef = React.useRef(false);
     const postingScopeRef = React.useRef(`${surface.scopeKey}:${editingId ?? 'new'}`);
     postingScopeRef.current = `${surface.scopeKey}:${editingId ?? 'new'}`;
+    useEffect(() => () => {
+        postingScopeRef.current = 'disposed';
+    }, []);
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
     const [pharmacyMenuVisible, setPharmacyMenuVisible] = useState(false);
