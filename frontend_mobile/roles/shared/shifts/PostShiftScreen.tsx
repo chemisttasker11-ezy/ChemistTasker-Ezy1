@@ -673,6 +673,23 @@ export default function PostShiftScreen() {
         }, [applyBookingPrefillFromParams])
     );
 
+    // Guard pharmacy/role writes from stale callbacks after scope switches.
+    const templateScope = `${pharmacyId}:${roleNeeded}`;
+    const templateScopeRef = React.useRef(templateScope);
+    templateScopeRef.current = templateScope;
+    const templateMutationGen = React.useRef(0);
+    const rateMutationGen = React.useRef(0);
+    useEffect(() => {
+        templateMutationGen.current += 1;
+        rateMutationGen.current += 1;
+        setDescriptionTemplateSaving(false);
+        setSavingPharmacyRates(false);
+        return () => {
+            templateMutationGen.current += 1;
+            rateMutationGen.current += 1;
+        };
+    }, [templateScope]);
+
     // Do not refetch the role template on each description keystroke.
     // Read the newest user draft when an in-flight role-template request resolves.
     const latestDescriptionRef = React.useRef(description);
@@ -741,22 +758,28 @@ export default function PostShiftScreen() {
             setToast('Enter a description before saving it as a template');
             return;
         }
+        if (descriptionTemplateSaving) return;
+        const mutation = ++templateMutationGen.current;
+        const scope = templateScope;
+        const stillCurrent = () => mutation === templateMutationGen.current && templateScopeRef.current === scope;
         setDescriptionTemplateSaving(true);
         try {
             const data = await saveShiftDescriptionTemplate(Number(pharmacyId), roleNeeded, description);
+            if (!stillCurrent()) return;
             setDescriptionTemplate(data as ShiftDescriptionTemplate);
-            setDescriptionTemplateAutoAppliedKey(`${pharmacyId}:${roleNeeded}`);
+            setDescriptionTemplateAutoAppliedKey(scope);
             setToast('Description template saved for this role');
         } catch {
-            setToast('Unable to save description template');
+            if (stillCurrent()) setToast('Unable to save description template');
         } finally {
-            setDescriptionTemplateSaving(false);
+            if (stillCurrent()) setDescriptionTemplateSaving(false);
         }
-    }, [description, pharmacyId, roleNeeded]);
+    }, [description, descriptionTemplateSaving, pharmacyId, roleNeeded, templateScope]);
 
     const handleDeleteDescriptionTemplate = useCallback(() => {
         if (!descriptionTemplate?.id || descriptionTemplateSaving) return;
         const selectedTemplateId = descriptionTemplate.id;
+        const scope = templateScope;
         Alert.alert(
             'Delete saved description?',
             'This removes the reusable pharmacy-role template. Your current shift description will not be changed.',
@@ -765,19 +788,23 @@ export default function PostShiftScreen() {
                 {
                     text: 'Delete template', style: 'destructive',
                     onPress: () => {
+                        if (templateScopeRef.current !== scope) return;
+                        const mutation = ++templateMutationGen.current;
+                        const stillCurrent = () => mutation === templateMutationGen.current && templateScopeRef.current === scope;
                         setDescriptionTemplateSaving(true);
                         void deleteShiftDescriptionTemplate(selectedTemplateId)
                             .then(() => {
+                                if (!stillCurrent()) return;
                                 setDescriptionTemplate(current => current?.id === selectedTemplateId ? null : current);
                                 setToast('Description template removed');
                             })
-                            .catch(() => setToast('Unable to delete description template'))
-                            .finally(() => setDescriptionTemplateSaving(false));
+                            .catch(() => { if (stillCurrent()) setToast('Unable to delete description template'); })
+                            .finally(() => { if (stillCurrent()) setDescriptionTemplateSaving(false); });
                     },
                 },
             ],
         );
-    }, [descriptionTemplate, descriptionTemplateSaving]);
+    }, [descriptionTemplate, descriptionTemplateSaving, templateScope]);
 
     const handleSavePharmacyRateDefaults = useCallback(async () => {
         if (!pharmacyId) {
@@ -789,6 +816,10 @@ export default function PostShiftScreen() {
             return;
         }
 
+        if (savingPharmacyRates) return;
+        const mutation = ++rateMutationGen.current;
+        const scope = templateScope;
+        const stillCurrent = () => mutation === rateMutationGen.current && templateScopeRef.current === scope;
         setSavingPharmacyRates(true);
         try {
             const payload = {
@@ -801,6 +832,7 @@ export default function PostShiftScreen() {
                 rate_late_night: rateLateNight || null,
             };
             const data = await updatePharmacy(Number(pharmacyId), payload);
+            if (!stillCurrent()) return;
             setPharmacies((current) =>
                 current.map((pharmacy) =>
                     Number(pharmacy.id) === Number(pharmacyId)
@@ -810,9 +842,9 @@ export default function PostShiftScreen() {
             );
             setToast('Pharmacy default rates updated');
         } catch {
-            setToast('Unable to update pharmacy default rates');
+            if (stillCurrent()) setToast('Unable to update pharmacy default rates');
         } finally {
-            setSavingPharmacyRates(false);
+            if (stillCurrent()) setSavingPharmacyRates(false);
         }
     }, [
         pharmacyId,
@@ -824,6 +856,8 @@ export default function PostShiftScreen() {
         rateType,
         rateWeekday,
         roleNeeded,
+        savingPharmacyRates,
+        templateScope,
     ]);
 
     const mergeSelectedDates = useCallback((incomingDates: string[]) => {
