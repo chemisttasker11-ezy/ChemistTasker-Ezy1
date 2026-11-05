@@ -164,3 +164,11 @@ These targeted source changes close several previously demonstrated implementati
 4. Perform accessibility/large-text and signed Android/iOS QA, then the consolidated exact-head Senior Package Testing only once implementation is frozen and authorized staging resources are available.
 
 **Evidence limitation:** All four commits are connector-mediated source changes. No local repository checkout, compiled TypeScript, targeted tests, emulator/device screenshots, runtime provider proof, or consolidated release gates were performed in this pass. These implementations must not be described as passing or production-ready. No merge, deployment, EAS update, live provider mutation or QR modifications were performed.
+
+### Subsequent W6 send and composer safety
+
+- `2101fe02`: a synchronous per-screen send mutex prevents duplicate message/attachment submissions. Account/room switches suppress stale send responses, errors and draft clearing, while retaining already-issued server operations under backend authority.
+- `d0e7f027`: text drafts, message-edit state and ephemeral menu/typing/pin presentation are reset or hidden when room/account scope changes. Other-account drafts must not remain displayed in a reused screen.
+- **Remaining:** source-level regression tests and actual runtime validation of rapid room/account switches, duplicate taps, attachment picker cancellation, reconnect semantics and late server acknowledgements. Do not infer that a submitted request is cancelled when the UI changes account.
+
+**Latest source checkpoint:** `d0e7f027ac51f6adefb62bd574587a6a5d7cfeb8`. No local runtime gate was run.
