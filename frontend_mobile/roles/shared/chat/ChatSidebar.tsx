@@ -180,7 +180,8 @@ export default function ChatSidebar({
                   key={`p-${item.id}`}
                   room={item}
                   onPress={onSelect}
-                  onTogglePin={canPin ? onTogglePin : () => {}}
+                  onTogglePin={onTogglePin}
+                  canPin={canPin}
                   onDelete={onDeleteRoom}
                   onEdit={onEditRoom}
                   onManageMembers={onManageGroup}
@@ -200,7 +201,8 @@ export default function ChatSidebar({
                   key={`g-${item.id}`}
                   room={item}
                   onPress={onSelect}
-                  onTogglePin={canPin ? onTogglePin : () => {}}
+                  onTogglePin={onTogglePin}
+                  canPin={canPin}
                   onDelete={onDeleteRoom}
                   onEdit={onEditRoom}
                   onManageMembers={onManageGroup}
@@ -221,6 +223,7 @@ export default function ChatSidebar({
                   room={room}
                   onPress={() => onSelectShiftContact?.(contact)}
                   onTogglePin={() => {}}
+                  canPin={false}
                   canEditDelete={false}
                 />
               ))}
@@ -236,7 +239,8 @@ export default function ChatSidebar({
                   key={`dm-${item.id}`}
                   room={item}
                   onPress={onSelect}
-                  onTogglePin={canPin ? onTogglePin : () => {}}
+                  onTogglePin={onTogglePin}
+                  canPin={canPin}
                   onDelete={onDeleteRoom}
                   onEdit={onEditRoom}
                   onManageMembers={onManageGroup}
