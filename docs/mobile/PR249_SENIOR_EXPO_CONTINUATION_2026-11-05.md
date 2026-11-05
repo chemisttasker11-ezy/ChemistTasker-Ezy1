@@ -225,3 +225,9 @@ These targeted source changes close several previously demonstrated implementati
 **Source boundary:** fixes are scoped to mobile UI requests and state. They do not grant new permissions or alter payroll, roster freeze, attendance corrections, award rates or booking/Stripe rules. In-flight server writes cannot be retracted by client generation guards.
 
 **Still required for actual W5 acceptance:** authenticated multiple-account and multiple-pharmacy transitions, manager/worker positive and denial tests, concurrent period correction/locking, real device font/keyboard QA, backend PostgreSQL evidence and full frozen-head CI. QR remains unchanged. **Not release ready without this evidence.**
+
+### W5 post-checkpoint refinements
+
+- `e0fc67cd`: manager timesheet period and summary responses now reject a change to another selected period or pharmacy, not only another signed-in account.
+- This is read-result isolation; the backend remains authoritative for period locking, corrections, approvals and payroll. It does not replace a two-client PostgreSQL concurrency rehearsal.
+- **Freeze and gate:** avoid further speculative changes and run the existing mandatory source, architecture, authenticated and native acceptance checks on the final SHA. CI automatically cancels prior branch-head runs when new commits are pushed. Results observed as queued, in progress, pending, skipped or cancelled are **not passing evidence**.
