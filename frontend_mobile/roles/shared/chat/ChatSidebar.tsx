@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, FlatList, ScrollView } from 'react-native';
 import { Searchbar, Button, Text, Divider, Chip, IconButton, Menu, useTheme } from 'react-native-paper';
 import type { ChatRoom } from './types';
@@ -77,44 +77,26 @@ export default function ChatSidebar({
     return { pinned, groupChats, dmChats };
   }, [filtered]);
 
-  const findMatchingRoomForShift = useCallback(
-    (contact: any): ChatRoom | null => {
-      const name = (displayNameFromUser(contact?.user) || '').toLowerCase();
-      const email = (contact?.user?.email || '').toLowerCase();
-      return (
-        rooms.find((r) => {
-          if (r.type !== 'DM') return false;
-          const title = (r.title || '').toLowerCase();
-          const pharmacyName = (r as any)?.pharmacy?.name?.toLowerCase?.() || '';
-          const matchTitle = title === name || title === email || title === pharmacyName;
-          const matchPartial = title === email || title === name || pharmacyName === name;
-          return matchTitle || matchPartial;
-        }) || null
-      );
-    },
-    [rooms],
-  );
-
+  // Contact identity must be resolved by the backend using the real user ID.
+  // Matching a room by display name/email could open another worker's DM when names collide.
   const shiftItems = useMemo(() => {
-    return (shiftContacts || []).map((c, idx) => {
-      const match = findMatchingRoomForShift(c);
-      const display = displayNameFromUser(c.user) || c.pharmacy_name || 'Shift Contact';
+    return (shiftContacts || []).map((contact, index) => {
+      const display = displayNameFromUser(contact.user) || contact.pharmacy_name || 'Shift Contact';
+      const userId = contact?.user?.id;
       return {
-        key: `shift-${idx}`,
-        contact: c,
-        room: match ?? ({
-          id: -100000 - idx,
+        key: `shift-${userId ?? index}-${contact?.shift_id ?? index}`,
+        contact,
+        room: {
+          id: -100000 - index,
           title: display,
           type: 'GROUP',
           unread_count: 0,
-          updated_at: c.shift_date,
+          updated_at: contact.shift_date,
           last_message: undefined,
-        } as any),
-        display,
-        matched: !!match,
+        } as ChatRoom,
       };
     });
-  }, [shiftContacts, findMatchingRoomForShift]);
+  }, [shiftContacts]);
 
   const listForFilter = useMemo(() => {
     if (filter === 'group') return grouped.groupChats;
@@ -233,13 +215,11 @@ export default function ChatSidebar({
           {filter === 'shift' && shiftItems.length > 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.colors.onSurfaceVariant }]}>Shifts</Text>
-              {shiftItems.map(({ key, room, contact, matched }) => (
+              {shiftItems.map(({ key, room, contact }) => (
                 <ChatListItem
                   key={key}
                   room={room}
-                  onPress={() =>
-                    matched && room?.id ? onSelect(room) : onSelectShiftContact && onSelectShiftContact(contact)
-                  }
+                  onPress={() => onSelectShiftContact?.(contact)}
                   onTogglePin={() => {}}
                   canEditDelete={false}
                 />
