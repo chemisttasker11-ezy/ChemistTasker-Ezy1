@@ -52,6 +52,39 @@ New staged commits:
 
 **Next unclosed parity priorities (QR excluded):** full user-facing field and workflow comparison for Post Shift and worker onboarding, invoice revision and finance acceptance, subscription/checkout and roster freeze, notifications and marketplace, source-level navigation for all personas, then native visual/device acceptance and final exact-SHA gates. Maintain backend semantics and authorisation at every step.
 
+## Continued W3–W8 parity fixes — second implementation pass
+
+**Owner direction confirmed:** QR profile scanning and its present invitations are **frozen/unchanged**. No merge, deployment, native update, provider action or store submission has been authorized.
+
+| Commit | Scope | Contract preserved |
+|---|---|---|
+| `917d8e1c` | Legacy invoice list: complete paginated fetch, recoverable network errors, managed `finance_record_id` deep links | Managed invoices continue through revision-aware finance; legacy edit/send/PDF remain available |
+| `0be534a1` | Finance invoice defaults: pure merge and source tests protect manual GST-off, typed super rate and accepted-shift source | Server still validates tax and money values |
+| `7cfb369e` | Finance preview errors: explicit unavailable/retry/loading totals | Saving remains server-authoritative, draft remains editable |
+| `734966cb` | Post Shift saved-description lookup: failed versus absent state and retry without dropping draft | Template creation blocked while the current lookup is uncertain |
+| `d708978a` | Native notification inbox: server 20-row pages, load-more, explicit error and confirmed read writes | Server remains source of truth for read receipts |
+| `fc798a40` | Correct design-token reference in native inbox | No change to delivery semantics |
+| `944c38b7` | Pharmacist/other-staff/Explorer verification-card recovery, loading and styling | Existing onboarding verification remains authoritative |
+| `dda5ca20` | User/persona generation-scoped finance loading with data and drawer isolation | Discards old account data on a scope change |
+| `1a3d518c` | Organization and delegated Admin Hub notification routes | Current admin pharmacy's communications capability is checked |
+| `cf1b9a0d` | Inbox native typography, contrast, touch targets and design tokens | Presentation only |
+
+### Findings and deliberate exclusions
+
+- **Draft/publish Post Shift:** the existing **web** Post Shift also invokes `createOwnerShiftService` directly. A separate persisted shift draft/publish operation was not identified in that contract; avoid inventing one or falsely labelling a public shift as saved privately. The native Post Shift uses the same authorisation and posting payload, with web-like template/save behaviours.
+- **Finance pagination:** shared-core `getInvoices` now accepts an optional positive page while preserving the unchanged no-argument web API. Legacy client fetches every server page; finance workspace already uses paginated finance-domain operations.
+- **Notifications:** server `NotificationPagination` uses 20 rows per page; the native screen now requests subsequent pages and only updates local read state after `markNotificationsAsRead` confirms success.
+- **QR:** do not implement worker-targeted invites, scan-to-add staff/favourites, QR persistence or QR scanner UI in this pass.
+- **QA:** source-level implementation and regression test authoring only. **Tests are not claimed passing.** The owner requested consolidated gates only after implementation. CI may run automatically from pushes; its status is not release acceptance.
+
+### Remaining non-QR source and operational work
+
+- Reconcile all W3 Post Shift/Shift Centre/worker offer edge cases with web including server-side immutable terms snapshot, manager approvals, public holiday locality, recurring slots and concurrent checkout.
+- Review finance revisions/received invoice conflicts and PDF delivery across five personas; native actual auth/scope and real staging payments remain unverified.
+- Finish per-persona W4–W8 field/function matrix, including organization/admin navigation, permissions, marketplace, accessibility, communications and subscription availability.
+- Verify authenticated staging, native SDK 58 Android/iOS signed builds and large text/device screenshots, Expo deep linking and stores, server-configured notification delivery/email/Stripe (only when separately authorised), startup/crash/OTA rollback.
+- Then conduct exact-head full Senior Package Testing, fix any failures, review the entire diff independently, and obtain owner approval before merge/release.
+
 ## Explicit scope decisions
 
 1. **Multi-slot interest:** retain the mobile single batch `slot_ids` request for Apply All/Selected. The backend `backend/shifts/interest.py` validates the requested slot IDs before writing and the contract test in `backend/shifts/test_shift_actions_contract.py` proves two-slot creation and one manager notification. The web's per-slot `Promise.all` has different partial-failure behaviour; duplicating that is *not* a safe visual parity fix.
