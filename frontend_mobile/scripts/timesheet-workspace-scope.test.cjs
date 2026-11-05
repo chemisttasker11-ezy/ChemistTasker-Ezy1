@@ -11,3 +11,17 @@ test('timesheet list invalidates in-flight data when changing pharmacy and perio
   assert.match(text, /setSummary\(null\); setRows\(\[\]\)/);
   assert.match(text, /useFocusEffect/);
 });
+
+test('manager timesheet lists do not show or mutate a previous account workspace', () => {
+  assert.match(text, /const accountKey = user \? String\(user\.id \?\? user\.email/);
+  assert.match(text, /if \(!pharmacyId \|\| loadedAccount !== scope\)/);
+  assert.match(text, /if \(!periodId \|\| loadedAccount !== scope\)/);
+  assert.match(text, /if \(!accountKey \|\| loadedAccount !== accountKey\) return/);
+  assert.match(text, /actionId === writeGeneration\.current && accountRef\.current === scope/);
+});
+test('worker My Hours rejects stale account reads and submissions', () => {
+  const worker = readFileSync(resolve(__dirname, '../app/my-hours.tsx'), 'utf8');
+  assert.match(worker, /snapshot\.account === accountKey \? snapshot\.rows : \[\]/);
+  assert.match(worker, /request === requestRef\.current && accountRef\.current === accountKey/);
+  assert.match(worker, /submitGeneration\.current === action && accountRef\.current === scope/);
+});
