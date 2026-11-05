@@ -41,6 +41,8 @@ export default function WorkforceTimesheetsScreen() {
   const [loadedAccount, setLoadedAccount] = useState('');
   const [pharmacies, setPharmacies] = useState<{ id: number; name: string }[]>([]);
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
+  const pharmacyRef = useRef<number | null>(null);
+  pharmacyRef.current = pharmacyId;
   const [periods, setPeriods] = useState<WorkforceTimesheetPeriod[]>([]);
   const [periodId, setPeriodId] = useState<number | null>(null);
   const periodsRequestRef = useRef(0);
@@ -122,31 +124,45 @@ export default function WorkforceTimesheetsScreen() {
 
   const refresh = useCallback(async (pull = false) => {
     const requestedAccount = accountKey;
+    const requestedPharmacy = pharmacyId;
+    const current = () => accountRef.current === requestedAccount && pharmacyRef.current === requestedPharmacy;
     if (pull) setRefreshing(true); else setLoading(true);
     setError('');
     try {
       await loadPeriods();
       await loadPeriod();
     } catch (failure: any) {
-      if (accountRef.current === requestedAccount) setError(failure?.message || 'Unable to load timesheets.');
+      if (current()) setError(failure?.message || 'Unable to load timesheets.');
     } finally {
-      if (accountRef.current === requestedAccount) { setLoading(false); setRefreshing(false); }
+      if (current()) { setLoading(false); setRefreshing(false); }
     }
-  }, [loadPeriod, loadPeriods, accountKey]);
+  }, [loadPeriod, loadPeriods, accountKey, pharmacyId]);
 
-  useEffect(() => { void loadPeriods().catch((failure: any) => setError(failure?.message || 'Unable to load timesheet periods.')).finally(() => setLoading(false)); }, [loadPeriods]);
+  useEffect(() => {
+    const account = accountKey;
+    const pharmacy = pharmacyId;
+    const current = () => accountRef.current === account && pharmacyRef.current === pharmacy;
+    void loadPeriods()
+      .catch((failure: any) => { if (current()) setError(failure?.message || 'Unable to load timesheet periods.'); })
+      .finally(() => { if (current()) setLoading(false); });
+  }, [loadPeriods, accountKey, pharmacyId]);
   useFocusEffect(useCallback(() => {
-    void loadPeriod().catch((failure: any) => setError(failure?.message || 'Unable to load timesheets.'));
+    const account = accountKey;
+    const pharmacy = pharmacyId;
+    void loadPeriod().catch((failure: any) => {
+      if (accountRef.current === account && pharmacyRef.current === pharmacy) setError(failure?.message || 'Unable to load timesheets.');
+    });
     return () => { detailRequestRef.current += 1; };
-  }, [loadPeriod]));
+  }, [loadPeriod, accountKey, pharmacyId]));
 
   const selectedPeriod = useMemo(() => periods.find(row => row.id === periodId) ?? null, [periodId, periods]);
 
   const run = async (action: () => Promise<unknown>) => {
     if (writeRef.current || !accountKey || loadedAccount !== accountKey) return;
     const scope = accountKey;
+    const pharmacy = pharmacyId;
     const actionId = ++writeGeneration.current;
-    const current = () => actionId === writeGeneration.current && accountRef.current === scope;
+    const current = () => actionId === writeGeneration.current && accountRef.current === scope && pharmacyRef.current === pharmacy;
     writeRef.current = true;
     setBusy(true);
     setError('');
@@ -166,8 +182,10 @@ export default function WorkforceTimesheetsScreen() {
     if (!pharmacyId) return;
     const range = currentFortnight();
     void run(async () => {
+      const requestedAccount = accountKey;
+      const requestedPharmacy = pharmacyId;
       const opened = await workforce.openTimesheetPeriod(pharmacyId, range.start, range.end);
-      setPeriodId(opened.id);
+      if (accountRef.current === requestedAccount && pharmacyRef.current === requestedPharmacy) setPeriodId(opened.id);
     });
   };
 
@@ -188,8 +206,10 @@ export default function WorkforceTimesheetsScreen() {
         text: 'Correct',
         style: 'destructive',
         onPress: () => void run(async () => {
+          const requestedAccount = accountKey;
+          const requestedPharmacy = pharmacyId;
           await workforce.correctTimesheetPeriod(periodId, reason);
-          setCorrectionReason('');
+          if (accountRef.current === requestedAccount && pharmacyRef.current === requestedPharmacy) setCorrectionReason('');
         }),
       },
     ]);
