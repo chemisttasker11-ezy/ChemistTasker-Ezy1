@@ -65,3 +65,14 @@ test('private seller and enquiry screens remount when authenticated account chan
  assert.match(src,/MarketplaceParityContent key=\{\`\$\{user\?\.id\?\?'signed-out'\}:\$\{screen\}\`\}/);
  assert.match(src,/const draftScope=String\(user\?\.id/);
 });
+
+test('seller listing submit and audience mutations are synchronous single-flight and recover in place',()=>{
+ const src=read('features/parity/marketplace.tsx');
+ assert.match(src,/function MyListingDetail\(/);
+ assert.match(src,/const actionBusyRef=useRef\(false\)/);
+ assert.match(src,/if\(!row\|\|actionBusyRef\.current\)return/);
+ assert.match(src,/if\(!row\|\|!next\|\|actionBusyRef\.current\)return/);
+ assert.match(src,/finally\{actionBusyRef\.current=false;setBusy\(false\);\}/);
+ assert.match(src,/title="Listing action could not be completed"/);
+ assert.match(src,/onRetry=\{onReload\}/);
+});
