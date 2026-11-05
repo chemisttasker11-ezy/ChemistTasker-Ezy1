@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ActivityIndicator, Card, IconButton, Menu, Snackbar, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Card, IconButton, Menu, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useSegments } from 'expo-router';
 import {
@@ -19,6 +19,7 @@ import {
 } from '@chemisttasker/shared-core';
 import { shareLegacyInvoicePdf } from './shareLegacyInvoicePdf';
 import MobileInvoiceStats from './MobileInvoiceStats';
+import { colors, font, radius, space, touch } from '@/constants/tokens';
 import FinanceWorkspace from './FinanceWorkspace';
 import {
   filterInvoicesByTimeframe,
@@ -41,6 +42,23 @@ type Invoice = {
 };
 
 const PAGE_SIZE = 10;
+
+// DRF collection pagination is server-owned. Never report an empty invoice
+// history when page two or a later page has not been fetched.
+export async function fetchCompleteLegacyInvoices(): Promise<Invoice[]> {
+  const collected: Invoice[] = [];
+  const visited = new Set<string>();
+  for (let page = 1; page <= 100; page += 1) {
+    const data = await getInvoices({ page });
+    if (Array.isArray(data)) return [...collected, ...(data as Invoice[])];
+    if (!data || !Array.isArray(data.results)) throw new Error('Unexpected legacy invoice list response.');
+    collected.push(...data.results as Invoice[]);
+    if (!data.next) return collected;
+    if (visited.has(data.next)) throw new Error('Legacy invoice pagination repeated a page.');
+    visited.add(data.next);
+  }
+  throw new Error('Invoice history exceeds the available page limit. Please narrow the server query.');
+}
 
 type Props = { basePath?: string };
 
@@ -68,23 +86,24 @@ function LegacyInvoiceList({ basePath }: Props) {
   const [page, setPage] = useState(1);
   const [menuFor, setMenuFor] = useState<number | null>(null);
   const [snackbar, setSnackbar] = useState<string>('');
+  const [loadError, setLoadError] = useState('');
+  const requestGeneration = React.useRef(0);
   const [timeframe, setTimeframe] = useState<InvoiceTimeframe>('this_year');
 
   const load = useCallback(async () => {
+    const gen = ++requestGeneration.current;
     setLoading(true);
+    setLoadError('');
     try {
-      const data = await getInvoices();
-      const list = Array.isArray((data as any)?.results)
-        ? (data as any).results
-        : Array.isArray(data)
-        ? (data as any)
-        : [];
-      setInvoices(list);
+      const records = await fetchCompleteLegacyInvoices();
+      if (gen !== requestGeneration.current) return;
+      setInvoices(records);
     } catch (err: any) {
-      setSnackbar(err?.message || 'Failed to load invoices');
-      setInvoices([]);
+      if (gen !== requestGeneration.current) return;
+      // Preserve the last good list instead of inventing an empty history.
+      setLoadError(err?.message || 'Failed to load invoices');
     } finally {
-      setLoading(false);
+      if (gen === requestGeneration.current) setLoading(false);
     }
   }, []);
 
@@ -97,6 +116,7 @@ function LegacyInvoiceList({ basePath }: Props) {
 
   React.useEffect(() => {
     void load();
+    return () => { requestGeneration.current += 1; };
   }, [load]);
 
   const sorted = useMemo(() => {
@@ -220,7 +240,10 @@ function LegacyInvoiceList({ basePath }: Props) {
     const statusLabel = financeManaged && String(item.status || '').toLowerCase() === 'draft' ? 'Saved' : (item.status || 'Unknown');
     const useWorkspace = () => {
       setMenuFor(null);
-      setSnackbar(`This invoice is managed in the ${isReceivedMode ? 'Received' : 'Invoices'} tab.`);
+      // finance_record_id is the managed record's primary key, not the
+      // historical invoice id: open the first-party review drawer directly.
+      if (!item.finance_record_id) return;
+      router.push(`${resolvedBase}?invoice=${item.finance_record_id}` as any);
     };
     return (
     <TouchableOpacity
@@ -273,7 +296,7 @@ function LegacyInvoiceList({ basePath }: Props) {
               {financeManaged ? (
                 <Menu.Item
                   leadingIcon="information-outline"
-                  title={`Use ${isReceivedMode ? 'Received' : 'Invoices'} tab`}
+                  title={`Open in ${isReceivedMode ? 'Received' : 'Invoices'}`}
                   onPress={useWorkspace}
                 />
               ) : !isReceivedMode ? (
@@ -310,15 +333,23 @@ function LegacyInvoiceList({ basePath }: Props) {
                   }
                 }}
               /> : null}
-              <Menu.Item
-                leadingIcon="file-pdf-box"
-                title={sharingPdfId === item.id ? "Preparing PDF…" : "Open PDF"}
-                disabled={sharingPdfId != null}
-                onPress={() => {
-                  setMenuFor(null);
-                  void onOpenPdf(item.id);
-                }}
-              />
+              {financeManaged ? (
+                <Menu.Item
+                  leadingIcon="file-pdf-box"
+                  title="View or share in Finance"
+                  onPress={useWorkspace}
+                />
+              ) : (
+                <Menu.Item
+                  leadingIcon="file-pdf-box"
+                  title={sharingPdfId === item.id ? 'Preparing PDF…' : 'Open PDF'}
+                  disabled={sharingPdfId != null}
+                  onPress={() => {
+                    setMenuFor(null);
+                    void onOpenPdf(item.id);
+                  }}
+                />
+              )}
               {!financeManaged && (isReceivedMode ? (
                 <Menu.Item
                   leadingIcon="alert-circle-outline"
@@ -372,7 +403,18 @@ function LegacyInvoiceList({ basePath }: Props) {
           keyExtractor={item => String(item.id)}
           contentContainerStyle={styles.listContent}
           renderItem={renderItem}
-          ListHeaderComponent={
+          ListHeaderComponent={<View>
+            {loadError ? <Card style={styles.errorCard}>
+              <Card.Content style={{ gap: space.sm }}>
+                <Text accessibilityRole="alert" variant="titleSmall" style={{ color: colors.status.red.fg }}>
+                  Invoice history could not refresh
+                </Text>
+                <Text style={{ color: colors.textPrimary }}>{loadError}</Text>
+                <Button mode="outlined" contentStyle={{ minHeight: touch.min }} onPress={() => void load()}>
+                  Try again
+                </Button>
+              </Card.Content>
+            </Card> : null}
             <MobileInvoiceStats
               invoices={sorted}
               timeframe={timeframe}
@@ -382,7 +424,7 @@ function LegacyInvoiceList({ basePath }: Props) {
                 setTimeframe(value);
               }}
             />
-          }
+          </View>}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4F46E5" />
           }
@@ -390,7 +432,7 @@ function LegacyInvoiceList({ basePath }: Props) {
           onEndReached={() => {
             if (paginated.length < filtered.length) setPage(p => p + 1);
           }}
-          ListEmptyComponent={
+          ListEmptyComponent={loadError ? null : (
             <View style={styles.empty}>
               <Text variant="titleMedium">No invoices yet</Text>
               <Text variant="bodyMedium" style={styles.sub}>
@@ -399,7 +441,7 @@ function LegacyInvoiceList({ basePath }: Props) {
                   : 'Generated invoices will appear here.'}
               </Text>
             </View>
-          }
+          )}
         />
       )}
 
@@ -422,7 +464,7 @@ const statusStyle = (status?: string) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.pageBg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -431,15 +473,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerCopy: { flex: 1 },
-  headerTitle: { fontWeight: '700' },
-  headerSubtitle: { color: '#6B7280' },
+  headerTitle: { fontFamily: font.outfit.medium, color: colors.textPrimary },
+  headerSubtitle: { color: colors.textSecondary },
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingHorizontal: 12, paddingBottom: 12, gap: 10 },
-  card: {
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    elevation: 1,
-  },
+  card: { borderRadius: radius.card, backgroundColor: colors.surfaceBg, elevation: 0, borderWidth: 1, borderColor: colors.border },
+  errorCard: { marginBottom: space.md, backgroundColor: colors.status.red.bg, borderColor: colors.status.red.fg, borderWidth: 1, borderRadius: radius.card },
   cardContent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   row: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   iconBox: {
