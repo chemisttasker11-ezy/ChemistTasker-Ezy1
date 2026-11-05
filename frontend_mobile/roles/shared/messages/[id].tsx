@@ -52,7 +52,7 @@ const CHAT_ATTACHMENT_TYPES = [
     'image/webp',
     'image/gif',
 ];
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 
 const messageKey = (item: MessageDisplay) => item.id ?? `${item.created_at}-${item.body}`;
 const messageTime = (item: MessageDisplay) => {
@@ -522,7 +522,7 @@ export default function SharedMessageDetailScreen() {
         const roomId = pickRoomId;
         if (sendBusyRef.current) return;
         if (file.size && file.size > MAX_ATTACHMENT_BYTES) {
-            setSnackbar('Attachments must be 10 MB or smaller.');
+            setSnackbar('Attachments must be 15 MB or smaller.');
             return;
         }
 

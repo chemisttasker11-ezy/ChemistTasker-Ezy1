@@ -2,6 +2,7 @@ import { FC, useMemo, useState } from 'react';
 import { Avatar, Box, IconButton, Paper, Tooltip, Typography } from '@mui/material';
 import { Copy, FileText, MessageCircle, Pencil, Pin, PinOff, SmilePlus, Trash2 } from 'lucide-react';
 import type { ChatMessage, UserLite } from './types';
+import { API_BASE_URL } from '../../../../constants/api';
 import { downloadChatAttachment } from '@chemisttasker/shared-core';
 import {
   EMOJI_FONT,
@@ -19,7 +20,16 @@ import {
  */
 export const safeChatAttachmentHref = (raw: string | null | undefined, messageId?: number): string | null => {
   if (!raw || !Number.isSafeInteger(messageId) || !messageId || messageId < 1) return null;
-  return raw === `/api/v1/messages/${messageId}/attachment/` ? raw : null;
+  const route = `/api/v1/messages/${messageId}/attachment/`;
+  if (raw === route) return route;
+  // Existing ChatPage normalizes relative API links to an absolute URL.
+  // Permit only the exact matching endpoint at the configured API origin.
+  try {
+    const origin = new URL(API_BASE_URL, window.location.origin).origin;
+    return raw === new URL(route, origin).href ? route : null;
+  } catch {
+    return null;
+  }
 };
 
 
