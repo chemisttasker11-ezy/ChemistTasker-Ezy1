@@ -143,6 +143,11 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     if (!current()) return;
     const bytes = await nativeFileBytes(blob);
     if (!current()) return;
+    // Do not hand HTML error bodies or other unexpected downloads to the OS
+    // as an invoice. Same PDF signature requirement as the legacy invoice path.
+    if (bytes.length < 5 || bytes[0] !== 37 || bytes[1] !== 80 || bytes[2] !== 68 || bytes[3] !== 70 || bytes[4] !== 45) {
+      throw new Error('The invoice could not be opened as a PDF.');
+    }
     const safeNumber = String(invoice.number).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
     const file = new File(Paths.cache, `invoice-${invoice.id}-${safeNumber}-revision-${targetVersion}.pdf`);
     try {
