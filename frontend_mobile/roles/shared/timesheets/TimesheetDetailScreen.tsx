@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Button, Card, Chip, Switch, Text, TextInput } from 'react-native-paper';
@@ -12,7 +12,11 @@ import TimesheetAdjustTimesSheet from './TimesheetAdjustTimesSheet';
 export default function TimesheetDetailScreen({ managerMode }: { managerMode: boolean }) {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
-  const { hasCapability } = useAuth();
+  const { hasCapability, user } = useAuth();
+  const accountKey = user ? String(user.id ?? user.email ?? user.username ?? '') : '';
+  const currentAccountRef = useRef(accountKey);
+  currentAccountRef.current = accountKey;
+  const writeGeneration = useRef(0);
   const timesheetId = Number(id);
   const valid = Number.isSafeInteger(timesheetId) && timesheetId > 0;
   const generation = useRef(0);
@@ -33,26 +37,46 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   const managerAllowed = Boolean(managerMode && data?.pharmacy?.id && hasCapability('MANAGE_ROSTER', data.pharmacy.id));
   const periodLocked = data?.period_status === 'LOCKED';
   const managerCanChange = managerAllowed && !periodLocked;
+  useEffect(() => {
+    // Do not display another account's timesheet or keep its draft corrections.
+    generation.current += 1;
+    writeGeneration.current += 1;
+    writeRef.current = false;
+    setData(null);
+    setLoading(Boolean(accountKey));
+    setBusy('');
+    setError('');
+    setSuccess('');
+    setComment('');
+    setReasonsByCheck({});
+    setReopenReason('');
+    setMissingPunchCheck(null);
+    setMissingPunchAt('');
+    setMissingPunchReason('');
+    setAdjustingDay(null);
+  }, [accountKey]);
 
   const load = useCallback(async () => {
     const request = ++generation.current;
-    setLoading(true);
+    const requestedAccount = accountKey;
+    const current = () => request === generation.current && currentAccountRef.current === requestedAccount;
+    setLoading(Boolean(requestedAccount));
     setError('');
     setData(null);
-    if (!valid) {
-      setError('Invalid timesheet link.');
+    if (!valid || !requestedAccount) {
+      setError(!requestedAccount ? 'Sign in to review this timesheet.' : 'Invalid timesheet link.');
       setLoading(false);
       return;
     }
     try {
       const result = await workforce.getTimesheet(timesheetId);
-      if (request === generation.current) setData(result);
+      if (current()) setData(result);
     } catch (failure: any) {
-      if (request === generation.current) setError(failure?.response?.data?.detail || failure?.message || 'Unable to load the timesheet.');
+      if (current()) setError(failure?.response?.data?.detail || failure?.message || 'Unable to load the timesheet.');
     } finally {
-      if (request === generation.current) setLoading(false);
+      if (current()) setLoading(false);
     }
-  }, [timesheetId, valid]);
+  }, [timesheetId, valid, accountKey]);
 
   useFocusEffect(useCallback(() => {
     void load();
@@ -60,22 +84,28 @@ export default function TimesheetDetailScreen({ managerMode }: { managerMode: bo
   }, [load]));
 
   const run = async (label: string, action: () => Promise<unknown>, done: string) => {
-    if (writeRef.current || !valid) return false;
+    if (writeRef.current || !valid || !accountKey) return false;
+    const requestedAccount = accountKey;
+    const writeRequest = ++writeGeneration.current;
+    const current = () => writeRequest === writeGeneration.current && currentAccountRef.current === requestedAccount;
     writeRef.current = true;
     setBusy(label);
     setError('');
     setSuccess('');
     try {
       await action();
+      if (!current()) return false;
       setSuccess(done);
       await load();
-      return true;
+      return current();
     } catch (failure: any) {
-      setError(failure?.response?.data?.error || failure?.response?.data?.detail || failure?.message || 'The action could not be saved.');
+      if (current()) setError(failure?.response?.data?.error || failure?.response?.data?.detail || failure?.message || 'The action could not be saved.');
       return false;
     } finally {
-      writeRef.current = false;
-      setBusy('');
+      if (current()) {
+        writeRef.current = false;
+        setBusy('');
+      }
     }
   };
 
