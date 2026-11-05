@@ -38,6 +38,8 @@ type Props = {
   setEmploymentType: Setter<string>;
   getEmploymentLabel: (value: string) => string;
   descriptionTemplateLoading: boolean;
+  descriptionTemplateError: string;
+  retryDescriptionTemplate: () => void;
   descriptionTemplate: ShiftDescriptionTemplate | null;
   descriptionTemplateSaving: boolean;
   handleUseDescriptionTemplate: () => void;
@@ -75,6 +77,8 @@ export default function PostShiftDetailsStep({
   setEmploymentType,
   getEmploymentLabel,
   descriptionTemplateLoading,
+  descriptionTemplateError,
+  retryDescriptionTemplate,
   descriptionTemplate,
   descriptionTemplateSaving,
   handleUseDescriptionTemplate,
@@ -150,6 +154,17 @@ export default function PostShiftDetailsStep({
         label="Description"
         placeholder="For example: busy community pharmacy, Webster packs on Tuesdays."
       />
+      {descriptionTemplateError ? (
+        <View style={{ gap: space.sm }} accessibilityRole="alert">
+          <Text style={{ color: colors.status.red.fg }}>
+            Saved description unavailable: {descriptionTemplateError}
+          </Text>
+          <Button mode="outlined" icon="refresh" contentStyle={{ minHeight: touch.min }}
+            onPress={retryDescriptionTemplate} disabled={descriptionTemplateLoading}>
+            Retry saved description
+          </Button>
+        </View>
+      ) : null}
       <View style={styles.templateActions}>
         {descriptionTemplate?.description ? (
           <Button mode="text" compact onPress={handleUseDescriptionTemplate} style={styles.templateButton} contentStyle={{ minHeight: touch.min }}>Use saved description</Button>
@@ -158,7 +173,7 @@ export default function PostShiftDetailsStep({
           mode="text"
           compact
           loading={descriptionTemplateSaving}
-          disabled={descriptionTemplateLoading || descriptionTemplateSaving || !pharmacyId || !roleNeeded || !description.trim()}
+          disabled={descriptionTemplateLoading || descriptionTemplateSaving || Boolean(descriptionTemplateError) || !pharmacyId || !roleNeeded || !description.trim()}
           onPress={handleSaveDescriptionTemplate}
           style={styles.templateButton}
           contentStyle={{ minHeight: touch.min }}

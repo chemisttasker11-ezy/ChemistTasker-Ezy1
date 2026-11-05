@@ -150,6 +150,8 @@ export default function PostShiftScreen() {
     const [description, setDescription] = useState('');
     const [descriptionTemplate, setDescriptionTemplate] = useState<ShiftDescriptionTemplate | null>(null);
     const [descriptionTemplateLoading, setDescriptionTemplateLoading] = useState(false);
+    const [descriptionTemplateError, setDescriptionTemplateError] = useState('');
+    const [templateRetry, setTemplateRetry] = useState(0);
     const [descriptionTemplateSaving, setDescriptionTemplateSaving] = useState(false);
     const [descriptionTemplateAutoAppliedKey, setDescriptionTemplateAutoAppliedKey] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -243,6 +245,7 @@ export default function PostShiftScreen() {
         setDescriptionTemplateAutoAppliedKey(null);
         setDescriptionTemplateLoading(false);
         setDescriptionTemplateSaving(false);
+        setDescriptionTemplateError('');
         setSlots(prefillState.slots);
         setSlotDate(prefillState.slotDate);
         setSelectedDates(prefillState.selectedDates);
@@ -701,6 +704,7 @@ export default function PostShiftScreen() {
         if (!pharmacyId || !roleNeeded) {
             setDescriptionTemplate(null);
             setDescriptionTemplateAutoAppliedKey(null);
+            setDescriptionTemplateError('');
             return;
         }
 
@@ -710,6 +714,7 @@ export default function PostShiftScreen() {
         const loadDescriptionTemplate = async () => {
             // Never offer an old pharmacy/role template while the new scope loads.
             setDescriptionTemplate(null);
+            setDescriptionTemplateError('');
             setDescriptionTemplateLoading(true);
             try {
                 const data = await listShiftDescriptionTemplates(Number(pharmacyId), roleNeeded);
@@ -726,9 +731,10 @@ export default function PostShiftScreen() {
                     setDescription(template.description);
                     setDescriptionTemplateAutoAppliedKey(templateKey);
                 }
-            } catch {
+            } catch (failure: any) {
                 if (!cancelled) {
                     setDescriptionTemplate(null);
+                    setDescriptionTemplateError(failure?.message || 'Could not load the saved description.');
                 }
             } finally {
                 if (!cancelled) {
@@ -742,7 +748,7 @@ export default function PostShiftScreen() {
         return () => {
             cancelled = true;
         };
-    }, [pharmacyId, roleNeeded, editingId]);
+    }, [pharmacyId, roleNeeded, editingId, templateRetry]);
 
     const handleUseDescriptionTemplate = useCallback(() => {
         if (!descriptionTemplate?.description) return;
@@ -758,7 +764,7 @@ export default function PostShiftScreen() {
             setToast('Enter a description before saving it as a template');
             return;
         }
-        if (descriptionTemplateSaving) return;
+        if (descriptionTemplateSaving || descriptionTemplateLoading || descriptionTemplateError) return;
         const mutation = ++templateMutationGen.current;
         const scope = templateScope;
         const stillCurrent = () => mutation === templateMutationGen.current && templateScopeRef.current === scope;
@@ -774,7 +780,7 @@ export default function PostShiftScreen() {
         } finally {
             if (stillCurrent()) setDescriptionTemplateSaving(false);
         }
-    }, [description, descriptionTemplateSaving, pharmacyId, roleNeeded, templateScope]);
+    }, [description, descriptionTemplateSaving, descriptionTemplateLoading, descriptionTemplateError, pharmacyId, roleNeeded, templateScope]);
 
     const handleDeleteDescriptionTemplate = useCallback(() => {
         if (!descriptionTemplate?.id || descriptionTemplateSaving) return;
@@ -1249,6 +1255,8 @@ export default function PostShiftScreen() {
                         setEmploymentType={edited(setEmploymentType)}
                         getEmploymentLabel={getEmploymentLabel}
                         descriptionTemplateLoading={descriptionTemplateLoading}
+                        descriptionTemplateError={descriptionTemplateError}
+                        retryDescriptionTemplate={() => setTemplateRetry(current => current + 1)}
                         descriptionTemplate={descriptionTemplate}
                         descriptionTemplateSaving={descriptionTemplateSaving}
                         handleUseDescriptionTemplate={edited(handleUseDescriptionTemplate)}
