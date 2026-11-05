@@ -205,3 +205,9 @@ These targeted source changes close several previously demonstrated implementati
 **Scope:** no change to paid checkout, Award/holiday rules, payroll locking, invoice financial calculations, QR scanning or server authorization. Do not claim end-to-end acceptance of these corrections without native and backend regression execution.
 
 **Current exact-head caveat:** source changes are committed, but the full CI/check-run suite is not yet confirmed complete on the latest SHA. The container cannot clone the repository from GitHub due unavailable DNS; source inspection and commits used the connected GitHub repository API. Android/iOS simulator, authenticated end-to-end testing, staging Stripe/SMTP/push providers, accessibility screenshots, app signing and store preparation remain unverified. The PR must stay draft and unmerged until those requirements are addressed.
+
+### Continued group-chat mutation safety
+
+- `6b92340a`: stale callbacks for chat room rename, deletion, pin changes and group creation can no longer close dialogs, navigate or display completion messages in a newly signed-in account. The account-change effect resets the rename spinner. Previously issued requests remain backend-authoritative and cannot be cancelled retroactively.
+- CI workflows for the working PR are auto-triggered by pushes. The new head requires a completed exact-head check; previous intermittent results and pending/skipped checks do not establish release acceptance.
+- This change does **not** implement any QR scan-to-add, membership invitation identity binding, live provider payment, server permissions override, or app release action.
