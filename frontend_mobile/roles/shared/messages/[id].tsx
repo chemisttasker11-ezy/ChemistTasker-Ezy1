@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity, Linking } from 'react-native';
+import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { Text, TextInput, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar, Avatar, Icon } from 'react-native-paper';
-import { Image } from 'expo-image';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useFocusEffect, useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -9,6 +10,7 @@ import {
     getRoomMessages,
     fetchRoomMessagesByUrl,
     sendRoomMessageService,
+    downloadChatAttachment,
     markRoomAsRead,
     reactToMessageService,
     updateMessageService,
@@ -24,8 +26,7 @@ import debounce from 'lodash.debounce';
 import { triggerUnreadBump } from '@/utils/pushNotifications';
 import { getActiveRoomId, setActiveRoomId } from '../chat/activeRoomState';
 import { displayNameFromUser } from '../chat/displayName';
-import { resolveApiBaseUrl } from '@/utils/apiUrl';
-import { safeChatAttachmentUrl } from './chatAttachmentUrl';
+import { nativeFileBytes } from '@/features/parity/nativeFileBytes';
 import { isNextPageForRoom, mergeOlderMessages, shouldAutoFollowMessage } from './messageHistory';
 
 type MessageDisplay = ChatMessage & { is_me: boolean };
@@ -52,7 +53,6 @@ const CHAT_ATTACHMENT_TYPES = [
     'image/gif',
 ];
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-const isImageAttachment = (item: MessageDisplay) => /\.(?:gif|jpe?g|png|webp)(?:$|[?#])/i.test(item.attachment_filename || item.attachment_url || '');
 
 const messageKey = (item: MessageDisplay) => item.id ?? `${item.created_at}-${item.body}`;
 const messageTime = (item: MessageDisplay) => {
@@ -728,14 +728,39 @@ const pinnedMessage = useMemo(() => {
         const isMe = item.is_me;
         const senderName = senderNameOf(item);
         const senderPhoto = photoOf(resolveMessageIdentity(item));
-        const attachmentUrl = safeChatAttachmentUrl(item.attachment_url, resolveApiBaseUrl(), process.env.EXPO_PUBLIC_CHAT_ATTACHMENT_ORIGINS);
+        const attachmentAvailable = Number.isSafeInteger(item.id) && Number(item.id) > 0 &&
+            item.attachment_url === `/api/v1/messages/${item.id}/attachment/`;
         const openAttachment = async () => {
-            if (!attachmentUrl) return;
+            if (!attachmentAvailable) return;
+            const accountId = user?.id ?? null;
+            const roomId = parseRoomId();
+            const current = () => accountId != null && accountRef.current === accountId && parseRoomId() === roomId;
+            if (!current()) return;
+            let file: File | null = null;
             try {
-                if (!await Linking.canOpenURL(attachmentUrl)) throw new Error('Unsupported attachment URL');
-                await Linking.openURL(attachmentUrl);
+                if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is unavailable on this device.');
+                if (!current()) return;
+                const blob = await downloadChatAttachment(Number(item.id));
+                if (!current()) return;
+                const bytes = await nativeFileBytes(blob);
+                if (!current()) return;
+                if (!bytes.length || bytes.length > 15 * 1024 * 1024) throw new Error('Attachment size is invalid.');
+                const safeName = String(item.attachment_filename || 'attachment')
+                    .replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 90);
+                file = new File(Paths.cache, `chat-${item.id}-${Date.now()}-${safeName}`);
+                file.create({ overwrite: false });
+                await file.write(bytes);
+                if (!current()) return;
+                await Sharing.shareAsync(file.uri, {
+                    dialogTitle: 'Open or share chat attachment',
+                    mimeType: blob.type || 'application/octet-stream',
+                });
             } catch {
-                setSnackbar('Unable to open this attachment.');
+                if (current()) setSnackbar('Unable to open attachment. Check your access and connection.');
+            } finally {
+                if (file) {
+                    try { file.delete(); } catch { /* platform share provider may have moved it */ }
+                }
             }
         };
         return (
@@ -773,25 +798,23 @@ const pinnedMessage = useMemo(() => {
                             {item.is_edited ? ' (edited)' : ''}
                             </Text>
                         </View>
-                    {item.attachment_url && !attachmentUrl ? (
-                        <Text accessibilityRole="alert" style={styles.attachmentLabel}>Attachment link unavailable</Text>
+                    {item.attachment_url && !attachmentAvailable ? (
+                        <Text accessibilityRole="alert" style={styles.attachmentLabel}>Attachment unavailable</Text>
                     ) : null}
-                    {attachmentUrl ? (
+                    {attachmentAvailable ? (
                         <TouchableOpacity
-                            accessibilityRole="link"
-                            accessibilityLabel={`Open attachment ${item.attachment_filename || ''}`.trim()}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Open or share attachment ${item.attachment_filename || ''}`.trim()}
                             activeOpacity={0.8}
                             onPress={() => void openAttachment()}
                             style={styles.attachment}
                         >
-                            {isImageAttachment(item) ? (
-                                <Image source={{ uri: attachmentUrl }} style={styles.attachmentImage} contentFit="cover" transition={150} />
-                            ) : (
-                                <View style={styles.attachmentFile}>
-                                    <Icon source="file-document-outline" size={22} />
-                                    <Text numberOfLines={2} style={styles.attachmentLabel}>{item.attachment_filename || 'Open attachment'}</Text>
-                                </View>
-                            )}
+                            <View style={styles.attachmentFile}>
+                                <Icon source="file-document-outline" size={22} />
+                                <Text numberOfLines={2} style={styles.attachmentLabel}>
+                                    {item.attachment_filename || 'Open attachment securely'}
+                                </Text>
+                            </View>
                         </TouchableOpacity>
                     ) : null}
                     {renderReactions(item)}
