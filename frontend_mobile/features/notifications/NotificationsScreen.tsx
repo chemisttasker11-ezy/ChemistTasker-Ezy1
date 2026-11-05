@@ -274,7 +274,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container}>
       {loading && notifications.length === 0 && !loadError ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.brandViolet} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   unreadItem: {
     backgroundColor: colors.tone.violet.bg,
     borderLeftWidth: 4,
-    borderLeftColor: colors.brandViolet,
+    borderLeftColor: colors.primary,
   },
   iconContainer: {
     position: 'relative',
