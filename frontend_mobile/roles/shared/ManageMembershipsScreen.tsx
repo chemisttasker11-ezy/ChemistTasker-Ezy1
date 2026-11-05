@@ -65,6 +65,9 @@ function adminCapabilitiesText(membership: Membership) {
 export default function ManageMembershipsScreen() {
   const { user, refreshUser } = useAuth();
   const generationRef = useRef(0);
+  const currentAccountRef = useRef(user?.id ?? null);
+  currentAccountRef.current = user?.id ?? null;
+  const actionBusyRef = useRef(false);
   const { refresh: refreshAhpra } = useAhpra();
   const theme = useTheme();
   const [memberships, setMemberships] = useState<Membership[]>([]);
@@ -79,12 +82,14 @@ export default function ManageMembershipsScreen() {
 
   const loadMemberships = useCallback(async () => {
     const generation = ++generationRef.current;
+    const requestedAccount = currentAccountRef.current;
+    const current = () => generation === generationRef.current && currentAccountRef.current === requestedAccount;
     try {
       const [membershipsResult, invitationsResult] = await Promise.allSettled([
         getMyMemberships(),
         getPendingPharmacyAdminInvitations(),
       ]);
-      if (generation !== generationRef.current) return;
+      if (!current()) return;
       if (membershipsResult.status === 'rejected') throw membershipsResult.reason;
       const data = membershipsResult.value;
       setMemberships((Array.isArray(data) ? data : data?.results || []) as unknown as Membership[]);
@@ -96,9 +101,9 @@ export default function ManageMembershipsScreen() {
         setError('Memberships loaded, but admin invitations could not be refreshed. Pull down to try again.');
       }
     } catch (err: any) {
-      if (generation === generationRef.current) setError(getMembershipErrorMessage(err, 'Unable to load memberships.'));
+      if (current()) setError(getMembershipErrorMessage(err, 'Unable to load memberships.'));
     } finally {
-      if (generation === generationRef.current) {
+      if (current()) {
         setLoadedOnce(true);
         setLoading(false);
         setRefreshing(false);
@@ -112,15 +117,26 @@ export default function ManageMembershipsScreen() {
     setAdminInvitations([]);
     setLoadedOnce(false);
     setLoading(true);
+    setError(null);
+    setActingKey(null);
+    setQuitTarget(null);
+    setToast(null);
+    actionBusyRef.current = false;
     void loadMemberships();
-    return () => { generationRef.current += 1; };
+    return () => { generationRef.current += 1; actionBusyRef.current = false; };
   }, [loadMemberships, user?.id]);
 
   const runAction = async (membership: Membership, action: 'accept' | 'reject' | 'quit') => {
+    if (actionBusyRef.current) return;
+    const requestedAccount = currentAccountRef.current;
+    if (requestedAccount == null || requestedAccount !== (user?.id ?? null)) return;
+    actionBusyRef.current = true;
     setActingKey(`membership-${membership.id}`);
     try {
       await respondToMyMembership(membership.id, action);
+      if (currentAccountRef.current !== requestedAccount) return;
       await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
+      if (currentAccountRef.current !== requestedAccount) return;
       setQuitTarget(null);
       setToast(
         action === 'quit'
@@ -130,22 +146,39 @@ export default function ManageMembershipsScreen() {
             : 'Invitation rejected.'
       );
     } catch (err: any) {
-      Alert.alert('Membership update failed', getMembershipErrorMessage(err, `Unable to ${action} membership.`));
+      if (currentAccountRef.current === requestedAccount) {
+        Alert.alert('Membership update failed', getMembershipErrorMessage(err, `Unable to ${action} membership.`));
+      }
     } finally {
-      setActingKey(null);
+      if (currentAccountRef.current === requestedAccount) {
+        actionBusyRef.current = false;
+        setActingKey(null);
+      }
     }
   };
 
   const respondToAdmin = async (invitation: AdminInvitation, accept: boolean) => {
+    if (actionBusyRef.current) return;
+    const requestedAccount = currentAccountRef.current;
+    if (requestedAccount == null || requestedAccount !== (user?.id ?? null)) return;
+    actionBusyRef.current = true;
     setActingKey(`admin-${invitation.id}`);
     try {
       await respondToPharmacyAdminInvitation(invitation.id, accept);
+      if (currentAccountRef.current !== requestedAccount) return;
       await Promise.all([loadMemberships(), refreshUser(), refreshAhpra()]);
-      setToast(accept ? 'Admin access accepted.' : 'Admin invitation declined.');
+      if (currentAccountRef.current === requestedAccount) {
+        setToast(accept ? 'Admin access accepted.' : 'Admin invitation declined.');
+      }
     } catch (err: any) {
-      setError(getMembershipErrorMessage(err, 'Unable to respond to this admin invitation.'));
+      if (currentAccountRef.current === requestedAccount) {
+        setError(getMembershipErrorMessage(err, 'Unable to respond to this admin invitation.'));
+      }
     } finally {
-      setActingKey(null);
+      if (currentAccountRef.current === requestedAccount) {
+        actionBusyRef.current = false;
+        setActingKey(null);
+      }
     }
   };
 
