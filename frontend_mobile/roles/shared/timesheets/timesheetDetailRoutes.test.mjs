@@ -37,3 +37,13 @@ test('worker and manager timesheet routes share a native detail implementation b
   assert.match(detail, /managerAllowed && !periodLocked/);
   assert.match(detail, /!data\.snapshot/);
 });
+
+test('timesheet screen never reuses another signed-in account data or late write results', () => {
+  const detail = read('./TimesheetDetailScreen.tsx');
+  assert.match(detail, /const accountKey = user \? String\(user\.id \?\? user\.email/);
+  assert.match(detail, /currentAccountRef\.current === requestedAccount/);
+  assert.match(detail, /writeRequest === writeGeneration\.current/);
+  assert.match(detail, /setData\(null\)/);
+  assert.match(detail, /setMissingPunchCheck\(null\)/);
+  assert.match(detail, /if \(!current\(\)\) return false/);
+});
