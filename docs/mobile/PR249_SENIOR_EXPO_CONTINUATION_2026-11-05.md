@@ -36,6 +36,22 @@
 
 Tests have been **authored but not executed** as instructed. All conclusions are source-level implementation only.
 
+## Continuation after the QR scope freeze (5 Nov 2026)
+
+Owner direction: **Leave the QR profile scanner as implemented.** No further scanner, QR identity, favourites-by-scan, or membership invite workflow changes in this continuation. These are deferred product opportunities, not work blocking unrelated Expo parity.
+
+New staged commits:
+
+| SHA | Implementation |
+|---|---|
+| `2e9d35d9` | Worker Basic Info parity: photo-management entry, mobile verification, legal-name/phone lock derived from verified status, DRF field error formatting, explicit retry state; pharmacist and other-staff source contracts |
+| `bbf07508` | Post Shift template and pharmacy rate mutations ignore stale success/failure/finally callbacks after a pharmacy/role switch; confirm-time template delete scope check |
+| `65380643` | Profile-initiated mobile verification returns to the worker Basic Info task after success; initial registration continues to use the original dashboard transition |
+
+**Important limits:** Photo selection/upload uses the existing worker Profile screens, and OTP uses the existing `/mobile-verify` service; no parallel upload or verification state machine was created. Tests added to the repository have not undergone the deferred consolidated gate. Source review does not establish Android/iOS runtime behaviour, real permissions, backend provider delivery or release readiness.
+
+**Next unclosed parity priorities (QR excluded):** full user-facing field and workflow comparison for Post Shift and worker onboarding, invoice revision and finance acceptance, subscription/checkout and roster freeze, notifications and marketplace, source-level navigation for all personas, then native visual/device acceptance and final exact-SHA gates. Maintain backend semantics and authorisation at every step.
+
 ## Explicit scope decisions
 
 1. **Multi-slot interest:** retain the mobile single batch `slot_ids` request for Apply All/Selected. The backend `backend/shifts/interest.py` validates the requested slot IDs before writing and the contract test in `backend/shifts/test_shift_actions_contract.py` proves two-slot creation and one manager notification. The web's per-slot `Promise.all` has different partial-failure behaviour; duplicating that is *not* a safe visual parity fix.
