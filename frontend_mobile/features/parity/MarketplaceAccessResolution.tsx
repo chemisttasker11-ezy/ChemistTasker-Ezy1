@@ -28,6 +28,7 @@ export function MarketplaceAccessResolution({
   const router = useRouter();
   const { user } = useAuth();
   const sessionRef = useRef(0);
+  const acceptingRef = useRef(false);
   const [termsRetry, setTermsRetry] = useState(0);
   const blocked = access.blockers ?? [];
   const needsTerms = blocked.some(row => row.code === 'MARKETPLACE_TERMS_REQUIRED');
@@ -39,6 +40,7 @@ export function MarketplaceAccessResolution({
   useEffect(() => {
     // Never reuse a previous account's terms checkbox or legal snapshot.
     const session = ++sessionRef.current;
+    acceptingRef.current = false;
     setTerms(null);
     setAgreed(false);
     setLoading(false);
@@ -53,14 +55,18 @@ export function MarketplaceAccessResolution({
   const termsHref = marketplaceTermsHref(terms?.terms_url);
 
   const accept = useCallback(async () => {
-    if (loading || !terms?.version || !termsHref || !agreed) return;
+    // A native double-tap can arrive before the disabled button rerenders.
+    // Avoid concurrent acceptance writes for the same account and terms.
+    if (acceptingRef.current || loading || !terms?.version || !termsHref || !agreed || !user?.id) return;
     const session = sessionRef.current;
+    acceptingRef.current = true;
     setLoading(true); setError('');
     try {
       await chemistTaskerApi.marketplace.acceptTerms(terms.version);
     } catch (failure: any) {
       if (session === sessionRef.current) {
         setError(failure?.message || 'Marketplace terms could not be saved. Please retry.');
+        acceptingRef.current = false;
         setLoading(false);
       }
       return;
@@ -72,9 +78,12 @@ export function MarketplaceAccessResolution({
     } catch {
       if (session === sessionRef.current) setError('Terms were saved, but eligibility could not refresh. Please retry.');
     } finally {
-      if (session === sessionRef.current) setLoading(false);
+      if (session === sessionRef.current) {
+        acceptingRef.current = false;
+        setLoading(false);
+      }
     }
-  }, [agreed, loading, onUpdated, terms, termsHref]);
+  }, [agreed, loading, onUpdated, terms, termsHref, user?.id]);
 
   const role = String(access.role_code || '').toUpperCase();
   const identityRoute = identityRoutes[role];
