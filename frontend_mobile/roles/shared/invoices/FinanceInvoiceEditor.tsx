@@ -4,6 +4,7 @@ import { Button, Checkbox, Chip, Divider, IconButton, List, Surface, Text, TextI
 import { DatePickerInput, TimePickerModal } from 'react-native-paper-dates';
 import { createFinanceDraft, finance, financeDueDate, financeItemLine, financeStatus, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceCustomerInput, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
 import { dateFromIso, isoDate } from '@/features/parity/utils';
+import { colors, font, radius, space, touch } from '@/constants/tokens';
 import { mergeFinanceInvoiceDefaults } from './financeInvoiceDefaults';
 
 const money = (value: string) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
@@ -17,6 +18,8 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const editedDefaults = useRef(new Set<keyof FinanceDraft>());
   const [busy, setBusy] = useState(false); const running = useRef(false);
   const [error, setError] = useState(''); const [preview, setPreview] = useState<FinanceCalculation | null>(null);
+  const [previewError, setPreviewError] = useState(''); const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewRetry, setPreviewRetry] = useState(0);
   const [customerOpen, setCustomerOpen] = useState(false); const [itemOpen, setItemOpen] = useState(false);
   const [customerOptions, setCustomerOptions] = useState<FinanceCustomer[]>(customers);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
@@ -183,11 +186,26 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
     }
   };
   useEffect(() => {
-    let active = true; setPreview(null);
+    let active = true;
+    setPreview(null);
+    setPreviewError('');
+    setPreviewBusy(Boolean(value.lines.length));
     if (!value.lines.length) return;
-    const timer = setTimeout(() => { finance.preview(value).then(result => { if (active) setPreview(result); }).catch(() => {}); }, 500);
+    const timer = setTimeout(() => {
+      finance.preview(value)
+        .then(result => {
+          if (!active) return;
+          setPreview(result);
+          setPreviewError('');
+        })
+        .catch((failure: any) => {
+          if (!active) return;
+          setPreviewError(failure?.message || 'Unable to calculate this invoice.');
+        })
+        .finally(() => { if (active) setPreviewBusy(false); });
+    }, 500);
     return () => { active = false; clearTimeout(timer); };
-  }, [value]);
+  }, [value, previewRetry]);
   const save = async () => {
     if (running.current) return;
     if ((!value.customer_id && !value.source_assignment_ids?.length) || !value.issuer_name.trim() || !value.lines.length) { setError('Select a customer, enter your business name and add an item.'); setBusinessOpen(true); return; }
@@ -203,6 +221,15 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
     <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8, borderBottomWidth: 1, borderColor: theme.colors.outlineVariant }}><IconButton icon="arrow-left" accessibilityLabel="Back to invoices" onPress={close} disabled={busy} /><View style={{ flex: 1 }}><Text variant="titleLarge">{initial ? initial.number : 'New invoice'}</Text><Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>{initial ? `Revision ${initial.version} · ${financeStatus(initial)}` : 'Unsaved until you press Save invoice'}</Text></View><Button mode="contained" loading={busy} disabled={busy} onPress={save}>{initial ? 'Save revision' : 'Save invoice'}</Button></View>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}>
       {!!error && <Text accessibilityRole="alert" style={{ color: theme.colors.error }}>{error}</Text>}
+      {!!previewError && <Surface elevation={0} style={{ backgroundColor: colors.status.red.bg, borderColor: colors.status.red.fg, borderWidth: 1, borderRadius: radius.card, padding: space.md, gap: space.sm }}>
+        <Text accessibilityRole="alert" style={{ color: colors.status.red.fg, fontFamily: font.inter.semiBold }}>
+          Invoice preview could not be calculated
+        </Text>
+        <Text style={{ color: colors.textPrimary }}>{previewError}</Text>
+        <Text variant="bodySmall" style={{ color: colors.textSecondary }}>Review the amounts and tax selections. Save is validated again by the server.</Text>
+        <Button mode="outlined" contentStyle={{ minHeight: touch.min }} disabled={busy || previewBusy}
+          onPress={() => setPreviewRetry(value => value + 1)}>Retry calculation</Button>
+      </Surface>}
       {!initial && internalSources.length ? <Surface elevation={0} style={{ padding: 14, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.outlineVariant }}>
         <Text variant="titleMedium">Start from an internal ABN shift</Text>
         <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginVertical: 8 }}>Pharmacy, shift hours/rate and onboarding details are prefilled. Nothing is saved yet.</Text>
@@ -365,7 +392,7 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
       </Surface>
       <Surface elevation={0} style={{ padding: 16, borderRadius: 8 }}>
         {field('notes', 'Notes to customer')}
-        {[['Subtotal', preview?.subtotal], ['GST', preview?.gst], ['Invoice total', preview?.payable], ['Super contribution', preview?.super]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}><Text style={{ fontWeight: label === 'Invoice total' ? '700' : '400' }}>{label}</Text><Text style={{ fontVariant: ['tabular-nums'] }}>{amount !== undefined ? money(amount) : value.lines.length ? 'Pending' : '$0.00'}</Text></View>)}
+        {[['Subtotal', preview?.subtotal], ['GST', preview?.gst], ['Invoice total', preview?.payable], ['Super contribution', preview?.super]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}><Text style={{ fontWeight: label === 'Invoice total' ? '700' : '400' }}>{label}</Text><Text style={{ fontVariant: ['tabular-nums'] }}>{amount !== undefined ? money(amount) : previewBusy ? 'Calculating…' : previewError ? 'Unavailable' : value.lines.length ? 'Pending' : '$0.00'}</Text></View>)}
         <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>Super is paid separately to the fund.</Text>
       </Surface>
       <List.Accordion title="Business details & GST" expanded={businessOpen} onPress={() => setBusinessOpen(!businessOpen)}><View style={{ padding: 12 }}>{field('issuer_name', 'Business name *')}{field('issuer_abn', 'Your ABN')}{field('issuer_address', 'Business address')}<View style={{ flexDirection: 'row', gap: 8 }}><Chip selected={value.issuer_entity_type !== 'company'} onPress={() => change('issuer_entity_type', 'sole_trader')}>Sole trader</Chip><Chip selected={value.issuer_entity_type === 'company'} onPress={() => change('issuer_entity_type', 'company')}>Company</Chip></View><Checkbox.Item label="I am registered for GST for this supply" status={value.gst_registered ? 'checked' : 'unchecked'} onPress={() => change('gst_registered', !value.gst_registered)} /></View></List.Accordion>
