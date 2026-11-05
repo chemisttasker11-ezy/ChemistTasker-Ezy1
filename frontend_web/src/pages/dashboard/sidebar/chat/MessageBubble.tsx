@@ -2,7 +2,7 @@ import { FC, useMemo, useState } from 'react';
 import { Avatar, Box, IconButton, Paper, Tooltip, Typography } from '@mui/material';
 import { Copy, FileText, MessageCircle, Pencil, Pin, PinOff, SmilePlus, Trash2 } from 'lucide-react';
 import type { ChatMessage, UserLite } from './types';
-import { API_BASE_URL } from '../../../../constants/api';
+import { downloadChatAttachment } from '@chemisttasker/shared-core';
 import {
   EMOJI_FONT,
   REACTIONS,
@@ -14,43 +14,14 @@ import {
   type GroupPosition,
 } from './chatFormat';
 
-/**
- * Server-returned attachment URLs are untrusted data. Do not render executable
- * URL schemes or arbitrary external redirects as clickable chat attachments.
- * Django serves /media/ from the API origin, or signed Azure Blob URLs.
- * A deployment using a custom media CDN can list its exact HTTPS origin in
- * VITE_CHAT_ATTACHMENT_ORIGINS (comma-separated); no wildcards are accepted.
+/** Only the backend-issued, message-ID-bound route is accepted. Never
+ * navigate to FileField storage URLs or Azure SAS links from chat payloads.
  */
-export const safeChatAttachmentHref = (raw: string | null | undefined): string | null => {
-  if (!raw || /[\u0000-\u001f\u007f]/.test(raw) || raw.startsWith('//')) return null;
-  try {
-    const apiOrigin = new URL(API_BASE_URL, window.location.origin).origin;
-    const url = new URL(raw, apiOrigin);
-    if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username || url.password) return null;
-    const firstPartyMedia =
-      (url.origin === apiOrigin || url.origin === window.location.origin) &&
-      /^\/(?:api\/v1\/)?media\//.test(url.pathname);
-    const azureMedia = url.protocol === 'https:' && /^[a-z0-9]{3,24}\.blob\.core\.windows\.net$/i.test(url.hostname);
-    const configuredMedia = String(import.meta.env.VITE_CHAT_ATTACHMENT_ORIGINS || '')
-      .split(',')
-      .some((origin) => {
-        try {
-          const allowed = new URL(origin.trim());
-          return allowed.protocol === 'https:' && allowed.origin === url.origin;
-        } catch {
-          return false;
-        }
-      });
-    return firstPartyMedia || azureMedia || configuredMedia ? url.href : null;
-  } catch {
-    return null;
-  }
+export const safeChatAttachmentHref = (raw: string | null | undefined, messageId?: number): string | null => {
+  if (!raw || !Number.isSafeInteger(messageId) || !messageId || messageId < 1) return null;
+  return raw === `/api/v1/messages/${messageId}/attachment/` ? raw : null;
 };
 
-const isImage = (url: string) => {
-  const extension = url.split('?')[0].split('.').pop()?.toLowerCase() || '';
-  return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension);
-};
 
 const REACTION_NAMES: Record<string, string> = { '👍': 'Thumbs up', '❤️': 'Heart', '🔥': 'Fire', '💩': 'Poop' };
 
@@ -100,6 +71,8 @@ export const MessageBubble: FC<Props> = ({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pinnedOpen, setPinnedOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [attachmentError, setAttachmentError] = useState('');
 
   const groupedReactions = useMemo(() => {
     const map = new Map<string, { count: number; mine: boolean; userIds: number[] }>();
@@ -122,8 +95,29 @@ export const MessageBubble: FC<Props> = ({
   const last = user?.last_name || fallback?.last_name;
   const fullName = sender ? `${first || ''} ${last || ''}`.trim() || `Member ${sender.id}` : 'Former member';
   const fileName = msg.attachment_filename || (msg.attachment_url ? decodeURIComponent(msg.attachment_url.split('/').pop() || '') : 'Attachment');
-  const attachmentHref = safeChatAttachmentHref(msg.attachment_url);
-  const attachmentIsImage = Boolean(attachmentHref && isImage(attachmentHref));
+  const attachmentHref = safeChatAttachmentHref(msg.attachment_url, msg.id);
+  const saveAttachment = async () => {
+    if (!attachmentHref || attachmentBusy) return;
+    setAttachmentBusy(true);
+    setAttachmentError('');
+    try {
+      const file = await downloadChatAttachment(msg.id);
+      const objectUrl = URL.createObjectURL(file);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = (fileName || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
+      anchor.rel = 'noopener noreferrer';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      // An object URL must not outlive the browser's download hand-off.
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch {
+      setAttachmentError('Attachment unavailable. Check your access and retry.');
+    } finally {
+      setAttachmentBusy(false);
+    }
+  };
 
   const startsGroup = position === 'single' || position === 'first';
   const endsGroup = position === 'single' || position === 'last';
@@ -270,32 +264,24 @@ export const MessageBubble: FC<Props> = ({
           ) : (
             <Box className={`bubble ${isMe ? 'me' : ''}`} sx={{ borderRadius: radius }}>
               {msg.attachment_url && (
-                <Box sx={{ mb: msg.body ? 1 : 0, mx: attachmentIsImage ? -0.75 : 0, mt: attachmentIsImage ? -0.5 : 0 }}>
+                <Box sx={{ mb: msg.body ? 1 : 0 }}>
                   {!attachmentHref ? (
-                    <Box role="status" sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.25, py: 1 }}>
-                      <FileText size={18} />
-                      <Typography variant="body2">Attachment unavailable</Typography>
-                    </Box>
-                  ) : attachmentIsImage ? (
-                    <a href={attachmentHref} target="_blank" rel="noopener noreferrer" aria-label={`Open image ${fileName}`}>
-                      <img src={attachmentHref} alt={fileName} loading="lazy" style={{ display: 'block', maxWidth: 'min(280px, 100%)', maxHeight: 320, borderRadius: 14, objectFit: 'cover' }} />
-                    </a>
+                    <Typography role="status" variant="body2">Attachment unavailable</Typography>
                   ) : (
-                    <Box
-                      component="a"
-                      href={attachmentHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      sx={{
-                        display: 'flex', alignItems: 'center', gap: 1, px: 1.25, py: 1, borderRadius: '12px', textDecoration: 'none', color: 'inherit',
-                        bgcolor: isMe ? 'rgba(255,255,255,0.16)' : 'var(--chat-canvas)',
-                        border: isMe ? '1px solid rgba(255,255,255,0.24)' : '1px solid var(--chat-border)',
-                      }}
-                    >
+                    <Box component="button" type="button" onClick={() => void saveAttachment()}
+                      disabled={attachmentBusy}
+                      aria-label={`Download attachment ${fileName}`}
+                      sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.25, py: 1,
+                        borderRadius: '12px', border: '1px solid var(--chat-border)',
+                        color: 'inherit', bgcolor: 'var(--chat-canvas)', cursor: 'pointer',
+                        font: 'inherit', maxWidth: '100%' }}>
                       <FileText size={18} />
-                      <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{fileName}</Typography>
+                      <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
+                        {attachmentBusy ? 'Downloading securely…' : fileName}
+                      </Typography>
                     </Box>
                   )}
+                  {attachmentError && <Typography role="alert" variant="caption">{attachmentError}</Typography>}
                 </Box>
               )}
               {msg.body && (
