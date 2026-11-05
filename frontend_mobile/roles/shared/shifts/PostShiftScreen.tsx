@@ -179,6 +179,7 @@ export default function PostShiftScreen() {
     const [ratePublicHoliday, setRatePublicHoliday] = useState('');
     const [rateEarlyMorning, setRateEarlyMorning] = useState('');
     const [rateLateNight, setRateLateNight] = useState('');
+    const manualRateEdits = React.useRef<{ pharmacyId: number | ''; fields: Set<string> }>({ pharmacyId: '', fields: new Set() });
 
     // FT/PT specific
     const [ftptPayMode, setFtptPayMode] = useState<'HOURLY' | 'ANNUAL'>('HOURLY');
@@ -239,6 +240,7 @@ export default function PostShiftScreen() {
         setHasTravel(false); setHasAccommodation(false); setIsUrgent(false); setFlexibleTiming(false);
         setInitialAudience('');
         setRateType('FLEXIBLE');
+        manualRateEdits.current = { pharmacyId: '', fields: new Set() };
         setOwnerBonus('');
         setDescription('');
         setDescriptionTemplate(null);
@@ -345,17 +347,23 @@ export default function PostShiftScreen() {
 
     useEffect(() => {
         if (!selectedPharmacy || editingId) return;
+        const edits = manualRateEdits.current;
+        if (edits.pharmacyId !== pharmacyId) {
+            manualRateEdits.current = { pharmacyId, fields: new Set() };
+        }
+        const touched = manualRateEdits.current.fields;
         const normalize = (val: any) => (val === undefined || val === null || val === '' ? '' : String(val));
         const defaultRateType = (selectedPharmacy as any).default_rate_type || (selectedPharmacy as any).defaultRateType || 'FLEXIBLE';
-
-        setRateType(defaultRateType);
-        setRateWeekday(normalize((selectedPharmacy as any).rate_weekday ?? (selectedPharmacy as any).rateWeekday));
-        setRateSaturday(normalize((selectedPharmacy as any).rate_saturday ?? (selectedPharmacy as any).rateSaturday));
-        setRateSunday(normalize((selectedPharmacy as any).rate_sunday ?? (selectedPharmacy as any).rateSunday));
-        setRatePublicHoliday(normalize((selectedPharmacy as any).rate_public_holiday ?? (selectedPharmacy as any).ratePublicHoliday));
-        setRateEarlyMorning(normalize((selectedPharmacy as any).rate_early_morning ?? (selectedPharmacy as any).rateEarlyMorning));
-        setRateLateNight(normalize((selectedPharmacy as any).rate_late_night ?? (selectedPharmacy as any).rateLateNight));
-    }, [selectedPharmacy, editingId]);
+        // A late refresh of the pharmacy's defaults may not overwrite rates
+        // the manager has already changed in the active Post Shift form.
+        if (!touched.has('rateType')) setRateType(defaultRateType);
+        if (!touched.has('rateWeekday')) setRateWeekday(normalize((selectedPharmacy as any).rate_weekday ?? (selectedPharmacy as any).rateWeekday));
+        if (!touched.has('rateSaturday')) setRateSaturday(normalize((selectedPharmacy as any).rate_saturday ?? (selectedPharmacy as any).rateSaturday));
+        if (!touched.has('rateSunday')) setRateSunday(normalize((selectedPharmacy as any).rate_sunday ?? (selectedPharmacy as any).rateSunday));
+        if (!touched.has('ratePublicHoliday')) setRatePublicHoliday(normalize((selectedPharmacy as any).rate_public_holiday ?? (selectedPharmacy as any).ratePublicHoliday));
+        if (!touched.has('rateEarlyMorning')) setRateEarlyMorning(normalize((selectedPharmacy as any).rate_early_morning ?? (selectedPharmacy as any).rateEarlyMorning));
+        if (!touched.has('rateLateNight')) setRateLateNight(normalize((selectedPharmacy as any).rate_late_night ?? (selectedPharmacy as any).rateLateNight));
+    }, [selectedPharmacy, editingId, pharmacyId]);
 
     // New shifts start with the pharmacy's own software (one per category) as preferred experience, by registry ID.
     const softwareDefaults = React.useRef<string[]>([]);
@@ -1203,6 +1211,14 @@ export default function PostShiftScreen() {
         markTouched();
         return fn(...args);
     };
+    const editedRate = <T,>(field: string, setter: (value: T) => void) => (next: T) => {
+        if (manualRateEdits.current.pharmacyId !== pharmacyId) {
+            manualRateEdits.current = { pharmacyId, fields: new Set() };
+        }
+        manualRateEdits.current.fields.add(field);
+        markTouched();
+        setter(next);
+    };
 
     const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff, showNotifyFavoriteStaff, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform }, slotsModified: areSlotsModified(), ratesModified: areRatesModified() });
 
@@ -1366,24 +1382,24 @@ export default function PostShiftScreen() {
                         superPercent={superPercent}
                         setSuperPercent={edited(setSuperPercent)}
                         rateType={rateType}
-                        setRateType={edited(setRateType)}
+                        setRateType={editedRate('rateType', setRateType)}
                         paymentPreference={paymentPreference}
                         setPaymentPreference={edited(setPaymentPreference)}
                         locumSuperIncluded={locumSuperIncluded}
                         setLocumSuperIncluded={edited(setLocumSuperIncluded)}
                         hasOutsidePharmacyMemberAudience={hasOutsidePharmacyMemberAudience}
                         rateWeekday={rateWeekday}
-                        setRateWeekday={edited(setRateWeekday)}
+                        setRateWeekday={editedRate('rateWeekday', setRateWeekday)}
                         rateSaturday={rateSaturday}
-                        setRateSaturday={edited(setRateSaturday)}
+                        setRateSaturday={editedRate('rateSaturday', setRateSaturday)}
                         rateSunday={rateSunday}
-                        setRateSunday={edited(setRateSunday)}
+                        setRateSunday={editedRate('rateSunday', setRateSunday)}
                         ratePublicHoliday={ratePublicHoliday}
-                        setRatePublicHoliday={edited(setRatePublicHoliday)}
+                        setRatePublicHoliday={editedRate('ratePublicHoliday', setRatePublicHoliday)}
                         rateEarlyMorning={rateEarlyMorning}
-                        setRateEarlyMorning={edited(setRateEarlyMorning)}
+                        setRateEarlyMorning={editedRate('rateEarlyMorning', setRateEarlyMorning)}
                         rateLateNight={rateLateNight}
-                        setRateLateNight={edited(setRateLateNight)}
+                        setRateLateNight={editedRate('rateLateNight', setRateLateNight)}
                         handleSavePharmacyRateDefaults={handleSavePharmacyRateDefaults}
                         savingPharmacyRates={savingPharmacyRates}
                         pharmacyId={pharmacyId}
