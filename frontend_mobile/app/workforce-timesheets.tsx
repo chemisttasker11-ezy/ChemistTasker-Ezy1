@@ -45,6 +45,8 @@ export default function WorkforceTimesheetsScreen() {
   pharmacyRef.current = pharmacyId;
   const [periods, setPeriods] = useState<WorkforceTimesheetPeriod[]>([]);
   const [periodId, setPeriodId] = useState<number | null>(null);
+  const periodRef = useRef<number | null>(null);
+  periodRef.current = periodId;
   const periodsRequestRef = useRef(0);
   const detailRequestRef = useRef(0);
   const [summary, setSummary] = useState<WorkforceTimesheetSummary | null>(null);
@@ -88,7 +90,8 @@ export default function WorkforceTimesheetsScreen() {
   const loadPeriods = useCallback(async () => {
     const request = ++periodsRequestRef.current;
     const scope = accountKey;
-    const current = () => request === periodsRequestRef.current && accountRef.current === scope;
+    const requestedPharmacy = pharmacyId;
+    const current = () => request === periodsRequestRef.current && accountRef.current === scope && pharmacyRef.current === requestedPharmacy;
     if (!pharmacyId || loadedAccount !== scope) {
       setPeriods([]); setPeriodId(null); return;
     }
@@ -105,7 +108,9 @@ export default function WorkforceTimesheetsScreen() {
   const loadPeriod = useCallback(async () => {
     const request = ++detailRequestRef.current;
     const scope = accountKey;
-    const current = () => request === detailRequestRef.current && accountRef.current === scope;
+    const requestedPeriod = periodId;
+    const requestedPharmacy = pharmacyId;
+    const current = () => request === detailRequestRef.current && accountRef.current === scope && periodRef.current === requestedPeriod && pharmacyRef.current === requestedPharmacy;
     if (!periodId || loadedAccount !== scope) {
       setSummary(null); setRows([]); return;
     }
@@ -120,7 +125,7 @@ export default function WorkforceTimesheetsScreen() {
     } catch (failure) {
       if (current()) throw failure;
     }
-  }, [periodId, accountKey, loadedAccount]);
+  }, [periodId, pharmacyId, accountKey, loadedAccount]);
 
   const refresh = useCallback(async (pull = false) => {
     const requestedAccount = accountKey;
