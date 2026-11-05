@@ -143,3 +143,24 @@ Do not mark a test as passed because it was written or because an older-head Git
 ### Current senior verdict
 
 These targeted source changes close several previously demonstrated implementation gaps. **The programme is not complete and PR #249 is not merge-/release-ready.** Keep this work on the existing stack; finish high-risk backend QR product workflows and per-persona functional/device acceptance without changing established backend authorization or payment rules.
+
+
+## Continued W6 communications account-isolation implementation — 5 November 2026
+
+**Baseline:** `237bf313`. **Working head following these edits:** `c6f3812d`. The existing PR #249 remains draft and stacked on #248. QR scanning and invitation implementations were not modified.
+
+| Commit | Source correction | What remains unproven |
+|---|---|---|
+| `27342461` | Chat room list and shift-contact hooks now scope displayed data by authenticated user ID, discard stale response generations, and clear old data on account changes. Refresh and initial-load failure states remain recoverable. | Multi-account device switching, rapid refresh and backend permission checks |
+| `8cbd32a7` | Pharmacy team membership chips, participant admin permissions, and related edit/dialog state reset with the account. Awaited team/shift-contact navigation is suppressed after account changes, and initial chat-list failure exposes Retry. | Real authorized team chat entry and group-management permissions on iOS/Android |
+| `7dbe776c` | Authenticated room socket reconnects on access-token/session change, suppressing post-cleanup WebSocket events/reconnects. | Actual account-switch socket handoff and reconnect delivery |
+| `c6f3812d` | Conversation history is displayed only when both room and authenticated user match the loaded snapshot. Participant/shift identity caches reload per account; paginated histories and read receipts reject stale account responses. | Rapid account/room switching, long-history scroll position, server read receipts |
+
+### Follow-up senior review priorities
+
+1. Finish a focused W6 review of pending chat mutations (send, edit, delete, pin, attachment) during account and room changes. An already-issued server request cannot be retracted; guard subsequent local transitions without weakening server permissions.
+2. Validate multi-pharmacy and six-persona communication permissions, unread counts, room deletion, team/group management and push-to-room navigation with the actual backend. Verify the same room ID cannot expose prior-account text while switching.
+3. Continue the existing W3–W8 cross-persona job matrix, particularly shift/paid-checkout concurrent state, marketplace submit authorization, invoice revision/PDF delivery and access control.
+4. Perform accessibility/large-text and signed Android/iOS QA, then the consolidated exact-head Senior Package Testing only once implementation is frozen and authorized staging resources are available.
+
+**Evidence limitation:** All four commits are connector-mediated source changes. No local repository checkout, compiled TypeScript, targeted tests, emulator/device screenshots, runtime provider proof, or consolidated release gates were performed in this pass. These implementations must not be described as passing or production-ready. No merge, deployment, EAS update, live provider mutation or QR modifications were performed.
