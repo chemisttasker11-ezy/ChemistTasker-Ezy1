@@ -4,6 +4,7 @@ import { Button, Checkbox, Chip, Divider, IconButton, List, Surface, Text, TextI
 import { DatePickerInput, TimePickerModal } from 'react-native-paper-dates';
 import { createFinanceDraft, finance, financeDueDate, financeItemLine, financeStatus, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceCustomerInput, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
 import { dateFromIso, isoDate } from '@/features/parity/utils';
+import { mergeFinanceInvoiceDefaults } from './financeInvoiceDefaults';
 
 const money = (value: string) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 
@@ -13,6 +14,7 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const theme = useTheme();
   const [value, setValue] = useState<FinanceDraft>(() => initial ? { ...initial.payload, version: initial.version, request_key: initial.request_key } : createFinanceDraft(requestKey, previous));
   const original = useRef(JSON.stringify(value));
+  const editedDefaults = useRef(new Set<keyof FinanceDraft>());
   const [busy, setBusy] = useState(false); const running = useRef(false);
   const [error, setError] = useState(''); const [preview, setPreview] = useState<FinanceCalculation | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false); const [itemOpen, setItemOpen] = useState(false);
@@ -39,7 +41,10 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const [timeTarget, setTimeTarget] = useState<'start' | 'end' | null>(null);
   const [breakMinutes, setBreakMinutes] = useState('0');
   const [computedHours, setComputedHours] = useState('');
-  const change = <K extends keyof FinanceDraft,>(key: K, next: FinanceDraft[K]) => setValue(current => ({ ...current, [key]: next }));
+  const change = <K extends keyof FinanceDraft,>(key: K, next: FinanceDraft[K]) => {
+    editedDefaults.current.add(key);
+    setValue(current => ({ ...current, [key]: next }));
+  };
   const snapshotCustomer = (item: FinanceCustomer) => ({
     name: item.name, legal_name: item.legal_name, address: item.address, abn: item.abn,
     email: item.email, contact_name: item.contact_name,
@@ -59,23 +64,12 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
     Promise.all([finance.invoiceDefaults(), finance.internalSources()]).then(([defaults, sources]) => {
       if (!active) return;
       setInternalSources(sources);
-      setValue(current => ({
-        ...current,
-        issuer_name: current.issuer_name || defaults.issuer_name,
-        issuer_abn: current.issuer_abn || defaults.issuer_abn,
-        issuer_address: current.issuer_address || defaults.issuer_address,
-        gst_registered: current.gst_registered || defaults.gst_registered,
-        bank_account_name: current.bank_account_name || defaults.bank_account_name,
-        bsb: current.bsb || defaults.bsb,
-        account_number: current.account_number || defaults.account_number,
-        super_fund_name: current.super_fund_name || defaults.super_fund_name,
-        super_usi: current.super_usi || defaults.super_usi,
-        super_member_number: current.super_member_number || defaults.super_member_number,
-        super_rate: defaults.super_rate || current.super_rate,
-      }));
-    }).catch((e: any) => setError(e.message || 'Unable to load invoice defaults.'));
+      setValue(current => mergeFinanceInvoiceDefaults(current, defaults, editedDefaults.current, Boolean(previous)));
+    }).catch((e: any) => {
+      if (active) setError(e.message || 'Unable to load invoice defaults.');
+    });
     return () => { active = false; };
-  }, [initial]);
+  }, [initial, previous]);
   useEffect(() => { setCustomerOptions(customers); }, [customers]);
   useEffect(() => { setItemOptions(items); }, [items]);
   const saveNewCustomer = async () => {
