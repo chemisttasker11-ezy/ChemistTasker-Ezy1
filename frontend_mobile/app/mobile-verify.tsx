@@ -110,7 +110,12 @@ export default function MobileVerifyScreen() {
             });
             setIdentityLocked(true);
             setStatus('Mobile verified! Redirecting...');
-            setTimeout(() => router.replace(getRoleHome(user?.role) as any), 800);
+            const destination = fromProfile
+                ? (user?.role === 'OTHER_STAFF' ? '/otherstaff/profile-basic-info'
+                    : user?.role === 'PHARMACIST' ? '/pharmacist/profile-basic-info'
+                    : getRoleHome(user?.role))
+                : getRoleHome(user?.role);
+            setTimeout(() => router.replace(destination as any), 800);
         } catch (err: any) {
             setError(err?.message || 'Verification failed.');
         } finally {
