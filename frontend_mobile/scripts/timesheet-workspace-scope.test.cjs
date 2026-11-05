@@ -25,3 +25,9 @@ test('worker My Hours rejects stale account reads and submissions', () => {
   assert.match(worker, /request === requestRef\.current && accountRef\.current === accountKey/);
   assert.match(worker, /submitGeneration\.current === action && accountRef\.current === scope/);
 });
+
+test('manager timesheet completion never writes into a different selected pharmacy', () => {
+  assert.match(text, /pharmacyRef\.current === pharmacy/);
+  assert.match(text, /pharmacyRef\.current === requestedPharmacy/);
+  assert.match(text, /accountRef\.current === requestedAccount && pharmacyRef\.current === requestedPharmacy/);
+});
