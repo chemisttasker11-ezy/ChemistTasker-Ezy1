@@ -312,15 +312,15 @@ export default function NotificationsScreen() {
               <Text style={styles.errorBody}>{readError}</Text>
               <Button mode="outlined" contentStyle={styles.retryTouch} onPress={() => void fetchNotifications(true, 1)}>Retry read status</Button>
             </> : null}
-          </Surface> : null}
+          </Surface> : undefined}
           ListFooterComponent={nextPage != null || olderError || loadingMore ? <View style={styles.footer}>
             {olderError ? <Text accessibilityRole="alert" style={styles.errorBody}>{olderError}</Text> : null}
             <Button mode="outlined" contentStyle={styles.retryTouch} loading={loadingMore}
               disabled={loadingMore || nextPage == null} onPress={loadOlder}>
               {olderError ? 'Retry older notifications' : 'Load older notifications'}
             </Button>
-          </View> : null}
-          ListEmptyComponent={loadError ? null : (
+          </View> : undefined}
+          ListEmptyComponent={loadError ? undefined : (
             <View style={styles.emptyState}>
               <Text variant="titleMedium" style={styles.emptyTitle}>
                 No notifications

@@ -432,7 +432,7 @@ function LegacyInvoiceList({ basePath }: Props) {
           onEndReached={() => {
             if (paginated.length < filtered.length) setPage(p => p + 1);
           }}
-          ListEmptyComponent={loadError ? null : (
+          ListEmptyComponent={loadError ? undefined : (
             <View style={styles.empty}>
               <Text variant="titleMedium">No invoices yet</Text>
               <Text variant="bodyMedium" style={styles.sub}>
