@@ -163,11 +163,13 @@ test('chat attachments reject raw storage origins and download via protected mes
     { ...message(86, ''), attachment_url: '/api/v1/messages/86/attachment/', attachment_filename: 'protected.pdf' },
   ];
   const downloads = [];
+  await openChat(page, { messages });
+  // Install the protected binary handler after the catch-all API fixture:
+  // Playwright resolves the most recently registered matching route first.
   await page.route('**/api/v1/messages/86/attachment/', route => {
     downloads.push({ url: route.request().url(), authorization: route.request().headers().authorization });
     return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/pdf' }, body: '%PDF-1.7\\nprivate\\n' });
   });
-  await openChat(page, { messages });
   const log = page.getByRole('log');
   await expect(log.getByText('Attachment unavailable', { exact: true })).toHaveCount(5);
   await expect(log.locator('a[href*="/media/chat/"]')).toHaveCount(0);
