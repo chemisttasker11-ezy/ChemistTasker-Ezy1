@@ -29,19 +29,25 @@ export default function ChatPage() {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuth();
+  const accountId = user?.id ?? null;
+  const activeAccountRef = React.useRef(accountId);
+  activeAccountRef.current = accountId;
+  const teamOpeningAccountRef = React.useRef<number | null>(null);
   const theme = useTheme();
   const { rooms, loading, refreshing, error, refresh, reload } = useChatRooms();
   const { contacts: shiftContacts } = useShiftContacts();
   const role = (user?.role || '').toUpperCase();
   const [search, setSearch] = useState('');
-  const [pharmacyTeams, setPharmacyTeams] = useState<Array<{ id: number; name: string }>>([]);
+  const [pharmacyTeamsState, setPharmacyTeams] = useState<{ accountId: number | null; rows: Array<{ id: number; name: string }> }>({ accountId: null, rows: [] });
+  const pharmacyTeams = pharmacyTeamsState.accountId === accountId ? pharmacyTeamsState.rows : [];
   const [openingPharmacyId, setOpeningPharmacyId] = useState<number | null>(null);
   const teamOpeningRef = React.useRef(false);
   const [newChatVisible, setNewChatVisible] = useState(false);
   const [newGroupVisible, setNewGroupVisible] = useState(false);
   const [manageGroupRoom, setManageGroupRoom] = useState<ChatRoom | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
-  const [participantAdmins, setParticipantAdmins] = useState<Record<number, boolean>>({});
+  const [participantAdminState, setParticipantAdmins] = useState<{ accountId: number | null; rows: Record<number, boolean> }>({ accountId: null, rows: {} });
+  const participantAdmins = participantAdminState.accountId === accountId ? participantAdminState.rows : {};
   const [fabMenuVisible, setFabMenuVisible] = useState(false);
   const [editRoom, setEditRoom] = useState<ChatRoom | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -59,34 +65,51 @@ export default function ChatPage() {
   }, [rooms]);
 
   useEffect(() => {
-    const loadParticipants = async () => {
-      try {
-        const data: any = await fetchChatParticipants();
+    let alive = true;
+    // Account changes invalidate every previously fetched participant permission.
+    setParticipantAdmins({ accountId, rows: {} });
+    if (accountId != null) {
+      void fetchChatParticipants().then((data: any) => {
+        if (!alive || activeAccountRef.current !== accountId) return;
         const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
         const map: Record<number, boolean> = {};
         list.forEach((p: any) => {
           const id = p.id ?? p.membership_id;
-          const isAdmin = p.is_admin ?? p.isAdmin ?? false;
-          if (id) map[id] = !!isAdmin;
+          if (id) map[id] = !!(p.is_admin ?? p.isAdmin ?? false);
         });
-        setParticipantAdmins(map);
-      } catch {
-        // ignore
-      }
-    };
-    loadParticipants();
-  }, []);
+        setParticipantAdmins({ accountId, rows: map });
+      }).catch(() => {
+        // The backend still enforces permissions; never reuse the previous account's map.
+      });
+    }
+    return () => { alive = false; };
+  }, [accountId]);
 
   useEffect(() => {
     let alive = true;
-    setPharmacyTeams([]);
-    void fetchMyMemberships({}).then(rows => {
-      if (alive) setPharmacyTeams(pharmacyChatsFromMemberships(rows));
-    }).catch(() => {
-      if (alive) setPharmacyTeams([]);
-    });
+    setPharmacyTeams({ accountId, rows: [] });
+    setSearch('');
+    setSnackbar(null);
+    setEditRoom(null);
+    setEditTitle('');
+    setManageGroupRoom(null);
+    setNewChatVisible(false);
+    setNewGroupVisible(false);
+    setFabMenuVisible(false);
+    setOpeningPharmacyId(null);
+    teamOpeningRef.current = false;
+    teamOpeningAccountRef.current = null;
+    if (accountId != null) {
+      void fetchMyMemberships({}).then(rows => {
+        if (alive && activeAccountRef.current === accountId) {
+          setPharmacyTeams({ accountId, rows: pharmacyChatsFromMemberships(rows) });
+        }
+      }).catch(() => {
+        if (alive && activeAccountRef.current === accountId) setPharmacyTeams({ accountId, rows: [] });
+      });
+    }
     return () => { alive = false; };
-  }, [user?.id]);
+  }, [accountId]);
 
   const canManageGroup = useCallback(
     (room: ChatRoom) => {
@@ -105,7 +128,7 @@ export default function ChatPage() {
 
   const openRoom = (room: ChatRoom, nameOverride?: string) => {
     const id = room.id;
-    if (!id) return;
+    if (!id || accountId == null) return;
     const routeRole = pathname.startsWith('/admin')
       ? 'ADMIN'
       : pathname.startsWith('/organization')
@@ -119,18 +142,24 @@ export default function ChatPage() {
   };
 
   const openPharmacyTeam = async (pharmacyId: number) => {
-    if (teamOpeningRef.current || !pharmacyTeams.some(row => row.id === pharmacyId)) return;
+    if (accountId == null || teamOpeningRef.current || !pharmacyTeams.some(row => row.id === pharmacyId)) return;
+    const initiatingAccount = accountId;
     teamOpeningRef.current = true;
+    teamOpeningAccountRef.current = initiatingAccount;
     setOpeningPharmacyId(pharmacyId);
     try {
       const existing = rooms.find(room => room.type === 'GROUP' && Number((room as any).pharmacy?.id ?? room.pharmacy) === pharmacyId);
       const room = existing ?? await getOrCreatePharmacyGroup(pharmacyId);
+      if (activeAccountRef.current !== initiatingAccount) return;
       openRoom(room as ChatRoom, pharmacyTeams.find(row => row.id === pharmacyId)?.name);
     } catch (failure: any) {
-      setSnackbar(failure?.message || 'Unable to open the pharmacy team conversation.');
+      if (activeAccountRef.current === initiatingAccount) setSnackbar(failure?.message || 'Unable to open the pharmacy team conversation.');
     } finally {
-      teamOpeningRef.current = false;
-      setOpeningPharmacyId(null);
+      if (teamOpeningAccountRef.current === initiatingAccount) {
+        teamOpeningRef.current = false;
+        teamOpeningAccountRef.current = null;
+        if (activeAccountRef.current === initiatingAccount) setOpeningPharmacyId(null);
+      }
     }
   };
 
@@ -142,21 +171,24 @@ export default function ChatPage() {
 
   const handleSelectShiftContact = useCallback(
     async (contact: any) => {
+      const initiatingAccount = accountId;
       try {
         const userId = contact?.user?.id;
-        if (!userId) return;
+        if (!userId || initiatingAccount == null) return;
         const room = await startDirectChat({ userId });
+        if (activeAccountRef.current !== initiatingAccount) return;
         const roomId = (room as any)?.id ?? (room as any)?.room_id;
         if (roomId) {
           await reload();
+          if (activeAccountRef.current !== initiatingAccount) return;
           const name = displayNameFromUser(contact?.user) || contact?.user?.email;
           openRoom({ id: roomId, title: name } as any, name);
         }
       } catch (err: any) {
-        setSnackbar(err?.message || 'Failed to open shift contact');
+        if (activeAccountRef.current === initiatingAccount) setSnackbar(err?.message || 'Failed to open shift contact');
       }
     },
-    [openRoom, reload],
+    [openRoom, reload, accountId],
   );
 
   const handleTogglePin = useCallback(
@@ -221,6 +253,11 @@ export default function ChatPage() {
         <View style={styles.center}>
           <ActivityIndicator />
           <Text style={styles.muted}>Loading chats...</Text>
+        </View>
+      ) : error && rooms.length === 0 ? (
+        <View style={styles.center}>
+          <Text accessibilityRole="alert">Unable to load conversations. {error}</Text>
+          <Button mode="contained" onPress={() => void reload()}>Retry</Button>
         </View>
       ) : (
       <ChatSidebar
@@ -341,8 +378,8 @@ export default function ChatPage() {
         </Modal>
       </Portal>
 
-      <Snackbar visible={!!(error || snackbar)} onDismiss={() => { setSnackbar(null); }} duration={3000}>
-        {error || snackbar || ''}
+      <Snackbar visible={!!snackbar} onDismiss={() => setSnackbar(null)} duration={3000}>
+        {snackbar || ''}
       </Snackbar>
 
       {canCreateChat ? (
