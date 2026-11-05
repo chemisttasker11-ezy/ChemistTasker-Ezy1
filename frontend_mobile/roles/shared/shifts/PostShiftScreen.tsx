@@ -155,6 +155,9 @@ export default function PostShiftScreen() {
     const [descriptionTemplateSaving, setDescriptionTemplateSaving] = useState(false);
     const [descriptionTemplateAutoAppliedKey, setDescriptionTemplateAutoAppliedKey] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const postingBusyRef = React.useRef(false);
+    const postingScopeRef = React.useRef(`${surface.scopeKey}:${editingId ?? 'new'}`);
+    postingScopeRef.current = `${surface.scopeKey}:${editingId ?? 'new'}`;
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
     const [pharmacyMenuVisible, setPharmacyMenuVisible] = useState(false);
@@ -1223,31 +1226,40 @@ export default function PostShiftScreen() {
     const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff, showNotifyFavoriteStaff, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform }, slotsModified: areSlotsModified(), ratesModified: areRatesModified() });
 
     const handleSubmit = async () => {
+        // State alone cannot prevent two taps before React renders the loading flag.
+        // A second create POST may publish a duplicate shift, so lock synchronously.
+        if (postingBusyRef.current || !hasAccess || hydrating) return;
         setError('');
-        const validation = validateShiftPostingDraft(postingDraft());
+        const draft = postingDraft();
+        const validation = validateShiftPostingDraft(draft);
         if (validation) { setError(validation); return; }
+        const scope = postingScopeRef.current;
+        const stillCurrent = () => scope === postingScopeRef.current;
+        postingBusyRef.current = true;
         setLoading(true);
         try {
-            const payload = buildShiftPostingPayload(postingDraft());
+            const payload = buildShiftPostingPayload(draft);
             if (editingId) {
                 await updateOwnerShiftService(editingId, payload);
+                if (!stillCurrent()) return;
                 setToast('Shift updated');
             } else {
                 await createOwnerShiftService(payload);
+                if (!stillCurrent()) return;
                 resetForm();
                 setToast('Shift posted');
-                // The retained tab starts a fresh draft: the baseline follows the reset and its defaults again.
+                // A successful new post starts a fresh form without inventing a backend draft state.
                 touchedRef.current = false;
             }
-            // Lets this save's own navigation pass the unsaved-changes guard.
             unsaved.markClean();
-            // Go back to the owner shift center (active tab is managed in-screen)
             router.back();
         } catch (e: any) {
-            const msg = e?.response?.data?.detail || 'Unable to save shift';
-            setError(msg);
+            if (stillCurrent()) {
+                setError(e?.response?.data?.detail || 'Unable to save shift');
+            }
         } finally {
-            setLoading(false);
+            postingBusyRef.current = false;
+            if (stillCurrent()) setLoading(false);
         }
     };
 
