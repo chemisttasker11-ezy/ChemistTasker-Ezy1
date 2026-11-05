@@ -31,6 +31,9 @@ two_factor_patterns = list(two_factor_patterns)
 two_factor_patterns[0] = path('account/login/', AdminAwareLoginView.as_view(), name='login')
 
 urlpatterns = [
+    # Legacy raw chat uploads must never bypass participant authentication,
+    # including while DEBUG's default static-media route is installed.
+    path('media/chat/<path:filename>', deny_raw_media),
     path('media/public_content/<path:filename>', deny_raw_media),
     path('media/pharmacy_hub/attachments/<path:filename>', HubMediaAccess.as_view()),
     path('', include((two_factor_patterns, two_factor_app_name), namespace='two_factor')),

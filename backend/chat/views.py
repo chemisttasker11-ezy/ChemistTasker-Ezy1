@@ -1,5 +1,9 @@
 """Chat API: conversations, messages, reactions, participants and shift contacts."""
 import logging
+import mimetypes
+import os
+
+from django.http import FileResponse, Http404
 
 log = logging.getLogger(__name__)
 
@@ -633,6 +637,31 @@ class ConversationViewSet(mixins.ListModelMixin,
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=True, methods=['get'], url_path='attachment')
+    def attachment(self, request, pk=None):
+        """Stream a file only to a currently authorized room participant.
+
+        Never redirect to the storage URL: Azure SAS links, public blob paths
+        and Django /media/ URLs must not bypass a revoked membership.
+        """
+        message = self.get_object()  # get_queryset enforces active room access.
+        if message.is_deleted or not message.attachment:
+            raise Http404
+        filename = os.path.basename(message.attachment_filename or message.attachment.name)
+        media_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+        inline = media_type in {'image/png', 'image/jpeg', 'image/gif', 'image/webp'}
+        try:
+            file = message.attachment.open('rb')
+            response = FileResponse(
+                file, as_attachment=not inline, filename=filename, content_type=media_type,
+            )
+        except (OSError, ValueError):
+            raise Http404
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['Content-Security-Policy'] = "default-src 'none'; sandbox"
+        return response
 
     def get_queryset(self):
         user = self.request.user
