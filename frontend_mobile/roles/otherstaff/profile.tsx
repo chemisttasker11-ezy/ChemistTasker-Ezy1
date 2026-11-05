@@ -206,7 +206,7 @@ export default function OtherStaffProfileScreen() {
         <Button mode="outlined" icon="qrcode" onPress={() => router.push('/share/worker' as any)} style={{ marginHorizontal: 16, marginVertical: 8 }}>
           Show my public worker QR
         </Button>
-        <ProfileVerificationCard roleKey="otherstaff" routes={{ mobile: '/mobile-verify', ahpra: '/otherstaff/profile-regulatory', role: '/otherstaff/profile-regulatory', gov_id: '/otherstaff/profile-identity', referees: '/otherstaff/profile-referees' }} />
+        <ProfileVerificationCard roleKey="otherstaff" routes={{ mobile: '/mobile-verify?source=profile', ahpra: '/otherstaff/profile-regulatory', role: '/otherstaff/profile-regulatory', gov_id: '/otherstaff/profile-identity', referees: '/otherstaff/profile-referees' }} />
 
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
