@@ -129,6 +129,9 @@ export default function SharedMessageDetailScreen() {
 
     const [messages, setMessages] = useState<MessageDisplay[]>([]);
     const [messagesRoomId, setMessagesRoomId] = useState<number | null>(null);
+    const [messagesAccountId, setMessagesAccountId] = useState<number | null>(null);
+    const accountRef = useRef(user?.id ?? null);
+    accountRef.current = user?.id ?? null;
     const [participantCache, setParticipantCache] = useState<Record<number, IdentityRecord>>({});
     const [shiftContactByUserId, setShiftContactByUserId] = useState<Record<number, ChatIdentity>>({});
     const [newMessage, setNewMessage] = useState('');
@@ -181,13 +184,17 @@ export default function SharedMessageDetailScreen() {
 
     useEffect(() => {
         let mounted = true;
+        setParticipantCache({});
+        setShiftContactByUserId({});
+        const identityAccountId = user?.id ?? null;
+        if (identityAccountId == null) return () => { mounted = false; };
         const loadIdentityCaches = async () => {
             try {
                 const [participantsData, shiftData] = await Promise.all([
                     fetchChatParticipants(),
                     fetchShiftContacts(),
                 ]);
-                if (!mounted) return;
+                if (!mounted || accountRef.current !== identityAccountId) return;
 
                 const participants = Array.isArray((participantsData as any)?.results)
                     ? (participantsData as any).results
@@ -238,7 +245,7 @@ export default function SharedMessageDetailScreen() {
         return () => {
             mounted = false;
         };
-    }, []);
+    }, [user?.id]);
 
     const resolveMessageIdentity = useCallback(
         (item: MessageDisplay): ChatIdentity => {
@@ -279,7 +286,9 @@ export default function SharedMessageDetailScreen() {
     const fetchMessages = useCallback(async () => {
         const roomId = parseRoomId();
         const generation = ++roomGenerationRef.current;
+        const requestedAccountId = user?.id ?? null;
         setMessagesRoomId(null);
+        setMessagesAccountId(null);
         setMessages([]);
         setLastReadAt(null);
         setNextHistoryUrl(null);
@@ -291,18 +300,19 @@ export default function SharedMessageDetailScreen() {
         readerNearBottomRef.current = true;
         shouldScrollRef.current = false;
         setLoading(true);
-        if (!Number.isSafeInteger(roomId) || roomId <= 0) {
+        if (!Number.isSafeInteger(roomId) || roomId <= 0 || requestedAccountId == null) {
             setMessageLoadError('This conversation link is invalid.');
             setLoading(false);
             return;
         }
         try {
             const data = await getRoomMessages(roomId);
-            if (generation !== roomGenerationRef.current) return;
+            if (generation !== roomGenerationRef.current || accountRef.current !== requestedAccountId) return;
             const rows = Array.isArray((data as any)?.results) ? (data as any).results
                 : Array.isArray(data) ? data : [];
             setMessages(current => mergeOlderMessages(current, rows.map((msg: any, idx: number) => mapMessage(msg, roomId, idx))));
             setMessagesRoomId(roomId);
+            setMessagesAccountId(requestedAccountId);
             const next = (data as any)?.next ?? null;
             setNextHistoryUrl(isNextPageForRoom(next, roomId) ? next : null);
             if ((data as any)?.my_last_read_at) setLastReadAt((data as any).my_last_read_at);
@@ -310,21 +320,21 @@ export default function SharedMessageDetailScreen() {
             // Read acknowledgement is best effort and must not overwrite a newer room's state.
             try {
                 const receipt = await markRoomAsRead(roomId);
-                if (generation === roomGenerationRef.current && (receipt as any)?.last_read_at) {
+                if (generation === roomGenerationRef.current && accountRef.current === requestedAccountId && (receipt as any)?.last_read_at) {
                     setLastReadAt((receipt as any).last_read_at);
                 }
             } catch {
                 // Reading remains available even when receipt submission fails.
             }
         } catch (error) {
-            if (generation === roomGenerationRef.current) {
+            if (generation === roomGenerationRef.current && accountRef.current === requestedAccountId) {
                 console.error('Error fetching messages:', error);
                 setMessageLoadError('Unable to load this conversation. Check your connection and try again.');
             }
         } finally {
-            if (generation === roomGenerationRef.current) setLoading(false);
+            if (generation === roomGenerationRef.current && accountRef.current === requestedAccountId) setLoading(false);
         }
-    }, [mapMessage, parseRoomId]);
+    }, [mapMessage, parseRoomId, user?.id]);
 
     useEffect(() => {
         void fetchMessages();
@@ -334,19 +344,20 @@ export default function SharedMessageDetailScreen() {
     const loadOlderMessages = async () => {
         const roomId = parseRoomId();
         const generation = roomGenerationRef.current;
+        const requestedAccountId = user?.id ?? null;
         if (!validRoomId || loading || !isNextPageForRoom(nextHistoryUrl, roomId) || historyBusyRef.current) return;
         historyBusyRef.current = true;
         setLoadingHistory(true);
         setHistoryError(null);
         try {
             const page = await fetchRoomMessagesByUrl(nextHistoryUrl!);
-            if (generation !== roomGenerationRef.current) return;
+            if (generation !== roomGenerationRef.current || accountRef.current !== requestedAccountId) return;
             setMessages(current => mergeOlderMessages(current, page.messages.map((msg: any, idx: number) => mapMessage(msg, roomId, idx))));
             setNextHistoryUrl(isNextPageForRoom(page.next, roomId) ? page.next : null);
         } catch (error: any) {
-            if (generation === roomGenerationRef.current) setHistoryError(error?.message || 'Older messages could not be loaded.');
+            if (generation === roomGenerationRef.current && accountRef.current === requestedAccountId) setHistoryError(error?.message || 'Older messages could not be loaded.');
         } finally {
-            if (generation === roomGenerationRef.current) {
+            if (generation === roomGenerationRef.current && accountRef.current === requestedAccountId) {
                 historyBusyRef.current = false;
                 setLoadingHistory(false);
             }
@@ -638,11 +649,11 @@ export default function SharedMessageDetailScreen() {
     const reactionToEmoji = (value: string) => REACTION_DISPLAY[value] ?? value;
 
 const pinnedMessage = useMemo(() => {
-        if (messagesRoomId !== currentRoomId) return null;
+        if (messagesRoomId !== currentRoomId || messagesAccountId !== (user?.id ?? null)) return null;
         const pinned = messages.filter((m) => m.is_pinned);
         if (!pinned.length) return null;
         return pinned.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-    }, [messages, messagesRoomId, currentRoomId]);
+    }, [messages, messagesRoomId, messagesAccountId, currentRoomId, user?.id]);
 
     const renderReactions = (item: MessageDisplay) => {
         if (!item.reactions || item.reactions.length === 0) return null;
@@ -823,7 +834,7 @@ const pinnedMessage = useMemo(() => {
             <View style={{ flex: 1 }}>
                 <FlatList
                     ref={flatListRef}
-                    data={messagesRoomId === currentRoomId ? messages : []}
+                    data={messagesRoomId === currentRoomId && messagesAccountId === (user?.id ?? null) ? messages : []}
                     maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
                     onScroll={event => {
                         const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
