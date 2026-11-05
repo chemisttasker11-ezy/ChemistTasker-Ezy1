@@ -21,6 +21,7 @@ export function ArticleDetail({ slug }: { slug: string }) {
   const accountKey = String(user?.id ?? 'anonymous');
   const generation = useRef(0);
   const submitting = useRef(false);
+  const pagingRef = useRef(false);
   const [article, setArticle] = useState<Article | null>(null);
   const [comments, setComments] = useState<PublicArticleComment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +39,7 @@ export function ArticleDetail({ slug }: { slug: string }) {
   const load = useCallback(async () => {
     const ticket = ++generation.current;
     setLoading(true); setError(''); setActionError('');
+    pagingRef.current = false;
     setArticle(null); setComments([]); setPage(null); setPaging(false); setReplyTo(null); setReportId(null); setReason('');
     try {
       const result = await chemistTaskerApi.publicContent.getArticle(slug);
@@ -60,7 +62,7 @@ export function ArticleDetail({ slug }: { slug: string }) {
     let active = true;
     // Defer initial load until after effects subscribe; stale generations cannot overwrite state.
     void Promise.resolve().then(() => { if (active) void load(); });
-    return () => { active = false; generation.current += 1; };
+    return () => { active = false; generation.current += 1; pagingRef.current = false; };
   }, [load]);
 
   const requiresSignIn = () => {
@@ -96,8 +98,9 @@ export function ArticleDetail({ slug }: { slug: string }) {
     } finally { if (ticket === generation.current) setBusy(false); }
   };
   const loadMoreComments = async () => {
-    if (page === null || paging) return;
+    if (page === null || pagingRef.current) return;
     const ticket = generation.current;
+    pagingRef.current = true;
     setPaging(true); setActionError('');
     try {
       const response = await chemistTaskerApi.publicContent.listArticleComments(slug, { page });
@@ -110,7 +113,12 @@ export function ArticleDetail({ slug }: { slug: string }) {
       setPage(response.next ? page + 1 : null);
     } catch (failure: any) {
       if (ticket === generation.current) setActionError(failure?.message || 'Older comments could not load.');
-    } finally { if (ticket === generation.current) setPaging(false); }
+    } finally {
+      if (ticket === generation.current) {
+        pagingRef.current = false;
+        setPaging(false);
+      }
+    }
   };
   const reportComment = async () => {
     if (!user || reportId === null || !reason.trim() || busy) return;
