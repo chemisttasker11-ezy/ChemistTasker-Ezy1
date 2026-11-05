@@ -85,6 +85,36 @@ New staged commits:
 - Verify authenticated staging, native SDK 58 Android/iOS signed builds and large text/device screenshots, Expo deep linking and stores, server-configured notification delivery/email/Stripe (only when separately authorised), startup/crash/OTA rollback.
 - Then conduct exact-head full Senior Package Testing, fix any failures, review the entire diff independently, and obtain owner approval before merge/release.
 
+## Continued native safety and marketplace wave — checkpoint 5 November 2026
+
+**Working source SHA before this handover:** `c8685dd3f636c28f3baad670f2ef50e11996a860`. PR #249 remains draft, stacked on #248, unmerged and undeployed.
+
+| Commit | Changes |
+|---|---|
+| `fb167a0a` | Delegated Admin membership notification routes honor current pharmacy's `MANAGE_STAFF`, with base-role fallback |
+| `9af4216c` | Ordinary Marketplace review synchronous submit mutex; prevent repeated create/update/upload/submit |
+| `e422ab73` | Notification inbox resets paginated rows, read cache, spinner and read alerts on account switch |
+| `37e87264` | Marketplace review attempt-generation guard: refuse later server write stages or local draft deletion after account switch; do not let stale attempt release a newer one |
+| `c8685dd3` | Public rich-content links surface an actionable error and retry instead of swallowing system open failure |
+
+### Senior safety/preservation notes
+
+- **QR scanner frozen:** no files in QR, public profile identity, scan-to-add, or QR invitation were changed. Leave the current behaviour until separately requested.
+- **Marketplace policy frozen:** only the current authorized listing create/update and private draft / submit-for-review APIs are used; no additional permission, product-category, S8, medicines, pharmacy escalation or payment rules were implemented.
+- **Marketplace synchronization:** the client stops additional network stages after a recognized account switch. An already-sent server request cannot be withdrawn by the UI; persistent server transactions and permission checks remain authoritative.
+- **Notification scope:** old read-state is not carried into a different signed-in account. Current role-shell guards still apply to all routed detail pages.
+- **Published Post Shift vs local draft:** these are different business concepts. Do not introduce new server-level draft status without the matching web and backend contract.
+- **QA evidence:** new regression source tests authored for each wave. **Do not report them as passing** until executed on one frozen final head. CI might run automatically with new pushes, but its results must be evaluated against that exact SHA.
+
+### Outstanding release blockers and continued work (QR excluded)
+
+1. **Functional acceptance:** Post Shift/shift centre and offers, roster/publication, payroll locks, approved finance revisions, state-specific holiday rates, marketplace state transitions, push, chat, permission matrix and session switching across owner, organization, admin, pharmacist, other staff, Explorer.
+2. **Mobile visual acceptance:** all six personas, small/large phones, Android/iOS, 1.6x font, keyboard, screen reader, slow/offline connection, error/recovery, native deep linking and back navigation.
+3. **Provider/staging:** with owner authorization only, signed binary SDK 58 iOS/Android, actual configured SMTP/Expo Push/Stripe test-mode callbacks, payment replay and rollback.
+4. **Consolidated exact-head Senior Package Testing and independent review** deferred at owner's instruction until source implementation is complete; preserve legitimate existing business logic.
+
+**Status:** substantive source gaps closed in reviewable commits; full Expo parity and production readiness are **not yet proven**. No merge, deploy, store release, EAS update or live service action performed.
+
 ## Explicit scope decisions
 
 1. **Multi-slot interest:** retain the mobile single batch `slot_ids` request for Apply All/Selected. The backend `backend/shifts/interest.py` validates the requested slot IDs before writing and the contract test in `backend/shifts/test_shift_actions_contract.py` proves two-slot creation and one manager notification. The web's per-slot `Promise.all` has different partial-failure behaviour; duplicating that is *not* a safe visual parity fix.
