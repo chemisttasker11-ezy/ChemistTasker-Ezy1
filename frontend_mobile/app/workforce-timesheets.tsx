@@ -11,6 +11,7 @@ import {
   type WorkforceTimesheetSummary,
   workforce,
 } from '@chemisttasker/shared-core';
+import { useAuth } from '@/context/AuthContext';
 
 
 
@@ -31,6 +32,13 @@ function currentFortnight() {
 
 export default function WorkforceTimesheetsScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const accountKey = user ? String(user.id ?? user.email ?? user.username ?? '') : '';
+  const accountRef = useRef(accountKey);
+  accountRef.current = accountKey;
+  const writeRef = useRef(false);
+  const writeGeneration = useRef(0);
+  const [loadedAccount, setLoadedAccount] = useState('');
   const [pharmacies, setPharmacies] = useState<{ id: number; name: string }[]>([]);
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
   const [periods, setPeriods] = useState<WorkforceTimesheetPeriod[]>([]);
@@ -45,33 +53,58 @@ export default function WorkforceTimesheetsScreen() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchPharmaciesService({})
+    let active = true;
+    periodsRequestRef.current += 1;
+    detailRequestRef.current += 1;
+    writeGeneration.current += 1;
+    writeRef.current = false;
+    setLoadedAccount('');
+    setPharmacies([]);
+    setPharmacyId(null);
+    setPeriodId(null);
+    setPeriods([]);
+    setSummary(null);
+    setRows([]);
+    setBusy(false);
+    setError('');
+    setCorrectionReason('');
+    if (!accountKey) { setLoading(false); return () => { active = false; }; }
+    setLoading(true);
+    void fetchPharmaciesService({})
       .then((data: any[]) => {
+        if (!active || accountRef.current !== accountKey) return;
         const mapped = (data || []).map(row => ({ id: Number(row.id), name: row.name || `Pharmacy #${row.id}` }));
         setPharmacies(mapped);
         setPharmacyId(current => current && mapped.some(row => row.id === current) ? current : (mapped[0]?.id ?? null));
+        setLoadedAccount(accountKey);
       })
-      .catch((failure: any) => setError(failure?.message || 'Unable to load pharmacies.'));
-  }, []);
+      .catch((failure: any) => { if (active && accountRef.current === accountKey) setError(failure?.message || 'Unable to load pharmacies.'); })
+      .finally(() => { if (active && accountRef.current === accountKey) setLoading(false); });
+    return () => { active = false; periodsRequestRef.current += 1; detailRequestRef.current += 1; };
+  }, [accountKey]);
 
   const loadPeriods = useCallback(async () => {
     const request = ++periodsRequestRef.current;
-    if (!pharmacyId) {
+    const scope = accountKey;
+    const current = () => request === periodsRequestRef.current && accountRef.current === scope;
+    if (!pharmacyId || loadedAccount !== scope) {
       setPeriods([]); setPeriodId(null); return;
     }
     try {
       const next = await workforce.listTimesheetPeriods(pharmacyId) as WorkforceTimesheetPeriod[];
-      if (request !== periodsRequestRef.current) return;
+      if (!current()) return;
       setPeriods(next);
       setPeriodId(current => current && next.some(row => row.id === current) ? current : (next[0]?.id ?? null));
     } catch (failure) {
-      if (request === periodsRequestRef.current) throw failure;
+      if (current()) throw failure;
     }
-  }, [pharmacyId]);
+  }, [pharmacyId, accountKey, loadedAccount]);
 
   const loadPeriod = useCallback(async () => {
     const request = ++detailRequestRef.current;
-    if (!periodId) {
+    const scope = accountKey;
+    const current = () => request === detailRequestRef.current && accountRef.current === scope;
+    if (!periodId || loadedAccount !== scope) {
       setSummary(null); setRows([]); return;
     }
     try {
@@ -79,26 +112,27 @@ export default function WorkforceTimesheetsScreen() {
         workforce.getTimesheetPeriodSummary(periodId),
         workforce.listTimesheets(periodId),
       ]) as [WorkforceTimesheetSummary, WorkforceTimesheetRow[]];
-      if (request !== detailRequestRef.current) return;
+      if (!current()) return;
       setSummary(nextSummary);
       setRows(nextRows);
     } catch (failure) {
-      if (request === detailRequestRef.current) throw failure;
+      if (current()) throw failure;
     }
-  }, [periodId]);
+  }, [periodId, accountKey, loadedAccount]);
 
   const refresh = useCallback(async (pull = false) => {
+    const requestedAccount = accountKey;
     if (pull) setRefreshing(true); else setLoading(true);
     setError('');
     try {
       await loadPeriods();
       await loadPeriod();
     } catch (failure: any) {
-      setError(failure?.message || 'Unable to load timesheets.');
+      if (accountRef.current === requestedAccount) setError(failure?.message || 'Unable to load timesheets.');
     } finally {
-      setLoading(false); setRefreshing(false);
+      if (accountRef.current === requestedAccount) { setLoading(false); setRefreshing(false); }
     }
-  }, [loadPeriod, loadPeriods]);
+  }, [loadPeriod, loadPeriods, accountKey]);
 
   useEffect(() => { void loadPeriods().catch((failure: any) => setError(failure?.message || 'Unable to load timesheet periods.')).finally(() => setLoading(false)); }, [loadPeriods]);
   useFocusEffect(useCallback(() => {
@@ -109,11 +143,23 @@ export default function WorkforceTimesheetsScreen() {
   const selectedPeriod = useMemo(() => periods.find(row => row.id === periodId) ?? null, [periodId, periods]);
 
   const run = async (action: () => Promise<unknown>) => {
-    if (busy) return;
-    setBusy(true); setError('');
-    try { await action(); await loadPeriods(); await loadPeriod(); }
-    catch (failure: any) { setError(failure?.message || 'Unable to complete this action.'); }
-    finally { setBusy(false); }
+    if (writeRef.current || !accountKey || loadedAccount !== accountKey) return;
+    const scope = accountKey;
+    const actionId = ++writeGeneration.current;
+    const current = () => actionId === writeGeneration.current && accountRef.current === scope;
+    writeRef.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      await action();
+      if (!current()) return;
+      await loadPeriods();
+      if (current()) await loadPeriod();
+    } catch (failure: any) {
+      if (current()) setError(failure?.message || 'Unable to complete this action.');
+    } finally {
+      if (current()) { writeRef.current = false; setBusy(false); }
+    }
   };
 
   const openCurrent = () => {
@@ -156,6 +202,17 @@ export default function WorkforceTimesheetsScreen() {
       { text: 'Lock', style: 'destructive', onPress: () => void run(() => workforce.lockTimesheetPeriod(periodId)) },
     ]);
   };
+
+  // Data from the previous account is hidden immediately, before effects run.
+  if (!accountKey || loadedAccount !== accountKey) return (
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <View style={styles.content}>
+        <Text variant="headlineSmall">Timesheets</Text>
+        {!accountKey ? <Text>Sign in to review timesheets.</Text> : <ActivityIndicator accessibilityLabel="Loading authorized pharmacy timesheets" />}
+        {!!error && <Text accessibilityRole="alert">{error}</Text>}
+      </View>
+    </SafeAreaView>
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
