@@ -19,3 +19,12 @@ test('historical financial reads and temporary PDF files remain within the activ
   assert.match(source, /if \(!current\(\)\) return;\s*await Sharing\.shareAsync/);
   assert.match(source, /file\.delete\(\)/);
 });
+
+test('shift invoice prefill cannot overwrite a draft edited while the request was pending', () => {
+  const editor = readFileSync(resolve(__dirname, '../roles/shared/invoices/FinanceInvoiceEditor.tsx'), 'utf8');
+  assert.match(editor, /const editGeneration = draftEditGeneration\.current/);
+  assert.match(editor, /draftEditGeneration\.current !== editGeneration/);
+  assert.match(editor, /prefillGeneration\.current !== request/);
+  assert.match(editor, /editedDefaults\.current\.add\(key\)/);
+  assert.match(editor, /setError\('The invoice was edited while loading this shift/);
+});
