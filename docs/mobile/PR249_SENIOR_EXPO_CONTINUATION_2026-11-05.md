@@ -172,3 +172,22 @@ These targeted source changes close several previously demonstrated implementati
 - **Remaining:** source-level regression tests and actual runtime validation of rapid room/account switches, duplicate taps, attachment picker cancellation, reconnect semantics and late server acknowledgements. Do not infer that a submitted request is cancelled when the UI changes account.
 
 **Latest source checkpoint:** `d0e7f027ac51f6adefb62bd574587a6a5d7cfeb8`. No local runtime gate was run.
+
+## Continued senior source remediation — W6 finance and communications (5 November 2026)
+
+**Starting head:** `c2188a86`; **latest implementation head before this handover:** `e56e580f`. This pass did not touch the QR code or scanner implementation, change financial business rules, merge, release or deploy.
+
+| Commit | Change | Invariant / QA needed |
+|---|---|---|
+| `26cf546b` | Shift-contact chat launches by backend user ID rather than matching the title/email of an existing DM | Avoid similarly named contacts opening a different person's conversation; validate with multiple identical display names |
+| `cfba2649` | Read-confirmed reactions and account/room generation guards for late edit, delete and pin results | Prevent rejected optimistic reactions and previous-account mutation responses appearing in the new room; backend is authority |
+| `c76000db` | Scoped historical finance revisions, account-scoped invoice deep-link keys, PDF-share cancellation after account switch, sanitized temporary filename and best-effort cache cleanup | No previous-account invoice share sheet after a credential switch; verify Expo file sharing on both platforms |
+| `9a7d7837`, `96f41fa7`, `9762af8c` | Extend existing finance and team-chat source regression tests | Source assertions only; no passing test claim until executed |
+| `72fcd7d3`, `e56e580f` | Hide pin actions in the chat list if the current persona cannot pin | UI role consistency; backend continues to decide authorization |
+
+### Verification and remaining risk
+
+- GitHub access is available through the connected repository, but the container has **no network DNS path to GitHub**, so a complete local checkout and runtime/typecheck/device build could not be performed here.
+- PR #249 is still draft on PR #248. CI checks start automatically on commits; only completed checks on the final immutable head can support acceptance.
+- Remaining work exceeds source review: all six personas on real authenticated backend; shift booking/paid checkout and payroll/roster lock concurrency; finance revision and PDF device acceptance; marketplace role and tenant permissions; app links, push notifications and real iOS/Android SDK 58 builds; accessibility and native visual review; authorised provider/staging proof; exact-head Senior Package Testing.
+- Do not state **fully finished**, **merge ready** or **production ready** based on this implementation wave. QR identity/product work remains explicitly out of scope at the owner's direction.
