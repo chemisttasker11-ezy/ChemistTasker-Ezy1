@@ -135,6 +135,7 @@ export default function SharedMessageDetailScreen() {
     const [participantCache, setParticipantCache] = useState<Record<number, IdentityRecord>>({});
     const [shiftContactByUserId, setShiftContactByUserId] = useState<Record<number, ChatIdentity>>({});
     const [newMessage, setNewMessage] = useState('');
+    const [composerScope, setComposerScope] = useState('');
     const [editingId, setEditingId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
@@ -165,6 +166,17 @@ export default function SharedMessageDetailScreen() {
     const flatListRef = useRef<FlatList<MessageDisplay>>(null);
     const currentRoomId = parseRoomId();
     const validRoomId = Number.isSafeInteger(currentRoomId) && currentRoomId > 0;
+    const currentComposerScope = `${user?.id ?? 'signed-out'}:${validRoomId ? currentRoomId : 'invalid'}`;
+    const visibleNewMessage = composerScope === currentComposerScope ? newMessage : '';
+    useEffect(() => {
+        setNewMessage('');
+        setComposerScope(currentComposerScope);
+        setEditingId(null);
+        setMenuFor(null);
+        setRoomPinned(false);
+        setTypingUsernames([]);
+        setSnackbar(null);
+    }, [currentComposerScope]);
 
     const mapMessage = useCallback((msg: any, roomId: number, index: number): MessageDisplay => {
         const senderUserId = msg.sender?.user_details?.id ?? msg.sender?.user?.id ?? msg.sender?.id ?? msg.sender;
@@ -451,7 +463,7 @@ export default function SharedMessageDetailScreen() {
     );
 
     const sendMessage = async () => {
-        const body = newMessage.trim();
+        const body = visibleNewMessage.trim();
         if (!body || sendBusyRef.current) return;
         const roomId = parseRoomId();
         const sendingAccountId = user?.id ?? null;
@@ -522,7 +534,7 @@ export default function SharedMessageDetailScreen() {
         setSending(true);
         try {
             const form = new FormData();
-            const body = newMessage.trim();
+            const body = visibleNewMessage.trim();
             if (body) form.append('body', body);
             form.append('attachment', {
                 uri: file.uri,
@@ -626,6 +638,7 @@ export default function SharedMessageDetailScreen() {
 
     const onEditStart = (message: MessageDisplay) => {
         setEditingId(message.id as number);
+        setComposerScope(currentComposerScope);
         setNewMessage(message.body || '');
     };
 
@@ -915,8 +928,9 @@ const pinnedMessage = useMemo(() => {
                     <TextInput
                         mode="outlined"
                         placeholder={editingId ? 'Edit message...' : 'Type a message...'}
-                        value={newMessage}
+                        value={visibleNewMessage}
                         onChangeText={(text) => {
+                            setComposerScope(currentComposerScope);
                             setNewMessage(text);
                             debouncedTyping();
                         }}
@@ -933,8 +947,8 @@ const pinnedMessage = useMemo(() => {
                             <TextInput.Icon
                                 icon={editingId ? 'check' : 'send'}
                                 onPress={sendMessage}
-                                disabled={sending || !newMessage.trim()}
-                                color={newMessage.trim() ? '#6366F1' : '#9CA3AF'}
+                                disabled={sending || !visibleNewMessage.trim()}
+                                color={visibleNewMessage.trim() ? '#6366F1' : '#9CA3AF'}
                             />
                         }
                     />
