@@ -1,4 +1,8 @@
-export function getMessageDetailRoute(userRole: string | null | undefined, roomId: number | string) {
+import type { ShiftPersona } from '@/roles/shared/shifts/shiftSurface';
+
+/** A chat thread route. `persona` (the active shell, see shiftPersonaFromPath) wins, so a delegated admin stays in /admin. */
+export function getMessageDetailRoute(userRole: string | null | undefined, roomId: number | string, persona?: ShiftPersona | null) {
+  if (persona) return `/${persona}/messages/${roomId}`;
   const normalized = String(userRole || '').toUpperCase();
   const rolePrefix =
     normalized === 'OWNER'

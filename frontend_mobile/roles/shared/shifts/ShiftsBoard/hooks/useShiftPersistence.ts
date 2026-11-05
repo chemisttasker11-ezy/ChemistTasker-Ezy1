@@ -10,10 +10,13 @@ import {
     REJECTED_SHIFT_STORAGE_KEY,
     REJECTED_SLOT_STORAGE_KEY,
     SAVED_STORAGE_KEY,
+    shiftStorageKey,
 } from '../constants';
 
 type UseShiftPersistenceParams = {
     shifts: Shift[];
+    /** useShiftSurface().scopeKey: markers are stored per persona, workspace, pharmacy and user. */
+    scopeKey: string;
     disableLocalPersistence?: boolean;
     savedFeatureEnabled: boolean;
     savedShiftIdsProp?: number[];
@@ -25,6 +28,7 @@ type UseShiftPersistenceParams = {
 
 export const useShiftPersistence = ({
     shifts,
+    scopeKey,
     disableLocalPersistence,
     savedFeatureEnabled,
     savedShiftIdsProp,
@@ -39,6 +43,12 @@ export const useShiftPersistence = ({
     const [rejectedShiftIds, setRejectedShiftIds] = useState<Set<number>>(new Set(initialRejectedShiftIds ?? []));
     const [rejectedSlotIds, setRejectedSlotIds] = useState<Set<number>>(new Set(initialRejectedSlotIds ?? []));
     const [isHydrated, setIsHydrated] = useState(false);
+    // The board remounts per scope (ShiftsBoard keys on scopeKey), so the keys are fixed for this mount.
+    const SAVED_KEY = shiftStorageKey(SAVED_STORAGE_KEY, scopeKey);
+    const APPLIED_KEY = shiftStorageKey(APPLIED_STORAGE_KEY, scopeKey);
+    const APPLIED_SLOT_KEY = shiftStorageKey(APPLIED_SLOT_STORAGE_KEY, scopeKey);
+    const REJECTED_SHIFT_KEY = shiftStorageKey(REJECTED_SHIFT_STORAGE_KEY, scopeKey);
+    const REJECTED_SLOT_KEY = shiftStorageKey(REJECTED_SLOT_STORAGE_KEY, scopeKey);
 
     const savedLoadRef = useRef(false);
     const markersLoadRef = useRef(false);
@@ -61,7 +71,7 @@ export const useShiftPersistence = ({
         markersLoadRef.current = true;
         (async () => {
             if (!disableLocalPersistence && savedFeatureEnabled && !savedShiftIdsProp && !savedLoadRef.current) {
-                const saved = await AsyncStorage.getItem(SAVED_STORAGE_KEY).catch(() => null);
+                const saved = await AsyncStorage.getItem(SAVED_KEY).catch(() => null);
                 if (saved) {
                     try {
                         const parsed = JSON.parse(saved);
@@ -74,36 +84,36 @@ export const useShiftPersistence = ({
             }
             if (!disableLocalPersistence) {
                 try {
-                    const appliedShifts = await AsyncStorage.getItem(APPLIED_STORAGE_KEY);
+                    const appliedShifts = await AsyncStorage.getItem(APPLIED_KEY);
                     if (appliedShifts) setAppliedShiftIds(new Set(JSON.parse(appliedShifts)));
                 } catch { }
                 try {
-                    const appliedSlots = await AsyncStorage.getItem(APPLIED_SLOT_STORAGE_KEY);
+                    const appliedSlots = await AsyncStorage.getItem(APPLIED_SLOT_KEY);
                     if (appliedSlots) setAppliedSlotIds(new Set(JSON.parse(appliedSlots)));
                 } catch { }
                 try {
-                    const rejShifts = await AsyncStorage.getItem(REJECTED_SHIFT_STORAGE_KEY);
+                    const rejShifts = await AsyncStorage.getItem(REJECTED_SHIFT_KEY);
                     if (rejShifts) setRejectedShiftIds(new Set(JSON.parse(rejShifts)));
                 } catch { }
                 try {
-                    const rejSlots = await AsyncStorage.getItem(REJECTED_SLOT_STORAGE_KEY);
+                    const rejSlots = await AsyncStorage.getItem(REJECTED_SLOT_KEY);
                     if (rejSlots) setRejectedSlotIds(new Set(JSON.parse(rejSlots)));
                 } catch { }
             }
             setIsHydrated(true);
         })();
-    }, [savedShiftIdsProp, savedFeatureEnabled, disableLocalPersistence]);
+    }, [savedShiftIdsProp, savedFeatureEnabled, disableLocalPersistence, SAVED_KEY, APPLIED_KEY, APPLIED_SLOT_KEY, REJECTED_SHIFT_KEY, REJECTED_SLOT_KEY]);
 
     // persist saved markers
     useEffect(() => {
         if (disableLocalPersistence || savedShiftIdsProp || !savedFeatureEnabled) return;
         const list = Array.from(savedShiftIds);
         if (list.length === 0) {
-            AsyncStorage.removeItem(SAVED_STORAGE_KEY).catch(() => null);
+            AsyncStorage.removeItem(SAVED_KEY).catch(() => null);
         } else {
-            AsyncStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify(list)).catch(() => null);
+            AsyncStorage.setItem(SAVED_KEY, JSON.stringify(list)).catch(() => null);
         }
-    }, [savedShiftIds, savedShiftIdsProp, disableLocalPersistence, savedFeatureEnabled]);
+    }, [savedShiftIds, savedShiftIdsProp, disableLocalPersistence, savedFeatureEnabled, SAVED_KEY]);
 
     // keep in sync with parent props (backend interests)
     useEffect(() => {
@@ -121,20 +131,20 @@ export const useShiftPersistence = ({
 
     useEffect(() => {
         if (disableLocalPersistence) return;
-        AsyncStorage.setItem(APPLIED_STORAGE_KEY, JSON.stringify(Array.from(appliedShiftIds))).catch(() => null);
-    }, [appliedShiftIds, disableLocalPersistence]);
+        AsyncStorage.setItem(APPLIED_KEY, JSON.stringify(Array.from(appliedShiftIds))).catch(() => null);
+    }, [appliedShiftIds, disableLocalPersistence, APPLIED_KEY]);
     useEffect(() => {
         if (disableLocalPersistence) return;
-        AsyncStorage.setItem(APPLIED_SLOT_STORAGE_KEY, JSON.stringify(Array.from(appliedSlotIds))).catch(() => null);
-    }, [appliedSlotIds, disableLocalPersistence]);
+        AsyncStorage.setItem(APPLIED_SLOT_KEY, JSON.stringify(Array.from(appliedSlotIds))).catch(() => null);
+    }, [appliedSlotIds, disableLocalPersistence, APPLIED_SLOT_KEY]);
     useEffect(() => {
         if (disableLocalPersistence) return;
-        AsyncStorage.setItem(REJECTED_SHIFT_STORAGE_KEY, JSON.stringify(Array.from(rejectedShiftIds))).catch(() => null);
-    }, [rejectedShiftIds, disableLocalPersistence]);
+        AsyncStorage.setItem(REJECTED_SHIFT_KEY, JSON.stringify(Array.from(rejectedShiftIds))).catch(() => null);
+    }, [rejectedShiftIds, disableLocalPersistence, REJECTED_SHIFT_KEY]);
     useEffect(() => {
         if (disableLocalPersistence) return;
-        AsyncStorage.setItem(REJECTED_SLOT_STORAGE_KEY, JSON.stringify(Array.from(rejectedSlotIds))).catch(() => null);
-    }, [rejectedSlotIds, disableLocalPersistence]);
+        AsyncStorage.setItem(REJECTED_SLOT_KEY, JSON.stringify(Array.from(rejectedSlotIds))).catch(() => null);
+    }, [rejectedSlotIds, disableLocalPersistence, REJECTED_SLOT_KEY]);
 
     // Drop local caches for shifts that no longer exist in the latest list
     useEffect(() => {
@@ -150,12 +160,12 @@ export const useShiftPersistence = ({
         if (!isHydrated) return;
         const liveIds = new Set(shifts.map((s) => s.id));
         if (!disableLocalPersistence) {
-            AsyncStorage.setItem(APPLIED_STORAGE_KEY, JSON.stringify([...appliedShiftIds].filter((id) => liveIds.has(id)))).catch(() => null);
-            AsyncStorage.setItem(APPLIED_SLOT_STORAGE_KEY, JSON.stringify([...appliedSlotIds].filter((id) => liveIds.has(id)))).catch(() => null);
-            AsyncStorage.setItem(REJECTED_SHIFT_STORAGE_KEY, JSON.stringify([...rejectedShiftIds].filter((id) => liveIds.has(id)))).catch(() => null);
-            AsyncStorage.setItem(REJECTED_SLOT_STORAGE_KEY, JSON.stringify([...rejectedSlotIds].filter((id) => liveIds.has(id)))).catch(() => null);
+            AsyncStorage.setItem(APPLIED_KEY, JSON.stringify([...appliedShiftIds].filter((id) => liveIds.has(id)))).catch(() => null);
+            AsyncStorage.setItem(APPLIED_SLOT_KEY, JSON.stringify([...appliedSlotIds].filter((id) => liveIds.has(id)))).catch(() => null);
+            AsyncStorage.setItem(REJECTED_SHIFT_KEY, JSON.stringify([...rejectedShiftIds].filter((id) => liveIds.has(id)))).catch(() => null);
+            AsyncStorage.setItem(REJECTED_SLOT_KEY, JSON.stringify([...rejectedSlotIds].filter((id) => liveIds.has(id)))).catch(() => null);
         }
-    }, [shifts, isHydrated, disableLocalPersistence, appliedShiftIds, appliedSlotIds, rejectedShiftIds, rejectedSlotIds]);
+    }, [shifts, isHydrated, disableLocalPersistence, appliedShiftIds, appliedSlotIds, rejectedShiftIds, rejectedSlotIds, APPLIED_KEY, APPLIED_SLOT_KEY, REJECTED_SHIFT_KEY, REJECTED_SLOT_KEY]);
 
     return {
         savedShiftIds,

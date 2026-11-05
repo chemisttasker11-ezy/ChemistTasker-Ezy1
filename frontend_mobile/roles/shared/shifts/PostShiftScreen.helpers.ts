@@ -1,9 +1,9 @@
 import { getPharmacyHoursForDate } from '@chemisttasker/shared-core';
 export const ROLE_OPTIONS = ['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT'];
 export const EMPLOYMENT_TYPES = ['LOCUM', 'PART_TIME', 'FULL_TIME'];
-export const PRIMARY = '#7c3aed';
-export const PRIMARY_LIGHT = '#F3E8FF';
-export const PRIMARY_TEXT = '#2D1B69';
+export const PRIMARY = '#4F46E5';
+export const PRIMARY_LIGHT = '#EEF2FF';
+export const PRIMARY_TEXT = '#312E81';
 
 export type StepKey = 'details' | 'skills' | 'visibility' | 'timetable' | 'payrate' | 'review';
 export type RateType = 'FLEXIBLE' | 'FIXED' | 'PHARMACIST_PROVIDED';
@@ -61,7 +61,7 @@ export const VISIBILITY_META: Record<
 
 export const RATE_TYPE_DESCRIPTIONS: Record<RateType, string> = {
     FLEXIBLE: 'The rate is flexible and negotiable with the candidate.',
-    FIXED: 'The rate is fixed in advanceand and not negotiable',
+    FIXED: 'The rate is fixed in advance and not negotiable.',
     PHARMACIST_PROVIDED: 'Use the candidate’s preset rate. You’ll always see it before assigning the shift.',
 };
 
@@ -205,3 +205,335 @@ export const normalizePrefillRole = (value?: string | null) => {
     if (normalized.includes('STUDENT')) return 'STUDENT';
     return '';
 };
+
+
+export type PostShiftRawParams = {
+    edit?: string | string[];
+    dates?: string | string[];
+    date?: string | string[];
+    role?: string | string[];
+    role_needed?: string | string[];
+    start_time?: string | string[];
+    end_time?: string | string[];
+    dedicated_user?: string | string[];
+    embedded?: string | string[];
+    pharmacyId?: string | string[];
+    pharmacy_id?: string | string[];
+};
+
+export type ParsedPostShiftParams = {
+    editingId: number | null;
+    routePharmacyId: number | null;
+    dates: string[];
+    roleNeeded: string;
+    startTime: string;
+    endTime: string;
+    hasStartTime: boolean;
+    hasEndTime: boolean;
+    dedicatedUserId: number | null;
+    isEmbedded: boolean;
+};
+
+const firstParam = (value: unknown): string => {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value) && value.length > 0 && value[0] != null) return String(value[0]);
+    return '';
+};
+
+export const toPositiveInt = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    const raw = typeof value === 'string' || typeof value === 'number' ? Number(value) : Number(firstParam(value));
+    return Number.isInteger(raw) && raw > 0 ? raw : null;
+};
+
+export function parsePostShiftSearchParams(
+    params?: PostShiftRawParams | null,
+    defaults?: { startTime?: string; endTime?: string },
+): ParsedPostShiftParams {
+    const editingId = toPositiveInt(params?.edit);
+    const routePharmacyId = toPositiveInt(params?.pharmacyId) ?? toPositiveInt(params?.pharmacy_id);
+
+    const rawDates = params?.dates;
+    let parsedDates: string[] = [];
+    if (typeof rawDates === 'string') {
+        parsedDates = rawDates.split(',').map((d) => d.trim()).filter(Boolean);
+    } else if (Array.isArray(rawDates)) {
+        parsedDates = rawDates
+            .reduce<string[]>((acc, val) => [...acc, ...String(val ?? '').split(',')], [])
+            .map((d) => d.trim())
+            .filter(Boolean);
+    }
+    const singleDate = firstParam(params?.date).trim();
+    const dates = Array.from(new Set(parsedDates.length > 0 ? parsedDates : singleDate ? [singleDate] : [])).sort();
+
+    const roleNeeded =
+        normalizePrefillRole(firstParam(params?.role_needed)) ||
+        normalizePrefillRole(firstParam(params?.role));
+
+    const rawStart = firstParam(params?.start_time).trim().slice(0, 5);
+    const rawEnd = firstParam(params?.end_time).trim().slice(0, 5);
+    const hasStartTime = /^\d{2}:\d{2}$/.test(rawStart);
+    const hasEndTime = /^\d{2}:\d{2}$/.test(rawEnd);
+
+    return {
+        editingId,
+        routePharmacyId,
+        dates,
+        roleNeeded,
+        startTime: hasStartTime ? rawStart : (defaults?.startTime ?? '09:00'),
+        endTime: hasEndTime ? rawEnd : (defaults?.endTime ?? '17:00'),
+        hasStartTime,
+        hasEndTime,
+        dedicatedUserId: toPositiveInt(params?.dedicated_user),
+        isEmbedded: firstParam(params?.embedded) === '1',
+    };
+}
+
+export function pickScopedPharmacyId(input: {
+    routePharmacyId?: number | string | null;
+    scopedPharmacyId?: number | string | null;
+    currentPharmacyId?: number | string | null;
+    pharmacies?: ReadonlyArray<{ id: number | string }>;
+    preserveCurrent?: boolean;
+}): number | '' {
+    const list = input.pharmacies;
+    if (list && list.length === 0) return '';
+    const isAllowed = (id: number | null): id is number =>
+        id != null && (!list || list.some((item) => Number(item.id) === id));
+
+    const routeId = toPositiveInt(input.routePharmacyId);
+    const scopedId = toPositiveInt(input.scopedPharmacyId);
+    const currentId = toPositiveInt(input.currentPharmacyId);
+    const ordered = input.preserveCurrent
+        ? [currentId, routeId, scopedId]
+        : [routeId, scopedId, currentId];
+
+    for (const candidate of ordered) {
+        if (isAllowed(candidate)) return candidate;
+    }
+    if (list && list.length > 0) {
+        return toPositiveInt(list[0]?.id) ?? '';
+    }
+    return '';
+}
+
+export function canAccessPostShift(
+    surface: { persona: string | null; canManageShifts: boolean; ready: boolean },
+    routePharmacyId?: number | null,
+    hasCapability?: (capability: string, pharmacyId?: number | null) => boolean,
+): boolean {
+    if (!surface.ready) return true;
+    if (surface.canManageShifts) return true;
+    if (surface.persona === 'admin' && routePharmacyId != null && hasCapability?.('MANAGE_ROSTER', routePharmacyId)) {
+        return true;
+    }
+    return false;
+}
+
+export type PostShiftInitScope = {
+    editingId: number | null;
+    routePharmacyId: number | null;
+    scopedPharmacyId: number | string | null;
+};
+
+export function shouldTriggerPostShiftInit(
+    prev: PostShiftInitScope | null,
+    next: PostShiftInitScope,
+    isRetry?: boolean,
+): boolean {
+    if (!prev || isRetry) return true;
+    return (
+        prev.editingId !== next.editingId ||
+        prev.routePharmacyId !== next.routePharmacyId ||
+        prev.scopedPharmacyId !== next.scopedPharmacyId
+    );
+}
+
+export type PostShiftFormResetOptions = {
+    preservePrefills?: boolean;
+    times?: { startTime?: string; endTime?: string };
+};
+
+export type ResetFormPrefillState = {
+    roleNeeded: string;
+    dedicatedUserId: number | null;
+    dates: string[];
+    slotDate: string;
+    slots: SlotEntry[];
+    selectedDates: string[];
+    selectedDateTimes: Record<string, { startTime: string; endTime: string }>;
+    slotStart: string;
+    slotEnd: string;
+};
+
+export function computeResetFormPrefills(
+    parsedParams?: ParsedPostShiftParams | null,
+    options?: PostShiftFormResetOptions,
+    currentTimes?: { startTime?: string; endTime?: string },
+): ResetFormPrefillState {
+    const todayIso = toLocalIsoDate(new Date());
+    const timesToUse = options?.times ?? currentTimes;
+    const preserve = Boolean(options?.preservePrefills);
+    if (!preserve || !parsedParams) {
+        return {
+            roleNeeded: 'PHARMACIST',
+            dedicatedUserId: null,
+            dates: [],
+            slotDate: todayIso,
+            slots: [],
+            selectedDates: [],
+            selectedDateTimes: {},
+            slotStart: timesToUse?.startTime || '09:00',
+            slotEnd: timesToUse?.endTime || '17:00',
+        };
+    }
+
+    const roleNeeded = parsedParams.roleNeeded || 'PHARMACIST';
+    const dedicatedUserId = parsedParams.dedicatedUserId ?? null;
+    const dates = Array.isArray(parsedParams.dates) ? parsedParams.dates : [];
+    const startTime = parsedParams.hasStartTime
+        ? parsedParams.startTime
+        : (timesToUse?.startTime || '09:00');
+    const endTime = parsedParams.hasEndTime
+        ? parsedParams.endTime
+        : (timesToUse?.endTime || '17:00');
+    const slotDate = dates.length > 0 ? dates[0] : todayIso;
+    const slots: SlotEntry[] = dates.map((date) => ({
+        date,
+        startTime,
+        endTime,
+        isRecurring: false,
+        recurringDays: [],
+        recurringEndDate: '',
+    }));
+    const selectedDateTimes = dates.reduce<Record<string, { startTime: string; endTime: string }>>(
+        (acc, date) => {
+            acc[date] = { startTime, endTime };
+            return acc;
+        },
+        {},
+    );
+
+    return {
+        roleNeeded,
+        dedicatedUserId,
+        dates,
+        slotDate,
+        slots,
+        selectedDates: dates,
+        selectedDateTimes,
+        slotStart: startTime,
+        slotEnd: endTime,
+    };
+}
+
+export type AppliedPrefills = {
+    datesKey?: string;
+    timesKey?: string;
+    roleKey?: string;
+    dedicatedUserKey?: string;
+};
+
+export type PrefillPlan = {
+    applyDates: boolean;
+    applyTimes: boolean;
+    applyRole: boolean;
+    applyDedicatedUser: boolean;
+    nextApplied: AppliedPrefills;
+};
+
+export function getStablePostShiftParamsKey(params?: PostShiftRawParams | null): string {
+    if (!params) return '';
+    return [
+        firstParam(params.edit),
+        firstParam(params.pharmacyId ?? params.pharmacy_id),
+        Array.isArray(params.dates) ? params.dates.join(',') : firstParam(params.dates),
+        firstParam(params.date),
+        firstParam(params.role_needed ?? params.role),
+        firstParam(params.start_time),
+        firstParam(params.end_time),
+        firstParam(params.dedicated_user),
+        firstParam(params.embedded),
+    ].join('|');
+}
+
+export function computePrefillPlan(
+    applied: AppliedPrefills,
+    parsed: ParsedPostShiftParams,
+    isEditing: boolean,
+): PrefillPlan {
+    if (isEditing) {
+        return {
+            applyDates: false,
+            applyTimes: false,
+            applyRole: false,
+            applyDedicatedUser: false,
+            nextApplied: applied,
+        };
+    }
+    const datesKey = parsed.dates.length > 0 ? parsed.dates.join(',') : '';
+    const applyDates = Boolean(datesKey) && applied.datesKey !== datesKey;
+
+    const timesKey = (parsed.hasStartTime || parsed.hasEndTime) ? (parsed.startTime + '-' + parsed.endTime) : '';
+    const applyTimes = Boolean(timesKey) && applied.timesKey !== timesKey;
+
+    const roleKey = parsed.roleNeeded || '';
+    const applyRole = Boolean(roleKey) && applied.roleKey !== roleKey;
+
+    const dedicatedUserKey = parsed.dedicatedUserId != null ? String(parsed.dedicatedUserId) : '';
+    const applyDedicatedUser = Boolean(dedicatedUserKey) && applied.dedicatedUserKey !== dedicatedUserKey;
+
+    return {
+        applyDates,
+        applyTimes,
+        applyRole,
+        applyDedicatedUser,
+        nextApplied: {
+            datesKey: datesKey || applied.datesKey,
+            timesKey: timesKey || applied.timesKey,
+            roleKey: roleKey || applied.roleKey,
+            dedicatedUserKey: dedicatedUserKey || applied.dedicatedUserKey,
+        },
+    };
+}
+
+export type InitChainResult<TPharmacy = any, TShift = any> =
+    | { status: 'aborted' }
+    | { status: 'pharmacies_failed'; error: unknown }
+    | { status: 'pharmacies_loaded'; pharmacies: TPharmacy }
+    | { status: 'shift_failed'; pharmacies: TPharmacy; error: unknown }
+    | { status: 'success'; pharmacies: TPharmacy; shift: TShift };
+
+export async function runPostShiftInitChain<TPharmacy = any, TShift = any>(options: {
+    isCurrent: () => boolean;
+    loadPharmacies: () => Promise<TPharmacy>;
+    loadShift?: () => Promise<TShift>;
+    shouldLoadShift: boolean;
+}): Promise<InitChainResult<TPharmacy, TShift>> {
+    if (!options.isCurrent()) return { status: 'aborted' };
+
+    let pharmacies: TPharmacy;
+    try {
+        pharmacies = await options.loadPharmacies();
+    } catch (error) {
+        if (!options.isCurrent()) return { status: 'aborted' };
+        return { status: 'pharmacies_failed', error };
+    }
+
+    if (!options.isCurrent()) return { status: 'aborted' };
+
+    if (!options.shouldLoadShift || !options.loadShift) {
+        return { status: 'pharmacies_loaded', pharmacies };
+    }
+
+    let shift: TShift;
+    try {
+        shift = await options.loadShift();
+    } catch (error) {
+        if (!options.isCurrent()) return { status: 'aborted' };
+        return { status: 'shift_failed', pharmacies, error };
+    }
+
+    if (!options.isCurrent()) return { status: 'aborted' };
+    return { status: 'success', pharmacies, shift };
+}

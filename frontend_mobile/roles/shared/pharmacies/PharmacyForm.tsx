@@ -448,6 +448,8 @@ export default function PharmacyForm({
         }
     };
 
+    const canCreateDraft = Boolean(form.name && form.street_address && form.suburb && form.state && form.postcode)
+        && form.abn.replace(/\D/g, '').length === 11;
     const validate = () => {
         if (!form.name || !form.street_address || !form.suburb || !form.state || !form.postcode) {
             setError('Please fill in all required fields (Name, Address, Suburb, State, Postcode).');
@@ -729,6 +731,8 @@ export default function PharmacyForm({
                 Alert.alert('Pharmacy already saved', 'This pharmacy was already saved earlier with different details. Re-apply your changes in the saved pharmacy.');
                 // Owner setup (/setup/owner/...) has no edit route of its own; use the role's.
                 const rolePath = pathname.replace(/^\/setup/, '').split('/')[1];
+                // The guard blocks leaving mid-save; this replace is the save's own outcome.
+                unsaved.markClean();
                 router.replace(`/${rolePath}/pharmacies/${conflictId}/edit` as any);
                 return false;
             }
@@ -788,7 +792,8 @@ export default function PharmacyForm({
     };
 
     const handleContinueLater = async () => {
-        if (!hasDraftContent) {
+        // Like web: a draft too incomplete to save is not saved; the unsaved-changes prompt tells the owner.
+        if (!hasDraftContent || (mode === 'create' && !canCreateDraft)) {
             if (onContinueLater) await onContinueLater();
             else if (onCancel) onCancel();
             else router.back();
@@ -1380,11 +1385,13 @@ export default function PharmacyForm({
                                 <>
                                     <Button
                                         mode="outlined"
-                                        onPress={() => activeTab > 0 ? setActiveTab(p => p - 1) : (onCancel ? onCancel() : router.back())}
+                                        onPress={() => activeTab > 0
+                                            ? setActiveTab(p => p - 1)
+                                            : onContinueLater ? void handleContinueLater() : (onCancel ? onCancel() : router.back())}
                                         disabled={saving || verificationPending}
                                         style={{ flex: 1 }}
                                     >
-                                        {activeTab > 0 ? 'Back' : 'Cancel'}
+                                        {activeTab > 0 ? 'Back' : onContinueLater ? 'Save & Continue Later' : 'Cancel'}
                                     </Button>
                                     <Button
                                         mode="contained"

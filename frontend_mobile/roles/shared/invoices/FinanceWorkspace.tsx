@@ -46,7 +46,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     const bytes = await nativeFileBytes(blob);
     const file = new File(Paths.cache, invoice.number + '-revision-' + targetVersion + '.pdf');
     file.create({ overwrite: true });
-    file.write(bytes);
+    await file.write(bytes);
     await Sharing.shareAsync(file.uri, {
       dialogTitle: 'Share ' + invoice.number + ' revision ' + targetVersion,
       mimeType: 'application/pdf',

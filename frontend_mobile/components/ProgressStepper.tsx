@@ -1,130 +1,80 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { ProgressBar, Text, Surface } from 'react-native-paper';
-import { brandColors } from '@/constants/theme';
+import React, { useEffect } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import { colors, font, radius, space, type } from '@/constants/tokens';
+import { durations, easings } from '@/constants/motion';
 
 interface ProgressStepperProps {
-    currentStep: number;
-    totalSteps: number;
-    steps: string[];
+  currentStep: number;
+  totalSteps: number;
+  steps: string[];
 }
 
+function Segment({ state }: { state: 'done' | 'current' | 'todo' }) {
+  const reducedMotion = useReducedMotion();
+  const fill = useSharedValue(state === 'todo' ? 0 : 1);
+
+  useEffect(() => {
+    const to = state === 'todo' ? 0 : 1;
+    fill.value = reducedMotion ? to : withTiming(to, { duration: durations.fast, easing: easings.smoothOut });
+  }, [fill, reducedMotion, state]);
+
+  // scaleX from the left edge: the bar fills without re-laying out the row.
+  const fillStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: fill.value }] }));
+
+  return (
+    <View style={styles.track}>
+      <Animated.View style={[styles.fill, fillStyle]} />
+    </View>
+  );
+}
+
+/** "Step 2 of 4 · Your role" over one segment per step; read as a single progress bar by screen readers. */
 export default function ProgressStepper({ currentStep, totalSteps, steps }: ProgressStepperProps) {
-    const progress = currentStep / totalSteps;
+  const label = steps[currentStep - 1] ?? '';
 
-    return (
-        <Surface style={styles.container} elevation={0}>
-            <View style={styles.header}>
-                <Text variant="titleMedium" style={styles.title}>
-                    Step {currentStep} of {totalSteps}
-                </Text>
-                <Text variant="bodyMedium" style={styles.stepLabel}>
-                    {steps[currentStep - 1]}
-                </Text>
-            </View>
-
-            <ProgressBar progress={progress} style={styles.progressBar} />
-
-            <View style={styles.stepsContainer}>
-                {steps.map((step, index) => (
-                    <View key={index} style={styles.stepItem}>
-                        <View
-                            style={[
-                                styles.stepCircle,
-                                index + 1 === currentStep && styles.stepCircleActive,
-                                index + 1 < currentStep && styles.stepCircleComplete,
-                            ]}
-                        >
-                            <Text
-                                style={[
-                                    styles.stepNumber,
-                                    (index + 1 === currentStep || index + 1 < currentStep) && styles.stepNumberActive,
-                                ]}
-                            >
-                                {index + 1}
-                            </Text>
-                        </View>
-                        <Text
-                            variant="bodySmall"
-                            style={[
-                                styles.stepText,
-                                index + 1 === currentStep && styles.stepTextActive,
-                            ]}
-                            numberOfLines={2}
-                        >
-                            {step}
-                        </Text>
-                    </View>
-                ))}
-            </View>
-        </Surface>
-    );
+  return (
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={`Step ${currentStep} of ${totalSteps}, ${label}`}
+      accessibilityValue={{ min: 1, max: totalSteps, now: currentStep }}
+      style={styles.container}
+    >
+      <Text style={styles.caption} maxFontSizeMultiplier={1.4}>
+        <Text style={styles.count}>
+          Step {currentStep} of {totalSteps}
+        </Text>
+        {label ? ` · ${label}` : ''}
+      </Text>
+      <View style={styles.segments}>
+        {Array.from({ length: totalSteps }, (_, index) => (
+          <Segment
+            key={index}
+            state={index + 1 < currentStep ? 'done' : index + 1 === currentStep ? 'current' : 'todo'}
+          />
+        ))}
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        padding: 16,
-        backgroundColor: brandColors.surfaceMuted,
-        borderRadius: 8,
-        marginBottom: 16,
-    },
-    header: {
-        marginBottom: 12,
-    },
-    title: {
-        fontWeight: 'bold',
-        marginBottom: 4,
-    },
-    stepLabel: {
-        color: brandColors.body,
-    },
-    progressBar: {
-        height: 8,
-        borderRadius: 4,
-        marginBottom: 16,
-    },
-    stepsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        gap: 8,
-    },
-    stepItem: {
-        flex: 1,
-        alignItems: 'center',
-        gap: 8,
-    },
-    stepCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: brandColors.border,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: brandColors.border,
-    },
-    stepCircleActive: {
-        backgroundColor: brandColors.primary,
-        borderColor: brandColors.primary,
-    },
-    stepCircleComplete: {
-        backgroundColor: brandColors.success,
-        borderColor: brandColors.success,
-    },
-    stepNumber: {
-        color: brandColors.body,
-        fontWeight: 'bold',
-    },
-    stepNumberActive: {
-        color: '#fff',
-    },
-    stepText: {
-        textAlign: 'center',
-        color: brandColors.body,
-        fontSize: 11,
-    },
-    stepTextActive: {
-        color: brandColors.primary,
-        fontWeight: '600',
-    },
+  container: { gap: space.sm },
+  caption: {
+    color: colors.textSecondary,
+    fontFamily: font.inter.medium,
+    fontSize: type.bodySmall.fontSize,
+    lineHeight: type.bodySmall.lineHeight,
+  },
+  count: { color: colors.accentStrong, fontFamily: font.inter.semiBold, fontVariant: ['tabular-nums'] },
+  segments: { flexDirection: 'row', gap: 6 },
+  track: {
+    flex: 1,
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+    overflow: 'hidden',
+  },
+  fill: { flex: 1, backgroundColor: colors.primary, transformOrigin: 'left' },
 });

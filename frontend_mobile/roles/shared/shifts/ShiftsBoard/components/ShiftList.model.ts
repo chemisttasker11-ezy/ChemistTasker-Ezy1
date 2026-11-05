@@ -38,6 +38,8 @@ export type ShiftListProps = {
     loading?: boolean;
     processedShifts: Shift[];
     clearAllFilters: () => void;
+    /** Words and next step for an empty list; defaults to "No shifts found" with Reset filters. */
+    emptyState?: { title: string; description?: string; actionLabel?: string; onAction?: () => void };
     hideCounterOffer?: boolean;
     onSubmitCounterOffer?: (payload: ShiftCounterOfferPayload) => Promise<void> | void;
     onRejectShift?: (shift: Shift) => Promise<void> | void;

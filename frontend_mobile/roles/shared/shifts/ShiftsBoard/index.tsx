@@ -1,26 +1,20 @@
-// ShiftsBoard - Mobile React Native version
+/// ShiftsBoard - Mobile React Native version
 // Complete shift board implementation matching web behavior
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, View, StyleSheet } from 'react-native';
-import {
-    Button,
-    Chip,
-    Divider,
-    IconButton,
-    Menu,
-    Modal,
-    Portal,
-    SegmentedButtons,
-    Text,
-} from 'react-native-paper';
+import { ScrollView, type ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
+import { ArrowUpDown, Check, ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react-native';
 import {
     Shift,
     fetchRatingsSummaryService,
     getOnboardingDetail,
     getPharmacistDashboard,
 } from '@chemisttasker/shared-core';
+import { BottomSheet, Button, Pill, ScalePressable, SegmentTabs } from '@/components/ui';
+import { colors, font, space, touch, type } from '@/constants/tokens';
 import { useAuth } from '@/context/AuthContext';
+import { plural } from '@/roles/shared/dashboard/managerHomeLogic';
+import { useShiftSurface } from '../useShiftSurface';
 import { RatePreference, ShiftsBoardProps, SlotFilterMode, SortKey } from './types';
 import FiltersSidebar from './components/FiltersSidebar';
 import CounterOfferDialog from './components/CounterOfferDialog';
@@ -37,8 +31,23 @@ const sortLabels: Record<SortKey, string> = {
     rate: 'Rate',
     distance: 'Distance',
 };
+const SORT_KEYS: SortKey[] = ['shiftDate', 'postedDate', 'rate', 'distance'];
+// Ascending, then descending, in the words a worker uses.
+const sortOrderLabels: Record<SortKey, [string, string]> = {
+    shiftDate: ['Soonest first', 'Latest first'],
+    postedDate: ['Oldest first', 'Newest first'],
+    rate: ['Lowest first', 'Highest first'],
+    distance: ['Nearest first', 'Farthest first'],
+};
 
-const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
+/** Keyed by the surface scope: a persona, workspace, pharmacy or account switch starts a clean board. */
+const ShiftsBoard: React.FC<ShiftsBoardProps> = (props) => {
+    const { scopeKey } = useShiftSurface();
+    return <ScopedShiftsBoard key={scopeKey} {...props} scopeKey={scopeKey} />;
+};
+
+const ScopedShiftsBoard: React.FC<ShiftsBoardProps & { scopeKey: string }> = ({
+    scopeKey,
     title,
     shifts,
     loading,
@@ -164,6 +173,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
         setRejectedSlotIds,
     } = useShiftPersistence({
         shifts,
+        scopeKey,
         disableLocalPersistence,
         savedFeatureEnabled,
         savedShiftIdsProp,
@@ -184,7 +194,6 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
         toggleFilter,
         toggleBooleanFilter,
         clearAllFilters,
-        handleSortChange,
         activeFilterCount,
         roleOptions,
         locationGroups,
@@ -203,6 +212,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
 
     const [filtersVisible, setFiltersVisible] = useState(false);
     const [sortMenuVisible, setSortMenuVisible] = useState(false);
+    const scrollRef = useRef<ScrollViewInstance>(null);
     const [expandedCards, setExpandedCards] = useState<Record<number, boolean>>({});
     const [selectedSlotIds, setSelectedSlotIds] = useState<Record<number, Set<number>>>({});
     const [pharmacyRatings, setPharmacyRatings] = useState<Record<number, { average: number; count: number }>>({});
@@ -255,8 +265,11 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
         setReviewOfferShiftId,
         reviewOffers,
         reviewLoading,
+        reviewError,
+        retryReview,
     } = useCounterOffers({
         shifts,
+        scopeKey,
         userRole: user?.role,
         pharmacistRatePref,
         hideCounterOffer,
@@ -544,15 +557,54 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
 
     const headerSubtitle =
         activeTab === 'saved'
-            ? `${displayShifts.length} saved items`
-            : useServerFiltering && typeof totalCount === 'number' && effectiveSlotFilterMode === 'all'
-                ? `Showing ${totalCount} opportunities`
-                : `Showing ${displayShifts.length} opportunities`;
+            ? `${displayShifts.length} saved`
+            : plural(
+                useServerFiltering && typeof totalCount === 'number' && effectiveSlotFilterMode === 'all' ? totalCount : displayShifts.length,
+                'shift',
+            );
 
     const pageCount =
         useServerFiltering && typeof totalCount === 'number' && pageSize
             ? Math.max(1, Math.ceil(totalCount / pageSize))
             : null;
+    const currentPage = page ?? 1;
+    const goToPage = (next: number) => {
+        onPageChange?.(next);
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+    };
+
+    const booleanFilterLabels = {
+        onlyUrgent: 'Urgent',
+        bulkShiftsOnly: 'Bulk shifts',
+        negotiableOnly: 'Negotiable',
+        travelProvided: 'Travel',
+        accommodationProvided: 'Accommodation',
+    } as const;
+    const activeFilters: { key: string; label: string; remove: () => void }[] = [
+        ...(Object.keys(booleanFilterLabels) as (keyof typeof booleanFilterLabels)[])
+            .filter((key) => filterConfig[key])
+            .map((key) => ({ key, label: booleanFilterLabels[key], remove: () => toggleBooleanFilter(key) })),
+        ...(['roles', 'employmentTypes', 'timeOfDay'] as const).flatMap((key) =>
+            filterConfig[key].map((value) => ({ key: `${key}-${value}`, label: value, remove: () => toggleFilter(key, value) })),
+        ),
+    ];
+
+    // One next step on every empty list (humanise 3.4.2); the board's tab picks the words.
+    const emptyState =
+        activeTab === 'saved'
+            ? { title: 'No saved shifts', description: 'Tap the heart on a shift to keep it here.' }
+            : effectiveSlotFilterMode === 'interested'
+                ? { title: 'No interest shown yet', description: 'Shifts you apply for or counter show here.' }
+                : effectiveSlotFilterMode === 'rejected'
+                    ? { title: 'Nothing rejected', description: 'Shifts and dates you turn down show here.' }
+                    : activeFilterCount > 0
+                        ? { title: 'No shifts match your filters', description: 'Try fewer filters to see more shifts.', actionLabel: 'Clear filters', onAction: clearAllFilters }
+                        : {
+                            title: 'No open shifts right now',
+                            description: 'New shifts show here as pharmacies post them.',
+                            actionLabel: onRefresh ? 'Refresh' : undefined,
+                            onAction: onRefresh ? () => void refreshShifts() : undefined,
+                        };
 
     return (
         <View style={styles.container}>
@@ -577,12 +629,15 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
                 visible={reviewOfferShiftId != null}
                 onDismiss={() => setReviewOfferShiftId(null)}
                 reviewLoading={reviewLoading}
+                reviewError={reviewError}
+                onRetry={retryReview}
                 reviewOfferShiftId={reviewOfferShiftId}
                 reviewOffers={reviewOffers}
                 shifts={shifts}
             />
 
             <ScrollView
+                ref={scrollRef}
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
@@ -590,124 +645,55 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
                 scrollEventThrottle={16}
             >
                 <View style={styles.header}>
-                    <View style={styles.headerText}>
-                        <Text variant="headlineMedium" style={styles.title}>{title}</Text>
-                        <Text variant="bodySmall" style={styles.subtitle}>{headerSubtitle}</Text>
-                    </View>
+                    <Text accessibilityRole="header" style={styles.title}>{title}</Text>
+                    {!loading ? <Text style={styles.subtitle}>{headerSubtitle}</Text> : null}
                 </View>
 
                 {!hideTabs && (
-                    <View style={styles.tabsRow}>
-                        <SegmentedButtons
-                            value={activeTab === 'saved' ? 'saved' : 'browse'}
-                            onValueChange={(value) => handleActiveTabChange(value as 'browse' | 'saved')}
-                            buttons={[
-                                { value: 'browse', label: 'Browse' },
-                                savedFeatureEnabled
-                                    ? { value: 'saved', label: `Saved (${savedShiftIds.size})` }
-                                    : null,
-                            ].filter(Boolean) as Array<{ value: 'browse' | 'saved'; label: string }>}
-                            theme={{ colors: { secondaryContainer: '#EEF2FF', onSecondaryContainer: '#6366F1' } }}
-                        />
-                    </View>
+                    <SegmentTabs
+                        tabs={[
+                            { value: 'browse' as const, label: 'Browse' },
+                            ...(savedFeatureEnabled ? [{ value: 'saved' as const, label: `Saved (${savedShiftIds.size})` }] : []),
+                        ]}
+                        value={activeTab === 'saved' ? 'saved' : 'browse'}
+                        onChange={handleActiveTabChange}
+                        label="Shift list"
+                        idPrefix="shift-board-list"
+                        style={styles.tabsRow}
+                    />
                 )}
 
                 {!hideFiltersAndSort && (
-                    <View style={styles.filtersRow}>
-                        <Button
-                            mode="outlined"
-                            icon="tune"
+                    <View style={styles.chipRow}>
+                        <Pill
+                            label={activeFilterCount > 0 ? `Filters · ${activeFilterCount}` : 'Filters'}
+                            icon={<SlidersHorizontal />}
+                            selected={activeFilterCount > 0}
                             onPress={() => setFiltersVisible(true)}
-                        >
-                            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-                        </Button>
-                        <Menu
-                            visible={sortMenuVisible}
-                            onDismiss={() => setSortMenuVisible(false)}
-                            anchor={
-                                <Button
-                                    mode="outlined"
-                                    icon="swap-vertical"
-                                    onPress={() => setSortMenuVisible(true)}
-                                >
-                                    Sort: {sortLabels[sortConfig.key]}
-                                </Button>
-                            }
-                        >
-                            {(['shiftDate', 'postedDate', 'rate', 'distance'] as SortKey[]).map((key) => (
-                                <Menu.Item
-                                    key={key}
-                                    onPress={() => {
-                                        handleSortChange(key);
-                                        setSortMenuVisible(false);
-                                    }}
-                                    title={sortLabels[key]}
-                                />
-                            ))}
-                        </Menu>
-                        <IconButton
-                            icon={sortConfig.direction === 'ascending' ? 'arrow-up' : 'arrow-down'}
-                            onPress={() =>
-                                setSortConfig((prev) => ({
-                                    ...prev,
-                                    direction: prev.direction === 'ascending' ? 'descending' : 'ascending',
-                                }))
-                            }
+                            accessibilityLabel={activeFilterCount > 0 ? `Filters, ${activeFilterCount} on` : 'Filters'}
+                        />
+                        <Pill
+                            label={`Sort: ${sortLabels[sortConfig.key]}`}
+                            icon={<ArrowUpDown />}
+                            onPress={() => setSortMenuVisible(true)}
+                            accessibilityLabel={`Sort by ${sortLabels[sortConfig.key]}, ${sortOrderLabels[sortConfig.key][sortConfig.direction === 'ascending' ? 0 : 1]}`}
                         />
                     </View>
                 )}
 
                 {!hideFiltersAndSort && activeFilterCount > 0 && (
-                    <View style={styles.activeFilters}>
-                        {filterConfig.onlyUrgent && (
-                            <Chip onClose={() => toggleBooleanFilter('onlyUrgent')}>Urgent</Chip>
-                        )}
-                        {filterConfig.bulkShiftsOnly && (
-                            <Chip onClose={() => toggleBooleanFilter('bulkShiftsOnly')}>Bulk shifts</Chip>
-                        )}
-                        {filterConfig.negotiableOnly && (
-                            <Chip onClose={() => toggleBooleanFilter('negotiableOnly')}>Negotiable</Chip>
-                        )}
-                        {filterConfig.travelProvided && (
-                            <Chip onClose={() => toggleBooleanFilter('travelProvided')}>Travel</Chip>
-                        )}
-                        {filterConfig.accommodationProvided && (
-                            <Chip onClose={() => toggleBooleanFilter('accommodationProvided')}>Accommodation</Chip>
-                        )}
-                        {filterConfig.roles.map((role) => (
-                            <Chip key={role} onClose={() => toggleFilter('roles', role)}>{role}</Chip>
+                    <View style={styles.chipRow}>
+                        {activeFilters.map((filter) => (
+                            <Pill
+                                key={filter.key}
+                                label={filter.label}
+                                icon={<X />}
+                                selected
+                                onPress={filter.remove}
+                                accessibilityLabel={`Remove filter ${filter.label}`}
+                            />
                         ))}
-                        {filterConfig.employmentTypes.map((type) => (
-                            <Chip key={type} onClose={() => toggleFilter('employmentTypes', type)}>{type}</Chip>
-                        ))}
-                        {filterConfig.timeOfDay.map((time) => (
-                            <Chip key={time} onClose={() => toggleFilter('timeOfDay', time)}>{time}</Chip>
-                        ))}
-                        <Button mode="text" onPress={clearAllFilters} icon="close">
-                            Clear all
-                        </Button>
-                    </View>
-                )}
-
-                {useServerFiltering && effectiveSlotFilterMode === 'all' && pageCount && onPageChange && (
-                    <View style={styles.paginationRow}>
-                        <Button
-                            mode="outlined"
-                            disabled={(page ?? 1) <= 1}
-                            onPress={() => onPageChange(Math.max(1, (page ?? 1) - 1))}
-                        >
-                            Previous
-                        </Button>
-                        <Text variant="bodySmall" style={styles.pageText}>
-                            Page {page ?? 1} of {pageCount}
-                        </Text>
-                        <Button
-                            mode="outlined"
-                            disabled={(page ?? 1) >= pageCount}
-                            onPress={() => onPageChange(Math.min(pageCount, (page ?? 1) + 1))}
-                        >
-                            Next
-                        </Button>
+                        <Pill label="Clear all" onPress={clearAllFilters} accessibilityLabel="Clear all filters" />
                     </View>
                 )}
 
@@ -715,6 +701,7 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
                     loading={loading}
                     processedShifts={displayShifts}
                     clearAllFilters={clearAllFilters}
+                    emptyState={emptyState}
                     hideCounterOffer={hideCounterOffer}
                     onSubmitCounterOffer={onSubmitCounterOffer}
                     onRejectShift={onRejectShift}
@@ -751,100 +738,106 @@ const ShiftsBoard: React.FC<ShiftsBoardProps> = ({
                     disableSlotActions={disableSlotActions}
                     disableActionGuards={disableActionGuards}
                 />
+
+                {useServerFiltering && effectiveSlotFilterMode === 'all' && pageCount && pageCount > 1 && onPageChange && !loading ? (
+                    <View style={styles.paginationRow}>
+                        <Button
+                            label="Previous"
+                            variant="outlined"
+                            icon={<ChevronLeft />}
+                            disabled={currentPage <= 1}
+                            onPress={() => goToPage(Math.max(1, currentPage - 1))}
+                            accessibilityLabel="Previous page"
+                        />
+                        <Text style={styles.pageText}>{`Page ${currentPage} of ${pageCount}`}</Text>
+                        <Button
+                            label="Next"
+                            variant="outlined"
+                            icon={<ChevronRight />}
+                            disabled={currentPage >= pageCount}
+                            onPress={() => goToPage(Math.min(pageCount, currentPage + 1))}
+                            accessibilityLabel="Next page"
+                        />
+                    </View>
+                ) : null}
             </ScrollView>
 
             {!hideFiltersAndSort && (
-                <Portal>
-                    <Modal
-                        visible={filtersVisible}
-                        onDismiss={() => setFiltersVisible(false)}
-                        contentContainerStyle={styles.filterModal}
+                <>
+                    <BottomSheet
+                        open={filtersVisible}
+                        onClose={() => setFiltersVisible(false)}
+                        title="Filters"
+                        footer={<Button label="Show shifts" onPress={() => setFiltersVisible(false)} />}
                     >
-                        <View style={styles.filterHeader}>
-                            <Text variant="titleMedium">Filters</Text>
-                            <IconButton icon="close" onPress={() => setFiltersVisible(false)} />
+                        {sidebarContent}
+                    </BottomSheet>
+                    <BottomSheet open={sortMenuVisible} onClose={() => setSortMenuVisible(false)} title="Sort shifts">
+                        <View accessibilityRole="radiogroup" accessibilityLabel="Sort by">
+                            {SORT_KEYS.map((key) => {
+                                const checked = sortConfig.key === key;
+                                return (
+                                    <ScalePressable
+                                        key={key}
+                                        static
+                                        pressBg
+                                        accessibilityRole="radio"
+                                        accessibilityState={{ checked }}
+                                        accessibilityLabel={sortLabels[key]}
+                                        onPress={() => setSortConfig((prev) => ({ ...prev, key }))}
+                                        style={styles.sortRow}
+                                    >
+                                        <Text style={[styles.sortLabel, checked ? styles.sortLabelOn : null]}>{sortLabels[key]}</Text>
+                                        {checked ? <Check size={20} color={colors.accentStrong} strokeWidth={2} /> : null}
+                                    </ScalePressable>
+                                );
+                            })}
                         </View>
-                        <Divider />
-                        <View style={styles.filterBody}>{sidebarContent}</View>
-                    </Modal>
-                </Portal>
+                        <SegmentTabs
+                            tabs={[
+                                { value: 'ascending' as const, label: sortOrderLabels[sortConfig.key][0] },
+                                { value: 'descending' as const, label: sortOrderLabels[sortConfig.key][1] },
+                            ]}
+                            value={sortConfig.direction}
+                            onChange={(direction) => setSortConfig((prev) => ({ ...prev, direction }))}
+                            label="Sort order"
+                            idPrefix="shift-sort-order"
+                            style={styles.sortOrder}
+                        />
+                    </BottomSheet>
+                </>
             )}
         </View>
     );
 };
 
+const text = (t: { fontFamily: string; fontSize: number; lineHeight: number }) =>
+    ({ fontFamily: t.fontFamily, fontSize: t.fontSize, lineHeight: t.lineHeight });
+
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingBottom: 24,
-    },
-    header: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 8,
-    },
-    headerText: {
-        gap: 4,
-    },
-    title: {
-        fontWeight: '700',
-    },
-    subtitle: {
-        color: '#6B7280',
-    },
-    tabsRow: {
-        paddingHorizontal: 16,
-        paddingBottom: 8,
-    },
-    filtersRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        alignItems: 'center',
-    },
-    activeFilters: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        paddingHorizontal: 16,
-        paddingBottom: 8,
-        alignItems: 'center',
-    },
-    paginationRow: {
+    container: { flex: 1 },
+    scrollView: { flex: 1 },
+    scrollContent: { gap: space.md, paddingBottom: space['2xl'] },
+    header: { paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.xxs },
+    title: { ...text(type.titleLarge), color: colors.textPrimary },
+    subtitle: { ...text(type.bodySmall), color: colors.textSecondary, fontVariant: ['tabular-nums'] },
+    tabsRow: { marginHorizontal: space.lg },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg },
+    paginationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm, paddingHorizontal: space.lg },
+    pageText: { ...text(type.bodySmall), fontFamily: font.inter.medium, color: colors.textSecondary, fontVariant: ['tabular-nums'] },
+    sortRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingBottom: 12,
+        minHeight: touch.min,
+        paddingHorizontal: space.sm,
+        marginHorizontal: -space.sm,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.border,
     },
-    pageText: {
-        color: '#6B7280',
-    },
-    filterModal: {
-        backgroundColor: '#FFFFFF',
-        marginHorizontal: 16,
-        marginVertical: 24,
-        borderRadius: 12,
-        overflow: 'hidden',
-        maxHeight: '90%',
-    },
-    filterHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-    },
-    filterBody: {
-        flex: 1,
-    },
+    sortLabel: { ...text(type.bodyLarge), color: colors.textPrimary },
+    sortLabelOn: { fontFamily: font.inter.semiBold, color: colors.accentStrong },
+    sortOrder: { marginTop: space.lg, marginBottom: space.md },
 });
 
 export default ShiftsBoard;

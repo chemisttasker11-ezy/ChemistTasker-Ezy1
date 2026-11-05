@@ -1,9 +1,2 @@
-import { View, Text } from 'react-native';
-
-export default function TabNameScreen() {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <Text>Shifts</Text>
-    </View>
-  );
-}
+// Shifts tab: the shared Shift Centre; persona, sections and access come from the shift surface policy.
+export { default } from '@/roles/shared/shifts/ShiftsScreen';

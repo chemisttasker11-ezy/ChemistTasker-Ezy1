@@ -1,0 +1,16 @@
+Skills (read and apply; paths from the repo root):
+- .agents/skills/ui-ux-pro-max/SKILL.md
+- .agents/skills/design-taste-frontend/SKILL.md (run its pre-flight)
+- .claude/skills/impeccable/SKILL.md
+- .claude/skills/expo/expo-native-ui/SKILL.md
+- .claude/skills/vercel-react-native-skills/SKILL.md
+Known traps (from W2's review rounds; avoid them up front):
+1. Every entry point uses web's capability or workspace guards; allowed users keep access.
+2. Data keyed by the current scope/workspace; a late response for an old scope never shows or acts.
+3. Only the latest request writes state (request generation); 403 paths too.
+4. A failed list shows retry, never "nothing to do" / zero.
+5. Empty arrays keep identity (functional setters) so memoised fetchers don't re-run.
+6. Precedence/branching logic lives in pure functions with tests that fail on a swap.
+7. Backend links (/dashboard/...) map to existing mobile routes for the persona; delegated admins stay in /admin.
+Rules: routes, endpoints, payloads, permissions unchanged; 44pt targets; AA text; light mode; Lucide; tokens only;
+no new @react-navigation/* imports; keep each file's line endings (this checkout uses CRLF).

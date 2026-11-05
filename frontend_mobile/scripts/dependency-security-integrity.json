@@ -7,12 +7,17 @@
     "node_modules/braces/lib/stringify.js": "c95abf85ab3c3b62399e98ee65aabfc17e672d6b4cc48b454df5a8c6adaf59a7",
     "node_modules/braces/lib/utils.js": "35f0d608bd905438e3114da522d9d7473a1b7b2a117ee47efd75833dfc393e42",
     "node_modules/node-forge/lib/rsa.js": "7357e4064840b0855d4bc47ecbed100c83f88104726c89cdf3ab67337f0f363b",
-    "node_modules/metro/src/Assets.js": "d6c19bdbcd1858c16ee7dce4b2301a18b735d017c4859eb93b1ad9cd12e03cd8",
-    "node_modules/metro/src/Assets.js.flow": "11f7bc3869f8c2f6621e393d773eff09530edd4f049e1840740004d57a413bfd",
+    "node_modules/metro/src/Assets.js": "7b7d34e62514c19b2728627bb1cc2a5512ff89f1525bdd4930916f0b532d3dc8",
+    "node_modules/metro/src/Assets.js.flow": "c8274d7e6cc87f2e89a79a10012d1e42696ea26a641394a94485ed959427a564",
     "node_modules/minimatch/minimatch.js": "746849f267c4868a53729225bd85c7dccd387712136fb305fcc0a3eadd4a3d9d",
     "node_modules/deepmerge/index.js": "281deda15dc48e3f932e7e36310d6bcb5cbc7c851280fd0ee59fd2bf6f56bba1",
     "node_modules/deepmerge/dist/cjs.js": "976c91f003a1fc609ebe2017babda35eb15dcb972c4bc868637626d3850c2756",
     "node_modules/deepmerge/dist/umd.js": "88e2fb95a180eaa6d0e739d051a2faf9e2d9c7a1111022a4709d56d7da53dfe0",
-    "node_modules/expo-router/node_modules/query-string/index.js": "2add7bc9d1f6d15f869c05207b53ded3c2ff0b7c0b8424becb0023890cc4314b"
+    "node_modules/metro/src/lib/imageSize.js": "611312a04a65ffedfefa6d165893717db6866e28411de07cde485e62b4e7351c",
+    "node_modules/metro/src/lib/imageSize.js.flow": "0b033001d33a1c30235673f6cfc13c5c817c0077afc9d468bd126f9498c4e3ef",
+    "node_modules/@expo/metro/node_modules/metro/src/Assets.js": "5c60a372e8c8053342160a2ad195d2214b8bb8c766e953be63cbf534bcbd1fe3",
+    "node_modules/@expo/metro/node_modules/metro/src/Assets.js.flow": "c8d7f82b17f7f95646c8c899badc91992e1616b696a246350c6c1404c01de1d8",
+    "node_modules/@expo/metro/node_modules/metro/src/lib/imageSize.js": "0d730a1748d389687e7d05768a91475510aec7a2427eafc8c345bbc1d3fa45eb",
+    "node_modules/@expo/metro/node_modules/metro/src/lib/imageSize.js.flow": "343986e611195b03971f87b9eb59b430ed93f5104826e97181a592faf70bb9f6"
   }
 }

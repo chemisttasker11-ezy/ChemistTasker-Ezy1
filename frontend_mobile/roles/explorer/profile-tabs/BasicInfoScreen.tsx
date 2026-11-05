@@ -45,7 +45,7 @@ export default function ExplorerBasicInfoScreen() {
   const [genderMenuVisible, setGenderMenuVisible] = useState(false);
   const [form, setForm] = useState<ApiData>({});
   const [lockedNames, setLockedNames] = useState({ first: false, last: false });
-  const saveRef = useRef<(() => Promise<void>) | null>(null);
+  const saveRef = useRef<(() => Promise<boolean | void>) | null>(null);
   const unsaved = useUnsavedChangesGuard(form, { enabled: !loading, onSave: () => saveRef.current?.(), saving });
   const { refreshUser, user } = useAuth();
 
@@ -137,6 +137,7 @@ export default function ExplorerBasicInfoScreen() {
       } else {
         setError(err?.message || 'Failed to save basic info.');
       }
+      return false;
     } finally {
       setSaving(false);
     }

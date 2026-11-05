@@ -5,6 +5,9 @@ import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { ActivityIndicator, HelperText, SegmentedButtons, Switch, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { usePathname, useRouter } from 'expo-router';
+import { Pencil } from 'lucide-react-native';
+import { Button } from '@/components/ui';
 import { type MembershipDTO, type PharmacyAdminDTO, type PharmacyDTO } from '@chemisttasker/shared-core';
 import StaffManager from './StaffManager';
 import LocumManager from './LocumManager';
@@ -24,6 +27,8 @@ interface PharmacyDetailViewProps {
     onToggleAutoPublishWorkerRequests?: (nextValue: boolean) => Promise<void> | void;
     autoPublishSaving?: boolean;
     autoPublishError?: string;
+    /** Defaults to this route's `edit` child (`/{role}/pharmacies/{id}/edit`). */
+    onEdit?: () => void;
 }
 
 export default function PharmacyDetailView({
@@ -37,8 +42,12 @@ export default function PharmacyDetailView({
     onToggleAutoPublishWorkerRequests,
     autoPublishSaving = false,
     autoPublishError = '',
+    onEdit,
 }: PharmacyDetailViewProps) {
     const [activeTab, setActiveTab] = useState<Tab>('staff');
+    const router = useRouter();
+    const pathname = usePathname();
+    const editPharmacy = onEdit ?? (() => router.push(`${pathname}/edit` as any));
 
     // Filter memberships by type
     // Any employment type that is NOT strictly a locum/casual type is considered general staff
@@ -60,6 +69,12 @@ export default function PharmacyDetailView({
 
     return (
         <SafeAreaView style={styles.container} edges={['left', 'right']}>
+            {/* Web: "Edit details" whenever the API allows editing. */}
+            {pharmacy.can_edit !== false ? (
+                <View style={styles.editRow}>
+                    <Button variant="outlined" label="Edit details" icon={<Pencil />} onPress={editPharmacy} />
+                </View>
+            ) : null}
             <View style={styles.automationSection}>
                 <View style={styles.automationHeader}>
                     <View style={styles.automationCopy}>
@@ -145,6 +160,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: surfaceTokens.bgDark,
+    },
+    editRow: {
+        paddingHorizontal: 16,
+        paddingTop: 16,
     },
     quickActions: {
         padding: 16,

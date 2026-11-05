@@ -2,10 +2,12 @@
 // Displays public shift candidates with counter offers and interests
 
 import React from 'react';
-import { Image, View, StyleSheet, ScrollView } from 'react-native';
-import { Surface, Text, Button, Divider, Chip, Card, Avatar } from 'react-native-paper';
+import { Image, View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Surface, Text, Divider, ActivityIndicator } from 'react-native-paper';
+import { Tag, UserCheck, Star } from 'lucide-react-native';
 import { Shift, ShiftInterest } from '@chemisttasker/shared-core';
-import { customTheme } from '../../theme';
+import { Pill } from '@/components/ui/Pill';
+import { colors as tokenColors, font, radius, space, touch } from '@/constants/tokens';
 import SlotSelector from './SlotSelector';
 import { getInterestDisplayName } from '../../utils/candidateHelpers';
 
@@ -28,53 +30,35 @@ interface PublicLevelViewProps {
     buzzLoadingOfferId?: number | null;
 }
 
-const colorMap = {
-    offer: { bg: '#F7F0FF', fg: '#6D28D9', border: '#C4B5FD', shadow: '#6D28D9' },
-    match: { bg: '#E8FCFF', fg: '#008EA6', border: '#A5F3FC', shadow: '#08BEEA' },
-};
-
 function PublicCandidateCard({
     title,
     count,
     icon,
-    palette,
+    tone,
     emptyTitle,
     emptySubtitle,
     children,
 }: {
     title: string;
     count: number;
-    icon: string;
-    palette: keyof typeof colorMap;
+    icon: React.ReactNode;
+    tone: 'violet' | 'cyan';
     emptyTitle: string;
     emptySubtitle: string;
     children: React.ReactNode;
 }) {
-    const colors = colorMap[palette];
-
     return (
-        <Card style={[styles.card, { backgroundColor: colors.bg, borderColor: colors.border, shadowColor: colors.shadow }]}>
-            <Card.Title
-                title={title}
-                titleStyle={[styles.cardTitle, { color: colors.fg }]}
-                left={() => (
-                    <Avatar.Icon
-                        size={40}
-                        icon={icon}
-                        style={styles.titleAvatar}
-                        color={colors.fg}
-                    />
-                )}
-                right={() => (
-                    <Chip
-                        style={{ backgroundColor: colors.fg }}
-                        textStyle={{ color: '#fff', fontWeight: 'bold' }}
-                    >
-                        {count}
-                    </Chip>
-                )}
-            />
-            <Card.Content style={styles.cardContent}>
+        <View style={styles.card}>
+            <View style={styles.cardHeader}>
+                <View style={styles.headerLeft}>
+                    <View style={styles.iconCircle}>
+                        {icon}
+                    </View>
+                    <Text style={styles.cardTitle}>{title}</Text>
+                </View>
+                <Pill label={String(count)} tone={tone} />
+            </View>
+            <View style={styles.cardContent}>
                 {count > 0 ? (
                     <View style={styles.candidateList}>{children}</View>
                 ) : (
@@ -83,8 +67,8 @@ function PublicCandidateCard({
                         <Text style={styles.emptySubText}>{emptySubtitle}</Text>
                     </View>
                 )}
-            </Card.Content>
-        </Card>
+            </View>
+        </View>
     );
 }
 
@@ -121,36 +105,38 @@ export default function PublicLevelView({
     const findInterestForOffer = (offer: any, offerSlotId: number | null) => {
         const offerUserId = typeof offer.user === 'object' ? offer.user?.id : offer.user;
         if (offerUserId == null) return null;
-        return interestsAll.find((i: any) => {
-            const iUserId = i.userId ?? i.user?.id ?? null;
-            if (iUserId !== offerUserId) return false;
-            if (offerSlotId == null) {
-                return i.slotId == null;
-            }
-            return i.slotId === offerSlotId;
-        }) || null;
+        return (
+            interestsAll.find((i: any) => {
+                const iUserId = i.userId ?? i.user?.id ?? null;
+                if (iUserId !== offerUserId) return false;
+                if (offerSlotId == null) {
+                    return i.slotId == null;
+                }
+                return i.slotId === offerSlotId;
+            }) || null
+        );
     };
 
     // Filter interests based on slot
     const slotInterests = slotId
-        ? interestsAll.filter(i => i.slotId === slotId || i.slotId == null)
+        ? interestsAll.filter((i) => i.slotId === slotId || i.slotId == null)
         : interestsAll;
 
     // Filter counter offers based on slot
     const slotOffers = slotId
-        ? counterOffers.filter(o => {
-            const offerSlots = o.slots || o.offer_slots || [];
-            return offerSlots.some((s: any) => (s.slot_id ?? s.slotId ?? s.slot?.id) === slotId);
-        })
+        ? counterOffers.filter((o) => {
+              const offerSlots = o.slots || o.offer_slots || [];
+              return offerSlots.some((s: any) => (s.slot_id ?? s.slotId ?? s.slot?.id) === slotId);
+          })
         : offersList;
 
     const offerUserIds = new Set(
         slotOffers
-            .map(o => (typeof o.user === 'object' ? o.user?.id : o.user))
+            .map((o) => (typeof o.user === 'object' ? o.user?.id : o.user))
             .filter((id: any) => id != null)
     );
 
-    const slotInterestsFiltered = slotInterests.filter(interest => {
+    const slotInterestsFiltered = slotInterests.filter((interest) => {
         const iUserId = interest.userId ?? interest.user?.id ?? null;
         if (iUserId == null) return true;
         return !offerUserIds.has(iUserId);
@@ -172,11 +158,9 @@ export default function PublicLevelView({
 
             <View style={styles.dividerContainer}>
                 <Divider style={styles.dividerLine} />
-                <Surface style={[styles.dividerChip, styles.publicDividerChip]} elevation={2}>
+                <Surface style={styles.dividerChip} elevation={1}>
                     <Image source={chemisttaskerBadge} style={styles.publicDividerLogo} resizeMode="contain" />
-                    <Text style={[styles.dividerChipText, styles.publicDividerText]}>
-                        ChemistTasker Public Candidates
-                    </Text>
+                    <Text style={styles.dividerChipText}>ChemistTasker Public Candidates</Text>
                 </Surface>
                 <Divider style={styles.dividerLine} />
             </View>
@@ -185,25 +169,27 @@ export default function PublicLevelView({
                 <PublicCandidateCard
                     title="Counter offers"
                     count={slotOffers.length}
-                    icon="tag"
-                    palette="offer"
+                    icon={<Tag size={18} color="#6D28D9" />}
+                    tone="violet"
                     emptyTitle="No counter offers yet."
                     emptySubtitle="When candidates send counter offers, they'll appear here."
                 >
                     {slotOffers.map((offer) => {
                         const offerSlotId = slotId ?? getOfferSlotId(offer);
                         const interest = findInterestForOffer(offer, offerSlotId);
+                        const isRevealed = Boolean(interest?.revealed);
                         const label = interest && !interest.revealed ? 'Reveal offer' : 'Review offer';
-                        const isRevealLabel = label.toLowerCase().includes('reveal');
+                        const isRevealAction = !isRevealed && interest && !interest.revealed;
+
                         const title = (() => {
-                            if (interest && interest.revealed) {
+                            if (isRevealed) {
                                 if (interest.user) {
                                     const userObj = typeof interest.user === 'object' ? interest.user : null;
                                     if (userObj) {
                                         const name =
-                                            (userObj.firstName && userObj.lastName)
+                                            userObj.firstName && userObj.lastName
                                                 ? `${userObj.firstName} ${userObj.lastName}`
-                                                : (userObj.first_name && userObj.last_name)
+                                                : userObj.first_name && userObj.last_name
                                                     ? `${userObj.first_name} ${userObj.last_name}`
                                                     : userObj.name || userObj.displayName || userObj.display_name;
                                         if (name) return name;
@@ -217,27 +203,39 @@ export default function PublicLevelView({
                         })();
 
                         return (
-                            <Surface key={offer.id} style={styles.candidateCard} elevation={1}>
-                                <View style={styles.candidateRow}>
-                                    <Text
-                                        style={styles.candidateName}
-                                        numberOfLines={1}
-                                        ellipsizeMode="tail"
-                                        adjustsFontSizeToFit
-                                        minimumFontScale={0.72}
-                                    >
-                                        {title}
-                                    </Text>
-                                    <Button
-                                        mode={isRevealLabel ? 'contained' : 'outlined'}
-                                        compact
-                                        onPress={() => onReviewOffer(shift, offer, offerSlotId)}
-                                        style={styles.candidateButton}
-                                    >
-                                        {label}
-                                    </Button>
+                            <View key={offer.id} style={styles.memberCard}>
+                                <View style={styles.memberRow}>
+                                    <View style={styles.memberInfo}>
+                                        <Text style={styles.memberName} numberOfLines={1} ellipsizeMode="tail">
+                                            {title}
+                                        </Text>
+                                        <Text style={styles.memberSubtitle}>
+                                            {isRevealed ? 'Revealed profile' : 'Public candidate offer'}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.memberBadges}>
+                                        <Pill label="Counter offer" tone="violet" />
+                                        <TouchableOpacity
+                                            style={isRevealAction ? styles.actionBtnPrimary : styles.actionBtnOutline}
+                                            activeOpacity={0.8}
+                                            onPress={() => onReviewOffer(shift, offer, offerSlotId)}
+                                            accessible
+                                            accessibilityRole="button"
+                                            accessibilityLabel={`${label} from ${title}`}
+                                        >
+                                            <Text
+                                                style={
+                                                    isRevealAction
+                                                        ? styles.actionBtnLabelPrimary
+                                                        : styles.actionBtnLabelOutline
+                                                }
+                                            >
+                                                {label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
-                            </Surface>
+                            </View>
                         );
                     })}
                 </PublicCandidateCard>
@@ -245,60 +243,97 @@ export default function PublicLevelView({
                 <PublicCandidateCard
                     title="Interested matches"
                     count={slotInterestsFiltered.length}
-                    icon="account-check"
-                    palette="match"
+                    icon={<UserCheck size={18} color="#008EA6" />}
+                    tone="cyan"
                     emptyTitle="No matches yet."
                     emptySubtitle="When public candidates show interest, they'll appear here."
                 >
-                    {slotInterestsFiltered.map(interest => {
+                    {slotInterestsFiltered.map((interest) => {
                         const isRevealing = revealingInterestId === interest.id;
-                        const isPendingConfirmation = Boolean(interest.pendingConfirmation ?? interest.pending_confirmation);
-                        const isAwaitingPayment = Boolean(interest.awaitingPayment ?? interest.awaiting_payment);
-                        const pendingOfferId = interest.pendingOfferId ?? interest.pending_offer_id ?? null;
+                        const isPendingConfirmation = Boolean(
+                            interest.pendingConfirmation ?? interest.pending_confirmation
+                        );
+                        const isAwaitingPayment = Boolean(
+                            interest.awaitingPayment ?? interest.awaiting_payment
+                        );
+                        const pendingOfferId =
+                            interest.pendingOfferId ?? interest.pending_offer_id ?? null;
+                        const candidateName = interest.revealed
+                            ? getInterestDisplayName(interest, interest.user)
+                            : 'Platform candidate';
+                        const actionLabel = isPendingConfirmation || isAwaitingPayment
+                            ? 'View'
+                            : interest.revealed
+                                ? 'Review'
+                                : 'Reveal';
+
                         return (
-                            <Surface key={interest.id} style={styles.candidateCard} elevation={1}>
-                                <View style={styles.candidateRow}>
-                                    <Text
-                                        style={styles.candidateName}
-                                        numberOfLines={1}
-                                        ellipsizeMode="tail"
-                                        adjustsFontSizeToFit
-                                        minimumFontScale={0.72}
-                                    >
-                                        {interest.revealed
-                                            ? getInterestDisplayName(interest, interest.user)
-                                            : 'Anonymous Interest User'}
-                                    </Text>
-                                    {isAwaitingPayment ? (
-                                        <Chip compact style={styles.awaitingPaymentChip}>Awaiting payment</Chip>
-                                    ) : isPendingConfirmation ? (
-                                        <Chip compact style={styles.pendingChip}>Pending</Chip>
-                                    ) : null}
-                                    <Button
-                                        mode={interest.revealed ? 'outlined' : 'contained'}
-                                        compact
-                                        onPress={() => onReveal(shift, interest)}
-                                        disabled={isRevealing}
-                                        loading={isRevealing}
-                                        style={styles.candidateButton}
-                                    >
-                                        {isPendingConfirmation || isAwaitingPayment ? 'View' : interest.revealed ? 'Review' : 'Reveal'}
-                                    </Button>
-                                    {isPendingConfirmation && !isAwaitingPayment && pendingOfferId != null && onBuzzWorker && (
-                                        <Button
-                                            mode="contained"
-                                            compact
-                                            loading={buzzLoadingOfferId === Number(pendingOfferId)}
-                                            disabled={buzzLoadingOfferId === Number(pendingOfferId)}
-                                            onPress={() => onBuzzWorker(Number(pendingOfferId))}
-                                            style={styles.buzzButton}
-                                            labelStyle={styles.buzzButtonLabel}
+                            <View key={interest.id} style={styles.memberCard}>
+                                <View style={styles.memberRow}>
+                                    <View style={styles.memberInfo}>
+                                        <Text style={styles.memberName} numberOfLines={1} ellipsizeMode="tail">
+                                            {candidateName}
+                                        </Text>
+                                        <Text style={styles.memberSubtitle}>
+                                            {interest.revealed ? 'Revealed candidate' : 'Public applicant'}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.memberBadges}>
+                                        {isAwaitingPayment ? (
+                                            <Pill label="Awaiting payment" tone="red" />
+                                        ) : isPendingConfirmation ? (
+                                            <Pill label="Pending" tone="amber" />
+                                        ) : !interest.revealed ? (
+                                            <Pill label="Public" tone="cyan" />
+                                        ) : null}
+
+                                        <TouchableOpacity
+                                            style={interest.revealed ? styles.actionBtnOutline : styles.actionBtnPrimary}
+                                            activeOpacity={0.8}
+                                            disabled={isRevealing}
+                                            onPress={() => onReveal(shift, interest)}
+                                            accessible
+                                            accessibilityRole="button"
+                                            accessibilityLabel={`${actionLabel} ${candidateName}`}
                                         >
-                                            Buzz
-                                        </Button>
-                                    )}
+                                            {isRevealing ? (
+                                                <ActivityIndicator size={14} color="#FFFFFF" />
+                                            ) : (
+                                                <Text
+                                                    style={
+                                                        interest.revealed
+                                                            ? styles.actionBtnLabelOutline
+                                                            : styles.actionBtnLabelPrimary
+                                                    }
+                                                >
+                                                    {actionLabel}
+                                                </Text>
+                                            )}
+                                        </TouchableOpacity>
+
+                                        {isPendingConfirmation &&
+                                            !isAwaitingPayment &&
+                                            pendingOfferId != null &&
+                                            onBuzzWorker && (
+                                                <TouchableOpacity
+                                                    style={styles.actionBtnBuzz}
+                                                    activeOpacity={0.8}
+                                                    disabled={buzzLoadingOfferId === Number(pendingOfferId)}
+                                                    onPress={() => onBuzzWorker(Number(pendingOfferId))}
+                                                    accessible
+                                                    accessibilityRole="button"
+                                                    accessibilityLabel={`Buzz candidate for offer ${pendingOfferId}`}
+                                                >
+                                                    {buzzLoadingOfferId === Number(pendingOfferId) ? (
+                                                        <ActivityIndicator size={14} color="#713F12" />
+                                                    ) : (
+                                                        <Text style={styles.actionBtnLabelBuzz}>Buzz</Text>
+                                                    )}
+                                                </TouchableOpacity>
+                                            )}
+                                    </View>
                                 </View>
-                            </Surface>
+                            </View>
                         );
                     })}
                 </PublicCandidateCard>
@@ -309,126 +344,194 @@ export default function PublicLevelView({
 
 const styles = StyleSheet.create({
     container: {
-        padding: customTheme.spacing.md,
-        gap: customTheme.spacing.md,
+        padding: space.md,
+        gap: space.md,
     },
     dividerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: customTheme.spacing.sm,
-        marginVertical: customTheme.spacing.sm,
+        gap: space.sm,
+        marginVertical: space.sm,
     },
     dividerLine: {
         flex: 1,
     },
     dividerChip: {
-        backgroundColor: customTheme.colors.greyLight,
-        borderRadius: 999,
-        paddingHorizontal: customTheme.spacing.md,
-        paddingVertical: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    publicDividerChip: {
         backgroundColor: '#F5F0FF',
         borderWidth: 1,
         borderColor: '#C4B5FD',
-        shadowColor: '#6D28D9',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.16,
-        shadowRadius: 12,
+        borderRadius: radius.pill,
+        paddingHorizontal: space.md,
+        paddingVertical: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.xs + 2,
     },
     publicDividerLogo: {
-        width: 24,
-        height: 24,
+        width: 20,
+        height: 20,
     },
     dividerChipText: {
         fontSize: 13,
-        fontWeight: '900',
-    },
-    publicDividerText: {
+        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
         color: '#4C1D95',
     },
     grid: {
-        gap: customTheme.spacing.md,
+        gap: space.md,
     },
     card: {
+        backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderRadius: 18,
-        minHeight: 128,
-        elevation: 2,
+        borderColor: tokenColors.border,
+        borderRadius: radius.card,
+        minHeight: 120,
+        elevation: 1,
         shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.06,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        overflow: 'hidden',
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: space.md,
+        paddingTop: space.md,
+        paddingBottom: space.xs,
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.xs + 4,
+    },
+    iconCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: radius.pill,
+        backgroundColor: '#F8FAFC',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     cardTitle: {
-        fontWeight: '900',
-    },
-    titleAvatar: {
-        backgroundColor: '#fff',
+        fontWeight: '800',
+        fontSize: 15,
+        fontFamily: font.inter.semiBold,
+        color: tokenColors.textPrimary,
     },
     cardContent: {
-        paddingTop: customTheme.spacing.xs,
+        paddingTop: space.xs,
+        paddingHorizontal: space.md,
+        paddingBottom: space.md,
     },
     candidateList: {
         width: '100%',
-        gap: customTheme.spacing.sm,
+        gap: space.xs + 2,
     },
-    candidateCard: {
-        width: '100%',
-        padding: customTheme.spacing.sm,
-        borderRadius: 14,
-        backgroundColor: '#fff',
+    memberCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: radius.nested,
+        borderWidth: 1,
+        borderColor: tokenColors.border,
+        paddingHorizontal: space.sm,
+        paddingVertical: space.xs + 2,
     },
-    candidateRow: {
+    memberRow: {
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        gap: customTheme.spacing.sm,
-        minWidth: 0,
+        gap: space.xs,
+        minHeight: touch.min,
     },
-    candidateName: {
-        fontSize: 13,
-        fontWeight: 'bold',
-        color: customTheme.colors.text,
+    memberInfo: {
         flex: 1,
         flexShrink: 1,
         minWidth: 0,
     },
-    candidateButton: {
-        alignSelf: 'flex-start',
+    memberName: {
+        fontSize: 13,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
+        color: tokenColors.textPrimary,
+        lineHeight: 17,
     },
-    buzzButton: {
-        alignSelf: 'flex-start',
-        backgroundColor: '#F9F295',
+    memberSubtitle: {
+        fontSize: 11,
+        fontFamily: font.inter.regular,
+        color: tokenColors.textSecondary,
+        marginTop: 1,
     },
-    buzzButtonLabel: {
-        color: '#111827',
+    memberBadges: {
+        flexDirection: 'row',
+        gap: space.xs,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+    },
+    actionBtnPrimary: {
+        minHeight: touch.min,
+        minWidth: 54,
+        paddingHorizontal: space.sm,
+        borderRadius: radius.control,
+        backgroundColor: tokenColors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionBtnLabelPrimary: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
+    },
+    actionBtnOutline: {
+        minHeight: touch.min,
+        minWidth: 54,
+        paddingHorizontal: space.sm,
+        borderRadius: radius.control,
+        borderWidth: 1,
+        borderColor: tokenColors.border,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionBtnLabelOutline: {
+        color: tokenColors.textPrimary,
+        fontSize: 11,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
+    },
+    actionBtnBuzz: {
+        minHeight: touch.min,
+        minWidth: 48,
+        paddingHorizontal: space.xs + 4,
+        borderRadius: radius.control,
+        backgroundColor: '#FEF08A',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionBtnLabelBuzz: {
+        color: '#713F12',
+        fontSize: 11,
         fontWeight: '800',
-    },
-    pendingChip: {
-        backgroundColor: '#F59E0B',
-        alignSelf: 'flex-start',
-    },
-    awaitingPaymentChip: {
-        backgroundColor: '#EF4444',
-        alignSelf: 'flex-start',
+        fontFamily: font.inter.semiBold,
     },
     emptyCopy: {
-        paddingVertical: customTheme.spacing.md,
+        paddingVertical: space.md,
     },
     emptyTitle: {
-        color: customTheme.colors.text,
-        fontWeight: '800',
-        marginBottom: 3,
+        color: tokenColors.textPrimary,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
+        fontSize: 13,
+        marginBottom: 2,
         textAlign: 'center',
     },
     emptySubText: {
-        color: customTheme.colors.textMuted,
+        color: tokenColors.textSecondary,
         fontSize: 12,
-        lineHeight: 17,
+        fontFamily: font.inter.regular,
+        lineHeight: 16,
         textAlign: 'center',
     },
 });

@@ -359,7 +359,7 @@ const scannerStyles=StyleSheet.create({
   coverRow:{gap:8},
   scannerShell:{gap:12},
   cameraFrame:{height:360,borderRadius:16,overflow:'hidden',backgroundColor:'#07111F',position:'relative'},
-  scanOverlay:{...StyleSheet.absoluteFillObject,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(7,17,31,0.24)'},
+  scanOverlay:{...StyleSheet.absoluteFill,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(7,17,31,0.24)'},
   guideFrame:{width:'68%',aspectRatio:1,borderWidth:3,borderRadius:16,borderColor:'#FFFFFF',backgroundColor:'transparent'},
   cameraStatus:{position:'absolute',left:16,right:16,bottom:16,minHeight:48,borderRadius:12,paddingHorizontal:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,backgroundColor:'rgba(7,17,31,0.82)'},
   cameraStatusText:{color:'#FFFFFF',fontWeight:'700',textAlign:'center',flexShrink:1},

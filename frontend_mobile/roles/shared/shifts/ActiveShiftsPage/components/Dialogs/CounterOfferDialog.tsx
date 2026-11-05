@@ -1,7 +1,16 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Portal, Dialog, Button, Text, Surface, Divider, ActivityIndicator, Chip } from 'react-native-paper';
-import { customTheme } from '../../theme';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Portal, Dialog, Text, Divider, ActivityIndicator } from 'react-native-paper';
+import {
+    Star,
+    Plane,
+    MapPin,
+    Clock,
+    DollarSign,
+    Calendar,
+} from 'lucide-react-native';
+import { Pill } from '@/components/ui/Pill';
+import { colors as tokenColors, font, radius, space, touch } from '@/constants/tokens';
 import { RatingComment, RatingSummary } from '../../types';
 import type { ShiftReviewCandidate } from '@chemisttasker/shared-core';
 import { CandidateWorkProfile } from '../../../../skills/CandidateWorkProfile';
@@ -66,12 +75,8 @@ export default function CounterOfferDialog({
 }: CounterOfferDialogProps) {
     if (!offer && !candidate) return null;
 
-    const awaitingPayment = Boolean(
-        candidate?.awaitingPayment
-    );
-    const pendingConfirmation = !awaitingPayment && Boolean(
-        candidate?.pendingConfirmation
-    );
+    const awaitingPayment = Boolean(candidate?.awaitingPayment);
+    const pendingConfirmation = !awaitingPayment && Boolean(candidate?.pendingConfirmation);
     const offerStatus = String(offer?.status ?? '').toUpperCase();
     const isActionableCounterOffer = Boolean(offer) && !pendingConfirmation && !awaitingPayment && offerStatus === 'PENDING';
     const counterOfferDetails =
@@ -88,88 +93,134 @@ export default function CounterOfferDialog({
         (counterOfferDetails as any)?.requestTravel ??
         (counterOfferDetails as any)?.request_travel
     );
-    const rawSlots = counterOfferDetails?._mappedSlots || counterOfferDetails?.slots || counterOfferDetails?.offer_slots || [];
+    const rawSlots =
+        counterOfferDetails?._mappedSlots ||
+        counterOfferDetails?.slots ||
+        counterOfferDetails?.offer_slots ||
+        [];
     const visibleSlots =
         slotId == null
             ? rawSlots
             : rawSlots.filter((s: any) => (s.slotId ?? s.slot_id ?? s.slot?.id ?? s.id) === slotId);
     const slotsToShow = visibleSlots.length > 0 ? visibleSlots : rawSlots;
 
-    const isOffer = Boolean(offer);
     const isLoading = counterActionLoading != null && offer?.id === counterActionLoading;
+
+    const dialogTitle = awaitingPayment
+        ? 'Awaiting Payment'
+        : pendingConfirmation
+            ? 'Pending Confirmation'
+            : isActionableCounterOffer
+                ? 'Counter Offer'
+                : 'Candidate Review';
 
     return (
         <Portal>
             <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
-                <Dialog.Title>{awaitingPayment ? 'Awaiting Payment' : pendingConfirmation ? 'Pending Confirmation' : isActionableCounterOffer ? 'Counter Offer' : 'Candidate Review'}</Dialog.Title>
-                <Dialog.ScrollArea>
+                <Dialog.Title style={styles.dialogTitle}>{dialogTitle}</Dialog.Title>
+                <Dialog.ScrollArea style={styles.scrollArea}>
                     <ScrollView contentContainerStyle={styles.content}>
                         {candidate && (
-                            <Surface style={styles.section} elevation={1}>
+                            <View style={styles.section}>
                                 {/* Same profile as web Review: no contact details before the booking is confirmed. */}
-                                <CandidateWorkProfile name={candidate.name || 'Candidate'} bio={candidate.shortBio} profile={candidate.profile} />
+                                <CandidateWorkProfile
+                                    name={candidate.name || 'Candidate'}
+                                    bio={candidate.shortBio}
+                                    profile={candidate.profile}
+                                />
                                 {pendingConfirmation && (
-                                    <Chip style={styles.pendingChip}>Offer sent. Waiting for candidate confirmation.</Chip>
+                                    <View style={styles.statusPillWrap}>
+                                        <Pill label="Offer sent · Waiting for candidate confirmation" tone="amber" />
+                                    </View>
                                 )}
                                 {awaitingPayment && (
-                                    <Chip style={styles.awaitingPaymentChip}>Candidate confirmed. Payment is required to finalize.</Chip>
+                                    <View style={styles.statusPillWrap}>
+                                        <Pill label="Candidate confirmed · Payment is required to finalize" tone="red" />
+                                    </View>
                                 )}
-                            </Surface>
+                            </View>
                         )}
 
                         {counterOfferDetails && slotsToShow.length > 0 && (
-                            <Surface style={styles.section} elevation={1}>
+                            <View style={styles.section}>
                                 <Text style={styles.sectionTitle}>Proposed Shift Terms</Text>
-                                {slotsToShow.map((slot: any, idx: number) => (
-                                    <View key={`${slot.slotId ?? slot.id ?? idx}`} style={styles.offerSlotBlock}>
-                                        <Text style={styles.slotDate}>
-                                            {slot.date || slot.slotDate
-                                                ? new Date(slot.date || slot.slotDate).toLocaleDateString()
-                                                : `Slot ${idx + 1}`}
-                                        </Text>
-                                        <Text style={styles.detail}>
-                                            Proposed time:{' '}
-                                            {(slot.proposedStart ?? slot.proposedStartTime ?? slot.proposed_start_time ?? slot.startTime ?? slot.start_time)?.slice(0, 5) || 'N/A'}
-                                            {' - '}
-                                            {(slot.proposedEnd ?? slot.proposedEndTime ?? slot.proposed_end_time ?? slot.endTime ?? slot.end_time)?.slice(0, 5) || 'N/A'}
-                                        </Text>
-                                        <Text style={styles.slotRate}>
-                                            Proposed rate: {slot.proposedRate != null ? `$${slot.proposedRate}` : 'N/A'}
-                                        </Text>
-                                    </View>
-                                ))}
-                            </Surface>
+                                {slotsToShow.map((slot: any, idx: number) => {
+                                    const slotDate = slot.date || slot.slotDate;
+                                    const startTime = (slot.proposedStart ?? slot.proposedStartTime ?? slot.proposed_start_time ?? slot.startTime ?? slot.start_time)?.slice(0, 5) || 'N/A';
+                                    const endTime = (slot.proposedEnd ?? slot.proposedEndTime ?? slot.proposed_end_time ?? slot.endTime ?? slot.end_time)?.slice(0, 5) || 'N/A';
+                                    const rate = slot.proposedRate != null ? `$${slot.proposedRate}` : null;
+
+                                    return (
+                                        <View key={`${slot.slotId ?? slot.id ?? idx}`} style={styles.offerSlotBlock}>
+                                            <View style={styles.slotRow}>
+                                                <Calendar size={14} color={tokenColors.textSecondary} />
+                                                <Text style={styles.slotDate}>
+                                                    {slotDate ? new Date(slotDate).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }) : `Slot ${idx + 1}`}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.slotRow}>
+                                                <Clock size={14} color={tokenColors.textSecondary} />
+                                                <Text style={styles.detail}>
+                                                    Proposed time: {startTime} - {endTime}
+                                                </Text>
+                                            </View>
+                                            {rate && (
+                                                <View style={styles.slotRow}>
+                                                    <DollarSign size={14} color={tokenColors.primary} />
+                                                    <Text style={styles.slotRate}>
+                                                        Proposed rate: {rate}/hr
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    );
+                                })}
+                            </View>
                         )}
 
                         {counterOfferDetails && (
-                            <Surface style={styles.section} elevation={1}>
+                            <View style={styles.section}>
                                 <Text style={styles.sectionTitle}>Travel</Text>
                                 {requestTravel ? (
-                                    <>
-                                        <Chip icon="airplane" style={styles.travelChip}>Requested travel support</Chip>
-                                        <Text style={styles.detail}>
-                                            Traveling from: {travelSuburb || rawOrigin || 'Location not provided'}
-                                        </Text>
-                                    </>
+                                    <View style={styles.travelWrap}>
+                                        <Pill
+                                            label="Requested travel support"
+                                            tone="violet"
+                                            icon={<Plane size={11} color="#6D28D9" />}
+                                        />
+                                        <View style={styles.locationRow}>
+                                            <MapPin size={14} color={tokenColors.textSecondary} />
+                                            <Text style={styles.detail}>
+                                                Traveling from: {travelSuburb || rawOrigin || 'Location not provided'}
+                                            </Text>
+                                        </View>
+                                    </View>
                                 ) : (
                                     <Text style={styles.detail}>No travel support requested.</Text>
                                 )}
-                            </Surface>
+                            </View>
                         )}
 
-                        <Surface style={styles.section} elevation={1}>
+                        <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Ratings & Reviews</Text>
                             {workerRatingSummary ? (
-                                <Text style={styles.detail}>
-                                    {workerRatingSummary.average.toFixed(1)} ({workerRatingSummary.count} reviews)
-                                </Text>
+                                <View style={styles.ratingSummaryRow}>
+                                    <Star size={16} color="#B45309" fill="#B45309" />
+                                    <Text style={styles.ratingSummaryText}>
+                                        {workerRatingSummary.average.toFixed(1)} ({workerRatingSummary.count} reviews)
+                                    </Text>
+                                </View>
                             ) : (
                                 <Text style={styles.detail}>No ratings yet.</Text>
                             )}
                             {workerRatingComments.length > 0 ? (
                                 workerRatingComments.map((comment) => (
                                     <View key={comment.id} style={styles.commentRow}>
-                                        <Text style={styles.commentStars}>{'★'.repeat(comment.stars || 0)}</Text>
+                                        <View style={styles.commentStarsRow}>
+                                            {Array.from({ length: comment.stars || 0 }).map((_, i) => (
+                                                <Star key={i} size={12} color="#B45309" fill="#B45309" />
+                                            ))}
+                                        </View>
                                         <Text style={styles.commentText}>{comment.comment}</Text>
                                     </View>
                                 ))
@@ -178,58 +229,95 @@ export default function CounterOfferDialog({
                             )}
                             {workerCommentsPageCount > 1 && (
                                 <View style={styles.paginationRow}>
-                                    <Button
-                                        mode="outlined"
-                                        compact
+                                    <TouchableOpacity
+                                        style={[styles.pageBtn, workerCommentsPage <= 1 && styles.pageBtnDisabled]}
                                         disabled={workerCommentsPage <= 1}
                                         onPress={() => onPageChange(workerCommentsPage - 1)}
+                                        accessible
+                                        accessibilityRole="button"
+                                        accessibilityLabel="Previous reviews page"
                                     >
-                                        Prev
-                                    </Button>
+                                        <Text style={styles.pageBtnText}>Prev</Text>
+                                    </TouchableOpacity>
                                     <Text style={styles.pageText}>
                                         {workerCommentsPage} / {workerCommentsPageCount}
                                     </Text>
-                                    <Button
-                                        mode="outlined"
-                                        compact
+                                    <TouchableOpacity
+                                        style={[styles.pageBtn, workerCommentsPage >= workerCommentsPageCount && styles.pageBtnDisabled]}
                                         disabled={workerCommentsPage >= workerCommentsPageCount}
                                         onPress={() => onPageChange(workerCommentsPage + 1)}
+                                        accessible
+                                        accessibilityRole="button"
+                                        accessibilityLabel="Next reviews page"
                                     >
-                                        Next
-                                    </Button>
+                                        <Text style={styles.pageBtnText}>Next</Text>
+                                    </TouchableOpacity>
                                 </View>
                             )}
-                        </Surface>
+                        </View>
                     </ScrollView>
                 </Dialog.ScrollArea>
                 <Divider />
-                <Dialog.Actions>
-                    <Button onPress={onDismiss} disabled={isLoading || assignLoading}>Close</Button>
-                    {isActionableCounterOffer ? (
+                <Dialog.Actions style={styles.actions}>
+                    <TouchableOpacity
+                        onPress={onDismiss}
+                        disabled={isLoading || assignLoading}
+                        style={styles.actionBtnSecondary}
+                        accessible
+                        accessibilityRole="button"
+                        accessibilityLabel="Close dialog"
+                    >
+                        <Text style={styles.actionBtnLabelSecondary}>Close</Text>
+                    </TouchableOpacity>
+
+                    {isActionableCounterOffer && (
                         <>
-                            <Button onPress={() => onReject(offer)} disabled={isLoading} textColor={customTheme.colors.error}>
-                                Reject
-                            </Button>
-                            <Button
-                                onPress={() => onAccept(offer)}
-                                loading={isLoading}
+                            <TouchableOpacity
+                                onPress={() => onReject(offer)}
                                 disabled={isLoading}
-                                mode="contained"
+                                style={styles.actionBtnDestructive}
+                                accessible
+                                accessibilityRole="button"
+                                accessibilityLabel="Reject counter offer"
                             >
-                                Accept
-                            </Button>
+                                <Text style={styles.actionBtnLabelDestructive}>Reject</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => onAccept(offer)}
+                                disabled={isLoading}
+                                style={styles.actionBtnPrimary}
+                                accessible
+                                accessibilityRole="button"
+                                accessibilityLabel="Accept counter offer"
+                            >
+                                {isLoading ? (
+                                    <ActivityIndicator size={14} color="#FFFFFF" />
+                                ) : (
+                                    <Text style={styles.actionBtnLabelPrimary}>Accept</Text>
+                                )}
+                            </TouchableOpacity>
                         </>
-                    ) : !pendingConfirmation && !awaitingPayment && onAssign && candidate ? (
-                        <Button
-                            mode="contained"
-                            loading={assignLoading}
+                    )}
+
+                    {!isActionableCounterOffer && !pendingConfirmation && !awaitingPayment && onAssign && candidate && (
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (candidate.userId != null) onAssign(candidate.userId, slotId);
+                            }}
                             disabled={assignLoading}
-                            onPress={() => { if (candidate.userId != null) onAssign(candidate.userId, slotId); }}
+                            style={styles.actionBtnPrimary}
+                            accessible
+                            accessibilityRole="button"
+                            accessibilityLabel={assignLabel || 'Assign Candidate'}
                         >
-                            {assignLabel || 'Assign Candidate'}
-                        </Button>
-                    ) : (
-                        <ActivityIndicator />
+                            {assignLoading ? (
+                                <ActivityIndicator size={14} color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.actionBtnLabelPrimary}>
+                                    {assignLabel || 'Assign Candidate'}
+                                </Text>
+                            )}
+                        </TouchableOpacity>
                     )}
                 </Dialog.Actions>
             </Dialog>
@@ -239,80 +327,186 @@ export default function CounterOfferDialog({
 
 const styles = StyleSheet.create({
     dialog: {
-        maxHeight: '80%',
+        maxHeight: '84%',
+        borderRadius: radius.card,
+        backgroundColor: '#FFFFFF',
+    },
+    dialogTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
+        color: tokenColors.textPrimary,
+        paddingHorizontal: space.md,
+        paddingTop: space.md,
+        paddingBottom: space.xs,
+    },
+    scrollArea: {
+        paddingHorizontal: 0,
     },
     content: {
-        paddingHorizontal: 16,
-        paddingBottom: 16,
+        paddingHorizontal: space.md,
+        paddingBottom: space.md,
+        gap: space.sm,
     },
     section: {
-        padding: customTheme.spacing.md,
-        borderRadius: 8,
-        marginBottom: customTheme.spacing.sm,
-        backgroundColor: customTheme.colors.greyLight,
+        padding: space.md,
+        borderRadius: radius.nested,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: tokenColors.border,
+        gap: space.xs,
     },
     sectionTitle: {
-        fontWeight: '600',
-        fontSize: 14,
-        color: customTheme.colors.grey,
-        marginBottom: customTheme.spacing.xs,
-    },
-    candidateName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: customTheme.colors.text,
-    },
-    detail: {
+        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
         fontSize: 13,
-        color: customTheme.colors.textMuted,
-        marginTop: 4,
+        color: tokenColors.textPrimary,
+        marginBottom: space.xs,
     },
-    pendingChip: {
+    statusPillWrap: {
+        marginTop: space.xs,
         alignSelf: 'flex-start',
-        marginTop: customTheme.spacing.sm,
-        backgroundColor: customTheme.colors.warningLight,
-    },
-    awaitingPaymentChip: {
-        alignSelf: 'flex-start',
-        marginTop: customTheme.spacing.sm,
-        backgroundColor: customTheme.colors.errorLight,
     },
     offerSlotBlock: {
-        paddingVertical: 8,
+        paddingVertical: space.xs + 2,
         borderBottomWidth: 1,
-        borderBottomColor: customTheme.colors.border,
+        borderBottomColor: tokenColors.border,
+        gap: 3,
+    },
+    slotRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.xs,
     },
     slotDate: {
-        fontSize: 14,
-        color: customTheme.colors.text,
+        fontSize: 13,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
+        color: tokenColors.textPrimary,
     },
     slotRate: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: customTheme.colors.primary,
+        fontSize: 13,
+        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
+        color: tokenColors.primary,
     },
-    travelChip: {
-        alignSelf: 'flex-start',
-        marginTop: customTheme.spacing.xs,
+    detail: {
+        fontSize: 12,
+        fontFamily: font.inter.regular,
+        color: tokenColors.textSecondary,
+    },
+    travelWrap: {
+        gap: space.xs,
+        alignItems: 'flex-start',
+    },
+    locationRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.xs,
+        marginTop: 2,
+    },
+    ratingSummaryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.xs,
+    },
+    ratingSummaryText: {
+        fontSize: 13,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
+        color: tokenColors.textPrimary,
     },
     commentRow: {
-        marginTop: customTheme.spacing.xs,
+        marginTop: space.xs,
+        paddingTop: space.xs,
+        borderTopWidth: 1,
+        borderTopColor: tokenColors.border,
+        gap: 2,
     },
-    commentStars: {
-        color: customTheme.colors.warning,
-        fontSize: 12,
+    commentStarsRow: {
+        flexDirection: 'row',
+        gap: 2,
     },
     commentText: {
-        color: customTheme.colors.text,
-        fontSize: 13,
+        color: tokenColors.textPrimary,
+        fontSize: 12,
+        fontFamily: font.inter.regular,
     },
     paginationRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginTop: customTheme.spacing.sm,
+        marginTop: space.sm,
+    },
+    pageBtn: {
+        minHeight: touch.min,
+        minWidth: 54,
+        paddingHorizontal: space.sm,
+        borderRadius: radius.control,
+        borderWidth: 1,
+        borderColor: tokenColors.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
+    },
+    pageBtnDisabled: {
+        opacity: 0.4,
+    },
+    pageBtnText: {
+        fontSize: 12,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
+        color: tokenColors.textPrimary,
     },
     pageText: {
-        color: customTheme.colors.textMuted,
+        color: tokenColors.textSecondary,
+        fontSize: 12,
+        fontFamily: font.inter.medium,
+    },
+    actions: {
+        paddingHorizontal: space.md,
+        paddingVertical: space.sm,
+        gap: space.xs,
+    },
+    actionBtnSecondary: {
+        minHeight: touch.min,
+        paddingHorizontal: space.md,
+        borderRadius: radius.control,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionBtnLabelSecondary: {
+        color: tokenColors.textSecondary,
+        fontSize: 12,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
+    },
+    actionBtnDestructive: {
+        minHeight: touch.min,
+        paddingHorizontal: space.md,
+        borderRadius: radius.control,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionBtnLabelDestructive: {
+        color: '#DC2626',
+        fontSize: 12,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
+    },
+    actionBtnPrimary: {
+        minHeight: touch.min,
+        minWidth: 64,
+        paddingHorizontal: space.md,
+        borderRadius: radius.control,
+        backgroundColor: tokenColors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionBtnLabelPrimary: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
     },
 });

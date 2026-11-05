@@ -4,7 +4,6 @@ import {
   Button,
   Checkbox,
   Chip,
-  IconButton,
   Surface,
   Text,
   TextInput,
@@ -17,6 +16,8 @@ import {
   type SlotEntry,
   type SlotTime,
 } from './PostShiftScreen.helpers';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react-native';
+import { colors, radius, space, touch } from '@/constants/tokens';
 import { styles } from './PostShiftScreen.styles';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
@@ -112,8 +113,8 @@ export default function PostShiftTimetableStep({
 }: Props) {
   return (
     <>
-      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingVertical:8}}>
-        <Text>Start and finish times can move a little</Text>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',minHeight:touch.min,paddingVertical:space.xs}}>
+        <Text style={{color:colors.textPrimary}}>Start and finish times can move a little</Text>
         <Switch accessibilityLabel="Start and finish times can move a little" value={flexibleTiming} onValueChange={setFlexibleTiming} />
       </View>
     <Surface style={styles.card} elevation={1}>
@@ -124,6 +125,7 @@ export default function PostShiftTimetableStep({
           onPress={addManualSlot}
           icon="plus"
           style={styles.primaryBtn}
+          contentStyle={{ minHeight: touch.min }}
           labelStyle={styles.primaryBtnText}
         >
           Add date
@@ -177,27 +179,31 @@ export default function PostShiftTimetableStep({
 
       <Surface style={styles.calendarPanel} elevation={0}>
         <View style={styles.calendarHeader}>
-          <IconButton
-            icon="chevron-left"
-            size={18}
+          <TouchableOpacity
+            style={{ minWidth: touch.min, minHeight: touch.min, alignItems: 'center', justifyContent: 'center' }}
             onPress={() =>
               setCalendarMonthAnchor(
                 (previous) =>
                   new Date(previous.getFullYear(), previous.getMonth() - 1, 1),
               )
             }
-          />
+            accessibilityLabel="Previous month"
+          >
+            <ChevronLeft size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
           <Text style={styles.calendarTitle}>{monthLabel}</Text>
-          <IconButton
-            icon="chevron-right"
-            size={18}
+          <TouchableOpacity
+            style={{ minWidth: touch.min, minHeight: touch.min, alignItems: 'center', justifyContent: 'center' }}
             onPress={() =>
               setCalendarMonthAnchor(
                 (previous) =>
                   new Date(previous.getFullYear(), previous.getMonth() + 1, 1),
               )
             }
-          />
+            accessibilityLabel="Next month"
+          >
+            <ChevronRight size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.calendarWeekHead}>
@@ -275,7 +281,7 @@ export default function PostShiftTimetableStep({
         </Text>
       </Surface>
 
-      <View style={styles.row}>
+      <View style={[styles.row, { minHeight: touch.min }]}>
         <Checkbox
           status={slotRecurring ? 'checked' : 'unchecked'}
           onPress={() => setSlotRecurring((value) => !value)}
@@ -315,7 +321,7 @@ export default function PostShiftTimetableStep({
         </>
       ) : null}
 
-      <View style={styles.row}>
+      <View style={[styles.row, { minHeight: touch.min }]}>
         <Checkbox
           status={singleUserOnly ? 'checked' : 'unchecked'}
           onPress={() => setSingleUserOnly((value) => !value)}
@@ -333,6 +339,7 @@ export default function PostShiftTimetableStep({
                 onPress={addAllSelectedSlots}
                 icon="plus"
                 style={styles.primaryBtn}
+                contentStyle={{ minHeight: touch.min }}
                 labelStyle={styles.primaryBtnText}
               >
                 Add all
@@ -343,6 +350,7 @@ export default function PostShiftTimetableStep({
                   setSelectedDates([]);
                   setSelectedDateTimes({});
                 }}
+                contentStyle={{ minHeight: touch.min }}
               >
                 Clear
               </Button>
@@ -406,10 +414,11 @@ export default function PostShiftTimetableStep({
                     </View>
 
                     <TouchableOpacity
-                      style={styles.selectedDayAddBtn}
+                      style={[styles.selectedDayAddBtn, { minWidth: touch.min, minHeight: touch.min }]}
                       onPress={() => addSelectedDateSlot(date)}
+                      accessibilityLabel="Add slot for date"
                     >
-                      <IconButton icon="plus" size={18} iconColor="#FFFFFF" />
+                      <Plus size={18} color="#FFFFFF" />
                     </TouchableOpacity>
                   </View>
 
@@ -467,7 +476,7 @@ export default function PostShiftTimetableStep({
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.slotText}>
-                {formatLongSlotDate(slot.date)} — {slot.startTime} to {slot.endTime}
+                {formatLongSlotDate(slot.date)} · {slot.startTime} to {slot.endTime}
               </Text>
               {slot.isRecurring ? (
                 <Text style={styles.slotRecurringText}>
@@ -479,16 +488,20 @@ export default function PostShiftTimetableStep({
               ) : null}
             </View>
             <View style={styles.slotActions}>
-              <IconButton
-                icon="pencil"
-                size={18}
+              <TouchableOpacity
+                style={{ minWidth: touch.min, minHeight: touch.min, alignItems: 'center', justifyContent: 'center' }}
                 onPress={() => editSlot(index)}
-              />
-              <IconButton
-                icon="delete"
-                size={18}
+                accessibilityLabel="Edit slot"
+              >
+                <Pencil size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ minWidth: touch.min, minHeight: touch.min, alignItems: 'center', justifyContent: 'center' }}
                 onPress={() => removeSlot(index)}
-              />
+                accessibilityLabel="Delete slot"
+              >
+                <Trash2 size={18} color={colors.status.red.fg} />
+              </TouchableOpacity>
             </View>
           </Surface>
         ))}

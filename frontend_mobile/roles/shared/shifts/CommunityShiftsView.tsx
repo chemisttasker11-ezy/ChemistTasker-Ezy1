@@ -3,7 +3,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Snackbar, SegmentedButtons, Text, Button } from 'react-native-paper';
+import { useRouter } from 'expo-router';
+import { Lock } from 'lucide-react-native';
+import { Snackbar } from 'react-native-paper';
 import {
     Shift,
     ShiftCounterOfferPayload,
@@ -25,9 +27,27 @@ import {
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import { ContentState } from '@/components/ui';
+import { space } from '@/constants/tokens';
+import { useShiftSurface } from './useShiftSurface';
 import ShiftsBoard from './ShiftsBoard';
+import { BoardTabs } from './ShiftsBoard/components/BoardTabs';
 import type { FilterConfig } from './ShiftsBoard/types';
 import ShiftEngagementTermsDialog from './ShiftsBoard/components/ShiftEngagementTermsDialog';
+import {
+    TermsAcceptanceState,
+    createTermsAcceptanceState,
+    dismissTermsAcceptance,
+    dropCachedOfferPreviews,
+    isTermsChangedError,
+    isTermsDialogVisible,
+    narrowSelectedOffers,
+    selectOffersForTerms,
+    transitionReloadFailure,
+    transitionReloadStart,
+    transitionReloadSuccess,
+    transitionTermsChanged,
+} from './workerShiftDetailLogic';
 import type { ShiftOfferAcceptancePayload } from '@chemisttasker/shared-core';
 
 type CommunityShiftsViewProps = {
@@ -59,7 +79,31 @@ const rejectSlotIdsWithBatchFallback = async (shiftId: number, slotIds: number[]
     await rejectCommunityShiftService({ shiftId, slotIds: uniqueSlotIds } as any);
 };
 
-export default function CommunityShiftsView({
+/**
+ * Waits for the workspace policy (never a "switching" spinner) and starts a clean board for each scope.
+ * Explorers see public shifts only (surface.publicOnly): Community explains internal access instead of loading.
+ */
+export default function CommunityShiftsView(props: CommunityShiftsViewProps = {}) {
+    const surface = useShiftSurface();
+    const router = useRouter();
+    if (!surface.ready) return <ContentState kind="loading" style={styles.state} />;
+    if (surface.publicOnly) {
+        return (
+            <ContentState
+                kind="empty"
+                icon={<Lock />}
+                title="Community shifts are for pharmacy teams"
+                description="Pharmacies share these shifts with their own staff and favourite locums. Upgrade to a pharmacist or staff account and join a pharmacy to see them. Public shifts stay open to you."
+                actionLabel="Upgrade my account"
+                onAction={() => router.push('/explorer/profile' as any)}
+                style={styles.state}
+            />
+        );
+    }
+    return <CommunityShiftsBoard key={surface.scopeKey} {...props} />;
+}
+
+function CommunityShiftsBoard({
     activeTabOverride,
     onActiveTabChange,
     hideTabs,
@@ -69,10 +113,13 @@ export default function CommunityShiftsView({
     const { user } = useAuth();
     const { workspace, selectedPharmacyId } = useWorkspace();
     const userId = user?.id;
-    const isWorkspaceReady = workspace === 'internal';
+    // Only the latest request writes state: a slow page or filter response never replaces a newer one.
+    const generation = useRef(0);
+    const offersGeneration = useRef(0);
 
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [appliedShiftIds, setAppliedShiftIds] = useState<number[]>([]);
     const [appliedSlotIds, setAppliedSlotIds] = useState<number[]>([]);
@@ -89,7 +136,8 @@ export default function CommunityShiftsView({
     );
     const [offers, setOffers] = useState<ShiftOffer[]>([]);
     const [offersLoading, setOffersLoading] = useState(false);
-    const [termsOffers, setTermsOffers] = useState<ShiftOffer[]>([]);
+    const [offersError, setOffersError] = useState(false);
+    const [termsState, setTermsState] = useState<TermsAcceptanceState>(() => createTermsAcceptanceState());
     const [termsConfirming, setTermsConfirming] = useState(false);
 
     const showError = (message: string) => {
@@ -125,8 +173,9 @@ export default function CommunityShiftsView({
 
     const loadShifts = useCallback(
         async (activeFilters: FilterConfig, activePage: number) => {
+            const request = ++generation.current;
             setLoading(true);
-            setError(null);
+            setLoadError(false);
             try {
                 const apiFilters = {
                     search: activeFilters.search,
@@ -154,6 +203,7 @@ export default function CommunityShiftsView({
                     fetchShiftInterests({ userId }),
                     fetchShiftRejections({ userId }),
                 ]);
+                if (request !== generation.current) return;
 
                 const available = (communityShifts.results ?? []).filter((shift: Shift) => {
                     const slots = shift.slots ?? [];
@@ -162,7 +212,7 @@ export default function CommunityShiftsView({
                     return assignedSlotCount < slots.length;
                 });
 
-                setShifts(available);
+                setShifts((prev) => (prev.length === 0 && available.length === 0 ? prev : available));
                 setTotalCount(communityShifts.count);
 
                 const nextShiftIds = new Set<number>();
@@ -189,24 +239,25 @@ export default function CommunityShiftsView({
                 setRejectedShiftIds(Array.from(nextRejectedShiftIds));
                 setRejectedSlotIds(Array.from(nextRejectedSlotIds));
             } catch (err) {
+                if (request !== generation.current) return;
                 console.error('Failed to load community shifts', err);
-                setError('Failed to load community shifts.');
+                setLoadError(true);
             } finally {
-                setLoading(false);
+                if (request === generation.current) setLoading(false);
             }
         },
         [selectedPharmacyId, userId, workspace]
     );
 
     useEffect(() => {
-        if (!userId || !isWorkspaceReady) return;
+        if (!userId) return;
         loadSaved();
-    }, [loadSaved, userId, isWorkspaceReady]);
+    }, [loadSaved, userId]);
 
     useEffect(() => {
-        if (!userId || !isWorkspaceReady) return;
+        if (!userId) return;
         loadShifts(filters, page);
-    }, [filters, page, loadShifts, userId, isWorkspaceReady]);
+    }, [filters, page, loadShifts, userId]);
 
     const handleApplyAll = async (shift: Shift) => {
         try {
@@ -336,15 +387,19 @@ export default function CommunityShiftsView({
     };
 
     const loadOffers = useCallback(async () => {
+        const request = ++offersGeneration.current;
         setOffersLoading(true);
+        setOffersError(false);
         try {
             const pending = await fetchShiftOffersService({ status: 'PENDING' });
+            if (request !== offersGeneration.current) return;
             setOffers((pending as ShiftOffer[]).filter((offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'));
         } catch (err) {
+            if (request !== offersGeneration.current) return;
             console.error('Failed to load offers', err);
-            showError('Failed to load offers.');
+            setOffersError(true);
         } finally {
-            setOffersLoading(false);
+            if (request === offersGeneration.current) setOffersLoading(false);
         }
     }, []);
 
@@ -409,9 +464,41 @@ export default function CommunityShiftsView({
         [offersByShift]
     );
 
+    const reloadTermsOffers = async (selected: ShiftOffer[]) => {
+        setTermsConfirming(true);
+        setTermsState((prev) => transitionReloadStart(prev, selected));
+        try {
+            const fresh = await fetchShiftOffersService({ status: 'PENDING' });
+            const freshPending = (fresh as ShiftOffer[]).filter(
+                (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
+            );
+            setOffers(freshPending);
+            setTermsState((prev) => {
+                const next = transitionReloadSuccess(prev, freshPending);
+                if (next.status === 'failed') {
+                    showError('The selected offers are no longer available.');
+                }
+                return next;
+            });
+        } catch (fetchErr) {
+            setTermsState((prev) =>
+                transitionReloadFailure(prev, 'Shift engagement terms have changed. Failed to refresh terms. Please retry.')
+            );
+            showError('Failed to refresh updated terms. Please retry.');
+        } finally {
+            setTermsConfirming(false);
+        }
+    };
+
     const acceptOffers = async (list: ShiftOffer[], payload?: ShiftOfferAcceptancePayload) => {
         if (list.length === 0) return;
         if (!payload) {
+            const selection = selectOffersForTerms(termsState, list);
+            if (selection.needsReload) {
+                setTermsState(selection.state);
+                await reloadTermsOffers(list);
+                return;
+            }
             const blocked = list.some((offer) => Boolean(offer.engagementTermsPreview?.blocked));
             if (blocked) {
                 showError('This offer cannot be confirmed until the required onboarding/payment details are completed.');
@@ -419,16 +506,24 @@ export default function CommunityShiftsView({
             }
             const requiresAcceptance = list.some((offer) => Boolean(offer.engagementTermsPreview?.acceptanceRequired));
             if (requiresAcceptance) {
-                setTermsOffers(list);
+                setTermsState(selection.state);
                 return;
             }
         }
         setTermsConfirming(true);
         try {
             await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, payload)));
-            setTermsOffers([]);
+            setTermsState(createTermsAcceptanceState());
             await loadOffers();
         } catch (err) {
+            if (isTermsChangedError(err)) {
+                const termsMsg = 'Shift engagement terms have changed. Please review the updated terms and confirm again.';
+                showError(termsMsg);
+                setOffers((prev) => dropCachedOfferPreviews(prev, list.map((o) => o.id)));
+                setTermsState((prev) => transitionTermsChanged(prev, list, termsMsg));
+                await reloadTermsOffers(list);
+                return;
+            }
             showError(errorMessage(err, 'Failed to confirm the shift offer.'));
             throw err;
         } finally {
@@ -477,48 +572,29 @@ export default function CommunityShiftsView({
     );
 
     if (!userId) return null;
-    if (!isWorkspaceReady) {
-        return (
-            <View style={styles.container}>
-                <ActivityIndicator style={{ marginTop: 24 }} />
-                <Text style={{ textAlign: 'center', marginTop: 8 }}>Switching to Internal mode...</Text>
-            </View>
-        );
-    }
 
     return (
         <View style={styles.container}>
-            {!hideTabs && (
-                <View style={styles.tabsContainer}>
-                    <SegmentedButtons
-                        value={boardTab}
-                        onValueChange={(value) => handleBoardTabChange(value as any)}
-                        buttons={[
-                            { value: 'browse', label: 'Browse' },
-                            { value: 'saved', label: `Saved (${savedShiftIds.size})` },
-                            { value: 'interested', label: 'Interested' },
-                            { value: 'rejected', label: 'Rejected' },
-                            { value: 'accepted', label: 'Offers' },
-                        ]}
-                        theme={{ colors: { secondaryContainer: '#EEF2FF', onSecondaryContainer: '#6366F1' } }}
-                    />
-                </View>
-            )}
+            {!hideTabs && <BoardTabs value={boardTab} onChange={handleBoardTabChange} savedCount={savedShiftIds.size} />}
             {boardTab === 'accepted' ? (
-                <View style={styles.placeholderCard}>
-                    {offersLoading ? (
-                        <ActivityIndicator style={styles.placeholderLoader} />
-                    ) : offerShifts.length === 0 ? (
-                        <>
-                            <Text variant="titleMedium" style={styles.placeholderTitle}>
-                                Offers
-                            </Text>
-                            <Text variant="bodyMedium" style={styles.placeholderText}>
-                                No offers yet.
-                            </Text>
-                        </>
-                    ) : (
-                        <>
+                offersLoading ? (
+                    <ContentState kind="loading" style={styles.state} />
+                ) : offersError ? (
+                    <ContentState
+                        kind="error"
+                        title="Your offers did not load"
+                        description="Check your connection, then try again."
+                        onAction={() => void loadOffers()}
+                        style={styles.state}
+                    />
+                ) : offerShifts.length === 0 ? (
+                    <ContentState
+                        kind="empty"
+                        title="No offers yet"
+                        description="When a pharmacy offers you a shift, you confirm it here."
+                        style={styles.state}
+                    />
+                ) : (
                         <ShiftsBoard
                             title="Offers"
                             shifts={offerShifts}
@@ -545,12 +621,18 @@ export default function CommunityShiftsView({
                             fallbackToAllShiftsWhenEmpty
                             showAllSlots
                         />
-                        </>
-                    )}
-                </View>
+                )
+            ) : loadError ? (
+                <ContentState
+                    kind="error"
+                    title="Community shifts did not load"
+                    description="Check your connection, then try again."
+                    onAction={() => void loadShifts(filters, page)}
+                    style={styles.state}
+                />
             ) : (
                 <ShiftsBoard
-                    title="Community Shifts"
+                    title="Community shifts"
                     shifts={shifts}
                     loading={loading}
                     useServerFiltering
@@ -582,11 +664,16 @@ export default function CommunityShiftsView({
                 />
             )}
             <ShiftEngagementTermsDialog
-                visible={termsOffers.length > 0}
-                offers={termsOffers}
-                loading={termsConfirming}
-                onDismiss={() => setTermsOffers([])}
-                onConfirm={(payload) => acceptOffers(termsOffers, payload)}
+                visible={isTermsDialogVisible(termsState)}
+                offers={termsState.offers}
+                loading={termsConfirming || termsState.status === 'reloading'}
+                status={termsState.status}
+                error={termsState.error}
+                onDismiss={() => {
+                    setTermsState((prev) => dismissTermsAcceptance(prev));
+                }}
+                onConfirm={(payload) => acceptOffers(termsState.offers, payload)}
+                onRetry={() => void reloadTermsOffers(termsState.offers.length > 0 ? termsState.offers : termsState.selectedOfferIds.map((id) => ({ id } as ShiftOffer)))}
             />
             <Snackbar
                 visible={!!error}
@@ -603,59 +690,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    tabsContainer: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-    },
-    placeholderCard: {
-        marginHorizontal: 16,
-        marginTop: 8,
-        padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderStyle: 'dashed',
-        borderColor: '#D1D5DB',
-        backgroundColor: '#FFFFFF',
-        alignItems: 'center',
-    },
-    placeholderTitle: {
-        fontWeight: '700',
-        marginBottom: 6,
-        textAlign: 'center',
-    },
-    placeholderText: {
-        color: '#6B7280',
-        textAlign: 'center',
-    },
-    awaitingPaymentText: {
-        color: '#B45309',
-        fontWeight: '700',
-        marginBottom: 12,
-        textAlign: 'center',
-    },
-    placeholderLoader: {
-        marginTop: 8,
-    },
-    offerList: {
-        width: '100%',
-        marginTop: 12,
-        gap: 12,
-    },
-    offerCard: {
-        borderRadius: 12,
-        backgroundColor: '#FFFFFF',
-    },
-    offerTitle: {
-        fontWeight: '700',
-        marginBottom: 4,
-    },
-    offerMeta: {
-        color: '#6B7280',
-        marginBottom: 4,
-    },
-    offerActions: {
-        flexDirection: 'row',
-        gap: 8,
-        marginTop: 8,
+    state: {
+        margin: space.lg,
     },
 });

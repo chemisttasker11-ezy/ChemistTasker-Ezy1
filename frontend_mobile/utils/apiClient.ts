@@ -1,4 +1,4 @@
-import { AHPRA_UNREADABLE_MESSAGE, reportAhpraError } from '@chemisttasker/shared-core';
+import { AHPRA_UNREADABLE_MESSAGE, API_ENDPOINTS, reportAhpraError } from '@chemisttasker/shared-core';
 // utils/apiClient.ts
 import axios from 'axios';
 import { Platform } from 'react-native';
@@ -44,6 +44,12 @@ apiClient.interceptors.request.use(
         if (IS_WEB && !['get', 'head', 'options'].includes((config.method || 'get').toLowerCase())) {
             config.headers['X-CSRFToken'] = await getBrowserCsrfToken(API_BASE_URL);
         }
+        // Signed-out auth calls need no token. Looking one up can refresh a dead session, and that refresh's
+        // clearStoredSession() bumps the generation, which cancelled the sign-in itself ("canceled" on web).
+        if (isPublicAuthRequest(config.url)) {
+            delete config.headers.Authorization;
+            return config;
+        }
         try {
             const token = await getValidAccessToken(API_BASE_URL);
             if (token) {
@@ -61,6 +67,17 @@ apiClient.interceptors.request.use(
         return Promise.reject(error);
     }
 );
+
+// Signed-out auth calls: their 401 is the server's answer (e.g. a wrong password), not an expired session.
+const PUBLIC_AUTH_PATHS: string[] = [
+    API_ENDPOINTS.login,
+    API_ENDPOINTS.register,
+    API_ENDPOINTS.verifyOtp,
+    API_ENDPOINTS.resendOtp,
+    API_ENDPOINTS.passwordReset,
+    API_ENDPOINTS.passwordResetConfirm,
+];
+const isPublicAuthRequest = (url?: string) => PUBLIC_AUTH_PATHS.some((path) => url?.split('?')[0].endsWith(path));
 
 let isRefreshing = false;
 let failedQueue: any[] = [];
@@ -90,7 +107,7 @@ apiClient.interceptors.response.use(
         }
 
         // If 401 and we haven't retried yet, try to refresh token
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && !originalRequest._retry && !isPublicAuthRequest(originalRequest.url)) {
             if (isRefreshing) {
                 return new Promise(function (resolve, reject) {
                     failedQueue.push({ resolve, reject });

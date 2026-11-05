@@ -2,9 +2,19 @@
 // Displays candidates grouped by status (Interested, Assigned, Rejected, No Response)
 
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Card, Text, Button, Chip, ActivityIndicator, Surface, Avatar } from 'react-native-paper';
-import { customTheme } from '../../theme';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Card, Text, ActivityIndicator } from 'react-native-paper';
+import {
+    Heart,
+    CheckCircle2,
+    XCircle,
+    Clock,
+    Star,
+    Building2,
+    FileText,
+} from 'lucide-react-native';
+import { Pill } from '@/components/ui/Pill';
+import { colors as tokenColors, font, radius, space, touch } from '@/constants/tokens';
 import { ShiftMemberStatus } from '@chemisttasker/shared-core';
 import { getCandidateDisplayName } from '../../utils/candidateHelpers';
 
@@ -22,39 +32,40 @@ interface StatusCardProps {
 }
 
 const colorMap = {
-    success: { bg: customTheme.colors.successLight, fg: customTheme.colors.success },
-    error: { bg: customTheme.colors.errorLight, fg: customTheme.colors.error },
-    warning: { bg: customTheme.colors.warningLight, fg: customTheme.colors.warning },
-    info: { bg: customTheme.colors.infoLight, fg: customTheme.colors.info },
+    success: { bg: '#F0FDF4', fg: '#15803D', pillTone: 'green' as const },
+    error: { bg: '#FEF2F2', fg: '#B91C1C', pillTone: 'red' as const },
+    warning: { bg: '#FFFBEB', fg: '#B45309', pillTone: 'amber' as const },
+    info: { bg: '#EFF6FF', fg: '#1D4ED8', pillTone: 'blue' as const },
 };
 
-function StatusIllustration({ title, icon, fg }: { title: string; icon: string; fg: string }) {
+function StatusIllustration({ title, fg }: { title: string; fg: string }) {
     const isHourglass = title === 'No Response';
     const isInterested = title === 'Interested';
     const isAssigned = title === 'Assigned';
     const isRejected = title === 'Rejected';
     return (
         <View style={styles.illustration}>
-            <View style={[styles.illustrationGlow, { backgroundColor: fg + '22' }]} />
+            <View style={[styles.illustrationGlow, { backgroundColor: fg + '18' }]} />
             {isInterested ? (
-                <>
-                    <Avatar.Icon size={30} icon="account" style={[styles.groupPerson, styles.groupPersonLeft]} color="#64748B" />
-                    <Avatar.Icon size={36} icon="account" style={[styles.groupPerson, styles.groupPersonCenter]} color="#64748B" />
-                    <Avatar.Icon size={30} icon="account" style={[styles.groupPerson, styles.groupPersonRight]} color="#64748B" />
-                    <Avatar.Icon size={46} icon="heart" style={styles.heartBadge} color="#7C3AED" />
-                </>
-            ) : isAssigned || isRejected ? (
-                <>
-                    <Avatar.Icon size={62} icon="file-document" style={styles.documentIllustration} color={isAssigned ? '#2563EB' : '#64748B'} />
-                    <Avatar.Icon size={36} icon={isAssigned ? 'check-circle' : 'close-circle'} style={[styles.statusBadge, { backgroundColor: isAssigned ? '#0EA5E9' : '#EF4444' }]} color="#fff" />
-                </>
+                <View style={styles.iconCircle}>
+                    <Heart size={28} color="#7C3AED" fill="#7C3AED" />
+                </View>
+            ) : isAssigned ? (
+                <View style={styles.iconCircle}>
+                    <CheckCircle2 size={30} color="#15803D" />
+                </View>
+            ) : isRejected ? (
+                <View style={styles.iconCircle}>
+                    <XCircle size={30} color="#B91C1C" />
+                </View>
             ) : isHourglass ? (
-                <View style={styles.hourglass}>
-                    <View style={styles.hourglassTop} />
-                    <View style={styles.hourglassBottom} />
+                <View style={styles.iconCircle}>
+                    <Clock size={28} color="#B45309" />
                 </View>
             ) : (
-                <Avatar.Icon size={58} icon={icon} style={styles.illustrationMain} color={fg} />
+                <View style={styles.iconCircle}>
+                    <FileText size={28} color={fg} />
+                </View>
             )}
         </View>
     );
@@ -63,7 +74,6 @@ function StatusIllustration({ title, icon, fg }: { title: string; icon: string; 
 export default function StatusCard({
     title,
     members,
-    icon,
     color,
     shiftId,
     onReviewCandidate,
@@ -72,178 +82,151 @@ export default function StatusCard({
     onBuzzWorker,
     buzzLoadingOfferId,
 }: StatusCardProps) {
-    const colors = colorMap[color];
+    const scheme = colorMap[color];
 
     return (
-        <Card style={[styles.card, { backgroundColor: colors.bg, borderColor: colors.fg + '33' }]}>
-            <Card.Title
-                title={title}
-                titleStyle={[styles.cardTitle, { color: colors.fg }]}
-                left={() => (
-                    <Avatar.Icon
-                        size={40}
-                        icon={icon}
-                        style={styles.titleAvatar}
-                        color={colors.fg}
-                    />
-                )}
-                right={() => (
-                    <Chip
-                        style={{ backgroundColor: colors.fg }}
-                        textStyle={{ color: '#fff', fontWeight: 'bold' }}
-                    >
-                        {members.length}
-                    </Chip>
-                )}
-            />
+        <Card style={[styles.card, { backgroundColor: scheme.bg, borderColor: scheme.fg + '2A' }]}>
+            <View style={styles.cardHeader}>
+                <View style={styles.headerLeft}>
+                    {title === 'Interested' ? (
+                        <Heart size={18} color={scheme.fg} />
+                    ) : title === 'Assigned' ? (
+                        <CheckCircle2 size={18} color={scheme.fg} />
+                    ) : title === 'Rejected' ? (
+                        <XCircle size={18} color={scheme.fg} />
+                    ) : (
+                        <Clock size={18} color={scheme.fg} />
+                    )}
+                    <Text style={[styles.cardTitle, { color: scheme.fg }]}>{title}</Text>
+                </View>
+                <Pill label={String(members.length)} tone={scheme.pillTone} />
+            </View>
+
             <Card.Content style={styles.cardContent}>
                 <View style={styles.bodyRow}>
-                    <StatusIllustration title={title} icon={icon} fg={colors.fg} />
+                    <StatusIllustration title={title} fg={scheme.fg} />
                     {members.length > 0 ? (
-                    <View style={styles.membersList}>
-                        {members.map((member) => {
-                            const memberAny = member as any;
-                            const ratingValue = memberAny.averageRating ?? memberAny.rating ?? null;
-                            const match = getOfferForMember
-                                ? getOfferForMember(member)
-                                : { offer: null, slotId: null };
-                            const hasOffer = Boolean(match.offer);
-                            const pendingConfirmation = Boolean(
-                                memberAny.pendingConfirmation ?? memberAny.pending_confirmation
-                            );
-                            const awaitingPayment = Boolean(
-                                memberAny.awaitingPayment ?? memberAny.awaiting_payment
-                            );
-                            const isCounterOffer = hasOffer && Boolean(
-                                match.offer?.counterOffer ??
-                                match.offer?.counter_offer ??
-                                match.offer?.slots
-                            );
-                            const offerStatus = String(match.offer?.status ?? '').toUpperCase();
-                            const isPendingConfirmation = !awaitingPayment && !isCounterOffer && (
-                                pendingConfirmation || (hasOffer && offerStatus === 'PENDING')
-                            );
-                            const pendingOfferId = memberAny.pendingOfferId ?? memberAny.pending_offer_id ?? match.offer?.id ?? null;
-                            const userId = memberAny.userId || memberAny.user_id || memberAny.id;
-                            const sourceVisibility = memberAny.sourceVisibility ?? memberAny.visibilityLevel ?? memberAny.visibility_level;
-                            const organizationName = memberAny.organizationName ?? memberAny.organization_name;
-                            const showOrganizationLabel = sourceVisibility === 'ORG_CHAIN' && Boolean(organizationName);
+                        <View style={styles.membersList}>
+                            {members.map((member) => {
+                                const memberAny = member as any;
+                                const ratingValue = memberAny.averageRating ?? memberAny.rating ?? null;
+                                const match = getOfferForMember
+                                    ? getOfferForMember(member)
+                                    : { offer: null, slotId: null };
+                                const hasOffer = Boolean(match.offer);
+                                const pendingConfirmation = Boolean(
+                                    memberAny.pendingConfirmation ?? memberAny.pending_confirmation
+                                );
+                                const awaitingPayment = Boolean(
+                                    memberAny.awaitingPayment ?? memberAny.awaiting_payment
+                                );
+                                const isCounterOffer = hasOffer && Boolean(
+                                    match.offer?.counterOffer ??
+                                    match.offer?.counter_offer ??
+                                    match.offer?.slots
+                                );
+                                const offerStatus = String(match.offer?.status ?? '').toUpperCase();
+                                const isPendingConfirmation = !awaitingPayment && !isCounterOffer && (
+                                    pendingConfirmation || (hasOffer && offerStatus === 'PENDING')
+                                );
+                                const pendingOfferId = memberAny.pendingOfferId ?? memberAny.pending_offer_id ?? match.offer?.id ?? null;
+                                const userId = memberAny.userId || memberAny.user_id || memberAny.id;
+                                const sourceVisibility = memberAny.sourceVisibility ?? memberAny.visibilityLevel ?? memberAny.visibility_level;
+                                const organizationName = memberAny.organizationName ?? memberAny.organization_name;
+                                const showOrganizationLabel = sourceVisibility === 'ORG_CHAIN' && Boolean(organizationName);
 
-                            return (
-                                <Surface key={userId} style={styles.memberCard} elevation={1}>
-                                    <View style={styles.memberRow}>
-                                        <View style={styles.memberInfo}>
-                                            <Text
-                                                style={styles.memberName}
-                                                numberOfLines={2}
-                                                ellipsizeMode="tail"
-                                            >
-                                                {memberAny.name || getCandidateDisplayName(member)}
-                                            </Text>
-                                            {memberAny.employmentType && (
+                                return (
+                                    <View key={userId} style={styles.memberCard}>
+                                        <View style={styles.memberRow}>
+                                            <View style={styles.memberInfo}>
                                                 <Text
-                                                    style={styles.employmentType}
-                                                    numberOfLines={1}
+                                                    style={styles.memberName}
+                                                    numberOfLines={2}
                                                     ellipsizeMode="tail"
                                                 >
-                                                    {memberAny.employmentType}
+                                                    {memberAny.name || getCandidateDisplayName(member)}
                                                 </Text>
-                                            )}
-                                        </View>
-                                        <View style={styles.memberBadges}>
-                                            {title === 'Interested' && isPendingConfirmation && (
-                                                <Chip
-                                                    mode="flat"
-                                                    compact
-                                                    style={styles.pendingChip}
-                                                    textStyle={styles.statusChipText}
-                                                >
-                                                    Pending
-                                                </Chip>
-                                            )}
-                                            {title === 'Interested' && awaitingPayment && (
-                                                <Chip
-                                                    mode="flat"
-                                                    compact
-                                                    style={styles.awaitingPaymentChip}
-                                                    textStyle={styles.statusChipText}
-                                                >
-                                                    Awaiting payment
-                                                </Chip>
-                                            )}
-                                            {title === 'Interested' && isCounterOffer && !isPendingConfirmation && (
-                                                <Chip
-                                                    mode="flat"
-                                                    compact
-                                                    style={styles.counterChip}
-                                                    textStyle={styles.statusChipText}
-                                                >
-                                                    Counter offer
-                                                </Chip>
-                                            )}
-                                            {ratingValue && (
-                                                <Chip
-                                                    icon="star"
-                                                    mode="outlined"
-                                                    compact
-                                                    style={{ borderColor: customTheme.colors.warning }}
-                                                    textStyle={{ color: customTheme.colors.warning }}
-                                                >
-                                                    {ratingValue.toFixed(1)}
-                                                </Chip>
-                                            )}
-                                            {showOrganizationLabel && (
-                                                <Chip mode="outlined" compact>
-                                                    {organizationName}
-                                                </Chip>
-                                            )}
-                                            {title === 'Interested' && (
-                                                <Button
-                                                    mode="contained"
-                                                    onPress={() => {
-                                                const reviewMember = isPendingConfirmation && match.offer?.id != null
-                                                    ? {
-                                                        ...memberAny,
-                                                        pendingConfirmation: true,
-                                                        pendingOfferId: match.offer.id,
-                                                        pendingConfirmationCounterOffer: match.offer,
-                                                    }
-                                                    : member;
-                                                onReviewCandidate(
-                                                    reviewMember,
-                                                    shiftId,
-                                                    isPendingConfirmation || awaitingPayment ? null : match.offer,
-                                                    match.slotId
-                                                );
-                                                    }}
-                                                    disabled={reviewLoadingId === userId}
-                                                    loading={reviewLoadingId === userId}
-                                                    style={styles.reviewButton}
-                                                    contentStyle={styles.compactButtonContent}
-                                                    labelStyle={styles.compactButtonLabel}
-                                                >
-                                                    {isPendingConfirmation || awaitingPayment ? 'View' : hasOffer ? 'Review' : 'Review'}
-                                                </Button>
-                                            )}
-                                            {isPendingConfirmation && pendingOfferId != null && onBuzzWorker && (
-                                                <Button
-                                                    mode="contained"
-                                                    onPress={() => onBuzzWorker(Number(pendingOfferId))}
-                                                    disabled={buzzLoadingOfferId === Number(pendingOfferId)}
-                                                    loading={buzzLoadingOfferId === Number(pendingOfferId)}
-                                                    style={styles.buzzButton}
-                                                    contentStyle={styles.compactButtonContent}
-                                                    labelStyle={styles.buzzButtonLabel}
-                                                >
-                                                    Buzz
-                                                </Button>
-                                            )}
+                                                {memberAny.employmentType && (
+                                                    <Text
+                                                        style={styles.employmentType}
+                                                        numberOfLines={1}
+                                                        ellipsizeMode="tail"
+                                                    >
+                                                        {memberAny.employmentType}
+                                                    </Text>
+                                                )}
+                                            </View>
+                                            <View style={styles.memberBadges}>
+                                                {title === 'Interested' && isPendingConfirmation && (
+                                                    <Pill label="Pending" tone="amber" />
+                                                )}
+                                                {title === 'Interested' && awaitingPayment && (
+                                                    <Pill label="Awaiting payment" tone="red" />
+                                                )}
+                                                {title === 'Interested' && isCounterOffer && !isPendingConfirmation && (
+                                                    <Pill label="Counter offer" tone="violet" />
+                                                )}
+                                                {ratingValue && (
+                                                    <Pill
+                                                        label={ratingValue.toFixed(1)}
+                                                        tone="amber"
+                                                        icon={<Star size={11} color="#B45309" fill="#B45309" />}
+                                                    />
+                                                )}
+                                                {showOrganizationLabel && (
+                                                    <Pill label={organizationName} outlined icon={<Building2 size={11} color={tokenColors.textMuted} />} />
+                                                )}
+                                                {title === 'Interested' && (
+                                                    <TouchableOpacity
+                                                        onPress={() => {
+                                                            const reviewMember = isPendingConfirmation && match.offer?.id != null
+                                                                ? {
+                                                                    ...memberAny,
+                                                                    pendingConfirmation: true,
+                                                                    pendingOfferId: match.offer.id,
+                                                                    pendingConfirmationCounterOffer: match.offer,
+                                                                }
+                                                                : member;
+                                                            onReviewCandidate(
+                                                                reviewMember,
+                                                                shiftId,
+                                                                isPendingConfirmation || awaitingPayment ? null : match.offer,
+                                                                match.slotId
+                                                            );
+                                                        }}
+                                                        disabled={reviewLoadingId === userId}
+                                                        style={styles.actionBtnPrimary}
+                                                        activeOpacity={0.8}
+                                                    >
+                                                        {reviewLoadingId === userId ? (
+                                                            <ActivityIndicator size={14} color="#fff" />
+                                                        ) : (
+                                                            <Text style={styles.actionBtnLabelPrimary}>
+                                                                {isPendingConfirmation || awaitingPayment ? 'View' : 'Review'}
+                                                            </Text>
+                                                        )}
+                                                    </TouchableOpacity>
+                                                )}
+                                                {isPendingConfirmation && pendingOfferId != null && onBuzzWorker && (
+                                                    <TouchableOpacity
+                                                        onPress={() => onBuzzWorker(Number(pendingOfferId))}
+                                                        disabled={buzzLoadingOfferId === Number(pendingOfferId)}
+                                                        style={styles.actionBtnBuzz}
+                                                        activeOpacity={0.8}
+                                                    >
+                                                        {buzzLoadingOfferId === Number(pendingOfferId) ? (
+                                                            <ActivityIndicator size={14} color="#1E1B4B" />
+                                                        ) : (
+                                                            <Text style={styles.actionBtnLabelBuzz}>Buzz</Text>
+                                                        )}
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
                                         </View>
                                     </View>
-                                </Surface>
-                            );
-                        })}
-                    </View>
+                                );
+                            })}
+                        </View>
                     ) : (
                         <View style={styles.emptyCopy}>
                             <Text style={styles.emptyText}>No candidates yet.</Text>
@@ -267,36 +250,90 @@ export default function StatusCard({
 const styles = StyleSheet.create({
     card: {
         borderWidth: 1,
-        borderRadius: 18,
+        borderRadius: radius.card,
         minHeight: 128,
-        elevation: 2,
+        elevation: 1,
         shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.06,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        overflow: 'hidden',
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: space.md,
+        paddingTop: space.md,
+        paddingBottom: space.xs,
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.xs + 2,
     },
     cardTitle: {
-        fontWeight: '900',
+        fontWeight: '800',
+        fontSize: 15,
+        fontFamily: font.inter.semiBold,
     },
-    titleAvatar: {
-        backgroundColor: '#fff',
+    cardContent: {
+        paddingTop: space.xs,
+        paddingHorizontal: space.md,
+        paddingBottom: space.md,
+    },
+    bodyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.sm,
+    },
+    illustration: {
+        width: 68,
+        height: 68,
+        position: 'relative',
+        flexShrink: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    illustrationGlow: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: radius.pill,
+    },
+    iconCircle: {
+        width: 48,
+        height: 48,
+        borderRadius: radius.pill,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 2,
     },
     membersList: {
         flex: 1,
-        width: '100%',
-        gap: customTheme.spacing.sm,
+        gap: space.xs + 2,
     },
     memberCard: {
-        width: '100%',
-        padding: customTheme.spacing.sm,
-        borderRadius: 14,
-        backgroundColor: '#fff',
+        backgroundColor: '#FFFFFF',
+        borderRadius: radius.nested,
+        borderWidth: 1,
+        borderColor: tokenColors.border,
+        paddingHorizontal: space.sm,
+        paddingVertical: space.xs + 2,
     },
     memberRow: {
-        flexDirection: 'column',
-        alignItems: 'stretch',
-        gap: customTheme.spacing.sm,
-        marginBottom: customTheme.spacing.xs,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: space.xs,
+        minHeight: 44,
     },
     memberInfo: {
         flex: 1,
@@ -304,205 +341,66 @@ const styles = StyleSheet.create({
         minWidth: 0,
     },
     memberName: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: customTheme.colors.text,
-        flexShrink: 1,
-        lineHeight: 15,
+        fontSize: 13,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
+        color: tokenColors.textPrimary,
+        lineHeight: 17,
     },
     employmentType: {
-        fontSize: 10.5,
-        color: customTheme.colors.textMuted,
-        marginTop: 2,
+        fontSize: 11,
+        color: tokenColors.textSecondary,
+        marginTop: 1,
     },
     memberBadges: {
         flexDirection: 'row',
-        gap: customTheme.spacing.xs,
-        flexWrap: 'nowrap',
+        gap: space.xs,
+        flexWrap: 'wrap',
         alignItems: 'center',
-        maxWidth: '100%',
+        justifyContent: 'flex-end',
     },
-    reviewButton: {
-        alignSelf: 'flex-start',
-        minWidth: 50,
-    },
-    buzzButton: {
-        alignSelf: 'flex-start',
-        backgroundColor: '#F9F295',
-        minWidth: 50,
-    },
-    compactButtonContent: {
-        minHeight: 26,
-        paddingHorizontal: 3,
-    },
-    compactButtonLabel: {
-        fontSize: 9.5,
-        fontWeight: '800',
-        marginHorizontal: 2,
-    },
-    buzzButtonLabel: {
-        fontSize: 9.5,
-        fontWeight: '800',
-        marginHorizontal: 2,
-        color: '#111827',
-    },
-    pendingChip: {
-        backgroundColor: customTheme.colors.warningLight,
-        maxWidth: 74,
-    },
-    awaitingPaymentChip: {
-        backgroundColor: customTheme.colors.errorLight,
-    },
-    counterChip: {
-        backgroundColor: customTheme.colors.infoLight,
-    },
-    statusChipText: {
-        fontSize: 9.5,
-        fontWeight: '800',
-    },
-    emptyText: {
-        color: customTheme.colors.text,
-        fontWeight: '800',
-        marginBottom: 3,
-    },
-    emptySubText: {
-        color: customTheme.colors.textMuted,
-        fontSize: 12,
-        lineHeight: 17,
-    },
-    emptyState: {
-        flexDirection: 'row',
+    actionBtnPrimary: {
+        minHeight: 44,
+        minWidth: 54,
+        paddingHorizontal: space.sm,
+        borderRadius: radius.control,
+        backgroundColor: tokenColors.primary,
         alignItems: 'center',
-        gap: customTheme.spacing.md,
-        paddingVertical: customTheme.spacing.md,
+        justifyContent: 'center',
     },
-    cardContent: {
-        paddingTop: customTheme.spacing.xs,
+    actionBtnLabelPrimary: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
     },
-    bodyRow: {
-        flexDirection: 'row',
+    actionBtnBuzz: {
+        minHeight: 44,
+        minWidth: 48,
+        paddingHorizontal: space.xs + 4,
+        borderRadius: radius.control,
+        backgroundColor: '#FEF08A',
         alignItems: 'center',
-        gap: customTheme.spacing.sm,
+        justifyContent: 'center',
+    },
+    actionBtnLabelBuzz: {
+        color: '#713F12',
+        fontSize: 11,
+        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
     },
     emptyCopy: {
         flex: 1,
     },
-    illustration: {
-        width: 92,
-        height: 66,
-        position: 'relative',
-        flexShrink: 0,
-        alignSelf: 'center',
+    emptyText: {
+        color: tokenColors.textPrimary,
+        fontWeight: '700',
+        fontSize: 13,
+        marginBottom: 2,
     },
-    illustrationGlow: {
-        position: 'absolute',
-        left: 2,
-        right: 2,
-        top: 4,
-        bottom: 4,
-        borderRadius: 999,
-    },
-    illustrationMain: {
-        position: 'absolute',
-        left: 24,
-        bottom: 10,
-        backgroundColor: '#fff',
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.16,
-        shadowRadius: 14,
-        elevation: 5,
-    },
-    illustrationBadge: {
-        position: 'absolute',
-        right: 8,
-        bottom: 0,
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.18,
-        shadowRadius: 10,
-        elevation: 5,
-    },
-    groupPerson: {
-        position: 'absolute',
-        backgroundColor: '#EEF2FF',
-        shadowColor: '#6366F1',
-        shadowOffset: { width: 0, height: 7 },
-        shadowOpacity: 0.16,
-        shadowRadius: 10,
-        elevation: 4,
-    },
-    groupPersonLeft: {
-        left: 8,
-        top: 22,
-    },
-    groupPersonCenter: {
-        left: 31,
-        top: 6,
-    },
-    groupPersonRight: {
-        right: 8,
-        top: 22,
-    },
-    heartBadge: {
-        position: 'absolute',
-        left: 28,
-        bottom: 2,
-        backgroundColor: '#EEF2FF',
-        shadowColor: '#7C3AED',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.22,
-        shadowRadius: 12,
-        elevation: 5,
-    },
-    documentIllustration: {
-        position: 'absolute',
-        left: 20,
-        top: 4,
-        borderRadius: 12,
-        backgroundColor: '#fff',
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 5,
-    },
-    statusBadge: {
-        position: 'absolute',
-        right: 10,
-        bottom: 2,
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.18,
-        shadowRadius: 10,
-        elevation: 5,
-    },
-    hourglass: {
-        position: 'absolute',
-        left: 30,
-        top: 4,
-        width: 38,
-        height: 54,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#FDBA74',
-        backgroundColor: '#fff',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 8,
-    },
-    hourglassTop: {
-        width: 18,
-        height: 12,
-        borderBottomLeftRadius: 10,
-        borderBottomRightRadius: 10,
-        backgroundColor: '#FDBA74',
-    },
-    hourglassBottom: {
-        width: 18,
-        height: 12,
-        borderTopLeftRadius: 10,
-        borderTopRightRadius: 10,
-        backgroundColor: '#FED7AA',
+    emptySubText: {
+        color: tokenColors.textSecondary,
+        fontSize: 12,
+        lineHeight: 16,
     },
 });

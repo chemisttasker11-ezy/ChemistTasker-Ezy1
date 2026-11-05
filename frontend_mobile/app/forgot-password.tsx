@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { StyleSheet } from 'react-native';
-import { Text, TextInput, Button, Surface } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { passwordReset } from '@chemisttasker/shared-core';
-import AuthLayout from '../components/AuthLayout';
+import AuthLayout, { AuthLink, AuthNotice } from '../components/AuthLayout';
+import { Button, TextField } from '@/components/ui';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -13,15 +12,17 @@ export default function ForgotPasswordScreen() {
   const [error, setError] = useState('');
 
   const handleReset = async () => {
+    if (loading) return;
     setError('');
     setMessage('');
-    if (!email) {
+    const address = email.trim().toLowerCase();
+    if (!address) {
       setError('Please enter your email');
       return;
     }
     setLoading(true);
     try {
-      await passwordReset(email);
+      await passwordReset(address);
       setMessage('If an account exists, a reset link has been sent to your email.');
     } catch {
       setError('Something went wrong. Please try again.');
@@ -31,86 +32,40 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <AuthLayout title="Reset password">
-      <Text variant="bodyMedium" style={styles.subtitle}>
-        Enter your email and we&apos;ll send reset instructions.
-      </Text>
+    <AuthLayout
+      title="Reset your password"
+      subtitle="Enter your email and we'll send reset instructions."
+      onBack={router.canGoBack() ? () => router.back() : undefined}
+      backDisabled={loading}
+      footer={
+        // Always the sign-in screen: arriving from register's duplicate-email notice, back() would return there.
+        <AuthLink label="Back to login" onPress={() => router.replace('/login')} disabled={loading} />
+      }
+    >
+      {error ? <AuthNotice tone="error" message={error} /> : null}
+      {message ? <AuthNotice tone="success" message={message} /> : null}
 
-      {error ? (
-        <Surface style={styles.errorContainer} elevation={1}>
-          <Text style={styles.errorText}>{error}</Text>
-        </Surface>
-      ) : null}
-
-      {message ? (
-        <Surface style={styles.successContainer} elevation={1}>
-          <Text style={styles.successText}>{message}</Text>
-        </Surface>
-      ) : null}
-
-      <TextInput
+      <TextField
         label="Email"
         value={email}
         onChangeText={setEmail}
-        mode="outlined"
-        style={styles.input}
         keyboardType="email-address"
+        textContentType="emailAddress"
+        autoComplete="email"
         autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="send"
+        onSubmitEditing={() => void handleReset()}
+        disabled={loading}
       />
 
       <Button
-        mode="contained"
-        onPress={handleReset}
-        loading={loading}
-        disabled={loading}
-        style={styles.button}
-        contentStyle={styles.buttonContent}
-      >
-        Send reset link
-      </Button>
-
-      <Button mode="text" onPress={() => router.back()} style={styles.backButton}>
-        Back to login
-      </Button>
+        label={message ? 'Send again' : 'Send reset link'}
+        busyLabel="Sending"
+        onPress={() => void handleReset()}
+        busy={loading}
+        haptic="light"
+      />
     </AuthLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  subtitle: {
-    color: '#4b5563',
-    marginBottom: 12,
-  },
-  input: {
-    backgroundColor: '#fff',
-    marginTop: 8,
-  },
-  button: {
-    marginTop: 16,
-    borderRadius: 8,
-  },
-  buttonContent: {
-    paddingVertical: 8,
-  },
-  backButton: {
-    marginTop: 8,
-  },
-  errorContainer: {
-    backgroundColor: '#ffebee',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  errorText: {
-    color: '#c62828',
-  },
-  successContainer: {
-    backgroundColor: '#ecfdf3',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  successText: {
-    color: '#166534',
-  },
-});

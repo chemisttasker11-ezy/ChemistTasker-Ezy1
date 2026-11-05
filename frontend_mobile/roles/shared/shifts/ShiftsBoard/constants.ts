@@ -10,6 +10,12 @@ export const REJECTED_SHIFT_STORAGE_KEY = 'rejected_shift_ids';
 export const REJECTED_SLOT_STORAGE_KEY = 'rejected_slot_ids';
 export const COUNTER_OFFER_STORAGE_KEY = 'counter_offer_map';
 
+/**
+ * A board storage key for one surface scope (persona:workspace:pharmacyId:userId), so markers saved by one
+ * account, persona or workspace never show in another. The old global keys are left unread.
+ */
+export const shiftStorageKey = (base: string, scopeKey: string) => `${base}:${scopeKey}`;
+
 export const EMPTY_TRAVEL_LOCATION: TravelLocation = {
     streetAddress: '',
     suburb: '',

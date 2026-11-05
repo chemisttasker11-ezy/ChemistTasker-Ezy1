@@ -1,18 +1,18 @@
-/*  */import React, { useState } from 'react';
+﻿/*  */import React, { useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import {
     ActivityIndicator,
-    Avatar,
     Button,
     Card,
     Chip,
     Surface,
     Text,
 } from 'react-native-paper';
+import { Calendar, CheckCircle2, Heart, Lock, Star, User, Users } from 'lucide-react-native';
 import type { Shift, ShiftAssignment } from '@chemisttasker/shared-core';
-import { customTheme } from './ActiveShiftsPage/theme';
+import { colors, radius, space } from '@/constants/tokens';
 
-type AssignmentLike = ShiftAssignment | { slot_id?: number; user_id?: number; user?: any };
+export type AssignmentLike = ShiftAssignment | { slot_id?: number; user_id?: number; user?: any };
 
 type Props = {
     emptyText: string;
@@ -25,13 +25,13 @@ type Props = {
     title: string;
 };
 
-const getAssignmentSlotId = (assignment: AssignmentLike): number | null =>
+export const getAssignmentSlotId = (assignment: AssignmentLike): number | null =>
     'slotId' in assignment ? assignment.slotId ?? null : assignment.slot_id ?? null;
 
-const getAssignmentUserId = (assignment: AssignmentLike): number | null =>
+export const getAssignmentUserId = (assignment: AssignmentLike): number | null =>
     'userId' in assignment ? assignment.userId ?? null : assignment.user_id ?? null;
 
-const formatDateLabel = (rawDate?: string | null) => {
+export const formatDateLabel = (rawDate?: string | null) => {
     if (!rawDate) return { day: 'TBD', date: '--' };
     const parsed = new Date(`${rawDate}T00:00:00`);
     if (Number.isNaN(parsed.getTime())) return { day: 'TBD', date: rawDate };
@@ -41,19 +41,19 @@ const formatDateLabel = (rawDate?: string | null) => {
     };
 };
 
-const formatClockTime = (rawTime?: string | null) => {
+export const formatClockTime = (rawTime?: string | null) => {
     if (!rawTime) return '--';
     const [hour, minute] = String(rawTime).split(':');
     return hour && minute ? `${hour}:${minute}` : String(rawTime);
 };
 
-const formatTimeRange = (slot: any) => {
+export const formatTimeRange = (slot: any) => {
     const start = formatClockTime(slot?.startTime ?? slot?.start_time);
     const end = formatClockTime(slot?.endTime ?? slot?.end_time);
     return `${start} - ${end}`;
 };
 
-const formatLockedRate = (slot: any) => {
+export const formatSlotLockedRate = (slot: any) => {
     const rawRate = slot?.rate ?? slot?.hourlyRate ?? slot?.hourly_rate;
     if (rawRate == null || rawRate === '') return 'Rate locked';
     const numeric = Number(rawRate);
@@ -63,13 +63,13 @@ const formatLockedRate = (slot: any) => {
     return `$${value}/hr locked`;
 };
 
-const getAssignedMember = (shift: Shift, userId?: number | null) => {
+export const getAssignedMember = (shift: Shift, userId?: number | null) => {
     if (userId == null) return null;
     const members = ((shift as any).assignedMembers ?? (shift as any).assigned_members ?? []) as any[];
     return members.find((member) => Number(member.userId ?? member.user_id) === Number(userId)) ?? null;
 };
 
-const getAssignedName = (assignment?: AssignmentLike | null, member?: any) => {
+export const getAssignedName = (assignment?: AssignmentLike | null, member?: any) => {
     const user = (assignment as any)?.user ?? {};
     const firstName = user.firstName ?? user.first_name ?? '';
     const lastName = user.lastName ?? user.last_name ?? '';
@@ -80,12 +80,12 @@ const getAssignedName = (assignment?: AssignmentLike | null, member?: any) => {
     return fullName || user.name || user.displayName || memberFullName || member?.name || user.email || 'Assigned candidate';
 };
 
-const getAssignedDetails = (assignment?: AssignmentLike | null, member?: any) => {
+export const getAssignedDetails = (assignment?: AssignmentLike | null, member?: any) => {
     const user = (assignment as any)?.user ?? {};
     return user.email || user.phoneNumber || user.phone_number || member?.role || member?.employmentType || member?.employment_type || 'Profile locked to this slot';
 };
 
-const getAssignedEntries = (shift: Shift) => {
+export const getAssignedEntries = (shift: Shift) => {
     const assignments = ((shift as any).slotAssignments ?? (shift as any).slot_assignments ?? []) as AssignmentLike[];
     const slots = (shift.slots ?? []) as any[];
     const firstAssignedUserId = assignments.length > 0 ? getAssignmentUserId(assignments[0]) : null;
@@ -108,7 +108,7 @@ const getAssignedEntries = (shift: Shift) => {
         .filter((entry) => entry.userId != null);
 };
 
-const getSlotEntries = (shift: Shift) => {
+export const getSlotEntries = (shift: Shift) => {
     const assignments = ((shift as any).slotAssignments ?? (shift as any).slot_assignments ?? []) as AssignmentLike[];
     const slots = (shift.slots ?? []) as any[];
     const firstAssignedUserId = assignments.length > 0 ? getAssignmentUserId(assignments[0]) : null;
@@ -134,10 +134,10 @@ const getSlotEntries = (shift: Shift) => {
     });
 };
 
-function StatPill({ label, value, icon }: { icon: string; label: string; value: number }) {
+function StatPill({ label, value, icon }: { icon: React.ReactNode; label: string; value: number }) {
     return (
         <Surface style={styles.statPill} elevation={0}>
-            <Avatar.Icon size={36} icon={icon} style={styles.statIcon} color={customTheme.colors.primary} />
+            <View style={styles.statIconWrap}>{icon}</View>
             <View style={styles.statContent}>
                 <Text style={styles.statValue}>{value}</Text>
                 <Text style={styles.statLabel}>{label}</Text>
@@ -169,7 +169,7 @@ export default function OwnerAssignedShiftBoard({
     if (loading) {
         return (
             <View style={styles.centered}>
-                <ActivityIndicator color={customTheme.colors.primary} />
+                <ActivityIndicator color={colors.primary} />
             </View>
         );
     }
@@ -196,8 +196,8 @@ export default function OwnerAssignedShiftBoard({
                 const location = shift.uiAddressLine ?? shiftAny.ui_address_line ?? shift.pharmacyDetail?.streetAddress ?? '';
                 const isExpanded = Boolean(expandedShiftIds[shift.id]);
                 const modeColors = mode === 'history'
-                    ? { chipBg: customTheme.colors.warningLight, chipFg: customTheme.colors.warning, cardBg: '#FFFBEB' }
-                    : { chipBg: customTheme.colors.successLight, chipFg: customTheme.colors.success, cardBg: '#EFF6FF' };
+                    ? { chipBg: colors.status.amber.bg, chipFg: colors.status.amber.fg, cardBg: colors.status.amber.bg }
+                    : { chipBg: colors.status.green.bg, chipFg: colors.status.green.fg, cardBg: colors.primarySoft };
 
                 return (
                     <Card
@@ -210,24 +210,21 @@ export default function OwnerAssignedShiftBoard({
                             <View style={styles.headerRow}>
                                 <View style={styles.headerMain}>
                                     <View style={styles.headerTextBlock}>
-                                        <Avatar.Icon
-                                            size={54}
-                                            icon="account-check"
-                                            style={styles.headerAvatar}
-                                            color="#fff"
-                                        />
+                                        <View style={styles.headerAvatar}>
+                                            <CheckCircle2 size={24} color={colors.surfaceBg} />
+                                        </View>
                                         <Text style={styles.shiftTitle}>{shift.pharmacyDetail?.name ?? 'Unknown Pharmacy'}</Text>
                                         <View style={styles.chipRow}>
-                                            <Chip compact style={[styles.metaChip, { backgroundColor: customTheme.colors.successLight }]} textStyle={[styles.metaChipText, { color: customTheme.colors.success }]}>
+                                            <Chip compact style={[styles.metaChip, { backgroundColor: colors.status.green.bg }]} textStyle={[styles.metaChipText, { color: colors.status.green.fg }]}>
                                                 {shift.roleLabel ?? shift.roleNeeded ?? shiftAny.role_needed ?? 'Role'}
                                             </Chip>
                                             {shift.employmentType ? (
-                                                <Chip compact style={[styles.metaChip, { backgroundColor: customTheme.colors.infoLight }]} textStyle={[styles.metaChipText, { color: customTheme.colors.info }]}>
+                                                <Chip compact style={[styles.metaChip, { backgroundColor: colors.tone.blue.bg }]} textStyle={[styles.metaChipText, { color: colors.tone.blue.fg }]}>
                                                     {String(shift.employmentType).replace('_', ' ')}
                                                 </Chip>
                                             ) : null}
                                             {shift.uiIsUrgent ? (
-                                                <Chip compact style={[styles.metaChip, { backgroundColor: customTheme.colors.errorLight }]} textStyle={[styles.metaChipText, { color: customTheme.colors.error }]}>
+                                                <Chip compact style={[styles.metaChip, { backgroundColor: colors.status.red.bg }]} textStyle={[styles.metaChipText, { color: colors.status.red.fg }]}>
                                                     Urgent
                                                 </Chip>
                                             ) : null}
@@ -239,9 +236,9 @@ export default function OwnerAssignedShiftBoard({
                             {location ? <Text style={styles.locationText}>{location}</Text> : null}
 
                             <View style={styles.statsRow}>
-                                <StatPill icon="calendar-month" label="Slots" value={totalSlots} />
-                                <StatPill icon="account-group" label="Assigned" value={assignedEntries.length} />
-                                <StatPill icon="heart-outline" label="Interests" value={interests} />
+                                <StatPill icon={<Calendar size={18} color={colors.primary} />} label="Slots" value={totalSlots} />
+                                <StatPill icon={<Users size={18} color={colors.primary} />} label="Assigned" value={assignedEntries.length} />
+                                <StatPill icon={<Heart size={18} color={colors.primary} />} label="Interests" value={interests} />
                             </View>
 
                             {isExpanded && (
@@ -264,7 +261,7 @@ export default function OwnerAssignedShiftBoard({
                                             const assignedMember = getAssignedMember(shift, userId);
                                             const assignedName = getAssignedName(assignment, assignedMember);
                                             const assignedDetails = getAssignedDetails(assignment, assignedMember);
-                                            const lockedRate = formatLockedRate(slot);
+                                            const lockedRate = formatSlotLockedRate(slot);
                                             return (
                                                 <TouchableOpacity
                                                     key={`${shift.id}_${slot?.id}`}
@@ -281,8 +278,8 @@ export default function OwnerAssignedShiftBoard({
                                                             styles.slotCard,
                                                             mode === 'history' ? styles.slotCardCompact : null,
                                                             {
-                                                                backgroundColor: assigned ? modeColors.cardBg : '#F8FAFC',
-                                                                borderColor: assigned ? '#D9E2F2' : customTheme.colors.border,
+                                                                backgroundColor: assigned ? modeColors.cardBg : colors.subtleBg,
+                                                                borderColor: colors.border,
                                                             },
                                                         ]}
                                                         elevation={0}
@@ -293,7 +290,9 @@ export default function OwnerAssignedShiftBoard({
                                                                 <Text style={[styles.slotDate, mode === 'history' ? styles.slotDateCompact : null]}>{dateBits.date}</Text>
                                                             </View>
                                                             <View style={styles.slotTopMeta}>
-                                                                <Avatar.Icon size={mode === 'history' ? 28 : 34} icon="account" style={styles.slotAvatar} color={assigned ? customTheme.colors.primary : customTheme.colors.grey} />
+                                                                <View style={[styles.slotAvatarWrap, { backgroundColor: assigned ? colors.primarySoft : colors.subtleBg }]}>
+                                                                    <User size={16} color={assigned ? colors.primary : colors.textMuted} />
+                                                                </View>
                                                             </View>
                                                         </View>
 
@@ -307,7 +306,7 @@ export default function OwnerAssignedShiftBoard({
                                                                         {assignedDetails}
                                                                     </Text>
                                                                     <View style={styles.lockedRateRow}>
-                                                                        <Avatar.Icon size={18} icon="lock" style={styles.lockedRateIcon} color={customTheme.colors.primary} />
+                                                                        <Lock size={13} color={colors.primary} />
                                                                         <Text style={styles.lockedRateText}>{lockedRate}</Text>
                                                                     </View>
                                                                 </>
@@ -341,6 +340,7 @@ export default function OwnerAssignedShiftBoard({
                                                             <Button
                                                                 mode="outlined"
                                                                 compact
+                                                                icon={({ size, color }) => <Star size={size} color={color} />}
                                                                 onPress={() => onRateAssigned(userId as number)}
                                                                 style={styles.secondaryBtn}
                                                                 labelStyle={styles.secondaryBtnText}
@@ -377,11 +377,11 @@ const styles = StyleSheet.create({
     emptyState: {
         margin: 12,
         padding: 20,
-        borderRadius: 24,
+        borderRadius: radius.sheet,
         borderWidth: 1,
-        borderColor: customTheme.colors.border,
-        backgroundColor: '#fff',
-        shadowColor: '#0F172A',
+        borderColor: colors.border,
+        backgroundColor: colors.surfaceBg,
+        shadowColor: colors.textPrimary,
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.08,
         shadowRadius: 24,
@@ -390,17 +390,17 @@ const styles = StyleSheet.create({
     emptyTitle: {
         fontSize: 22,
         fontWeight: '900',
-        color: customTheme.colors.text,
+        color: colors.textPrimary,
         marginBottom: 6,
     },
     emptyText: {
-        color: customTheme.colors.grey,
+        color: colors.textMuted,
     },
     shiftCard: {
-        borderRadius: 24,
-        borderColor: '#D9E2F2',
-        backgroundColor: '#fff',
-        shadowColor: '#6366F1',
+        borderRadius: radius.card,
+        borderColor: colors.border,
+        backgroundColor: colors.surfaceBg,
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 14 },
         shadowOpacity: 0.12,
         shadowRadius: 28,
@@ -421,9 +421,14 @@ const styles = StyleSheet.create({
         alignItems: 'stretch',
     },
     headerAvatar: {
-        backgroundColor: customTheme.colors.primary,
+        width: 44,
+        height: 44,
+        borderRadius: radius.control,
+        backgroundColor: colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
         marginBottom: 2,
-        shadowColor: customTheme.colors.primary,
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.22,
         shadowRadius: 24,
@@ -434,7 +439,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
     },
     shiftTitle: {
-        color: customTheme.colors.text,
+        color: colors.textPrimary,
         fontWeight: '900',
         fontSize: 24,
         lineHeight: 28,
@@ -448,7 +453,7 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-start',
     },
     metaChip: {
-        borderRadius: 999,
+        borderRadius: radius.pill,
         alignSelf: 'flex-start',
         maxWidth: '100%',
     },
@@ -456,7 +461,7 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
     locationText: {
-        color: customTheme.colors.grey,
+        color: colors.textMuted,
         fontSize: 13,
         textAlign: 'left',
     },
@@ -472,36 +477,41 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        borderRadius: 18,
+        borderRadius: radius.nested,
         borderWidth: 1,
-        borderColor: '#D9E2F2',
-        backgroundColor: '#F8FAFC',
+        borderColor: colors.border,
+        backgroundColor: colors.subtleBg,
         paddingHorizontal: 8,
         paddingVertical: 8,
         flex: 1,
         minWidth: 0,
         marginHorizontal: 4,
-        shadowColor: '#0F172A',
+        shadowColor: colors.textPrimary,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.06,
         shadowRadius: 18,
         elevation: 2,
     },
-    statIcon: {
-        backgroundColor: customTheme.colors.primaryLight,
+    statIconWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: radius.pill,
+        backgroundColor: colors.primarySoft,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     statContent: {
         alignItems: 'center',
     },
     statValue: {
         fontWeight: '900',
-        color: customTheme.colors.text,
+        color: colors.textPrimary,
         fontSize: 16,
         lineHeight: 18,
         textAlign: 'center',
     },
     statLabel: {
-        color: customTheme.colors.grey,
+        color: colors.textMuted,
         fontSize: 10,
         textTransform: 'uppercase',
         textAlign: 'center',
@@ -513,15 +523,15 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     sectionTitle: {
-        color: customTheme.colors.text,
+        color: colors.textPrimary,
         fontWeight: '900',
         fontSize: 18,
     },
     stateChip: {
-        borderRadius: 999,
+        borderRadius: radius.pill,
     },
     sectionCopy: {
-        color: customTheme.colors.grey,
+        color: colors.textMuted,
         marginTop: -8,
     },
     slotGrid: {
@@ -540,12 +550,12 @@ const styles = StyleSheet.create({
         width: '33.3333%',
     },
     slotCard: {
-        borderRadius: 18,
+        borderRadius: radius.nested,
         borderWidth: 1,
-        borderColor: '#D9E2F2',
+        borderColor: colors.border,
         padding: 14,
         gap: 10,
-        shadowColor: '#0F172A',
+        shadowColor: colors.textPrimary,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.06,
         shadowRadius: 18,
@@ -568,13 +578,13 @@ const styles = StyleSheet.create({
         minWidth: 0,
     },
     slotDay: {
-        color: customTheme.colors.grey,
+        color: colors.textMuted,
         fontSize: 12,
         fontWeight: '800',
         textTransform: 'uppercase',
     },
     slotDate: {
-        color: customTheme.colors.text,
+        color: colors.textPrimary,
         fontSize: 22,
         fontWeight: '900',
         lineHeight: 26,
@@ -586,35 +596,39 @@ const styles = StyleSheet.create({
         fontSize: 18,
         lineHeight: 20,
     },
-    slotAvatar: {
-        backgroundColor: '#fff',
+    slotAvatarWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: radius.pill,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     slotTime: {
-        color: customTheme.colors.primary,
+        color: colors.primary,
         fontWeight: '800',
     },
     slotTimeCompact: {
         fontSize: 11,
     },
     assignedPanel: {
-        borderRadius: 14,
+        borderRadius: radius.control,
         borderWidth: 1,
-        borderColor: '#D9E2F2',
-        backgroundColor: '#FFFFFFD9',
+        borderColor: colors.border,
+        backgroundColor: colors.surfaceBg,
         padding: 12,
     },
     assignedPanelCompact: {
         padding: 8,
     },
     assignedTitle: {
-        color: customTheme.colors.text,
+        color: colors.textPrimary,
         fontWeight: '800',
     },
     assignedTitleCompact: {
         fontSize: 12,
     },
     assignedCopy: {
-        color: customTheme.colors.grey,
+        color: colors.textMuted,
         fontSize: 12,
     },
     assignedCopyCompact: {
@@ -626,11 +640,8 @@ const styles = StyleSheet.create({
         gap: 4,
         marginTop: 4,
     },
-    lockedRateIcon: {
-        backgroundColor: '#EEF2FF',
-    },
     lockedRateText: {
-        color: customTheme.colors.text,
+        color: colors.textPrimary,
         fontSize: 12,
         fontWeight: '800',
     },
@@ -640,19 +651,23 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     primaryBtn: {
-        backgroundColor: customTheme.colors.primary,
-        borderRadius: 999,
+        backgroundColor: colors.primary,
+        borderRadius: radius.pill,
+        minHeight: 44,
+        justifyContent: 'center',
     },
     primaryBtnText: {
-        color: '#fff',
+        color: colors.surfaceBg,
         fontWeight: '800',
     },
     secondaryBtn: {
-        borderRadius: 999,
-        borderColor: '#BAE6FD',
+        borderRadius: radius.pill,
+        borderColor: colors.border,
+        minHeight: 44,
+        justifyContent: 'center',
     },
     secondaryBtnText: {
-        color: customTheme.colors.text,
+        color: colors.textPrimary,
         fontWeight: '800',
     },
 });

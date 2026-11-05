@@ -216,7 +216,7 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
         ].join('\n');
         const file = new File(Paths.cache, `chemisttasker-payroll-${selectedPeriodId}.csv`);
         file.create({ overwrite: true });
-        file.write(csv);
+        await file.write(csv);
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: 'Export payroll-ready timesheets' });
         }

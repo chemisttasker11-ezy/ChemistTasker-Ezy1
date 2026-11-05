@@ -1,7 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Surface, Button, ActivityIndicator, IconButton } from 'react-native-paper';
+import { Text, Surface, ActivityIndicator } from 'react-native-paper';
+import {
+    Users,
+    Heart,
+    Store,
+    Building2,
+    TrendingUp,
+    Lock,
+} from 'lucide-react-native';
 import { EscalationLevelKey, Shift } from '@chemisttasker/shared-core';
+import { colors as tokenColors, font, radius, space, touch } from '@/constants/tokens';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { customTheme, levelColors } from '../../theme';
 import { getLevelLabel } from '../../utils/displayHelpers';
 
@@ -15,14 +25,6 @@ const ESCALATION_LEVELS: EscalationLevelKey[] = [
 
 const chemisttaskerBadge = require('../../../../../../assets/images/chemisttasker-platform.png');
 
-const levelIcons: Record<EscalationLevelKey, string> = {
-    FULL_PART_TIME: 'account-group',
-    LOCUM_CASUAL: 'heart',
-    OWNER_CHAIN: 'storefront',
-    ORG_CHAIN: 'office-building',
-    PLATFORM: 'web',
-};
-
 interface EscalationStepperProps {
     shift: Shift;
     currentLevel: EscalationLevelKey;
@@ -32,6 +34,33 @@ interface EscalationStepperProps {
     escalating?: boolean;
     labelOverrides?: Partial<Record<EscalationLevelKey, string>>;
     showPrivateFirst?: boolean;
+}
+
+function renderLevelIcon(level: EscalationLevelKey, isPlatform: boolean, isPlatformEscalated: boolean) {
+    if (isPlatform) {
+        return (
+            <Image
+                source={chemisttaskerBadge}
+                style={[
+                    styles.platformBadge,
+                    !isPlatformEscalated && styles.platformBadgeDisabled,
+                ]}
+                resizeMode="contain"
+            />
+        );
+    }
+    switch (level) {
+        case 'FULL_PART_TIME':
+            return <Users size={18} color="#FFFFFF" />;
+        case 'LOCUM_CASUAL':
+            return <Heart size={18} color="#FFFFFF" />;
+        case 'OWNER_CHAIN':
+            return <Store size={18} color="#FFFFFF" />;
+        case 'ORG_CHAIN':
+            return <Building2 size={18} color="#FFFFFF" />;
+        default:
+            return <Users size={18} color="#FFFFFF" />;
+    }
 }
 
 export default function EscalationStepper({
@@ -44,11 +73,13 @@ export default function EscalationStepper({
     labelOverrides,
     showPrivateFirst,
 }: EscalationStepperProps) {
+    const [confirmTargetLevel, setConfirmTargetLevel] = useState<EscalationLevelKey | null>(null);
+
     const allowedKeys = new Set<string>((shift as any).allowedEscalationLevels || []);
     if (!allowedKeys.size) {
         ESCALATION_LEVELS.forEach((level) => allowedKeys.add(level));
     }
-    
+
     // Filter to only show available escalation levels (matching web behavior)
     const levelSequence = ESCALATION_LEVELS.filter((level) => allowedKeys.has(level));
     const currentIndex = Math.max(0, levelSequence.indexOf(currentLevel));
@@ -67,28 +98,42 @@ export default function EscalationStepper({
     const nextLevelIndex = currentIndex + 1;
     const hasNextLevel = nextLevelIndex < levelSequence.length && allowedKeys.has(levelSequence[nextLevelIndex]);
 
+    const targetEscalateLevel = canEscalateToSelected
+        ? levelSequence[selectedIndex]
+        : hasNextLevel
+            ? levelSequence[nextLevelIndex]
+            : null;
+
     return (
-        <View>
+        <View style={styles.wrapper}>
             <View style={styles.container}>
                 {/* Background Track */}
                 <View style={[styles.track, { left: 20, right: 20 }]} />
-                
+
                 {/* Progress Track */}
-                <View 
+                <View
                     style={[
-                        styles.progressTrack, 
-                        { 
-                            width: `${Math.min(100, Math.max(0, ((Math.max(selectedIndex, uiCurrentIndex) + (showPrivateFirst ? 1 : 0)) / Math.max(1, levelSequence.length - 1)) * 100))}%`,
+                        styles.progressTrack,
+                        {
+                            width: `${Math.min(
+                                100,
+                                Math.max(
+                                    0,
+                                    ((Math.max(selectedIndex, uiCurrentIndex) + (showPrivateFirst ? 1 : 0)) /
+                                        Math.max(1, levelSequence.length - 1)) *
+                                        100
+                                )
+                            )}%`,
                             left: 20,
-                        } 
-                    ]} 
+                        },
+                    ]}
                 />
 
                 {showPrivateFirst && (
                     <Surface style={[styles.stepWrap, styles.stepItem]} elevation={0}>
                         <View style={[styles.stepConnector, styles.stepConnectorReached]} />
                         <View style={[styles.stepCircle, styles.stepCircleReached]}>
-                            <IconButton icon="lock" size={20} iconColor="#fff" style={styles.stepIcon} />
+                            <Lock size={16} color="#FFFFFF" />
                         </View>
                         <View style={styles.stepDot} />
                         <Text style={[styles.stepText, styles.privateStepText]} numberOfLines={2}>
@@ -118,6 +163,9 @@ export default function EscalationStepper({
                             activeOpacity={0.8}
                             disabled={!selectable}
                             onPress={() => onSelectLevel(level)}
+                            accessible
+                            accessibilityRole="button"
+                            accessibilityLabel={`Escalation level ${label}.${isReached ? ' Reached.' : ''}${isSelected ? ' Selected.' : ''}`}
                         >
                             <Surface
                                 style={[
@@ -134,25 +182,43 @@ export default function EscalationStepper({
                                         ]}
                                     />
                                 )}
-                                <View style={[styles.stepCircle, isReached ? styles.stepCircleReached : styles.stepCircleMuted, isSelected && !isPlatform && { borderColor: color }]}>
-                                    {isPlatform ? (
-                                        <Image
-                                            source={chemisttaskerBadge}
-                                            style={[
-                                                styles.platformBadge,
-                                                !isPlatformEscalated && styles.platformBadgeDisabled,
-                                            ]}
-                                            resizeMode="contain"
-                                        />
-                                    ) : (
-                                        <IconButton icon={levelIcons[level]} size={20} iconColor="#fff" style={styles.stepIcon} />
-                                    )}
+                                <View
+                                    style={[
+                                        styles.stepCircle,
+                                        isReached ? styles.stepCircleReached : styles.stepCircleMuted,
+                                        isSelected && !isPlatform && { borderColor: color },
+                                    ]}
+                                >
+                                    {renderLevelIcon(level, isPlatform, isPlatformEscalated)}
                                 </View>
-                                <View style={[styles.stepDot, { backgroundColor: isPlatform ? (isPlatformEscalated || isSelected ? color : '#CBD5E1') : isReached ? color : '#CBD5E1' }]} />
+                                <View
+                                    style={[
+                                        styles.stepDot,
+                                        {
+                                            backgroundColor: isPlatform
+                                                ? isPlatformEscalated || isSelected
+                                                    ? color
+                                                    : '#CBD5E1'
+                                                : isReached
+                                                    ? color
+                                                    : '#CBD5E1',
+                                        },
+                                    ]}
+                                />
                                 <Text
                                     style={[
                                         styles.stepText,
-                                        { color: isPlatform ? (isPlatformEscalated ? '#111827' : customTheme.colors.textMuted) : isSelected ? color : isActive || isCompleted ? '#111827' : customTheme.colors.textMuted },
+                                        {
+                                            color: isPlatform
+                                                ? isPlatformEscalated
+                                                    ? tokenColors.textPrimary
+                                                    : tokenColors.textMuted
+                                                : isSelected
+                                                    ? color
+                                                    : isActive || isCompleted
+                                                        ? tokenColors.textPrimary
+                                                        : tokenColors.textMuted,
+                                        },
                                     ]}
                                     numberOfLines={2}
                                 >
@@ -166,52 +232,70 @@ export default function EscalationStepper({
 
             {escalating ? (
                 <View style={styles.escalateBox}>
-                    <View style={styles.escalateIcon}><ActivityIndicator size="small" color="#fff" /></View>
+                    <View style={styles.escalateIcon}>
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                    </View>
                     <View style={styles.escalateCopy}>
                         <Text style={styles.escalateTitle}>Escalating...</Text>
-                        <Text style={styles.escalateText}>Escalate to the next audience to find the right candidate.</Text>
+                        <Text style={styles.escalateText}>Escalating to widen candidate audience.</Text>
                     </View>
                 </View>
-            ) : canEscalateToSelected ? (
+            ) : targetEscalateLevel ? (
                 <View style={styles.escalateBox}>
                     <View style={styles.escalateIcon}>
-                        <IconButton icon="trending-up" size={24} iconColor="#fff" style={styles.stepIcon} />
+                        <TrendingUp size={22} color="#FFFFFF" />
                     </View>
                     <View style={styles.escalateCopy}>
                         <Text style={styles.escalateTitle}>Ready to widen your search?</Text>
                         <Text style={styles.escalateText}>Escalate to the next audience to find the right candidate.</Text>
                     </View>
-                    <Button mode="contained" style={styles.escalateButton} onPress={() => onEscalate(shift, levelSequence[selectedIndex])}>
-                        Escalate to {resolveLabel(levelSequence[selectedIndex])}
-                    </Button>
-                </View>
-            ) : hasNextLevel ? (
-                // Fallback: Show escalation suggestion for next available level
-                <View style={styles.escalateBox}>
-                    <View style={styles.escalateIcon}>
-                        <IconButton icon="trending-up" size={24} iconColor="#fff" style={styles.stepIcon} />
-                    </View>
-                    <View style={styles.escalateCopy}>
-                        <Text style={styles.escalateTitle}>Ready to widen your search?</Text>
-                        <Text style={styles.escalateText}>Escalate to the next audience to find the right candidate.</Text>
-                    </View>
-                    <Button mode="contained" style={styles.escalateButton} onPress={() => onEscalate(shift, levelSequence[nextLevelIndex])}>
-                        Escalate to {resolveLabel(levelSequence[nextLevelIndex])}
-                    </Button>
+                    <TouchableOpacity
+                        style={styles.escalateBtn}
+                        activeOpacity={0.8}
+                        onPress={() => setConfirmTargetLevel(targetEscalateLevel)}
+                        accessible
+                        accessibilityRole="button"
+                        accessibilityLabel={`Escalate to ${resolveLabel(targetEscalateLevel)}`}
+                    >
+                        <Text style={styles.escalateBtnLabel}>
+                            Escalate to {resolveLabel(targetEscalateLevel)}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             ) : null}
+
+            <ConfirmDialog
+                open={confirmTargetLevel != null}
+                title={`Escalate to ${confirmTargetLevel ? resolveLabel(confirmTargetLevel) : ''}?`}
+                body="This will expand shift visibility to candidates at this level. Once escalated, candidates will be notified."
+                confirmLabel="Escalate"
+                busyLabel="Escalating..."
+                busy={Boolean(escalating)}
+                destructive={false}
+                onConfirm={() => {
+                    if (confirmTargetLevel) {
+                        const target = confirmTargetLevel;
+                        setConfirmTargetLevel(null);
+                        onEscalate(shift, target);
+                    }
+                }}
+                onClose={() => setConfirmTargetLevel(null)}
+            />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
+    wrapper: {
+        gap: space.sm,
+    },
     container: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         justifyContent: 'center',
         flexWrap: 'nowrap',
         position: 'relative',
-        paddingVertical: customTheme.spacing.sm,
+        paddingVertical: space.sm,
         paddingHorizontal: 0,
         gap: 2,
     },
@@ -219,18 +303,18 @@ const styles = StyleSheet.create({
         position: 'absolute',
         left: 20,
         right: 20,
-        top: 28,
+        top: 26,
         height: 4,
-        borderRadius: 999,
-        backgroundColor: '#E5E7EB',
+        borderRadius: radius.pill,
+        backgroundColor: tokenColors.border,
     },
     progressTrack: {
         position: 'absolute',
         left: 20,
-        top: 28,
+        top: 26,
         height: 4,
-        borderRadius: 999,
-        backgroundColor: '#7C3AED',
+        borderRadius: radius.pill,
+        backgroundColor: tokenColors.primary,
     },
     stepWrap: {
         width: '100%',
@@ -245,78 +329,71 @@ const styles = StyleSheet.create({
     stepTouch: {
         flex: 1,
         minWidth: 0,
+        minHeight: touch.min,
     },
     stepCircle: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        borderWidth: 3,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        borderWidth: 2,
         borderColor: '#E9D5FF',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#7C3AED',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.24,
-        shadowRadius: 14,
-        elevation: 5,
+        shadowColor: tokenColors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 8,
+        elevation: 3,
         zIndex: 2,
     },
     stepConnector: {
         position: 'absolute',
-        top: 19,
+        top: 18,
         left: '50%',
         right: '-50%',
         height: 4,
-        borderRadius: 999,
+        borderRadius: radius.pill,
         zIndex: 0,
     },
     stepConnectorReached: {
-        backgroundColor: '#7C3AED',
+        backgroundColor: tokenColors.primary,
     },
     stepConnectorMuted: {
-        backgroundColor: '#E5E7EB',
+        backgroundColor: tokenColors.border,
     },
     stepCircleReached: {
-        backgroundColor: '#7C3AED',
+        backgroundColor: tokenColors.primary,
     },
     stepCircleMuted: {
         backgroundColor: '#CBD5E1',
-        borderColor: '#E5E7EB',
-        shadowOpacity: 0.08,
-    },
-    stepIcon: {
-        margin: 0,
-        width: 30,
-        height: 30,
+        borderColor: tokenColors.border,
+        shadowOpacity: 0.04,
     },
     platformBadge: {
-        width: 28,
-        height: 28,
+        width: 24,
+        height: 24,
     },
     platformBadgeDisabled: {
         opacity: 0.42,
         tintColor: '#94A3B8',
     },
     stepDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        marginTop: -3,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginTop: -2,
         marginBottom: 3,
-        backgroundColor: '#7C3AED',
-        borderWidth: 2,
-        borderColor: '#fff',
+        backgroundColor: tokenColors.primary,
+        borderWidth: 1.5,
+        borderColor: '#FFFFFF',
     },
     stepText: {
-        fontSize: 7.5,
-        lineHeight: 8.5,
+        fontSize: 9,
+        lineHeight: 12,
         fontWeight: '700',
+        fontFamily: font.inter.semiBold,
         textAlign: 'center',
         maxWidth: 72,
-    },
-    privateStep: {
-        backgroundColor: '#E0F2FE',
-        borderColor: '#7DD3FC',
     },
     privateStepText: {
         color: '#0369A1',
@@ -328,40 +405,53 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         flexWrap: 'wrap',
-        padding: customTheme.spacing.md,
-        gap: customTheme.spacing.md,
+        padding: space.md,
+        gap: space.md,
         backgroundColor: '#FAF5FF',
-        borderRadius: 18,
+        borderRadius: radius.card,
         borderWidth: 1,
         borderColor: '#E9D5FF',
     },
     escalateIcon: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
-        backgroundColor: '#7C3AED',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: tokenColors.primary,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#7C3AED',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.22,
-        shadowRadius: 12,
+        shadowColor: tokenColors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
     },
     escalateCopy: {
         flex: 1,
         minWidth: 180,
     },
     escalateTitle: {
-        color: customTheme.colors.text,
-        fontWeight: '900',
-        fontSize: 15,
+        color: tokenColors.textPrimary,
+        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
+        fontSize: 14,
     },
     escalateText: {
-        color: customTheme.colors.textMuted,
+        color: tokenColors.textSecondary,
         fontSize: 12,
+        fontFamily: font.inter.regular,
         marginTop: 2,
     },
-    escalateButton: {
-        borderRadius: 10,
+    escalateBtn: {
+        minHeight: touch.min,
+        paddingHorizontal: space.md,
+        backgroundColor: tokenColors.primary,
+        borderRadius: radius.control,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    escalateBtnLabel: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
+        fontFamily: font.inter.semiBold,
     },
 });

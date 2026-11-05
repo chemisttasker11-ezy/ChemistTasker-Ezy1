@@ -32,6 +32,9 @@ import {
 } from '@/features/parity/ParityUI';
 import { asArray, dateFromIso, errorMessage, isoDate, replaceUnderscore, startOfWeek } from '@/features/parity/utils';
 import { useAuth } from '@/context/AuthContext';
+import { useWorkspace } from '@/context/WorkspaceContext';
+import { ContentState } from '@/components/ui';
+import { ownRosterAssignments } from '@/roles/shared/dashboard/workerHomeLogic';
 
 const addDays = (value: string, days: number) => {
   const date = dateFromIso(value);
@@ -60,34 +63,26 @@ const pharmacyNameOf = (row: any) => row?.name ?? row?.pharmacyName ?? row?.phar
 
 const openShiftSlots = (shift: any) => asArray<any>(shift?.slots);
 
-function numericUserId(...values: any[]): number {
-  for (const value of values) {
-    const candidate = typeof value === 'object' && value ? value.id : value;
-    const id = Number(candidate);
-    if (Number.isFinite(id) && id > 0) return id;
-  }
-  return 0;
-}
-
-const assignmentUserId = (row: any) => numericUserId(
-  row?.userId,
-  row?.user_id,
-  row?.user,
-  row?.userDetail,
-  row?.user_detail,
-);
-
 type EditState =
   | { type: 'leave'; assignment: any; existing?: LeaveRequest | null }
   | { type: 'cover'; assignment: any; existing?: WorkerShiftRequest | null }
   | { type: 'claim'; shift: any; slot: any }
   | null;
 
-export default function MyRosterScreen() {
+/** Shell scope owns the pharmacy; remount on changes so old rows and edit dialogs cannot carry across. */
+export function ShellRosterScreen() {
+  const { user } = useAuth();
+  const { selectedPharmacyId, isLoading } = useWorkspace();
+  if (isLoading) return <ContentState kind="loading" />;
+  return <MyRosterScreen key={`${user?.id}:${selectedPharmacyId}`} scopedPharmacyId={selectedPharmacyId} />;
+}
+
+export default function MyRosterScreen({ scopedPharmacyId }: { scopedPharmacyId?: number | null }) {
   const { user } = useAuth();
   const currentUserId = Number(user?.id || 0);
   const [pharmacies, setPharmacies] = useState<any[]>([]);
-  const [pharmacyId, setPharmacyId] = useState<number | null>(null);
+  const [localPharmacyId, setPharmacyId] = useState<number | null>(null);
+  const pharmacyId = scopedPharmacyId !== undefined ? scopedPharmacyId : localPharmacyId;
   const [weekStart, setWeekStart] = useState(startOfWeek());
   const [assignments, setAssignments] = useState<any[]>([]);
   const [openShifts, setOpenShifts] = useState<any[]>([]);
@@ -105,11 +100,13 @@ export default function MyRosterScreen() {
   const loadPharmacies = useCallback(async () => {
     const rows = asArray<any>(await fetchRosterWorkerPharmaciesService());
     setPharmacies(rows);
+    if (scopedPharmacyId !== undefined) return;
     setPharmacyId((current) => {
       if (current && rows.some((row) => pharmacyIdOf(row) === current)) return current;
       return rows.length ? pharmacyIdOf(rows[0]) : null;
     });
-  }, []);
+    if (rows.length === 0) setLoading(false);
+  }, [scopedPharmacyId]);
 
   const loadRoster = useCallback(async () => {
     if (!pharmacyId) {
@@ -129,7 +126,7 @@ export default function MyRosterScreen() {
       ]);
       // The worker roster endpoint may include a pharmacy-wide schedule for calendar
       // context. Only the authenticated worker's assignments are actionable here.
-      setAssignments(asArray<any>(assignmentRows).filter((row) => assignmentUserId(row) === currentUserId));
+      setAssignments(ownRosterAssignments(asArray<any>(assignmentRows), currentUserId));
       setOpenShifts(asArray<any>((openRows as any)?.results ?? openRows));
       setRequests(asArray<WorkerShiftRequest>(requestRows));
     } catch (e) {
@@ -148,8 +145,8 @@ export default function MyRosterScreen() {
   }, [loadPharmacies]);
 
   useEffect(() => {
-    if (pharmacyId) void loadRoster();
-  }, [loadRoster, pharmacyId]);
+    if (pharmacyId || scopedPharmacyId === null) void loadRoster();
+  }, [loadRoster, pharmacyId, scopedPharmacyId]);
 
   const refresh = () => {
     setRefreshing(true);
@@ -277,7 +274,9 @@ export default function MyRosterScreen() {
       onRefresh={refresh}
       refreshing={refreshing}
     >
-      {pharmacies.length > 1 ? (
+      {scopedPharmacyId !== undefined && pharmacyId == null ? (
+        <InfoNote title="Choose a pharmacy">Select a pharmacy in the workspace header to see your roster.</InfoNote>
+      ) : scopedPharmacyId === undefined && pharmacies.length > 1 ? (
         <Section title="Pharmacy" description="Choose the pharmacy roster you want to review.">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {pharmacies.map((row) => {
