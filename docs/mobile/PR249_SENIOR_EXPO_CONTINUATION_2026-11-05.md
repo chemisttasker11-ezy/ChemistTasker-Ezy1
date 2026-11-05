@@ -211,3 +211,17 @@ These targeted source changes close several previously demonstrated implementati
 - `6b92340a`: stale callbacks for chat room rename, deletion, pin changes and group creation can no longer close dialogs, navigate or display completion messages in a newly signed-in account. The account-change effect resets the rename spinner. Previously issued requests remain backend-authoritative and cannot be cancelled retroactively.
 - CI workflows for the working PR are auto-triggered by pushes. The new head requires a completed exact-head check; previous intermittent results and pending/skipped checks do not establish release acceptance.
 - This change does **not** implement any QR scan-to-add, membership invitation identity binding, live provider payment, server permissions override, or app release action.
+
+## W5 workforce source-isolation continuation — 5 November 2026
+
+| Commit | Implementation |
+|---|---|
+| `4db8e824`, `b6cf5fb3` | Timesheet detail now clears prior-account records, outstanding correction fields and stale read/write callbacks. The audited attendance and manager approval backend flows remain unchanged. |
+| `1fb49941` | Added timesheet detail source isolation contract. |
+| `ee9ba9d8` | Worker My Hours now holds account-tagged rows, discards stale loads and guards duplicate/stale timesheet submissions. |
+| `3470e971`, `64e55e3f` | Manager timesheet workspace and pharmacy period operations now hide previous-account data, reload authenticated pharmacies and reject stale account/pharmacy completion callbacks. |
+| `9f62d6c3`, `308bd45c` | Added manager and worker account/pharmacy scope tests in existing scripts. |
+
+**Source boundary:** fixes are scoped to mobile UI requests and state. They do not grant new permissions or alter payroll, roster freeze, attendance corrections, award rates or booking/Stripe rules. In-flight server writes cannot be retracted by client generation guards.
+
+**Still required for actual W5 acceptance:** authenticated multiple-account and multiple-pharmacy transitions, manager/worker positive and denial tests, concurrent period correction/locking, real device font/keyboard QA, backend PostgreSQL evidence and full frozen-head CI. QR remains unchanged. **Not release ready without this evidence.**
