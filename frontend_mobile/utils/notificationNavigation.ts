@@ -24,6 +24,7 @@ const ADMIN_GUARDS = {
   shifts: ['MANAGE_ROSTER'],
   calendar: ['MANAGE_COMMUNICATIONS', 'MANAGE_STAFF', 'MANAGE_ROSTER'],
   hub: ['MANAGE_COMMUNICATIONS', 'MANAGE_STAFF', 'MANAGE_ROSTER'],
+  membership: ['MANAGE_STAFF'],
 } as const;
 
 const activeShell = (
@@ -365,25 +366,23 @@ export const resolveMembershipNotificationRoute = ({
   actionUrl,
   payload,
   userRole,
+  persona,
+  adminCan,
 }: ResolveRouteInput): string | null => {
   const roleSlug = normalizeRoleSlug(userRole);
   const parsed = parseMembershipFromActionUrl(actionUrl) ?? parseMembershipFromPayload(payload);
-  if (!roleSlug || !parsed) return null;
+  if (!parsed) return null;
+  const targetRole = activeShell(persona, adminCan, 'membership') ?? roleSlug;
+  if (!targetRole) return null;
 
-  if (roleSlug === 'pharmacist' || roleSlug === 'otherstaff') {
-    return ROLE_MEMBERSHIP_ROUTE_MAP[roleSlug];
+  if (targetRole === 'pharmacist' || targetRole === 'otherstaff') {
+    return ROLE_MEMBERSHIP_ROUTE_MAP[targetRole];
   }
 
   const pharmacyId = parsed.pharmacyId ?? payload?.pharmacy_id ?? payload?.pharmacyId ?? null;
-  if (roleSlug === 'owner' && pharmacyId != null) {
-    return `/owner/pharmacies/${pharmacyId}`;
-  }
-  if (roleSlug === 'organization' && pharmacyId != null) {
-    return `/organization/pharmacies/${pharmacyId}`;
-  }
-  if (roleSlug === 'admin' && pharmacyId != null) {
-    return `/admin/pharmacies/${pharmacyId}`;
+  if (['owner', 'organization', 'admin'].includes(targetRole) && pharmacyId != null) {
+    return `/${targetRole}/pharmacies/${pharmacyId}`;
   }
 
-  return ROLE_MEMBERSHIP_ROUTE_MAP[roleSlug] ?? null;
+  return ROLE_MEMBERSHIP_ROUTE_MAP[targetRole] ?? null;
 };

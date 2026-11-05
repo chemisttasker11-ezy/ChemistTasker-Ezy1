@@ -219,6 +219,8 @@ export default function NotificationsScreen() {
       actionUrl: item.actionUrl,
       payload: item.payload,
       userRole: user?.role ?? null,
+      persona,
+      adminCan,
     });
     if (membershipRoute) {
       router.push(membershipRoute as any);
