@@ -41,9 +41,17 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const [editor, setEditor] = useState<{ invoice?: FinanceInvoice; key: string } | null>(null);
   const [form, setForm] = useState<Form | null>(null); const [formError, setFormError] = useState('');
   const [selected, setSelected] = useState<FinanceInvoice | null>(null);
+  const selectedInvoiceRef = useRef<number | null>(null);
+  selectedInvoiceRef.current = selected?.id ?? null;
   const [historyDocument, setHistoryDocument] = useState<FinanceInvoice | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  useEffect(() => {
+    historyGen.current += 1;
+    setHistoryLoading(false);
+    setHistoryDocument(null);
+    setHistoryError('');
+  }, [selected?.id]);
   const [start, setStart] = useState(`${financeToday().slice(0, 4)}-01-01`); const [end, setEnd] = useState(financeToday());
   const [basis, setBasis] = useState<'cash' | 'accrual'>('cash'); const [worksheet, setWorksheet] = useState<FinanceWorksheet | null>(null);
   const load = useCallback(async () => {
@@ -106,7 +114,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     if (historyLoading || running.current) return;
     const requestedScope = ownerScope;
     const request = ++historyGen.current;
-    const current = () => historyGen.current === request && scopeRef.current === requestedScope;
+    const current = () => historyGen.current === request && scopeRef.current === requestedScope && selectedInvoiceRef.current === invoice.id;
     setHistoryLoading(true);
     setHistoryError('');
     setHistoryDocument(null);
@@ -151,7 +159,11 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       try { file.delete(); } catch { /* best-effort cleanup */ }
     }
   };
-  const afterSave = async () => { try { await load(); } catch { setError('Saved. Pull to refresh to update the list.'); } };
+  const afterSave = async () => {
+    const savedScope = ownerScope;
+    try { await load(); }
+    catch { if (scopeRef.current === savedScope) setError('Saved. Pull to refresh to update the list.'); }
+  };
   const ask = (title: string, message: string, action: () => Promise<unknown>) => Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Confirm', onPress: () => void run(action) }]);
   const matches = (...values: string[]) => values.join(' ').toLowerCase().includes(search.toLowerCase());
   const panel = { padding: space.lg, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceBg, marginBottom: space.md };
@@ -188,7 +200,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     } });
   };
   const closeForm = () => { if (!busy) Alert.alert('Discard changes?', 'Unsaved changes will be lost.', [{ text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: () => setForm(null) }]); };
-  if (editor) return <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}><FinanceInvoiceEditor requestKey={editor.key} initial={editor.invoice} previous={invoices.find(i => i.kind === 'invoice')} customers={customers} items={items} onClose={() => setEditor(null)} onSaved={afterSave} /></SafeAreaView>;
+  if (editor) return <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}><FinanceInvoiceEditor requestKey={editor.key} initial={editor.invoice} previous={invoices.find(i => i.kind === 'invoice')} customers={customers} items={items} onClose={() => { if (scopeRef.current === ownerScope) setEditor(null); }} onSaved={afterSave} /></SafeAreaView>;
   const fieldOptions: Record<string, string[]> = { tax_code: ['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'], ...(form?.title.toLowerCase().includes('item') ? { category: ['ProfessionalServices', 'Superannuation', 'Transportation', 'Accommodation', 'Miscellaneous'] } : {}) };
   const labels: Record<string, string> = { name: 'Name', legal_name: 'Legal entity name', abn: 'ABN', contact_name: 'Accounts contact', email: 'Invoice email', phone: 'Phone', address: 'Billing address', payment_terms_days: 'Payment terms (days)', notes: 'Notes', active: 'Active', code: 'Item code (optional)', category: 'Category', unit: 'Unit', unit_price: 'Unit price (AUD)', tax_code: 'Tax treatment', super_eligible: 'Include in reviewed super base', supplier: 'Supplier', description: 'Description', incurred_on: 'Incurred date (YYYY-MM-DD)', paid_on: 'Paid date (YYYY-MM-DD, optional)', amount: 'Amount (AUD)', gst_amount: 'Actual GST (AUD)', business_use_percent: 'Business use %', reference: 'Reference', gst_registered: 'I am registered for GST for this acquisition', evidence_confirmed: 'I hold the required tax invoice / evidence', reimbursable: 'Potentially reimbursable', fund_payment_confirmed: 'Payment went to the super fund', date: 'Payment date (YYYY-MM-DD)' };
   return <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: theme.colors.background }}>
