@@ -17,3 +17,9 @@ test('team chat uses only active unique pharmacy memberships',()=>{
  ]);
  assert.deepEqual(Array.from(out,x=>x.id),[1,3]);
 });
+
+test('shift-contact entry never guesses a DM identity from a display name',()=>{
+ const source=readFileSync(new URL('./ChatSidebar.tsx',import.meta.url),'utf8');
+ assert.doesNotMatch(source,/findMatchingRoomForShift/);
+ assert.match(source,/onPress=\{\(\) => onSelectShiftContact\?\.\(contact\)\}/);
+});
