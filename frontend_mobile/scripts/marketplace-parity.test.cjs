@@ -57,3 +57,11 @@ test('catalogue load-more honors backend pagination and abandons stale filter re
  assert.match(src,/Load more listings/);
  assert.match(src,/More listings unavailable/);
 });
+
+
+test('private seller and enquiry screens remount when authenticated account changes',()=>{
+ const src=read('features/parity/marketplace.tsx');
+ assert.match(src,/MarketplaceParityScreen\(\{screen\}/);
+ assert.match(src,/MarketplaceParityContent key=\{\`\$\{user\?\.id\?\?'signed-out'\}:\$\{screen\}\`\}/);
+ assert.match(src,/const draftScope=String\(user\?\.id/);
+});

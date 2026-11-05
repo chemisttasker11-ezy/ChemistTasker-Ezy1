@@ -15,3 +15,11 @@ test('ethical inventory and transfers require a pharmacy context admitted by bac
  assert.match(source,/loading&&\(!access\|\|!context\)/);
  assert.match(source,/!loading&&!error&&\(!access\|\|!context\)/);
 });
+
+
+test('ethical inventory subtree is keyed to current account and pharmacy before any effect executes', () => {
+ assert.match(source,/function EthicalMarketplaceScreen\(\{screen\}/);
+ assert.match(source,/EthicalMarketplaceContent key=\{/);
+ assert.match(source,/selectedPharmacyId\?\?'none'/);
+ assert.match(source,/user\?\.id\?\?'signed-out'/);
+});
