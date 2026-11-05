@@ -25,6 +25,7 @@ import { triggerUnreadBump } from '@/utils/pushNotifications';
 import { getActiveRoomId, setActiveRoomId } from '../chat/activeRoomState';
 import { displayNameFromUser } from '../chat/displayName';
 import { resolveApiBaseUrl } from '@/utils/apiUrl';
+import { safeChatAttachmentUrl } from './chatAttachmentUrl';
 import { isNextPageForRoom, mergeOlderMessages, shouldAutoFollowMessage } from './messageHistory';
 
 type MessageDisplay = ChatMessage & { is_me: boolean };
@@ -52,11 +53,6 @@ const CHAT_ATTACHMENT_TYPES = [
 ];
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const isImageAttachment = (item: MessageDisplay) => /\.(?:gif|jpe?g|png|webp)(?:$|[?#])/i.test(item.attachment_filename || item.attachment_url || '');
-const absoluteAttachmentUrl = (value: string) => {
-    if (/^https?:\/\//i.test(value)) return value;
-    const origin = resolveApiBaseUrl().replace(/\/api\/?$/, '');
-    return `${origin}${value.startsWith('/') ? '' : '/'}${value}`;
-};
 
 const messageKey = (item: MessageDisplay) => item.id ?? `${item.created_at}-${item.body}`;
 const messageTime = (item: MessageDisplay) => {
@@ -732,7 +728,7 @@ const pinnedMessage = useMemo(() => {
         const isMe = item.is_me;
         const senderName = senderNameOf(item);
         const senderPhoto = photoOf(resolveMessageIdentity(item));
-        const attachmentUrl = item.attachment_url ? absoluteAttachmentUrl(item.attachment_url) : null;
+        const attachmentUrl = safeChatAttachmentUrl(item.attachment_url, resolveApiBaseUrl(), process.env.EXPO_PUBLIC_CHAT_ATTACHMENT_ORIGINS);
         const openAttachment = async () => {
             if (!attachmentUrl) return;
             try {
@@ -777,6 +773,9 @@ const pinnedMessage = useMemo(() => {
                             {item.is_edited ? ' (edited)' : ''}
                             </Text>
                         </View>
+                    {item.attachment_url && !attachmentUrl ? (
+                        <Text accessibilityRole="alert" style={styles.attachmentLabel}>Attachment link unavailable</Text>
+                    ) : null}
                     {attachmentUrl ? (
                         <TouchableOpacity
                             accessibilityRole="link"
