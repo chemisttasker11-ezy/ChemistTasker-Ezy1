@@ -239,7 +239,7 @@ export default function NotificationsScreen() {
       >
         <View style={styles.iconContainer} importantForAccessibility="no-hide-descendants">
           <Surface style={styles.iconSurface} elevation={0}>
-            <Icon source={getIconForType(item.type)} size={24} color="#6366F1" />
+            <Icon source={getIconForType(item.type)} size={24} color={colors.primary} />
           </Surface>
           {!item.readAt && <Badge size={8} style={styles.unreadDot} />}
         </View>
@@ -264,7 +264,7 @@ export default function NotificationsScreen() {
           icon="check"
           size={20}
           onPress={() => markAsRead(item.id)}
-          iconColor="#6B7280"
+          iconColor={colors.textSecondary}
           accessibilityLabel="Mark notification as read"
           accessibilityRole="button"
         />
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    padding: 16,
+    padding: space.lg,
   },
   notificationItem: {
     flexDirection: 'row',
@@ -342,8 +342,8 @@ const styles = StyleSheet.create({
   },
   notificationAction: {
     flex: 1,
-    minHeight: 68,
-    padding: 12,
+    minHeight: touch.min + 20,
+    padding: space.md,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -357,14 +357,14 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   iconSurface: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 20,
+    backgroundColor: colors.tone.violet.bg,
+    borderRadius: radius.card,
   },
   unreadDot: {
     position: 'absolute',
     top: 0,
     right: 0,
-    backgroundColor: '#EF4444',
+    backgroundColor: colors.status.red.solid,
   },
   contentContainer: {
     flex: 1,
@@ -375,25 +375,21 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   title: {
-    fontWeight: '600',
-    color: '#111827',
+    fontFamily: font.inter.semiBold,
+    color: colors.textPrimary,
     flex: 1,
     marginRight: 8,
   },
-  time: {
-    color: '#9CA3AF',
-  },
-  message: {
-    color: '#6B7280',
-  },
+  time: { color: colors.textSecondary },
+  message: { color: colors.textSecondary },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
   },
   emptyTitle: {
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#111827',
+    fontFamily: font.outfit.medium,
+    marginBottom: space.sm,
+    color: colors.textPrimary,
   },
   emptyText: { color: colors.textSecondary },
   footer: { paddingVertical: space.lg, alignItems: 'center', gap: space.sm },
