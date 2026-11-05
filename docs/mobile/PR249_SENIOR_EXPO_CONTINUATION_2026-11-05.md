@@ -191,3 +191,17 @@ These targeted source changes close several previously demonstrated implementati
 - PR #249 is still draft on PR #248. CI checks start automatically on commits; only completed checks on the final immutable head can support acceptance.
 - Remaining work exceeds source review: all six personas on real authenticated backend; shift booking/paid checkout and payroll/roster lock concurrency; finance revision and PDF device acceptance; marketplace role and tenant permissions; app links, push notifications and real iOS/Android SDK 58 builds; accessibility and native visual review; authorised provider/staging proof; exact-head Senior Package Testing.
 - Do not state **fully finished**, **merge ready** or **production ready** based on this implementation wave. QR identity/product work remains explicitly out of scope at the owner's direction.
+
+### Further W3 and W6 implementation after checkpoint
+
+| Commit | Confirmed source change |
+|---|---|
+| `6c0e8187`, `ea154d80` | Invoice editor protects a manually modified draft against a delayed internal shift prefill. Customer/item changes increment edit generation and imported shift values cannot be replaced by later default fetches. |
+| `bc205610` | Added invoice prefill source-regression contract to the existing finance revision test file. |
+| `e62a131e` | Invoice editor close/save and historical revision callbacks are guarded against previous-account or previous-selection results. |
+| `3d5ece3c`, `bd0704ac` | Post Shift manager-edited rate fields are preserved when pharmacy defaults refresh late; switching pharmacies establishes a new default scope. React setter signature retained. |
+| `60d726cf` | Added Post Shift source contract for late defaults and custom rates. |
+
+**Scope:** no change to paid checkout, Award/holiday rules, payroll locking, invoice financial calculations, QR scanning or server authorization. Do not claim end-to-end acceptance of these corrections without native and backend regression execution.
+
+**Current exact-head caveat:** source changes are committed, but the full CI/check-run suite is not yet confirmed complete on the latest SHA. The container cannot clone the repository from GitHub due unavailable DNS; source inspection and commits used the connected GitHub repository API. Android/iOS simulator, authenticated end-to-end testing, staging Stripe/SMTP/push providers, accessibility screenshots, app signing and store preparation remain unverified. The PR must stay draft and unmerged until those requirements are addressed.
