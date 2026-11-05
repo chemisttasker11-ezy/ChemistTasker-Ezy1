@@ -17,3 +17,13 @@ test('rate changes cannot overwrite data or busy state for another pharmacy', ()
   assert.match(code, /if \(!stillCurrent\(\)\) return;\s*setPharmacies/);
   assert.match(code, /if \(stillCurrent\(\)\) setSavingPharmacyRates\(false\)/);
 });
+
+test('late pharmacy defaults do not overwrite a manually entered rate in the same posting scope', () => {
+  assert.match(code, /const manualRateEdits = React\.useRef/);
+  assert.match(code, /if \(edits\.pharmacyId !== pharmacyId\)/);
+  assert.match(code, /if \(!touched\.has\('rateWeekday'\)\) setRateWeekday/);
+  assert.match(code, /if \(!touched\.has\('ratePublicHoliday'\)\) setRatePublicHoliday/);
+  assert.match(code, /manualRateEdits\.current\.fields\.add\(field\)/);
+  assert.match(code, /setRateWeekday=\{editedRate\('rateWeekday', setRateWeekday\)\}/);
+  assert.match(code, /setRateType=\{editedRate\('rateType', setRateType\)\}/);
+});
