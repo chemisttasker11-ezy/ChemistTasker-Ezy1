@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Linking, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, StyleSheet, Text, View } from 'react-native';
 import type { JsonValue } from '@chemisttasker/shared-core';
 import { colors, font, radius, space } from '@/constants/tokens';
 import { safePublicUrl } from './webLinks';
@@ -11,6 +11,22 @@ type RichNode = {
   marks?: Array<{ type?: string; attrs?: Record<string, unknown> }>;
   content?: RichNode[];
 };
+
+/** External destinations have already passed safePublicUrl. Do not swallow
+ * OS/browser failures: show a meaningful explanation and a user-initiated retry.
+ */
+function openArticleLink(url: string) {
+  void Linking.openURL(url).catch(() => {
+    Alert.alert(
+      'Link unavailable',
+      'This page could not be opened. Check your connection or try again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Try again', onPress: () => openArticleLink(url) },
+      ],
+    );
+  });
+}
 
 function content(node: RichNode): RichNode[] {
   return Array.isArray(node.content) ? node.content : [];
@@ -32,7 +48,7 @@ export function RichContent({ document, fallback = '' }: { document: JsonValue |
           marks.some(m => m.type === 'code') && styles.code,
           link && styles.link]}
         accessibilityRole={link ? 'link' : undefined}
-        onPress={link ? () => { void Linking.openURL(link).catch(() => {}); } : undefined}
+        onPress={link ? () => openArticleLink(link) : undefined}
       >{String(node.text || '')}</Text>;
     }
     const children = content(node).map((child, index) => render(child, key + '-' + index));
