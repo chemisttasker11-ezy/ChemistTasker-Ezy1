@@ -92,6 +92,7 @@ export default function ChatPage() {
     setSnackbar(null);
     setEditRoom(null);
     setEditTitle('');
+    setSavingTitle(false);
     setManageGroupRoom(null);
     setNewChatVisible(false);
     setNewGroupVisible(false);
@@ -128,7 +129,7 @@ export default function ChatPage() {
 
   const openRoom = (room: ChatRoom, nameOverride?: string) => {
     const id = room.id;
-    if (!id || accountId == null) return;
+    if (!id || accountId == null || activeAccountRef.current !== accountId) return;
     const routeRole = pathname.startsWith('/admin')
       ? 'ADMIN'
       : pathname.startsWith('/organization')
@@ -164,6 +165,7 @@ export default function ChatPage() {
   };
 
   const handleChatCreated = (roomId: number, displayName?: string) => {
+    if (accountId == null || activeAccountRef.current !== accountId) return;
     setSnackbar('Chat ready');
     reload();
     openRoom({ id: roomId } as ChatRoom, displayName);
@@ -193,15 +195,18 @@ export default function ChatPage() {
 
   const handleTogglePin = useCallback(
     async (room: ChatRoom) => {
+      const initiatingAccount = accountId;
+      if (initiatingAccount == null) return;
       try {
         const updated = await toggleRoomPinService(room.id, { target: 'conversation' } as any);
+        if (activeAccountRef.current !== initiatingAccount) return;
         setSnackbar(updated?.is_pinned ? 'Pinned' : 'Unpinned');
         await reload();
       } catch (err: any) {
-        setSnackbar(err?.message || 'Pin toggle failed');
+        if (activeAccountRef.current === initiatingAccount) setSnackbar(err?.message || 'Pin toggle failed');
       }
     },
-    [reload],
+    [reload, accountId],
   );
 
   useFocusEffect(
@@ -278,13 +283,15 @@ export default function ChatPage() {
         shiftContacts={shiftContacts}
         onSelectShiftContact={handleSelectShiftContact}
         onDeleteRoom={async (room) => {
-          if ((room as any)?.can_delete === false) return;
+          const initiatingAccount = accountId;
+          if (initiatingAccount == null || (room as any)?.can_delete === false) return;
           try {
             await deleteRoomService((room as any).id);
+            if (activeAccountRef.current !== initiatingAccount) return;
             setSnackbar('Conversation deleted');
-            reload();
+            void reload();
           } catch (err: any) {
-            setSnackbar(err?.message || 'Delete failed');
+            if (activeAccountRef.current === initiatingAccount) setSnackbar(err?.message || 'Delete failed');
           }
         }}
         onEditRoom={(room) => {
@@ -360,15 +367,18 @@ export default function ChatPage() {
                 if (!editRoom || !editTitle.trim()) return;
                 setSavingTitle(true);
                 try {
+                  const initiatingAccount = accountId;
+                  if (initiatingAccount == null) return;
                   await createOrUpdateGroupRoom({ roomId: (editRoom as any).id, title: editTitle.trim() });
+                  if (activeAccountRef.current !== initiatingAccount) return;
                   setSnackbar('Group name updated');
                   setEditRoom(null);
                   setEditTitle('');
                   reload();
                 } catch (err: any) {
-                  setSnackbar(err?.message || 'Unable to update the group name.');
+                  if (activeAccountRef.current === accountId) setSnackbar(err?.message || 'Unable to update the group name.');
                 } finally {
-                  setSavingTitle(false);
+                  if (activeAccountRef.current === accountId) setSavingTitle(false);
                 }
               }}
             >
