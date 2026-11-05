@@ -27,6 +27,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const scopeRef = useRef(ownerScope);
   scopeRef.current = ownerScope;
   const loadGen = useRef(0);
+  const historyGen = useRef(0);
   const { invoice: invoiceParam } = useLocalSearchParams<{ invoice?: string | string[] }>();
   const linkedId = Array.isArray(invoiceParam) ? invoiceParam[0] : invoiceParam;
   const requestedInvoiceId = typeof linkedId === 'string' && /^[1-9]\d*$/.test(linkedId)
@@ -69,10 +70,13 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     // Never show a different account's or persona's finance records while
     // refreshing the new authorized scope.
     setInvoices([]); setReceivedInvoices([]); setCustomers([]); setItems([]); setExpenses([]);
+    historyGen.current += 1;
+    handledLink.current = '';
     setSelected(null); setHistoryDocument(null); setForm(null); setEditor(null);
+    setHistoryLoading(false); setHistoryError(''); setWorksheet(null);
     setError(''); setLoading(true);
     void load().catch(() => {});
-    return () => { loadGen.current += 1; };
+    return () => { loadGen.current += 1; historyGen.current += 1; };
   }, [load]);
   // Consume ?invoice= only after the authorized finance list has loaded. A
   // re-fetch or screen re-render must not reopen a dismissed review modal.
@@ -81,7 +85,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     // A failed fetch or an active retry does not prove this invoice is absent.
     // Keep the deep link eligible for selection after a successful reload.
     if (loading || busy || error || !Number.isSafeInteger(requestedInvoiceId)) return;
-    const linkKey = (receivedMode ? 'received:' : 'issued:') + requestedInvoiceId;
+    const linkKey = ownerScope + ':' + requestedInvoiceId;
     if (handledLink.current === linkKey) return;
     const found = (receivedMode ? receivedInvoices : invoices).find(row => row.id === requestedInvoiceId);
     if (!found) {
@@ -93,41 +97,59 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     setHistoryDocument(null);
     setHistoryError('');
     setSelected(found);
-  }, [requestedInvoiceId, receivedMode, receivedInvoices, invoices, loading, busy, error]);
+  }, [requestedInvoiceId, receivedMode, receivedInvoices, invoices, loading, busy, error, ownerScope]);
   const clearInvoiceLink = () => {
     if (requestedInvoiceId != null) router.setParams({ invoice: undefined });
   };
   const run = async (action: () => Promise<unknown>) => { if (running.current) return; running.current = true; setBusy(true); setError(''); try { await action(); } catch (e: any) { setError(e.message || 'Unable to complete this action.'); } finally { running.current = false; setBusy(false); } };
   const openHistoricalRevision = async (invoice: FinanceInvoice, version: number) => {
     if (historyLoading || running.current) return;
+    const requestedScope = ownerScope;
+    const request = ++historyGen.current;
+    const current = () => historyGen.current === request && scopeRef.current === requestedScope;
     setHistoryLoading(true);
     setHistoryError('');
     setHistoryDocument(null);
     try {
       const revision = receivedMode ? await finance.receivedRevision(invoice.id, version) : await finance.invoiceRevision(invoice.id, version);
+      if (!current()) return;
       if (revision.id === invoice.id && revision.version === version) setHistoryDocument(revision);
       else setHistoryError('This revision could not be verified. Please retry.');
     } catch (failure: any) {
-      setHistoryError(failure?.message || 'Historical revision could not be opened.');
+      if (current()) setHistoryError(failure?.message || 'Historical revision could not be opened.');
     } finally {
-      setHistoryLoading(false);
+      if (current()) setHistoryLoading(false);
     }
   };
   const sharePdf = async (invoice: FinanceInvoice, received = false, version?: number) => {
+    const requestedScope = ownerScope;
+    const current = () => scopeRef.current === requestedScope;
+    if (!current()) return;
     if (!(await Sharing.isAvailableAsync())) throw new Error('PDF sharing is not available on this device.');
+    if (!current()) return;
     const targetVersion = version ?? invoice.version;
     const blob = version == null
       ? (received ? await finance.receivedPdf(invoice.id) : await finance.pdf(invoice.id))
       : (received ? await finance.receivedRevisionPdf(invoice.id, version) : await finance.invoiceRevisionPdf(invoice.id, version));
+    // A previous-account PDF must never enter this account's native share sheet.
+    if (!current()) return;
     const bytes = await nativeFileBytes(blob);
-    const file = new File(Paths.cache, invoice.number + '-revision-' + targetVersion + '.pdf');
-    file.create({ overwrite: true });
-    await file.write(bytes);
-    await Sharing.shareAsync(file.uri, {
-      dialogTitle: 'Share ' + invoice.number + ' revision ' + targetVersion,
-      mimeType: 'application/pdf',
-      UTI: 'com.adobe.pdf',
-    });
+    if (!current()) return;
+    const safeNumber = String(invoice.number).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+    const file = new File(Paths.cache, `invoice-${invoice.id}-${safeNumber}-revision-${targetVersion}.pdf`);
+    try {
+      file.create({ overwrite: true });
+      await file.write(bytes);
+      if (!current()) return;
+      await Sharing.shareAsync(file.uri, {
+        dialogTitle: 'Share ' + invoice.number + ' revision ' + targetVersion,
+        mimeType: 'application/pdf',
+        UTI: 'com.adobe.pdf',
+      });
+    } finally {
+      // Remove the temporary sensitive document even when the share sheet fails.
+      try { file.delete(); } catch { /* best-effort cleanup */ }
+    }
   };
   const afterSave = async () => { try { await load(); } catch { setError('Saved. Pull to refresh to update the list.'); } };
   const ask = (title: string, message: string, action: () => Promise<unknown>) => Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Confirm', onPress: () => void run(action) }]);
