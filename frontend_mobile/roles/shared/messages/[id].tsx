@@ -138,6 +138,8 @@ export default function SharedMessageDetailScreen() {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const sendBusyRef = useRef(false);
+    const sendScopeRef = useRef(0);
     const [menuFor, setMenuFor] = useState<number | null>(null);
     const [snackbar, setSnackbar] = useState<string | null>(null);
     const [roomPinned, setRoomPinned] = useState<boolean>(false);
@@ -286,6 +288,9 @@ export default function SharedMessageDetailScreen() {
     const fetchMessages = useCallback(async () => {
         const roomId = parseRoomId();
         const generation = ++roomGenerationRef.current;
+        sendScopeRef.current += 1;
+        sendBusyRef.current = false;
+        setSending(false);
         const requestedAccountId = user?.id ?? null;
         setMessagesRoomId(null);
         setMessagesAccountId(null);
@@ -447,14 +452,18 @@ export default function SharedMessageDetailScreen() {
 
     const sendMessage = async () => {
         const body = newMessage.trim();
-        if (!body) return;
+        if (!body || sendBusyRef.current) return;
         const roomId = parseRoomId();
-        if (!roomId) return;
-
+        const sendingAccountId = user?.id ?? null;
+        if (!roomId || sendingAccountId == null) return;
+        const sendScope = sendScopeRef.current;
+        const stillCurrent = () => sendScopeRef.current === sendScope && accountRef.current === sendingAccountId && parseRoomId() === roomId;
+        sendBusyRef.current = true;
         setSending(true);
         try {
             if (editingId) {
                 const updated = await updateMessageService(editingId, body);
+                if (!stillCurrent()) return;
                 setMessages((prev) => prev.map((m) => (m.id === updated.id ? { ...m, body: updated.body, is_edited: true } : m)));
                 setEditingId(null);
                 setNewMessage('');
@@ -463,6 +472,7 @@ export default function SharedMessageDetailScreen() {
 
             const payload = { body, content: body };
             const sentMessage = await sendRoomMessageService(roomId, payload) as any;
+            if (!stillCurrent()) return;
             const newMsg: MessageDisplay = {
                 id: sentMessage.id ?? `${Date.now()}`,
                 sender: sentMessage.sender,
@@ -478,27 +488,37 @@ export default function SharedMessageDetailScreen() {
             shouldScrollRef.current = true;
             setNewMessage('');
         } catch (error) {
-            console.error('Error sending message:', error);
+            if (stillCurrent()) setSnackbar('Unable to send message. Your draft has been retained.');
         } finally {
-            setSending(false);
+            if (stillCurrent()) {
+                sendBusyRef.current = false;
+                setSending(false);
+            }
         }
     };
 
     const pickAttachment = async () => {
+        if (sendBusyRef.current) return;
+        const pickingAccountId = user?.id ?? null;
+        const pickScope = sendScopeRef.current;
+        const pickRoomId = parseRoomId();
+        if (pickingAccountId == null || !Number.isSafeInteger(pickRoomId) || pickRoomId <= 0) return;
+        const stillCurrent = () => sendScopeRef.current === pickScope && accountRef.current === pickingAccountId && parseRoomId() === pickRoomId;
         const res = await DocumentPicker.getDocumentAsync({
             multiple: false,
             copyToCacheDirectory: true,
             type: CHAT_ATTACHMENT_TYPES,
         });
-        if (res.canceled || !res.assets?.length) return;
+        if (!stillCurrent() || res.canceled || !res.assets?.length) return;
         const file = res.assets[0];
-        const roomId = parseRoomId();
-        if (!roomId) return;
+        const roomId = pickRoomId;
+        if (sendBusyRef.current) return;
         if (file.size && file.size > MAX_ATTACHMENT_BYTES) {
             setSnackbar('Attachments must be 10 MB or smaller.');
             return;
         }
 
+        sendBusyRef.current = true;
         setSending(true);
         try {
             const form = new FormData();
@@ -510,6 +530,7 @@ export default function SharedMessageDetailScreen() {
                 type: file.mimeType || 'application/octet-stream',
             } as any);
             const sent = await sendRoomMessageService(roomId, form as any);
+            if (!stillCurrent()) return;
             if (!sent?.id) throw new Error('Attachment not saved');
             const mapped: MessageDisplay = {
                 id: sent.id,
@@ -526,10 +547,12 @@ export default function SharedMessageDetailScreen() {
             shouldScrollRef.current = true;
             setNewMessage(''); // This was already correct, just ensuring it's not changed.
         } catch (err: any) {
-            console.error('Attachment send failed', err);
-            setSnackbar(err?.message || 'Failed to send attachment');
+            if (stillCurrent()) setSnackbar(err?.message || 'Failed to send attachment');
         } finally {
-            setSending(false);
+            if (stillCurrent()) {
+                sendBusyRef.current = false;
+                setSending(false);
+            }
         }
     };
 
