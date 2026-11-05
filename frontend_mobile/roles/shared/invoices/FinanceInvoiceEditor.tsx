@@ -16,6 +16,13 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const [value, setValue] = useState<FinanceDraft>(() => initial ? { ...initial.payload, version: initial.version, request_key: initial.request_key } : createFinanceDraft(requestKey, previous));
   const original = useRef(JSON.stringify(value));
   const editedDefaults = useRef(new Set<keyof FinanceDraft>());
+  const draftEditGeneration = useRef(0);
+  const prefillGeneration = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; prefillGeneration.current += 1; };
+  }, []);
   const [busy, setBusy] = useState(false); const running = useRef(false);
   const [error, setError] = useState(''); const [preview, setPreview] = useState<FinanceCalculation | null>(null);
   const [previewError, setPreviewError] = useState(''); const [previewBusy, setPreviewBusy] = useState(false);
@@ -46,19 +53,23 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const [computedHours, setComputedHours] = useState('');
   const change = <K extends keyof FinanceDraft,>(key: K, next: FinanceDraft[K]) => {
     editedDefaults.current.add(key);
+    draftEditGeneration.current += 1;
     setValue(current => ({ ...current, [key]: next }));
   };
   const snapshotCustomer = (item: FinanceCustomer) => ({
     name: item.name, legal_name: item.legal_name, address: item.address, abn: item.abn,
     email: item.email, contact_name: item.contact_name,
   });
-  const changeCustomer = (key: keyof NonNullable<FinanceDraft['customer']>, next: string) => setValue(current => ({
+  const changeCustomer = (key: keyof NonNullable<FinanceDraft['customer']>, next: string) => {
+    draftEditGeneration.current += 1;
+    setValue(current => ({
     ...current,
     customer: {
       ...(current.customer || { name: '', legal_name: '', address: '', abn: '', email: '', contact_name: '' }),
       [key]: next,
     },
   }));
+  };
   const changeLine = (index: number, patch: Partial<FinanceLine>) => change('lines', value.lines.map((line, i) => i === index ? { ...line, ...patch } : line));
   const close = () => { if (busy) return; if (JSON.stringify(value) === original.current) onClose(); else Alert.alert('Discard changes?', 'Your unsaved invoice changes will be lost.', [{ text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: onClose }]); };
   useEffect(() => {
@@ -175,16 +186,27 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
     }
   };
   const applyInternalSource = async (source: FinanceInternalSource) => {
-    setBusy(true); setError('');
+    const request = ++prefillGeneration.current;
+    const editGeneration = draftEditGeneration.current;
+    setBusy(true);
+    setError('');
     try {
-      setValue(await finance.internalPrefill([source.assignment_id]));
+      const draft = await finance.internalPrefill([source.assignment_id]);
+      if (!mounted.current || prefillGeneration.current !== request) return;
+      if (draftEditGeneration.current !== editGeneration) {
+        setError('The invoice was edited while loading this shift. Choose the shift again to replace the draft.');
+        return;
+      }
+      draftEditGeneration.current += 1;
+      setValue(draft);
       setSourceOpen(false);
     } catch (e: any) {
-      setError(e.message || 'Unable to prefill this shift.');
+      if (mounted.current && prefillGeneration.current === request) setError(e.message || 'Unable to prefill this shift.');
     } finally {
-      setBusy(false);
+      if (mounted.current && prefillGeneration.current === request) setBusy(false);
     }
   };
+
   useEffect(() => {
     let active = true;
     setPreview(null);
@@ -250,7 +272,7 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
           <Button mode="outlined" icon="account-outline" disabled={internalSource} onPress={() => { setCustomerOpen(!customerOpen); setNewCustomerOpen(false); setItemOpen(false); setQuery(''); }}>{customer?.name || 'Select customer'}</Button>
           {!internalSource ? <Button mode="text" icon="account-plus-outline" onPress={() => { setNewCustomerOpen(!newCustomerOpen); setCustomerOpen(false); setItemOpen(false); }}>Create customer</Button> : null}
         </View>
-        {customerOpen && <View><TextInput mode="outlined" dense label="Search customers" value={query} onChangeText={setQuery} />{customerOptions.filter(c => c.active && c.name.toLowerCase().includes(query.toLowerCase())).map(c => <List.Item key={c.id} title={c.name} description={c.email || c.abn || undefined} onPress={() => { setValue(current => ({ ...current, customer_id: c.id, customer: snapshotCustomer(c), due_date: financeDueDate(current.invoice_date, c.payment_terms_days) })); setCustomerOpen(false); }} />)}{!customerOptions.length && <Text style={{ padding: 12 }}>No saved customers yet. Create one here without losing this invoice.</Text>}</View>}
+        {customerOpen && <View><TextInput mode="outlined" dense label="Search customers" value={query} onChangeText={setQuery} />{customerOptions.filter(c => c.active && c.name.toLowerCase().includes(query.toLowerCase())).map(c => <List.Item key={c.id} title={c.name} description={c.email || c.abn || undefined} onPress={() => { draftEditGeneration.current += 1; setValue(current => ({ ...current, customer_id: c.id, customer: snapshotCustomer(c), due_date: financeDueDate(current.invoice_date, c.payment_terms_days) })); setCustomerOpen(false); }} />)}{!customerOptions.length && <Text style={{ padding: 12 }}>No saved customers yet. Create one here without losing this invoice.</Text>}</View>}
         {newCustomerOpen ? <Surface elevation={0} style={{ marginTop: 12, borderRadius: 10, padding: 12, gap: 10, borderWidth: 1, borderColor: theme.colors.outlineVariant }}>
           <Text variant="titleSmall">Create customer / store</Text>
           <TextInput mode="outlined" dense label="Store / trading name *" value={newCustomerName} onChangeText={setNewCustomerName} />
