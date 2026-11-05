@@ -599,44 +599,49 @@ export default function SharedMessageDetailScreen() {
     };
 
     const onReact = async (messageId: number, reaction: string) => {
+        const requestedRoomId = parseRoomId();
+        const requestedAccountId = user?.id ?? null;
+        const generation = roomGenerationRef.current;
+        const stillCurrent = () => generation === roomGenerationRef.current && accountRef.current === requestedAccountId && parseRoomId() === requestedRoomId;
+        if (requestedAccountId == null || !validRoomId || messagesAccountId !== requestedAccountId || messagesRoomId !== requestedRoomId) return;
         try {
-            const userId = user?.id;
-            // Optimistic local update to avoid waiting for WS echo
-            if (userId) {
-                setMessages((prev) =>
-                    prev.map((m) => {
-                        if (m.id !== messageId) return m;
-                        const current = m.reactions || [];
-                        const mine = current.find((r) => r.user_id === userId);
-                        let next = current;
-                        if (mine) {
-                            next = current.filter((r) => r.user_id !== userId);
-                            if (mine.reaction !== reaction) {
-                                next = [...next, { user_id: userId, reaction }];
-                            }
-                        } else {
-                            next = [...current, { user_id: userId, reaction }];
-                        }
-                        return { ...m, reactions: next };
-                    }),
-                );
-            }
+            // Wait for server confirmation rather than retaining an unverified optimistic
+            // reaction when the backend rejects the change.
             await reactToMessageService(messageId, reaction);
+            if (!stillCurrent()) return;
+            setMessages(prev => prev.map(message => {
+                if (message.id !== messageId) return message;
+                const reactions = message.reactions || [];
+                const mine = reactions.find(item => item.user_id === requestedAccountId);
+                const remaining = reactions.filter(item => item.user_id !== requestedAccountId);
+                return {
+                    ...message,
+                    reactions: mine?.reaction === reaction ? remaining : [...remaining, { user_id: requestedAccountId, reaction }],
+                };
+            }));
         } catch (err: any) {
-            setSnackbar(err?.response?.data?.detail || 'Reaction failed');
+            if (stillCurrent()) setSnackbar(err?.response?.data?.detail || 'Reaction failed');
         }
     };
 
     const onDelete = async (messageId: number) => {
+        const roomId = parseRoomId();
+        const accountId = user?.id ?? null;
+        const generation = roomGenerationRef.current;
+        if (!validRoomId || accountId == null || messagesAccountId !== accountId || messagesRoomId !== roomId) return;
         try {
             await deleteMessageService(messageId);
-            setMessages((prev) => prev.filter((m) => m.id !== messageId));
+            if (generation !== roomGenerationRef.current || accountRef.current !== accountId || parseRoomId() !== roomId) return;
+            setMessages(prev => prev.filter(message => message.id !== messageId));
         } catch (err: any) {
-            setSnackbar(err?.response?.data?.detail || 'Delete failed');
+            if (generation === roomGenerationRef.current && accountRef.current === accountId && parseRoomId() === roomId) {
+                setSnackbar(err?.response?.data?.detail || 'Delete failed');
+            }
         }
     };
 
     const onEditStart = (message: MessageDisplay) => {
+        if (messagesAccountId !== (user?.id ?? null) || messagesRoomId !== currentRoomId) return;
         setEditingId(message.id as number);
         setComposerScope(currentComposerScope);
         setNewMessage(message.body || '');
@@ -644,25 +649,36 @@ export default function SharedMessageDetailScreen() {
 
     const onPinMessage = async (messageId: number) => {
         const roomId = parseRoomId();
-        if (!roomId) return;
+        const accountId = user?.id ?? null;
+        const generation = roomGenerationRef.current;
+        if (!validRoomId || accountId == null || messagesAccountId !== accountId || messagesRoomId !== roomId) return;
         try {
             await toggleRoomPinService(roomId, { target: 'message', messageId });
-            setMessages((prev) =>
-                prev.map((m) => (m.id === messageId ? { ...m, is_pinned: !m.is_pinned } : m))
-            );
-        } catch (err) {
-            console.error('Pin failed', err);
+            if (generation !== roomGenerationRef.current || accountRef.current !== accountId || parseRoomId() !== roomId) return;
+            setMessages(prev => prev.map(message => (
+                message.id === messageId ? { ...message, is_pinned: !message.is_pinned } : message
+            )));
+        } catch {
+            if (generation === roomGenerationRef.current && accountRef.current === accountId) {
+                setSnackbar('Unable to update pinned message.');
+            }
         }
     };
 
     const onPinRoom = async () => {
         const roomId = parseRoomId();
-        if (!roomId) return;
+        const accountId = user?.id ?? null;
+        const generation = roomGenerationRef.current;
+        if (!validRoomId || accountId == null || messagesAccountId !== accountId || messagesRoomId !== roomId) return;
         try {
             const updated = await toggleRoomPinService(roomId, { target: 'conversation' });
-            setRoomPinned(!!updated?.is_pinned);
-        } catch (err) {
-            console.error('Room pin failed', err);
+            if (generation === roomGenerationRef.current && accountRef.current === accountId && parseRoomId() === roomId) {
+                setRoomPinned(!!updated?.is_pinned);
+            }
+        } catch {
+            if (generation === roomGenerationRef.current && accountRef.current === accountId) {
+                setSnackbar('Unable to update conversation pin.');
+            }
         }
     };
 
