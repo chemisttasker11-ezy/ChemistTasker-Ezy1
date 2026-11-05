@@ -1211,7 +1211,7 @@ export default function PostShiftScreen() {
         markTouched();
         return fn(...args);
     };
-    const editedRate = <T,>(field: string, setter: (value: T) => void) => (next: T) => {
+    const editedRate = <T,>(field: string, setter: React.Dispatch<React.SetStateAction<T>>) => (next: React.SetStateAction<T>) => {
         if (manualRateEdits.current.pharmacyId !== pharmacyId) {
             manualRateEdits.current = { pharmacyId, fields: new Set() };
         }
