@@ -12,7 +12,7 @@ import { fetchOrganizationGroupMembers } from './pharmacyHub/api';
 import { getPublicJobBoard } from './shifts/api';
 import { getPharmacyAdmins, getPendingPharmacyAdminInvitations } from './organizations/api';
 import { createMembershipInviteLinkService } from './memberships/api';
-import { startDirectMessageByUser } from './chat/api';
+import { startDirectMessageByUser, downloadChatAttachment } from './chat/api';
 import { attendance } from './attendance/api';
 import { financeApi } from './finance/api';
 
@@ -43,6 +43,7 @@ describe('source-backed wire/domain contracts after extraction',()=>{
       listSavedProfessionalContacts: 'domains/talent/api.ts',
       saveProfessionalContact: 'domains/talent/api.ts',
       deleteSavedProfessionalContact: 'domains/talent/api.ts',
+      downloadChatAttachment: 'domains/chat/api.ts',
     } as const;
     expect(Object.keys(exportOwners)).toHaveLength(438 - retiredExports.length + checkoutRecoveryExports.length + Object.keys(newUtilityExports).length);
     for (const [name, owner] of Object.entries(newUtilityExports)) {
@@ -69,8 +70,27 @@ describe('source-backed wire/domain contracts after extraction',()=>{
     expect(publicApi.getPharmacyAdmins).toBe(getPharmacyAdmins);
     expect(publicApi.createMembershipInviteLinkService).toBe(createMembershipInviteLinkService);
     expect(publicApi.startDirectMessageByUser).toBe(startDirectMessageByUser);
+    expect(publicApi.downloadChatAttachment).toBe(downloadChatAttachment);
     expect(publicApi.attendance).toBe(attendance);
     expect(publicApi.financeApi).toBe(financeApi);
+  });
+  it('downloads chat attachments only by authenticated message ID', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    configureApi({
+      baseURL,
+      getToken: () => 'user-token',
+      fetchImpl: (async (url, init) => {
+        calls.push({url:String(url), init});
+        return new Response(new Blob(['private attachment']), {
+          status: 200, headers: {'Content-Type':'application/pdf'},
+        });
+      }) as typeof fetch,
+    });
+    await expect(downloadChatAttachment(17)).resolves.toBeInstanceOf(Blob);
+    expect(calls[0].url).toBe(baseURL + '/messages/17/attachment/');
+    expect(new Headers(calls[0].init?.headers).get('Authorization')).toBe('Bearer user-token');
+    await expect(downloadChatAttachment(-1)).rejects.toThrow('Invalid message ID.');
+    expect(calls).toHaveLength(1);
   });
   it('scrubs deleted chat content but preserves a legitimate message',()=>{
     const row={id:4,conversation:2,body:'Private preview',original_body:'Original',attachment_url:'/media/private.pdf',attachment_filename:'private.pdf',created_at:'2026-10-26T00:00:00Z',sender:null};

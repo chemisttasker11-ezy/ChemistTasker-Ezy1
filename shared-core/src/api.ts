@@ -449,6 +449,7 @@ export {
   fetchRoomMessagesService,
   fetchRoomMessagesByUrl,
   sendRoomMessageService,
+  downloadChatAttachment,
   markRoomAsReadService,
   startDirectMessageByMembership,
   createOrUpdateGroupRoom,

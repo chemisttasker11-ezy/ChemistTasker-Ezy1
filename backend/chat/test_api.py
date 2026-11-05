@@ -260,9 +260,10 @@ class ChatAttachmentTests(ChatBase):
         Membership.objects.filter(pk=self.bob_m.pk).update(is_active=False)
         self.assertEqual(client_for(self.bob).get(protected).status_code, 404)
         self.assertEqual(client_for(self.alice).get(protected).status_code, 200)
+        raw_path = f"/media/{message.attachment.name}"
         self.assertEqual(client_for(self.alice).delete(f"{MESSAGES}{message.pk}/").status_code, 204)
         self.assertEqual(client_for(self.alice).get(protected).status_code, 404)
-        self.assertEqual(client_for(self.alice).get(f"/media/{message.attachment.name}").status_code, 404)
+        self.assertEqual(client_for(self.alice).get(raw_path).status_code, 404)
 
     def test_disguised_attachment_is_rejected_without_a_message_or_stored_file(self):
         for url in self.urls:
