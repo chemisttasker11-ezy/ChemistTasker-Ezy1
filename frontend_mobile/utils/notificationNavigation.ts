@@ -23,6 +23,7 @@ type ResolveRouteInput = {
 const ADMIN_GUARDS = {
   shifts: ['MANAGE_ROSTER'],
   calendar: ['MANAGE_COMMUNICATIONS', 'MANAGE_STAFF', 'MANAGE_ROSTER'],
+  hub: ['MANAGE_COMMUNICATIONS', 'MANAGE_STAFF', 'MANAGE_ROSTER'],
 } as const;
 
 const activeShell = (
@@ -44,6 +45,8 @@ const ROLE_CALENDAR_ROUTE_MAP: Record<string, string> = {
 
 const ROLE_HUB_ROUTE_MAP: Record<string, string> = {
   owner: '/owner/hub',
+  organization: '/organization/hub',
+  admin: '/admin/hub',
   pharmacist: '/pharmacist/hub',
   otherstaff: '/otherstaff/hub',
 };
@@ -321,9 +324,16 @@ export const resolveHubNotificationRoute = ({
   actionUrl,
   payload,
   userRole,
+  persona,
+  adminCan,
 }: ResolveRouteInput): string | null => {
   const roleSlug = normalizeRoleSlug(userRole);
-  const baseRoute = roleSlug ? ROLE_HUB_ROUTE_MAP[roleSlug] : null;
+  const permittedShell = activeShell(persona, adminCan, 'hub');
+  // A delegated admin stays in /admin only when the current pharmacy allows
+  // communications. Without that grant fall back to their actual worker role.
+  const baseRoute = permittedShell && ROLE_HUB_ROUTE_MAP[permittedShell]
+    ? ROLE_HUB_ROUTE_MAP[permittedShell]
+    : roleSlug ? ROLE_HUB_ROUTE_MAP[roleSlug] : null;
   if (!baseRoute) return null;
 
   const actionParams = parseHubFromActionUrl(actionUrl);

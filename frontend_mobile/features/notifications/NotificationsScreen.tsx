@@ -208,6 +208,8 @@ export default function NotificationsScreen() {
       actionUrl: item.actionUrl,
       payload: item.payload,
       userRole: user?.role ?? null,
+      persona,
+      adminCan,
     });
     if (hubRoute) {
       router.push(hubRoute as any);
