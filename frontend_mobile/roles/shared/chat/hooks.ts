@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getRooms,
   fetchChatParticipants,
@@ -8,6 +8,7 @@ import {
   type ChatRoom,
   type ChatUserLite,
 } from '@chemisttasker/shared-core';
+import { useAuth } from '@/context/AuthContext';
 
 type UseChatRoomsResult = {
   rooms: ChatRoom[];
@@ -19,45 +20,70 @@ type UseChatRoomsResult = {
 };
 
 export function useChatRooms(): UseChatRoomsResult {
-  const [rooms, setRooms] = useState<ChatRoom[]>([]);
+  const { user } = useAuth();
+  const accountId = user?.id ?? null;
+  const accountRef = useRef(accountId);
+  accountRef.current = accountId;
+  const requestRef = useRef(0);
+  const [snapshot, setSnapshot] = useState<{ accountId: number | null; rows: ChatRoom[] }>({
+    accountId: null,
+    rows: [],
+  });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    if (accountId == null) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const data: any = await getRooms();
+      if (accountRef.current !== accountId || requestRef.current !== requestId) return;
       const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-      setRooms(list);
+      setSnapshot({ accountId, rows: list });
     } catch (err: any) {
-      setError(err?.message || 'Failed to load rooms');
+      if (accountRef.current === accountId && requestRef.current === requestId) {
+        setError(err?.message || 'Failed to load rooms');
+      }
     } finally {
-      setLoading(false);
+      if (accountRef.current === accountId && requestRef.current === requestId) setLoading(false);
     }
-  }, []);
+  }, [accountId]);
 
   const refresh = useCallback(async () => {
+    if (accountId == null) return;
     setRefreshing(true);
     await load();
-    setRefreshing(false);
-  }, [load]);
+    if (accountRef.current === accountId) setRefreshing(false);
+  }, [accountId, load]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    // Never carry room data or a completed request into another signed-in account.
+    requestRef.current += 1;
+    setSnapshot({ accountId, rows: [] });
+    setError(null);
+    setRefreshing(false);
+    setLoading(accountId != null);
+    if (accountId != null) void load();
+    return () => { requestRef.current += 1; };
+  }, [accountId, load]);
 
+  const rooms = snapshot.accountId === accountId ? snapshot.rows : [];
   return useMemo(
     () => ({
       rooms,
-      loading,
-      refreshing,
-      error,
+      loading: accountId != null && (snapshot.accountId !== accountId || loading),
+      refreshing: snapshot.accountId === accountId && refreshing,
+      error: snapshot.accountId === accountId ? error : null,
       reload: load,
       refresh,
     }),
-    [rooms, loading, refreshing, error, load, refresh],
+    [rooms, loading, refreshing, error, snapshot.accountId, accountId, load, refresh],
   );
 }
 
@@ -88,23 +114,53 @@ export async function startDirectChat(params: StartDmParams) {
 }
 
 export function useShiftContacts() {
-  const [contacts, setContacts] = useState<any[]>([]);
+  const { user } = useAuth();
+  const accountId = user?.id ?? null;
+  const accountRef = useRef(accountId);
+  accountRef.current = accountId;
+  const requestRef = useRef(0);
+  const [snapshot, setSnapshot] = useState<{ accountId: number | null; rows: any[] }>({
+    accountId: null,
+    rows: [],
+  });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    if (accountId == null) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    setError(null);
     try {
       const data: any = await fetchShiftContacts();
+      if (accountRef.current !== accountId || requestRef.current !== requestId) return;
       const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-      setContacts(list);
+      setSnapshot({ accountId, rows: list });
+    } catch (err: any) {
+      if (accountRef.current === accountId && requestRef.current === requestId) {
+        setError(err?.message || 'Failed to load shift contacts');
+      }
     } finally {
-      setLoading(false);
+      if (accountRef.current === accountId && requestRef.current === requestId) setLoading(false);
     }
-  }, []);
+  }, [accountId]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    requestRef.current += 1;
+    setSnapshot({ accountId, rows: [] });
+    setError(null);
+    setLoading(accountId != null);
+    if (accountId != null) void load();
+    return () => { requestRef.current += 1; };
+  }, [accountId, load]);
 
-  return { contacts, loading, reload: load };
+  return {
+    contacts: snapshot.accountId === accountId ? snapshot.rows : [],
+    loading: accountId != null && (snapshot.accountId !== accountId || loading),
+    error: snapshot.accountId === accountId ? error : null,
+    reload: load,
+  };
 }
