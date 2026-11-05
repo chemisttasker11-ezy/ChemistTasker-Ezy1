@@ -459,3 +459,15 @@ test('Terms dialog visibility separated from freshness: failed -> Cancel closes,
   assert.equal(isTermsDialogVisible(unavailableState), false);
   assert.equal(unavailableState.offers.length, 0);
 });
+
+test('background terms reload stays dismissed until explicit worker selection', () => {
+  const offer = { id: 501, engagementTermsPreview: { rate: 75 } };
+  const selected = selectOffersForTerms(createTermsAcceptanceState(), [offer]).state;
+  const cancelled = dismissTermsAcceptance(selected);
+  const reload = transitionReloadStart(cancelled, [offer]);
+  assert.equal(reload.visible, false);
+  assert.equal(isTermsDialogVisible(reload), false);
+  const updated = transitionReloadSuccess(reload, [offer]);
+  assert.equal(updated.visible, false);
+  assert.equal(selectOffersForTerms(updated, [offer]).state.visible, true);
+});

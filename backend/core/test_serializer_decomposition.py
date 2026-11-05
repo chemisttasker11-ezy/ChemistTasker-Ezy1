@@ -65,6 +65,24 @@ class SerializerDecompositionContracts(SimpleTestCase):
                 domain, name = qualified.split(".")
                 cls = getattr(importlib.import_module(f"{domain}.serializers"), name)
                 actual = field_contract(cls())
+                # The existing web contract stays pinned to the original F01
+                # snapshot. W3 adds a worker-scoped, read-only occurrence
+                # projection without changing any legacy field. Validate the
+                # exact extension, then verify the historical contract verbatim
+                # instead of silently refreshing its fingerprint.
+                if qualified == "shifts.MyShiftSerializer":
+                    extension = actual["fields"].pop("assigned_occurrences", None)
+                    self.assertEqual(extension, {
+                        "required": False,
+                        "read_only": True,
+                        "write_only": False,
+                        "allow_null": False,
+                        "type": "SerializerMethodField",
+                        "source": "*",
+                        "validators": [],
+                        "default": "empty",
+                    })
+                self.assertEqual(sorted(actual["fields"]), contract["fields"])
                 digest = hashlib.sha256(json.dumps(actual, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
                 self.assertEqual(digest, contract["sha256"], "Review any intentional field-contract change explicitly.")
 

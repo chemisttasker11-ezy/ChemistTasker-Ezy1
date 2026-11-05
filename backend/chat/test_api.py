@@ -220,8 +220,10 @@ class ChatAttachmentTests(ChatBase):
                                      (self.room, self.alice_m.pk, "Attachment caption"))
                     self.assertEqual(message.attachment_filename, name)
                     self.assertEqual(response.data["attachment_filename"], Path(message.attachment.name).name)
-                    self.assertTrue(response.data["attachment_url"].endswith(message.attachment.name))
-                    self.assertTrue(response.data["attachment"].endswith(message.attachment.name))
+                    protected = f"{MESSAGES}{message.pk}/attachment/"
+                    self.assertEqual(response.data["attachment_url"], protected)
+                    self.assertEqual(response.data["attachment"], protected)
+                    self.assertNotIn(message.attachment.name, str(response.data))
                     # Signature inspection must restore the stream before storage reads it.
                     with message.attachment.open("rb") as persisted:
                         self.assertEqual(persisted.read(), content)
@@ -231,6 +233,37 @@ class ChatAttachmentTests(ChatBase):
                     self.assertEqual(received["attachment_filename"], response.data["attachment_filename"])
                     self.assertEqual(received["attachment_url"], response.data["attachment_url"])
         self.assertEqual(Message.objects.filter(conversation_id=self.room).count(), 4)
+
+
+    def test_attachment_download_requires_current_room_access_and_avoids_raw_storage_urls(self):
+        content = b"%PDF-1.7\\nrestricted attachment\\n%%EOF\\n"
+        upload = client_for(self.alice).post(self.urls[1], {
+            "conversation": self.room,
+            "body": "private",
+            "attachment": SimpleUploadedFile("confidential.pdf", content, content_type="application/pdf"),
+        }, format="multipart")
+        self.assertEqual(upload.status_code, 201, upload.content)
+        message = Message.objects.get(pk=upload.data["id"])
+        protected = f"{MESSAGES}{message.pk}/attachment/"
+        self.assertEqual(upload.data["attachment_url"], protected)
+        self.assertEqual(upload.data["attachment"], protected)
+        self.assertNotIn(message.attachment.url, str(upload.data))
+        for stranger in (self.no_role,):
+            self.assertEqual(client_for(stranger).get(protected).status_code, 404)
+        self.assertIn(client_for().get(protected).status_code, (401, 403))
+        download = client_for(self.bob).get(protected)
+        self.assertEqual(download.status_code, 200, download.content if not download.streaming else b"")
+        self.assertEqual(download["Cache-Control"], "private, no-store")
+        self.assertEqual(download["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(b"".join(download.streaming_content), content)
+        # A stale participant record is not permission once the membership is revoked.
+        Membership.objects.filter(pk=self.bob_m.pk).update(is_active=False)
+        self.assertEqual(client_for(self.bob).get(protected).status_code, 404)
+        self.assertEqual(client_for(self.alice).get(protected).status_code, 200)
+        raw_path = f"/media/{message.attachment.name}"
+        self.assertEqual(client_for(self.alice).delete(f"{MESSAGES}{message.pk}/").status_code, 204)
+        self.assertEqual(client_for(self.alice).get(protected).status_code, 404)
+        self.assertEqual(client_for(self.alice).get(raw_path).status_code, 404)
 
     def test_disguised_attachment_is_rejected_without_a_message_or_stored_file(self):
         for url in self.urls:

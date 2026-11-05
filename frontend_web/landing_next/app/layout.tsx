@@ -6,6 +6,7 @@ import '@fontsource/inter/600.css';
 import '@fontsource/outfit/500.css';
 import '@fontsource/outfit/600.css';
 import './globals.css';
+import AppInstallBanner from '@/components/app-install-banner';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://chemisttasker.com.au'),
@@ -13,5 +14,5 @@ export const metadata: Metadata = {
   description: 'Find locum pharmacist shifts and pharmacy talent in Australia. Connect availability, hiring, team workspaces and public pharmacy communities with one ChemistTasker account.',
 };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en-AU" data-scroll-behavior="smooth"><body><SessionProvider>{children}</SessionProvider></body></html>;
+  return <html lang="en-AU" data-scroll-behavior="smooth"><body><SessionProvider>{children}<AppInstallBanner /></SessionProvider></body></html>;
 }

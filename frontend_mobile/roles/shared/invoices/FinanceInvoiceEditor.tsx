@@ -4,6 +4,8 @@ import { Button, Checkbox, Chip, Divider, IconButton, List, Surface, Text, TextI
 import { DatePickerInput, TimePickerModal } from 'react-native-paper-dates';
 import { createFinanceDraft, finance, financeDueDate, financeItemLine, financeStatus, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceCustomerInput, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
 import { dateFromIso, isoDate } from '@/features/parity/utils';
+import { colors, font, radius, space, touch } from '@/constants/tokens';
+import { mergeFinanceInvoiceDefaults } from './financeInvoiceDefaults';
 
 const money = (value: string) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 
@@ -13,8 +15,18 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const theme = useTheme();
   const [value, setValue] = useState<FinanceDraft>(() => initial ? { ...initial.payload, version: initial.version, request_key: initial.request_key } : createFinanceDraft(requestKey, previous));
   const original = useRef(JSON.stringify(value));
+  const editedDefaults = useRef(new Set<keyof FinanceDraft>());
+  const draftEditGeneration = useRef(0);
+  const prefillGeneration = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; prefillGeneration.current += 1; };
+  }, []);
   const [busy, setBusy] = useState(false); const running = useRef(false);
   const [error, setError] = useState(''); const [preview, setPreview] = useState<FinanceCalculation | null>(null);
+  const [previewError, setPreviewError] = useState(''); const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewRetry, setPreviewRetry] = useState(0);
   const [customerOpen, setCustomerOpen] = useState(false); const [itemOpen, setItemOpen] = useState(false);
   const [customerOptions, setCustomerOptions] = useState<FinanceCustomer[]>(customers);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
@@ -39,18 +51,25 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
   const [timeTarget, setTimeTarget] = useState<'start' | 'end' | null>(null);
   const [breakMinutes, setBreakMinutes] = useState('0');
   const [computedHours, setComputedHours] = useState('');
-  const change = <K extends keyof FinanceDraft,>(key: K, next: FinanceDraft[K]) => setValue(current => ({ ...current, [key]: next }));
+  const change = <K extends keyof FinanceDraft,>(key: K, next: FinanceDraft[K]) => {
+    editedDefaults.current.add(key);
+    draftEditGeneration.current += 1;
+    setValue(current => ({ ...current, [key]: next }));
+  };
   const snapshotCustomer = (item: FinanceCustomer) => ({
     name: item.name, legal_name: item.legal_name, address: item.address, abn: item.abn,
     email: item.email, contact_name: item.contact_name,
   });
-  const changeCustomer = (key: keyof NonNullable<FinanceDraft['customer']>, next: string) => setValue(current => ({
+  const changeCustomer = (key: keyof NonNullable<FinanceDraft['customer']>, next: string) => {
+    draftEditGeneration.current += 1;
+    setValue(current => ({
     ...current,
     customer: {
       ...(current.customer || { name: '', legal_name: '', address: '', abn: '', email: '', contact_name: '' }),
       [key]: next,
     },
   }));
+  };
   const changeLine = (index: number, patch: Partial<FinanceLine>) => change('lines', value.lines.map((line, i) => i === index ? { ...line, ...patch } : line));
   const close = () => { if (busy) return; if (JSON.stringify(value) === original.current) onClose(); else Alert.alert('Discard changes?', 'Your unsaved invoice changes will be lost.', [{ text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: onClose }]); };
   useEffect(() => {
@@ -59,23 +78,12 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
     Promise.all([finance.invoiceDefaults(), finance.internalSources()]).then(([defaults, sources]) => {
       if (!active) return;
       setInternalSources(sources);
-      setValue(current => ({
-        ...current,
-        issuer_name: current.issuer_name || defaults.issuer_name,
-        issuer_abn: current.issuer_abn || defaults.issuer_abn,
-        issuer_address: current.issuer_address || defaults.issuer_address,
-        gst_registered: current.gst_registered || defaults.gst_registered,
-        bank_account_name: current.bank_account_name || defaults.bank_account_name,
-        bsb: current.bsb || defaults.bsb,
-        account_number: current.account_number || defaults.account_number,
-        super_fund_name: current.super_fund_name || defaults.super_fund_name,
-        super_usi: current.super_usi || defaults.super_usi,
-        super_member_number: current.super_member_number || defaults.super_member_number,
-        super_rate: defaults.super_rate || current.super_rate,
-      }));
-    }).catch((e: any) => setError(e.message || 'Unable to load invoice defaults.'));
+      setValue(current => mergeFinanceInvoiceDefaults(current, defaults, editedDefaults.current, Boolean(previous)));
+    }).catch((e: any) => {
+      if (active) setError(e.message || 'Unable to load invoice defaults.');
+    });
     return () => { active = false; };
-  }, [initial]);
+  }, [initial, previous]);
   useEffect(() => { setCustomerOptions(customers); }, [customers]);
   useEffect(() => { setItemOptions(items); }, [items]);
   const saveNewCustomer = async () => {
@@ -97,6 +105,7 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
       };
       const saved = await finance.saveCustomer(input);
       setCustomerOptions(current => [...current, saved]);
+      draftEditGeneration.current += 1;
       setValue(current => ({
         ...current,
         customer_id: saved.id,
@@ -163,6 +172,7 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
         active: true,
       });
       setItemOptions(current => [...current, saved]);
+      draftEditGeneration.current += 1;
       setValue(current => ({ ...current, lines: [...current.lines, financeItemLine(saved)] }));
       setNewItemName('');
       setNewItemUnit('Item');
@@ -178,22 +188,51 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
     }
   };
   const applyInternalSource = async (source: FinanceInternalSource) => {
-    setBusy(true); setError('');
+    const request = ++prefillGeneration.current;
+    const editGeneration = draftEditGeneration.current;
+    setBusy(true);
+    setError('');
     try {
-      setValue(await finance.internalPrefill([source.assignment_id]));
+      const draft = await finance.internalPrefill([source.assignment_id]);
+      if (!mounted.current || prefillGeneration.current !== request) return;
+      if (draftEditGeneration.current !== editGeneration) {
+        setError('The invoice was edited while loading this shift. Choose the shift again to replace the draft.');
+        return;
+      }
+      draftEditGeneration.current += 1;
+      // Defaults are asynchronous. They must not override values imported
+      // from an accepted-shift snapshot after the prefill completes.
+      (Object.keys(draft) as Array<keyof FinanceDraft>).forEach(key => editedDefaults.current.add(key));
+      setValue(draft);
       setSourceOpen(false);
     } catch (e: any) {
-      setError(e.message || 'Unable to prefill this shift.');
+      if (mounted.current && prefillGeneration.current === request) setError(e.message || 'Unable to prefill this shift.');
     } finally {
-      setBusy(false);
+      if (mounted.current && prefillGeneration.current === request) setBusy(false);
     }
   };
+
   useEffect(() => {
-    let active = true; setPreview(null);
+    let active = true;
+    setPreview(null);
+    setPreviewError('');
+    setPreviewBusy(Boolean(value.lines.length));
     if (!value.lines.length) return;
-    const timer = setTimeout(() => { finance.preview(value).then(result => { if (active) setPreview(result); }).catch(() => {}); }, 500);
+    const timer = setTimeout(() => {
+      finance.preview(value)
+        .then(result => {
+          if (!active) return;
+          setPreview(result);
+          setPreviewError('');
+        })
+        .catch((failure: any) => {
+          if (!active) return;
+          setPreviewError(failure?.message || 'Unable to calculate this invoice.');
+        })
+        .finally(() => { if (active) setPreviewBusy(false); });
+    }, 500);
     return () => { active = false; clearTimeout(timer); };
-  }, [value]);
+  }, [value, previewRetry]);
   const save = async () => {
     if (running.current) return;
     if ((!value.customer_id && !value.source_assignment_ids?.length) || !value.issuer_name.trim() || !value.lines.length) { setError('Select a customer, enter your business name and add an item.'); setBusinessOpen(true); return; }
@@ -209,6 +248,15 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
     <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8, borderBottomWidth: 1, borderColor: theme.colors.outlineVariant }}><IconButton icon="arrow-left" accessibilityLabel="Back to invoices" onPress={close} disabled={busy} /><View style={{ flex: 1 }}><Text variant="titleLarge">{initial ? initial.number : 'New invoice'}</Text><Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>{initial ? `Revision ${initial.version} · ${financeStatus(initial)}` : 'Unsaved until you press Save invoice'}</Text></View><Button mode="contained" loading={busy} disabled={busy} onPress={save}>{initial ? 'Save revision' : 'Save invoice'}</Button></View>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}>
       {!!error && <Text accessibilityRole="alert" style={{ color: theme.colors.error }}>{error}</Text>}
+      {!!previewError && <Surface elevation={0} style={{ backgroundColor: colors.status.red.bg, borderColor: colors.status.red.fg, borderWidth: 1, borderRadius: radius.card, padding: space.md, gap: space.sm }}>
+        <Text accessibilityRole="alert" style={{ color: colors.status.red.fg, fontFamily: font.inter.semiBold }}>
+          Invoice preview could not be calculated
+        </Text>
+        <Text style={{ color: colors.textPrimary }}>{previewError}</Text>
+        <Text variant="bodySmall" style={{ color: colors.textSecondary }}>Review the amounts and tax selections. Save is validated again by the server.</Text>
+        <Button mode="outlined" contentStyle={{ minHeight: touch.min }} disabled={busy || previewBusy}
+          onPress={() => setPreviewRetry(value => value + 1)}>Retry calculation</Button>
+      </Surface>}
       {!initial && internalSources.length ? <Surface elevation={0} style={{ padding: 14, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.outlineVariant }}>
         <Text variant="titleMedium">Start from an internal ABN shift</Text>
         <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginVertical: 8 }}>Pharmacy, shift hours/rate and onboarding details are prefilled. Nothing is saved yet.</Text>
@@ -229,7 +277,7 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
           <Button mode="outlined" icon="account-outline" disabled={internalSource} onPress={() => { setCustomerOpen(!customerOpen); setNewCustomerOpen(false); setItemOpen(false); setQuery(''); }}>{customer?.name || 'Select customer'}</Button>
           {!internalSource ? <Button mode="text" icon="account-plus-outline" onPress={() => { setNewCustomerOpen(!newCustomerOpen); setCustomerOpen(false); setItemOpen(false); }}>Create customer</Button> : null}
         </View>
-        {customerOpen && <View><TextInput mode="outlined" dense label="Search customers" value={query} onChangeText={setQuery} />{customerOptions.filter(c => c.active && c.name.toLowerCase().includes(query.toLowerCase())).map(c => <List.Item key={c.id} title={c.name} description={c.email || c.abn || undefined} onPress={() => { setValue(current => ({ ...current, customer_id: c.id, customer: snapshotCustomer(c), due_date: financeDueDate(current.invoice_date, c.payment_terms_days) })); setCustomerOpen(false); }} />)}{!customerOptions.length && <Text style={{ padding: 12 }}>No saved customers yet. Create one here without losing this invoice.</Text>}</View>}
+        {customerOpen && <View><TextInput mode="outlined" dense label="Search customers" value={query} onChangeText={setQuery} />{customerOptions.filter(c => c.active && c.name.toLowerCase().includes(query.toLowerCase())).map(c => <List.Item key={c.id} title={c.name} description={c.email || c.abn || undefined} onPress={() => { draftEditGeneration.current += 1; setValue(current => ({ ...current, customer_id: c.id, customer: snapshotCustomer(c), due_date: financeDueDate(current.invoice_date, c.payment_terms_days) })); setCustomerOpen(false); }} />)}{!customerOptions.length && <Text style={{ padding: 12 }}>No saved customers yet. Create one here without losing this invoice.</Text>}</View>}
         {newCustomerOpen ? <Surface elevation={0} style={{ marginTop: 12, borderRadius: 10, padding: 12, gap: 10, borderWidth: 1, borderColor: theme.colors.outlineVariant }}>
           <Text variant="titleSmall">Create customer / store</Text>
           <TextInput mode="outlined" dense label="Store / trading name *" value={newCustomerName} onChangeText={setNewCustomerName} />
@@ -371,7 +419,7 @@ export default function FinanceInvoiceEditor({ initial, previous, customers, ite
       </Surface>
       <Surface elevation={0} style={{ padding: 16, borderRadius: 8 }}>
         {field('notes', 'Notes to customer')}
-        {[['Subtotal', preview?.subtotal], ['GST', preview?.gst], ['Invoice total', preview?.payable], ['Super contribution', preview?.super]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}><Text style={{ fontWeight: label === 'Invoice total' ? '700' : '400' }}>{label}</Text><Text style={{ fontVariant: ['tabular-nums'] }}>{amount !== undefined ? money(amount) : value.lines.length ? 'Pending' : '$0.00'}</Text></View>)}
+        {[['Subtotal', preview?.subtotal], ['GST', preview?.gst], ['Invoice total', preview?.payable], ['Super contribution', preview?.super]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}><Text style={{ fontWeight: label === 'Invoice total' ? '700' : '400' }}>{label}</Text><Text style={{ fontVariant: ['tabular-nums'] }}>{amount !== undefined ? money(amount) : previewBusy ? 'Calculating…' : previewError ? 'Unavailable' : value.lines.length ? 'Pending' : '$0.00'}</Text></View>)}
         <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>Super is paid separately to the fund.</Text>
       </Surface>
       <List.Accordion title="Business details & GST" expanded={businessOpen} onPress={() => setBusinessOpen(!businessOpen)}><View style={{ padding: 12 }}>{field('issuer_name', 'Business name *')}{field('issuer_abn', 'Your ABN')}{field('issuer_address', 'Business address')}<View style={{ flexDirection: 'row', gap: 8 }}><Chip selected={value.issuer_entity_type !== 'company'} onPress={() => change('issuer_entity_type', 'sole_trader')}>Sole trader</Chip><Chip selected={value.issuer_entity_type === 'company'} onPress={() => change('issuer_entity_type', 'company')}>Company</Chip></View><Checkbox.Item label="I am registered for GST for this supply" status={value.gst_registered ? 'checked' : 'unchecked'} onPress={() => change('gst_registered', !value.gst_registered)} /></View></List.Accordion>

@@ -1,8 +1,15 @@
-import React, { Fragment, type ReactNode, useState } from 'react';
+import React, { Fragment, type ReactNode, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  BookOpen,
   CalendarDays,
+  CalendarCheck2,
+  Newspaper,
+  PenLine,
+  Settings2,
+  ScanLine,
+  Users,
   ChevronRight,
   Clock,
   Gift,
@@ -16,6 +23,8 @@ import {
 } from 'lucide-react-native';
 import { ConfirmDialog, IconTile, ScalePressable, SectionCard, type Tone } from '@/components/ui';
 import { usePlatformTools } from '@/components/ParityToolsCard';
+import { chemistTaskerApi } from '@/config/api';
+import { openWebPage } from '@/features/explore/webLinks';
 import { useAuth } from '@/context/AuthContext';
 import { colors, font, radius, space, type } from '@/constants/tokens';
 import { type MoreItem, useShell } from './ShellContext';
@@ -32,6 +41,12 @@ const toolIcons: Record<string, LucideIcon> = {
 };
 
 const TILE = 36;
+
+const exploreItems: MoreItem[] = [
+  { label: 'Learning', icon: BookOpen, route: '/explore/learning' },
+  { label: 'Blog and news', icon: Newspaper, route: '/explore/blog' },
+  { label: 'Public community', icon: Users, route: '/explore/hubs' },
+];
 
 function Row({
   item,
@@ -83,7 +98,20 @@ export function MoreScreen({ children }: { children?: ReactNode }) {
   const shell = useShell();
   const tools = usePlatformTools();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const publisherId = user?.id == null ? null : String(user.id);
+  const [publisherAccess, setPublisherAccess] = useState<{ id: string; allowed: boolean } | null>(null);
+  const canPublish = publisherId !== null && publisherAccess?.id === publisherId && publisherAccess.allowed;
+  const [publisherError, setPublisherError] = useState('');
+  useEffect(() => {
+    let active = true;
+    if (publisherId === null) return () => { active = false; };
+    // Results are scoped to the account ID; a previous account never reveals its editor link.
+    void chemistTaskerApi.contentManagement.getMe().then(response => {
+      if (active) setPublisherAccess({ id: publisherId, allowed: Boolean(response.administrator || Object.keys(response.areas || {}).length) });
+    }).catch(() => { if (active) setPublisherAccess({ id: publisherId, allowed: false }); });
+    return () => { active = false; };
+  }, [publisherId]);
   // Sign out sits just above the tab bar, so a stray tap asks first.
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -117,7 +145,25 @@ export function MoreScreen({ children }: { children?: ReactNode }) {
           <Rows items={group.items} tone={group.tone} onItem={open} />
         </SectionCard>
       ))}
+      <SectionCard title="Explore" flush dense>
+        <Rows items={exploreItems} tone="blue" onItem={open} />
+      </SectionCard>
+      {canPublish ? <SectionCard title="Publishing" flush dense>
+        <Rows items={[{ label: 'Publishing workspace (web sign-in required)', icon: PenLine, onPress: () => {
+          setPublisherError('');
+          void openWebPage('/content').catch(() => setPublisherError('Publishing workspace could not open. Try again.'));
+        } }]} tone="blue" onItem={open} />
+        {publisherError ? <Text accessibilityRole="alert" style={styles.publisherError}>{publisherError}</Text> : null}
+      </SectionCard> : null}
       {children}
+      <SectionCard title="Mobile tools" flush dense>
+        <Rows items={[
+          { label: 'Scan a pharmacy or worker code', icon: ScanLine, route: '/share/scan' },
+          { label: 'Saved QR contacts', icon: BookOpen, route: '/share/saved' },
+          ...(['PHARMACIST', 'OTHER_STAFF'].includes(String(user?.role || '').toUpperCase()) ? [{ label: 'My next shifts and calendar', icon: CalendarCheck2, route: '/next-shifts' }] : []),
+          { label: 'Security, notifications and permissions', icon: Settings2, route: '/settings/mobile' },
+        ]} tone="blue" onItem={open} />
+      </SectionCard>
       <SectionCard title="Account" flush dense>
         <Rows items={account} tone="violet" onItem={open} />
         {account.length ? <View style={styles.divider} /> : null}
@@ -168,6 +214,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.status.red.bg,
   },
   dangerLabel: { color: colors.status.red.fg },
+  publisherError: { padding: space.md, color: colors.status.red.fg },
   // Inset to the label edge so each row's tile stays one column.
   divider: {
     height: StyleSheet.hairlineWidth,

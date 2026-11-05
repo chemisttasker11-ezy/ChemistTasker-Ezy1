@@ -2,7 +2,7 @@ import type { UserAvailabilityApi, ExplorerPostApi } from '../../types';
 import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
 import { fetchApi } from '../../transport/application';
-import { asList, buildQuery } from '../../utils/serialization';
+import { asList, buildQuery, fetchAllPages } from '../../utils/serialization';
 import { mapUserAvailability } from './mappers';
 export function getUserAvailability() {
     return fetchApi<Collection<UserAvailabilityApi>>('/user-availability/');
@@ -20,8 +20,10 @@ export function deleteUserAvailability(id: number | string) {
     return fetchApi(`/user-availability/${id}/`, { method: 'DELETE' });
 }
 export async function fetchUserAvailabilityService() {
-    const data = await getUserAvailability();
-    return asList(data).map(mapUserAvailability);
+    const rows = await fetchAllPages((page) =>
+        fetchApi<Collection<UserAvailabilityApi>>(`/user-availability/?page=${page}`)
+    );
+    return rows.map(mapUserAvailability);
 }
 export async function createUserAvailabilityService(payload: unknown) {
     const data = await createUserAvailability(payload);
@@ -70,4 +72,24 @@ export function updateExplorerPost(id: number | string, data: unknown) {
 }
 export function deleteExplorerPost(id: number | string) {
     return fetchApi(`/explorer-posts/${id}/`, { method: 'DELETE' });
+}
+
+
+export type SavedProfessionalContact = {
+ id: number;
+ kind: 'WORKER_LISTING' | 'ORGANIZATION';
+ reference: string;
+ saved_at: string;
+};
+export function listSavedProfessionalContacts() {
+ return fetchApi<SavedProfessionalContact[]>('/saved-professional-contacts/');
+}
+export function saveProfessionalContact(payload: Pick<SavedProfessionalContact, 'kind'|'reference'>) {
+ return fetchApi<SavedProfessionalContact>('/saved-professional-contacts/',{
+  method:'POST',body:JSON.stringify(payload),
+ });
+}
+export function deleteSavedProfessionalContact(id: number) {
+ if(!Number.isSafeInteger(id)||id<=0)throw new Error('Invalid saved contact ID.');
+ return fetchApi('/saved-professional-contacts/'+id+'/',{method:'DELETE'});
 }

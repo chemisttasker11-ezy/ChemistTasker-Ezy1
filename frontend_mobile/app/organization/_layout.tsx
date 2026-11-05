@@ -3,6 +3,8 @@ import { Tabs, usePathname, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
   CalendarCheck,
+  BookOpen,
+  Building2,
   CalendarClock,
   CalendarDays,
   ClipboardCheck,
@@ -47,6 +49,8 @@ const titles: Record<string, string> = {
   'shifts/[id]': 'Shift',
   'post-shift': 'Post shift',
   'pharmacies/index': 'Pharmacies',
+  'pharmacies/claims': 'Pharmacy claims',
+  chain: 'My chain',
   'pharmacies/[id]': 'Pharmacy',
   'pharmacies/[id]/edit': 'Edit pharmacy',
   'pharmacies/[id]/staff': 'Staff',
@@ -56,6 +60,7 @@ const titles: Record<string, string> = {
   pills: 'Pills',
   notifications: 'Notifications',
   calendar: 'Calendar',
+  learning: 'Learning',
   'talent-board': 'Talent Hub',
   invoice: 'Invoices',
   'invoice/new': 'New invoice',
@@ -236,6 +241,7 @@ export default function OrganizationLayout() {
         title: 'Pharmacies & people',
         tone: 'cyan',
         items: [
+          { label: 'My chain', icon: Building2, route: '/organization/chain', hidden: !can.chain },
           { label: 'Invite staff', icon: UserPlus, route: '/organization/invite', hidden: !can.invite },
           { label: 'Workforce & Payroll', icon: Wallet, route: '/workforce-settings', hidden: !can.staff },
           { label: 'Employment terms', icon: HardHat, route: '/workforce/employment-engagements', hidden: !(can.staff || can.roster) },
@@ -258,6 +264,7 @@ export default function OrganizationLayout() {
         items: [
           { label: 'Talent Hub', icon: Search, route: '/organization/talent-board' },
           { label: 'Marketplace', icon: ShoppingBag, route: '/marketplace' },
+          { label: 'Learning materials', icon: BookOpen, route: '/organization/learning' },
           { label: 'Ethical Marketplace', icon: ShieldCheck, route: '/marketplace/ethical/access' },
         ],
       },

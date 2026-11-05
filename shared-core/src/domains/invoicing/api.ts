@@ -4,8 +4,13 @@ import type { Invoice } from '../../types';
 import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
 import { fetchApi, getApiConfig, performApiRequest } from '../../transport/application';
-export function getInvoices() {
-    return fetchApi<Collection<Invoice>>('/invoices/');
+export function getInvoices(params?: { page?: number }) {
+    // Existing web callers still read the default first page. Mobile can
+    // explicitly traverse DRF pages without owning endpoint transport.
+    const page = params?.page;
+    const query = page != null && Number.isSafeInteger(page) && page > 0
+        ? `?page=${page}` : '';
+    return fetchApi<Collection<Invoice>>(`/invoices/${query}`);
 }
 export function getInvoiceDetail(id: number | string) {
     return fetchApi<InvoiceDetailApi>(`/invoices/${id}/`);

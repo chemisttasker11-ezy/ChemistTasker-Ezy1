@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Divider, Icon, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
 import { usePathname, useRouter } from 'expo-router';
-import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOwnerDashboard, getPharmacistDashboard, getOtherStaffDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
+import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOwnerDashboard, getPharmacistDashboard, getOtherStaffDashboard, getExplorerDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useUnsavedChangesRegistry } from '@/roles/shared/forms/UnsavedChangesRegistryProvider';
@@ -233,11 +233,22 @@ export function useScopedDashboard(roleOverride?: string | null) {
       return payload as DashboardPayload;
     } catch (error: any) {
       if ((error?.response?.status ?? error?.status) === 403 && isCurrentDashboardRequest(request, dashboardRequest.current)) {
-        const firstPharmacy = pharmacies[0];
-        if (firstPharmacy && scopedWorkspace === 'internal') {
-          selectPharmacy(firstPharmacy);
-        } else if (canSelectPlatform) {
-          selectPlatform();
+        const worker = role === 'PHARMACIST' || role === 'OTHER_STAFF';
+        // Match the existing web dashboard: a worker who cannot load this
+        // scope can still see their permitted Explorer-level opportunities.
+        // Never expose another pharmacy's restricted dashboard or change the
+        // selected pharmacy implicitly just to hide the failed request.
+        if (worker) {
+          try {
+            const fallback = await getExplorerDashboard();
+            if (isCurrentDashboardRequest(request, dashboardRequest.current)) {
+              return fallback as DashboardPayload;
+            }
+            return null;
+          } catch {
+            // Preserve the original 403 and explicit Retry rather than
+            // silently switching workspaces after a failed fallback.
+          }
         }
       }
       throw error;
@@ -388,6 +399,43 @@ export function DashboardPersonaSwitcher(_props: { role?: string | null }) {
   );
 }
 
+/** The web and Expo route trees intentionally differ. These are *job* destinations,
+ * not a permission bypass: the existing root guard still authorizes each target.
+ */
+export function translateDashboardJobPath(path: string, persona?: string): string | null {
+  if (!path.startsWith('/') || path.startsWith('//')) return null;
+  const shared = path.match(/^\/dashboard\/(workforce\/timesheets|workforce\/settings|my-hours|my-leave|attendance(?:\/reviews)?)\/?([?#].*)?$/);
+  if (shared) {
+    const routes: Record<string, string> = {
+      'workforce/timesheets': '/workforce-timesheets',
+      'workforce/settings': '/workforce-settings',
+      'my-hours': '/my-hours',
+      'my-leave': '/my-leave',
+      'attendance': '/attendance',
+      'attendance/reviews': '/attendance/reviews',
+    };
+    return routes[shared[1]] + (shared[2] || '');
+  }
+  const scoped = path.match(/^\/dashboard\/(admin\/[^/?#]+|owner|organization|pharmacist|otherstaff|explorer)(\/[^?#]*)?([?#].*)?$/);
+  if (!scoped) return null;
+  const role = scoped[1].startsWith('admin/') || (persona === 'admin' && scoped[1] === 'owner')
+    ? 'admin' : scoped[1];
+  const action = (scoped[2] || '').replace(/\/$/, '');
+  const suffix = scoped[3] || '';
+  const match = (prefix: string) => action === prefix || action.startsWith(prefix + '/');
+  if (match('/manage-pharmacies/my-chain')) return (role === 'owner' || role === 'organization') ? `/${role}/chain${suffix}` : null;
+  if (match('/manage-pharmacies/my-pharmacies') || action === '/manage-pharmacies') return `/${role}/pharmacies${suffix}`;
+  if (match('/manage-pharmacies/roster')) return '/manager/roster' + suffix;
+  if (match('/manage-pharmacies/attendance-reviews') || action === '/attendance-reviews') return '/attendance/reviews' + suffix;
+  if (action === '/onboarding' && role === 'owner') return '/owner/profile' + suffix;
+  if (action === '/overview' || action === '') return (role === 'admin' ? '/admin' : `/${role}/dashboard`) + suffix;
+  if (action === '/logout') return null;
+  // Existing native routes keep their exact suffixes, but unknown web-only
+  // manage-pharmacies paths must never silently route to an unrelated screen.
+  if (match('/manage-pharmacies') || match('/shift-center')) return null;
+  return `/${role}${action}${suffix}`;
+}
+
 /** The mobile route for a dashboard activity link (web /dashboard/<persona>/... paths), or null. */
 export function activityRoute(item: NonNullable<DashboardPayload['activity']>[number], persona?: string) {
   const raw = item.actionUrl || item.action_url;
@@ -401,14 +449,7 @@ export function activityRoute(item: NonNullable<DashboardPayload['activity']>[nu
     const toAdmin = shiftLink.persona === 'admin' || (persona === 'admin' && shiftLink.persona === 'owner');
     return shiftRoute(toAdmin ? 'admin' : shiftLink.persona, shiftLink);
   }
-  const adminMatch = path.match(/^\/dashboard\/admin\/[^/?#]+(\/[^?#]*)?([?#].*)?$/);
-  if (adminMatch) return `/admin${adminMatch[1] || ''}${adminMatch[2] || ''}`;
-  const roleMatch = path.match(/^\/dashboard\/(owner|organization|pharmacist|otherstaff|explorer)(?=\/|[?#]|$)/);
-  if (roleMatch) {
-    const role = persona === 'admin' && roleMatch[1] === 'owner' ? 'admin' : roleMatch[1];
-    return path.replace(roleMatch[0], `/${role}`);
-  }
-  return path.startsWith('/') ? path : null;
+  return translateDashboardJobPath(path, persona);
 }
 
 export function DashboardActivity({ data }: { data: DashboardPayload | null }) {

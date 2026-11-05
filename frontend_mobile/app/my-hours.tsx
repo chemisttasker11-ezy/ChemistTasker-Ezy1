@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Chip, Text } from 'react-native-paper';
 import { formatAttendanceMinutes, workforce } from '@chemisttasker/shared-core';
+import { useAuth } from '@/context/AuthContext';
 
 type Row = {
   id: number;
@@ -23,39 +25,74 @@ type Row = {
 
 
 export default function MyHoursScreen() {
-  const [rows, setRows] = useState<Row[]>([]);
+  const router = useRouter();
+  const { user } = useAuth();
+  const accountKey = user ? String(user.id ?? user.email ?? user.username ?? '') : '';
+  const accountRef = useRef(accountKey);
+  accountRef.current = accountKey;
+  const requestRef = useRef(0);
+  const submitRef = useRef(false);
+  const submitGeneration = useRef(0);
+  const [snapshot, setSnapshot] = useState<{ account: string; rows: Row[] }>({ account: '', rows: [] });
+  const rows = snapshot.account === accountKey ? snapshot.rows : [];
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState<number | null>(null);
 
   const load = useCallback(async (refresh = false) => {
+    const request = ++requestRef.current;
+    const current = () => request === requestRef.current && accountRef.current === accountKey;
+    if (!accountKey) {
+      setLoading(false);
+      return;
+    }
     if (refresh) setRefreshing(true); else setLoading(true);
     setError('');
     try {
       const response = await workforce.getMyHours();
-      setRows(Array.isArray(response) ? response : []);
+      if (current()) setSnapshot({ account: accountKey, rows: Array.isArray(response) ? response : [] });
     } catch (err: any) {
-      setError(err?.response?.data?.error || err?.message || 'Unable to load your hours.');
+      if (current()) setError(err?.response?.data?.error || err?.message || 'Unable to load your hours.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (current()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, []);
+  }, [accountKey]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    requestRef.current += 1;
+    submitGeneration.current += 1;
+    submitRef.current = false;
+    setSnapshot({ account: accountKey, rows: [] });
+    setError('');
+    setSubmitting(null);
+    setRefreshing(false);
+    setLoading(Boolean(accountKey));
+    if (accountKey) void load();
+    return () => { requestRef.current += 1; submitGeneration.current += 1; };
+  }, [accountKey, load]);
 
   const submit = async (row: Row) => {
-    if (!row.revision_number) return;
+    if (!row.revision_number || submitRef.current || !accountKey) return;
+    const action = ++submitGeneration.current;
+    const scope = accountKey;
+    const current = () => submitGeneration.current === action && accountRef.current === scope;
+    submitRef.current = true;
     setSubmitting(row.id);
     setError('');
     try {
       await workforce.submitTimesheet(row.id, row.revision_number);
-      await load();
+      if (current()) await load();
     } catch (err: any) {
-      setError(err?.response?.data?.error || err?.message || 'Unable to submit the timesheet.');
+      if (current()) setError(err?.response?.data?.error || err?.message || 'Unable to submit the timesheet.');
     } finally {
-      setSubmitting(null);
+      if (current()) {
+        submitRef.current = false;
+        setSubmitting(null);
+      }
     }
   };
 
@@ -88,7 +125,8 @@ export default function MyHoursScreen() {
                 {row.warning_checks > 0 && <Chip compact>{row.warning_checks} warnings</Chip>}
                 {row.needs_rebuild && <Chip compact>Recalculation pending</Chip>}
               </View>
-              <Button mode="contained" loading={submitting === row.id} disabled={!row.revision_number || row.needs_rebuild || row.status === 'APPROVED' || row.status === 'SUBMITTED' || submitting != null} onPress={() => submit(row)}>
+              <Button mode="outlined" onPress={() => router.push(`/my-hours/${row.id}` as any)} disabled={submitting != null}>View days & checks</Button>
+              <Button mode="contained" loading={submitting === row.id} disabled={!row.revision_number || row.needs_rebuild || row.status === 'APPROVED' || row.status === 'SUBMITTED' || row.status === 'LOCKED' || submitting != null} onPress={() => submit(row)}>
                 Submit reviewed hours
               </Button>
             </Card.Content>

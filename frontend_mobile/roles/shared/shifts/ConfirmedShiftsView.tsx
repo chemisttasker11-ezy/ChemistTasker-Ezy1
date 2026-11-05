@@ -8,76 +8,43 @@ import {
 } from 'react-native-paper';
 import {
     activateShiftOfferPayrollService,
-    fetchShiftOffers,
-
-    type ShiftApi,
-    type ShiftOfferApi,
-    shiftsDomain,
-
+    fetchAllConfirmedShifts,
+    fetchDeferredPayrollOffersService,
     type Shift,
     type ShiftUser,
     viewAssignedShiftProfileService,
 } from '@chemisttasker/shared-core';
-import { type ApiList, camelCaseKeysDeep, fetchAllPages } from '@chemisttasker/shared-core/dist/utils/serialization';
-import { fetchApi } from '@chemisttasker/shared-core/dist/transport/application';
 import { ContentState } from '@/components/ui';
 import { colors, radius, space } from '@/constants/tokens';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
 import { useShiftSurface } from './useShiftSurface';
 import { WorkerProfileDialog } from './WorkerProfileDialog';
-
-export type DeferredPayrollOffer = {
-    id: number;
-    paymentPreferenceSnapshot?: string;
-    settlementChannel?: string;
-    engagementKind?: string;
-    payrollActivatedAt?: string | null;
-    engagementTermsSnapshot?: {
-        payrollActivationRequired?: boolean;
-        pharmacyId?: number;
-        pharmacyName?: string;
-        workerName?: string;
-        awardClassification?: string;
-        payBasis?: string;
-    };
-};
+import { filterDeferredPayrollOffers, type DeferredPayrollOffer } from './confirmedPayroll';
+export { filterDeferredPayrollOffers } from './confirmedPayroll';
+export type { DeferredPayrollOffer } from './confirmedPayroll';
 
 export function filterShiftsByPharmacy(shifts: Shift[], scopedPharmacyId: number | null): Shift[] {
     if (!Array.isArray(shifts)) return [];
     if (scopedPharmacyId == null) return shifts;
     return shifts.filter((shift: Shift) => {
-        const targetId =
+        const raw =
             (shift as any).pharmacyDetail?.id ??
             (shift as any).pharmacy_detail?.id ??
             (shift as any).pharmacy_id ??
             (shift as any).pharmacyId ??
             (shift as any).pharmacy;
-        return typeof targetId === 'number' ? targetId === scopedPharmacyId : true;
-    });
-}
-
-export function filterDeferredPayrollOffers(
-    offers: DeferredPayrollOffer[],
-    scopedPharmacyId: number | null,
-): DeferredPayrollOffer[] {
-    if (!Array.isArray(offers)) return [];
-    return offers.filter((offer) => {
-        const terms = offer.engagementTermsSnapshot;
-        const pref = String(offer.paymentPreferenceSnapshot || '').toUpperCase();
-        const kind = String(offer.engagementKind || '').toUpperCase();
-        if (pref === 'ABN') return false;
-        const isTfn = pref === 'TFN' || pref === 'PAYROLL' || kind === 'EMPLOYEE' || Boolean(terms?.payrollActivationRequired);
-        const pending = !offer.payrollActivatedAt;
-        if (!isTfn || !pending) return false;
-        if (scopedPharmacyId != null && typeof terms?.pharmacyId === 'number') {
-            return terms.pharmacyId === scopedPharmacyId;
-        }
-        return true;
+        const identity = typeof raw === 'object' && raw !== null ? raw.id : raw;
+        const id = identity == null || identity === '' ? NaN : Number(identity);
+        return Number.isSafeInteger(id) && id > 0 && id === scopedPharmacyId;
     });
 }
 
 export default function ConfirmedShiftsView() {
     const surface = useShiftSurface();
+    return <ScopedConfirmedShifts key={surface.scopeKey} surface={surface} />;
+}
+
+function ScopedConfirmedShifts({ surface }: { surface: ReturnType<typeof useShiftSurface> }) {
     const scopedPharmacyId = surface.scopedPharmacyId;
 
     const [shifts, setShifts] = useState<Shift[]>([]);
@@ -99,14 +66,12 @@ export default function ConfirmedShiftsView() {
 
     const loadShifts = useCallback(async () => {
         const gen = ++loadGenRef.current;
+        // Same-scope refreshes preserve already rendered bookings if the network fails.
         setLoading(true);
         setError(null);
         try {
-            const raw = await fetchAllPages<ShiftApi>((page) =>
-                fetchApi<ApiList<ShiftApi>>(`/shifts/confirmed/?page=${page}`)
-            );
+            const data = await fetchAllConfirmedShifts();
             if (gen !== loadGenRef.current) return;
-            const data = raw.map(shiftsDomain.mapShift);
             const filtered = filterShiftsByPharmacy(data, scopedPharmacyId);
             setShifts((prev) => (filtered.length === 0 && prev.length === 0 ? prev : filtered));
         } catch (err: any) {
@@ -130,16 +95,8 @@ export default function ConfirmedShiftsView() {
         setPayrollLoading(true);
         setPayrollError(null);
         try {
-            const [acceptedRaw, awaitingRaw] = await Promise.all([
-                fetchAllPages<ShiftOfferApi>((page) =>
-                    fetchShiftOffers(`?status=ACCEPTED&page=${page}`)
-                ),
-                fetchAllPages<ShiftOfferApi>((page) =>
-                    fetchShiftOffers(`?status=ACCEPTED_AWAITING_PAYMENT&page=${page}`)
-                ),
-            ]);
+            const rows = await fetchDeferredPayrollOffersService() as DeferredPayrollOffer[];
             if (gen !== payrollGenRef.current) return;
-            const rows = [...acceptedRaw, ...awaitingRaw].map(camelCaseKeysDeep) as unknown as DeferredPayrollOffer[];
             const filtered = filterDeferredPayrollOffers(rows, scopedPharmacyId);
             setDeferredPayrollOffers((prev) => (filtered.length === 0 && prev.length === 0 ? prev : filtered));
         } catch (err: any) {
@@ -190,11 +147,8 @@ export default function ConfirmedShiftsView() {
             loadGenRef.current++;
             payrollGenRef.current++;
             profileGenRef.current++;
-            setDeferredPayrollOffers([]);
-            setActivatingPayrollOfferIds(new Set());
-            setPayrollError(null);
         };
-    }, [surface.scopeKey]);
+    }, []);
 
     const openProfile = async (shiftId: number, slotId: number | null, userId: number) => {
         const gen = ++profileGenRef.current;

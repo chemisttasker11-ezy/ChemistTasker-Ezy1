@@ -5,14 +5,15 @@ log = logging.getLogger(__name__)
 
 
 from rest_framework import mixins, permissions, viewsets
+from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
-from notifications.models import Notification
+from notifications.models import Notification, NotificationPushPreference
 from rest_framework.response import Response
 from rest_framework.exceptions import NotAuthenticated, ValidationError
 from rest_framework.decorators import action
 from notifications.services import mark_notifications_read
 from users.models import DeviceToken
-from notifications.serializers import DeviceTokenSerializer, NotificationSerializer
+from notifications.serializers import DeviceTokenSerializer, NotificationSerializer, NotificationPushPreferenceSerializer
 
 
 # -----------------------------------------------------------------------------
@@ -72,3 +73,21 @@ class DeviceTokenViewSet(mixins.CreateModelMixin,
             existing.save(update_fields=["platform", "user", "active", "updated_at"])
             return existing
         serializer.save(user=user, active=True)
+
+
+class NotificationPushPreferenceView(APIView):
+    """GET/PATCH only the authenticated user's push notification preferences."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        preference = NotificationPushPreference.objects.filter(user=request.user).first()
+        if preference is None:
+            preference = NotificationPushPreference(user=request.user)
+        return Response(NotificationPushPreferenceSerializer(preference).data)
+
+    def patch(self, request):
+        preference, _ = NotificationPushPreference.objects.get_or_create(user=request.user)
+        serializer = NotificationPushPreferenceSerializer(preference, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

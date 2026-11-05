@@ -37,6 +37,7 @@ const helpers = loadTs('./PostShiftScreen.helpers.ts', {
 const {
   parsePostShiftSearchParams,
   pickScopedPharmacyId,
+  pickRetryPostShiftPharmacyId,
   canAccessPostShift,
   normalizePrefillRole,
   getStablePostShiftParamsKey,
@@ -44,6 +45,10 @@ const {
   computeResetFormPrefills,
   runPostShiftInitChain,
   shouldTriggerPostShiftInit,
+  toLocalIsoDate,
+  getEscalationClock,
+  withEscalationDate,
+  withEscalationTime,
 } = helpers;
 
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -189,6 +194,19 @@ test('pickScopedPharmacyId precedence swap test: routeId must strictly beat scop
     picked,
     'A swap in precedence must produce a different result and fail',
   );
+});
+
+
+test('same-scope Post Shift retry retains authorized pharmacy without cross-pharmacy leakage', () => {
+  const allowed = [{ id: 7 }, { id: 12 }];
+  assert.equal(pickRetryPostShiftPharmacyId(12, 7, allowed), 12,
+    'keep manually selected authorized pharmacy');
+  assert.equal(pickRetryPostShiftPharmacyId(18, 7, allowed), 7,
+    'revoke a selection no longer present in the authorized list');
+  assert.equal(pickRetryPostShiftPharmacyId(12, '', []), '',
+    'no pharmacy may remain selected when authorization list becomes empty');
+  assert.equal(pickRetryPostShiftPharmacyId('', 7, allowed), 7,
+    'first load should use authorized default');
 });
 
 test('canAccessPostShift guards entry points based on surface persona, capabilities and ready state', () => {
@@ -553,4 +571,49 @@ test('init -> user edits time -> no reset', async () => {
     await runInitLoad();
   }
   assert.equal(initLoadCount, 3, 'retry must trigger init chain');
+});
+
+test('Australian date selection is local, not serialized through UTC', () => {
+  const previous = process.env.TZ;
+  try {
+    process.env.TZ = 'Australia/Brisbane';
+    const chosen = new Date(2026, 10, 10);
+    assert.equal(toLocalIsoDate(chosen), '2026-11-10');
+    assert.equal(chosen.toISOString().slice(0, 10), '2026-11-09', 'UTC lost one day for a Brisbane date picker');
+    assert.equal(withEscalationDate(chosen), '2026-11-10T09:00');
+    assert.equal(withEscalationTime('2026-11-10T09:00', 16, 45), '2026-11-10T16:45');
+    assert.deepEqual(plain(getEscalationClock('2026-11-10T16:45')), { hours: 16, minutes: 45 });
+    assert.equal(withEscalationTime('2026-11-10T09:00', 25, 0), null);
+    assert.equal(withEscalationDate(new Date(2026, 10, 12), '2026-11-10T16:45'), '2026-11-12T16:45');
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
+});
+
+test('W3b post-shift deep links preserve the web query contract and apply once', () => {
+  const parsed = plain(parsePostShiftSearchParams({
+    pharmacy: '8', slot_dates: '2026-11-16,2026-02-30,bad-date', slot_date: '2026-11-20',
+    role_needed: 'technician', start: '07:30', end: '16:30',
+    employment_type: 'CASUAL', visibility: 'PLATFORM', dedicated_user_id: '33',
+  }));
+  assert.equal(parsed.routePharmacyId, 8);
+  assert.deepEqual(parsed.dates, ['2026-11-16']);
+  assert.equal(parsed.visibility, 'PLATFORM');
+  assert.equal(parsed.employmentType, 'CASUAL');
+  assert.equal(parsed.dedicatedUserId, 33);
+  assert.equal(parsed.startTime, '07:30');
+  assert.equal(parsed.endTime, '16:30');
+  const initial = computePrefillPlan({}, parsed, false);
+  assert.equal(initial.applyVisibility, true);
+  assert.equal(initial.applyEmploymentType, true);
+  const repeated = computePrefillPlan(initial.nextApplied, parsed, false);
+  assert.equal(repeated.applyVisibility, false);
+  assert.equal(repeated.applyEmploymentType, false);
+  const editing = computePrefillPlan({}, parsed, true);
+  assert.equal(editing.applyVisibility, false);
+  assert.equal(editing.applyEmploymentType, false);
+  const changedKey = getStablePostShiftParamsKey({ visibility: 'LOCUM_CASUAL', employment_type: 'PART_TIME' });
+  assert.notEqual(changedKey, getStablePostShiftParamsKey({ visibility: 'PLATFORM', employment_type: 'CASUAL' }));
+  assert.equal(parsePostShiftSearchParams({ start: '25:99', end: '17:10' }).hasStartTime, false);
 });

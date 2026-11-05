@@ -73,6 +73,7 @@ export default function HistoryShiftsView() {
 
     const loadShifts = useCallback(async () => {
         const gen = ++loadGenRef.current;
+        setShifts([]); // Do not show data from the previous pharmacy on load failure.
         setLoading(true);
         setError(null);
         try {

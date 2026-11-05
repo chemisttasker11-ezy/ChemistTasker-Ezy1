@@ -262,22 +262,36 @@ class WorkerPublishedRosterView(APIView):
         from workforce.models import RosterAcknowledgement, RosterPeriod
 
         shifts = get_worker_published_roster(request.user, start_date=start_date, end_date=end_date)
-        period_ids = set()
+        weeks = {
+            (a.shift.pharmacy_id, a.slot_date - timedelta(days=a.slot_date.weekday()))
+            for a in shifts
+        }
+        periods = list(RosterPeriod.objects.filter(
+            pharmacy_id__in={key[0] for key in weeks},
+            week_start__in={key[1] for key in weeks},
+        )) if weeks else []
+        periods_by_week = {(period.pharmacy_id, period.week_start): period for period in periods}
+        published_at_by_id = {
+            period.pk: period.published_at
+            for period in periods
+            if period.status == RosterPeriod.Status.PUBLISHED and period.published_at is not None
+        }
         shift_items = []
         for a in shifts:
             monday = a.slot_date - timedelta(days=a.slot_date.weekday())
-            period = RosterPeriod.objects.filter(pharmacy_id=a.shift.pharmacy_id, week_start=monday).first()
-            pid = period.id if period else None
-            if pid:
-                period_ids.add(pid)
-            shift_items.append((a, pid, bool(period and period.status == RosterPeriod.Status.PUBLISHED)))
+            period = periods_by_week.get((a.shift.pharmacy_id, monday))
+            pid = period.pk if period else None
+            shift_items.append((a, pid, pid in published_at_by_id))
 
-        acked_period_ids = set(
-            RosterAcknowledgement.objects.filter(
-                roster_period_id__in=period_ids,
+        # A republished roster invalidates an acknowledgement of the prior publication.
+        # Managers apply this same published_at cutoff in get_roster_acknowledgement_status.
+        acked_period_ids = {
+            pid for pid, acknowledged_at in RosterAcknowledgement.objects.filter(
+                roster_period_id__in=published_at_by_id,
                 user=request.user,
-            ).values_list("roster_period_id", flat=True)
-        )
+            ).values_list("roster_period_id", "acknowledged_at")
+            if acknowledged_at >= published_at_by_id[pid]
+        }
 
         return Response({
             "worker_id": request.user.id,
@@ -292,7 +306,7 @@ class WorkerPublishedRosterView(APIView):
                     "start_time": str(a.slot.start_time),
                     "end_time": str(a.slot.end_time),
                     "role": a.shift.role_needed,
-                    "is_acknowledged": (pid in acked_period_ids) if pid else False,
+                    "is_acknowledged": pid in acked_period_ids and can_acknowledge,
                     "can_acknowledge": can_acknowledge,
                 }
                 for a, pid, can_acknowledge in shift_items

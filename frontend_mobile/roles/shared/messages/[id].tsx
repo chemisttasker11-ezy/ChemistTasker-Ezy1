@@ -1,13 +1,16 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity, Linking } from 'react-native';
+import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { Text, TextInput, IconButton, Surface, ActivityIndicator, Menu, Divider, Snackbar, Avatar, Icon } from 'react-native-paper';
-import { Image } from 'expo-image';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useFocusEffect, useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import {
     getRoomMessages,
+    fetchRoomMessagesByUrl,
     sendRoomMessageService,
+    downloadChatAttachment,
     markRoomAsRead,
     reactToMessageService,
     updateMessageService,
@@ -21,9 +24,10 @@ import { useAuth } from '../../../context/AuthContext';
 import { useLiveMessages } from './useLiveMessages';
 import debounce from 'lodash.debounce';
 import { triggerUnreadBump } from '@/utils/pushNotifications';
-import { setActiveRoomId } from '../chat/activeRoomState';
+import { getActiveRoomId, setActiveRoomId } from '../chat/activeRoomState';
 import { displayNameFromUser } from '../chat/displayName';
-import { resolveApiBaseUrl } from '@/utils/apiUrl';
+import { nativeFileBytes } from '@/features/parity/nativeFileBytes';
+import { isNextPageForRoom, mergeOlderMessages, shouldAutoFollowMessage } from './messageHistory';
 
 type MessageDisplay = ChatMessage & { is_me: boolean };
 type ChatIdentity = {
@@ -48,13 +52,7 @@ const CHAT_ATTACHMENT_TYPES = [
     'image/webp',
     'image/gif',
 ];
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-const isImageAttachment = (item: MessageDisplay) => /\.(?:gif|jpe?g|png|webp)(?:$|[?#])/i.test(item.attachment_filename || item.attachment_url || '');
-const absoluteAttachmentUrl = (value: string) => {
-    if (/^https?:\/\//i.test(value)) return value;
-    const origin = resolveApiBaseUrl().replace(/\/api\/?$/, '');
-    return `${origin}${value.startsWith('/') ? '' : '/'}${value}`;
-};
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 
 const messageKey = (item: MessageDisplay) => item.id ?? `${item.created_at}-${item.body}`;
 const messageTime = (item: MessageDisplay) => {
@@ -126,18 +124,33 @@ export default function SharedMessageDetailScreen() {
     const insets = useSafeAreaInsets();
 
     const [messages, setMessages] = useState<MessageDisplay[]>([]);
+    const [messagesRoomId, setMessagesRoomId] = useState<number | null>(null);
+    const [messagesAccountId, setMessagesAccountId] = useState<number | null>(null);
+    const accountRef = useRef(user?.id ?? null);
+    accountRef.current = user?.id ?? null;
     const [participantCache, setParticipantCache] = useState<Record<number, IdentityRecord>>({});
     const [shiftContactByUserId, setShiftContactByUserId] = useState<Record<number, ChatIdentity>>({});
     const [newMessage, setNewMessage] = useState('');
+    const [composerScope, setComposerScope] = useState('');
     const [editingId, setEditingId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const sendBusyRef = useRef(false);
+    const sendScopeRef = useRef(0);
     const [menuFor, setMenuFor] = useState<number | null>(null);
     const [snackbar, setSnackbar] = useState<string | null>(null);
     const [roomPinned, setRoomPinned] = useState<boolean>(false);
     const [typingUsernames, setTypingUsernames] = useState<string[]>([]);
     const typingSentRef = useRef(0);
     const [lastReadAt, setLastReadAt] = useState<string | null>(null);
+    const [nextHistoryUrl, setNextHistoryUrl] = useState<string | null>(null);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [messageLoadError, setMessageLoadError] = useState<string | null>(null);
+    const [unseenMessages, setUnseenMessages] = useState(0);
+    const readerNearBottomRef = useRef(true);
+    const historyBusyRef = useRef(false);
+    const roomGenerationRef = useRef(0);
     const shouldScrollRef = useRef<boolean>(false);
 
     const parseRoomId = useCallback(() => {
@@ -147,16 +160,51 @@ export default function SharedMessageDetailScreen() {
     }, [id]);
 
     const flatListRef = useRef<FlatList<MessageDisplay>>(null);
+    const currentRoomId = parseRoomId();
+    const validRoomId = Number.isSafeInteger(currentRoomId) && currentRoomId > 0;
+    const currentComposerScope = `${user?.id ?? 'signed-out'}:${validRoomId ? currentRoomId : 'invalid'}`;
+    const visibleNewMessage = composerScope === currentComposerScope ? newMessage : '';
+    useEffect(() => {
+        setNewMessage('');
+        setComposerScope(currentComposerScope);
+        setEditingId(null);
+        setMenuFor(null);
+        setRoomPinned(false);
+        setTypingUsernames([]);
+        setSnackbar(null);
+    }, [currentComposerScope]);
+
+    const mapMessage = useCallback((msg: any, roomId: number, index: number): MessageDisplay => {
+        const senderUserId = msg.sender?.user_details?.id ?? msg.sender?.user?.id ?? msg.sender?.id ?? msg.sender;
+        return {
+            id: msg.id ?? `${msg.created_at ?? ''}-${index}`,
+            sender: msg.sender,
+            conversation: msg.conversation ?? roomId,
+            body: msg.body ?? msg.content ?? '',
+            created_at: msg.created_at ?? new Date().toISOString(),
+            attachment_url: msg.attachment_url ?? null,
+            attachment_filename: msg.attachment_filename ?? null,
+            is_deleted: msg.is_deleted,
+            is_edited: msg.is_edited,
+            reactions: msg.reactions ?? [],
+            is_pinned: msg.is_pinned,
+            is_me: user?.id != null ? senderUserId === user.id : false,
+        };
+    }, [user?.id]);
 
     useEffect(() => {
         let mounted = true;
+        setParticipantCache({});
+        setShiftContactByUserId({});
+        const identityAccountId = user?.id ?? null;
+        if (identityAccountId == null) return () => { mounted = false; };
         const loadIdentityCaches = async () => {
             try {
                 const [participantsData, shiftData] = await Promise.all([
                     fetchChatParticipants(),
                     fetchShiftContacts(),
                 ]);
-                if (!mounted) return;
+                if (!mounted || accountRef.current !== identityAccountId) return;
 
                 const participants = Array.isArray((participantsData as any)?.results)
                     ? (participantsData as any).results
@@ -207,7 +255,7 @@ export default function SharedMessageDetailScreen() {
         return () => {
             mounted = false;
         };
-    }, []);
+    }, [user?.id]);
 
     const resolveMessageIdentity = useCallback(
         (item: MessageDisplay): ChatIdentity => {
@@ -247,88 +295,96 @@ export default function SharedMessageDetailScreen() {
 
     const fetchMessages = useCallback(async () => {
         const roomId = parseRoomId();
-        if (!roomId) return;
+        const generation = ++roomGenerationRef.current;
+        sendScopeRef.current += 1;
+        sendBusyRef.current = false;
+        setSending(false);
+        const requestedAccountId = user?.id ?? null;
+        setMessagesRoomId(null);
+        setMessagesAccountId(null);
+        setMessages([]);
+        setLastReadAt(null);
+        setNextHistoryUrl(null);
+        setHistoryError(null);
+        setMessageLoadError(null);
+        setUnseenMessages(0);
+        setLoadingHistory(false);
+        historyBusyRef.current = false;
+        readerNearBottomRef.current = true;
+        shouldScrollRef.current = false;
+        setLoading(true);
+        if (!Number.isSafeInteger(roomId) || roomId <= 0 || requestedAccountId == null) {
+            setMessageLoadError('This conversation link is invalid.');
+            setLoading(false);
+            return;
+        }
         try {
             const data = await getRoomMessages(roomId);
-            const list = Array.isArray((data as any)?.results)
-                ? (data as any).results
-                : Array.isArray(data)
-                    ? (data as any)
-                    : [];
-
-            if ((data as any)?.my_last_read_at) {
-                setLastReadAt((data as any).my_last_read_at);
-            }
-
-            const mapped: MessageDisplay[] = list.map((msg: any, idx: number) => {
-                const senderUserId =
-                    msg.sender?.user_details?.id ??
-                    msg.sender?.user?.id ??
-                    msg.sender?.id ??
-                    msg.sender;
-                return {
-                    id: msg.id ?? `${msg.created_at ?? ''}-${idx}`,
-                    sender: msg.sender,
-                    conversation: msg.conversation ?? roomId,
-                    body: msg.body ?? msg.content ?? '',
-                    created_at: msg.created_at ?? new Date().toISOString(),
-                    attachment_url: msg.attachment_url ?? null,
-                    attachment_filename: msg.attachment_filename ?? null,
-                    is_deleted: msg.is_deleted,
-                    is_edited: msg.is_edited,
-                    reactions: msg.reactions ?? [],
-                    is_pinned: msg.is_pinned,
-                    is_me: user?.id != null ? senderUserId === user.id : false,
-                };
-            });
-            const unique = new Map<string | number, MessageDisplay>();
-            for (const msg of mapped) {
-                unique.set(messageKey(msg), msg);
-            }
-            const sorted = Array.from(unique.values()).sort(
-                (a, b) => messageTime(a) - messageTime(b)
-            );
-            setMessages(sorted);
+            if (generation !== roomGenerationRef.current || accountRef.current !== requestedAccountId) return;
+            const rows = Array.isArray((data as any)?.results) ? (data as any).results
+                : Array.isArray(data) ? data : [];
+            setMessages(current => mergeOlderMessages(current, rows.map((msg: any, idx: number) => mapMessage(msg, roomId, idx))));
+            setMessagesRoomId(roomId);
+            setMessagesAccountId(requestedAccountId);
+            const next = (data as any)?.next ?? null;
+            setNextHistoryUrl(isNextPageForRoom(next, roomId) ? next : null);
+            if ((data as any)?.my_last_read_at) setLastReadAt((data as any).my_last_read_at);
             shouldScrollRef.current = true;
-            const res = await markRoomAsRead(roomId);
-            if ((res as any)?.last_read_at) {
-                setLastReadAt((res as any).last_read_at);
+            // Read acknowledgement is best effort and must not overwrite a newer room's state.
+            try {
+                const receipt = await markRoomAsRead(roomId);
+                if (generation === roomGenerationRef.current && accountRef.current === requestedAccountId && (receipt as any)?.last_read_at) {
+                    setLastReadAt((receipt as any).last_read_at);
+                }
+            } catch {
+                // Reading remains available even when receipt submission fails.
             }
         } catch (error) {
-            console.error('Error fetching messages:', error);
+            if (generation === roomGenerationRef.current && accountRef.current === requestedAccountId) {
+                console.error('Error fetching messages:', error);
+                setMessageLoadError('Unable to load this conversation. Check your connection and try again.');
+            }
         } finally {
-            setLoading(false);
+            if (generation === roomGenerationRef.current && accountRef.current === requestedAccountId) setLoading(false);
         }
-    }, [user?.id, parseRoomId]);
+    }, [mapMessage, parseRoomId, user?.id]);
 
     useEffect(() => {
         void fetchMessages();
+        return () => { roomGenerationRef.current += 1; historyBusyRef.current = false; };
     }, [fetchMessages]);
 
-    // After initial load/render, scroll to the bottom once the list is mounted
-    useEffect(() => {
-        if (!loading && messages.length > 0 && shouldScrollRef.current) {
-            requestAnimationFrame(() => {
-                scrollIfNeeded();
-            });
+    const loadOlderMessages = async () => {
+        const roomId = parseRoomId();
+        const generation = roomGenerationRef.current;
+        const requestedAccountId = user?.id ?? null;
+        if (!validRoomId || loading || !isNextPageForRoom(nextHistoryUrl, roomId) || historyBusyRef.current) return;
+        historyBusyRef.current = true;
+        setLoadingHistory(true);
+        setHistoryError(null);
+        try {
+            const page = await fetchRoomMessagesByUrl(nextHistoryUrl!);
+            if (generation !== roomGenerationRef.current || accountRef.current !== requestedAccountId) return;
+            setMessages(current => mergeOlderMessages(current, page.messages.map((msg: any, idx: number) => mapMessage(msg, roomId, idx))));
+            setNextHistoryUrl(isNextPageForRoom(page.next, roomId) ? page.next : null);
+        } catch (error: any) {
+            if (generation === roomGenerationRef.current && accountRef.current === requestedAccountId) setHistoryError(error?.message || 'Older messages could not be loaded.');
+        } finally {
+            if (generation === roomGenerationRef.current && accountRef.current === requestedAccountId) {
+                historyBusyRef.current = false;
+                setLoadingHistory(false);
+            }
         }
-    }, [loading, messages.length]);
-
-    // Mirror web: whenever messages or room change, jump to bottom after layout frame.
-    useEffect(() => {
-        if (loading || messages.length === 0) return;
-        requestAnimationFrame(() => {
-            flatListRef.current?.scrollToEnd({ animated: false });
-            shouldScrollRef.current = false;
-        });
-    }, [messages.length, parseRoomId, loading]);
+    };
 
     useFocusEffect(
         useCallback(() => {
             const roomId = parseRoomId();
-            if (roomId) {
-                setActiveRoomId(roomId);
-            }
+            if (Number.isSafeInteger(roomId) && roomId > 0) setActiveRoomId(roomId);
+            return () => {
+                // Background notification filtering must resume as soon as this conversation loses focus.
+                if (getActiveRoomId() === roomId) setActiveRoomId(null);
+            };
         }, [parseRoomId])
     );
 
@@ -340,6 +396,7 @@ export default function SharedMessageDetailScreen() {
         const roomId = parseRoomId();
         if (payload.type === 'chat.message' || payload.type === 'message.created') {
             const msg = payload.message || payload;
+            if (Number(msg.conversation ?? msg.room ?? msg.room_id ?? roomId) !== roomId) return;
             const senderUserId =
                 msg.sender?.user_details?.id ??
                 msg.sender?.user?.id ??
@@ -359,8 +416,10 @@ export default function SharedMessageDetailScreen() {
                 is_pinned: msg.is_pinned,
                 is_me: user?.id != null ? senderUserId === user.id : false,
             };
+            const shouldFollow = shouldAutoFollowMessage(mapped.is_me, readerNearBottomRef.current);
             setMessages((prev) => upsertSortedMessage(prev, mapped));
-            shouldScrollRef.current = true;
+            if (shouldFollow) shouldScrollRef.current = true;
+            else setUnseenMessages(value => value + 1);
         } else if (payload.type === 'message.updated') {
             const msg = payload.message || payload;
             if (msg?.id) {
@@ -400,15 +459,19 @@ export default function SharedMessageDetailScreen() {
     );
 
     const sendMessage = async () => {
-        const body = newMessage.trim();
-        if (!body) return;
+        const body = visibleNewMessage.trim();
+        if (!body || sendBusyRef.current) return;
         const roomId = parseRoomId();
-        if (!roomId) return;
-
+        const sendingAccountId = user?.id ?? null;
+        if (!roomId || sendingAccountId == null) return;
+        const sendScope = sendScopeRef.current;
+        const stillCurrent = () => sendScopeRef.current === sendScope && accountRef.current === sendingAccountId && parseRoomId() === roomId;
+        sendBusyRef.current = true;
         setSending(true);
         try {
             if (editingId) {
                 const updated = await updateMessageService(editingId, body);
+                if (!stillCurrent()) return;
                 setMessages((prev) => prev.map((m) => (m.id === updated.id ? { ...m, body: updated.body, is_edited: true } : m)));
                 setEditingId(null);
                 setNewMessage('');
@@ -417,6 +480,7 @@ export default function SharedMessageDetailScreen() {
 
             const payload = { body, content: body };
             const sentMessage = await sendRoomMessageService(roomId, payload) as any;
+            if (!stillCurrent()) return;
             const newMsg: MessageDisplay = {
                 id: sentMessage.id ?? `${Date.now()}`,
                 sender: sentMessage.sender,
@@ -432,31 +496,41 @@ export default function SharedMessageDetailScreen() {
             shouldScrollRef.current = true;
             setNewMessage('');
         } catch (error) {
-            console.error('Error sending message:', error);
+            if (stillCurrent()) setSnackbar('Unable to send message. Your draft has been retained.');
         } finally {
-            setSending(false);
+            if (stillCurrent()) {
+                sendBusyRef.current = false;
+                setSending(false);
+            }
         }
     };
 
     const pickAttachment = async () => {
+        if (sendBusyRef.current) return;
+        const pickingAccountId = user?.id ?? null;
+        const pickScope = sendScopeRef.current;
+        const pickRoomId = parseRoomId();
+        if (pickingAccountId == null || !Number.isSafeInteger(pickRoomId) || pickRoomId <= 0) return;
+        const stillCurrent = () => sendScopeRef.current === pickScope && accountRef.current === pickingAccountId && parseRoomId() === pickRoomId;
         const res = await DocumentPicker.getDocumentAsync({
             multiple: false,
             copyToCacheDirectory: true,
             type: CHAT_ATTACHMENT_TYPES,
         });
-        if (res.canceled || !res.assets?.length) return;
+        if (!stillCurrent() || res.canceled || !res.assets?.length) return;
         const file = res.assets[0];
-        const roomId = parseRoomId();
-        if (!roomId) return;
+        const roomId = pickRoomId;
+        if (sendBusyRef.current) return;
         if (file.size && file.size > MAX_ATTACHMENT_BYTES) {
-            setSnackbar('Attachments must be 10 MB or smaller.');
+            setSnackbar('Attachments must be 15 MB or smaller.');
             return;
         }
 
+        sendBusyRef.current = true;
         setSending(true);
         try {
             const form = new FormData();
-            const body = newMessage.trim();
+            const body = visibleNewMessage.trim();
             if (body) form.append('body', body);
             form.append('attachment', {
                 uri: file.uri,
@@ -464,6 +538,7 @@ export default function SharedMessageDetailScreen() {
                 type: file.mimeType || 'application/octet-stream',
             } as any);
             const sent = await sendRoomMessageService(roomId, form as any);
+            if (!stillCurrent()) return;
             if (!sent?.id) throw new Error('Attachment not saved');
             const mapped: MessageDisplay = {
                 id: sent.id,
@@ -480,10 +555,12 @@ export default function SharedMessageDetailScreen() {
             shouldScrollRef.current = true;
             setNewMessage(''); // This was already correct, just ensuring it's not changed.
         } catch (err: any) {
-            console.error('Attachment send failed', err);
-            setSnackbar(err?.message || 'Failed to send attachment');
+            if (stillCurrent()) setSnackbar(err?.message || 'Failed to send attachment');
         } finally {
-            setSending(false);
+            if (stillCurrent()) {
+                sendBusyRef.current = false;
+                setSending(false);
+            }
         }
     };
 
@@ -503,77 +580,101 @@ export default function SharedMessageDetailScreen() {
     const debouncedTyping = useMemo(() => debounce(sendTyping, 300), [sendTyping]);
 
     const scrollIfNeeded = () => {
-        if (!shouldScrollRef.current) return;
+        if (!shouldScrollRef.current || loadingHistory) return;
         if (flatListRef.current) {
             flatListRef.current.scrollToEnd({ animated: false });
             shouldScrollRef.current = false;
+            readerNearBottomRef.current = true;
+            setUnseenMessages(0);
         }
     };
 
+    const jumpToLatest = () => {
+        shouldScrollRef.current = true;
+        scrollIfNeeded();
+    };
+
     const onReact = async (messageId: number, reaction: string) => {
+        const requestedRoomId = parseRoomId();
+        const requestedAccountId = user?.id ?? null;
+        const generation = roomGenerationRef.current;
+        const stillCurrent = () => generation === roomGenerationRef.current && accountRef.current === requestedAccountId && parseRoomId() === requestedRoomId;
+        if (requestedAccountId == null || !validRoomId || messagesAccountId !== requestedAccountId || messagesRoomId !== requestedRoomId) return;
         try {
-            const userId = user?.id;
-            // Optimistic local update to avoid waiting for WS echo
-            if (userId) {
-                setMessages((prev) =>
-                    prev.map((m) => {
-                        if (m.id !== messageId) return m;
-                        const current = m.reactions || [];
-                        const mine = current.find((r) => r.user_id === userId);
-                        let next = current;
-                        if (mine) {
-                            next = current.filter((r) => r.user_id !== userId);
-                            if (mine.reaction !== reaction) {
-                                next = [...next, { user_id: userId, reaction }];
-                            }
-                        } else {
-                            next = [...current, { user_id: userId, reaction }];
-                        }
-                        return { ...m, reactions: next };
-                    }),
-                );
-            }
+            // Wait for server confirmation rather than retaining an unverified optimistic
+            // reaction when the backend rejects the change.
             await reactToMessageService(messageId, reaction);
+            if (!stillCurrent()) return;
+            setMessages(prev => prev.map(message => {
+                if (message.id !== messageId) return message;
+                const reactions = message.reactions || [];
+                const mine = reactions.find(item => item.user_id === requestedAccountId);
+                const remaining = reactions.filter(item => item.user_id !== requestedAccountId);
+                return {
+                    ...message,
+                    reactions: mine?.reaction === reaction ? remaining : [...remaining, { user_id: requestedAccountId, reaction }],
+                };
+            }));
         } catch (err: any) {
-            setSnackbar(err?.response?.data?.detail || 'Reaction failed');
+            if (stillCurrent()) setSnackbar(err?.response?.data?.detail || 'Reaction failed');
         }
     };
 
     const onDelete = async (messageId: number) => {
+        const roomId = parseRoomId();
+        const accountId = user?.id ?? null;
+        const generation = roomGenerationRef.current;
+        if (!validRoomId || accountId == null || messagesAccountId !== accountId || messagesRoomId !== roomId) return;
         try {
             await deleteMessageService(messageId);
-            setMessages((prev) => prev.filter((m) => m.id !== messageId));
+            if (generation !== roomGenerationRef.current || accountRef.current !== accountId || parseRoomId() !== roomId) return;
+            setMessages(prev => prev.filter(message => message.id !== messageId));
         } catch (err: any) {
-            setSnackbar(err?.response?.data?.detail || 'Delete failed');
+            if (generation === roomGenerationRef.current && accountRef.current === accountId && parseRoomId() === roomId) {
+                setSnackbar(err?.response?.data?.detail || 'Delete failed');
+            }
         }
     };
 
     const onEditStart = (message: MessageDisplay) => {
+        if (messagesAccountId !== (user?.id ?? null) || messagesRoomId !== currentRoomId) return;
         setEditingId(message.id as number);
+        setComposerScope(currentComposerScope);
         setNewMessage(message.body || '');
     };
 
     const onPinMessage = async (messageId: number) => {
         const roomId = parseRoomId();
-        if (!roomId) return;
+        const accountId = user?.id ?? null;
+        const generation = roomGenerationRef.current;
+        if (!validRoomId || accountId == null || messagesAccountId !== accountId || messagesRoomId !== roomId) return;
         try {
             await toggleRoomPinService(roomId, { target: 'message', messageId });
-            setMessages((prev) =>
-                prev.map((m) => (m.id === messageId ? { ...m, is_pinned: !m.is_pinned } : m))
-            );
-        } catch (err) {
-            console.error('Pin failed', err);
+            if (generation !== roomGenerationRef.current || accountRef.current !== accountId || parseRoomId() !== roomId) return;
+            setMessages(prev => prev.map(message => (
+                message.id === messageId ? { ...message, is_pinned: !message.is_pinned } : message
+            )));
+        } catch {
+            if (generation === roomGenerationRef.current && accountRef.current === accountId) {
+                setSnackbar('Unable to update pinned message.');
+            }
         }
     };
 
     const onPinRoom = async () => {
         const roomId = parseRoomId();
-        if (!roomId) return;
+        const accountId = user?.id ?? null;
+        const generation = roomGenerationRef.current;
+        if (!validRoomId || accountId == null || messagesAccountId !== accountId || messagesRoomId !== roomId) return;
         try {
             const updated = await toggleRoomPinService(roomId, { target: 'conversation' });
-            setRoomPinned(!!updated?.is_pinned);
-        } catch (err) {
-            console.error('Room pin failed', err);
+            if (generation === roomGenerationRef.current && accountRef.current === accountId && parseRoomId() === roomId) {
+                setRoomPinned(!!updated?.is_pinned);
+            }
+        } catch {
+            if (generation === roomGenerationRef.current && accountRef.current === accountId) {
+                setSnackbar('Unable to update conversation pin.');
+            }
         }
     };
 
@@ -596,10 +697,11 @@ export default function SharedMessageDetailScreen() {
     const reactionToEmoji = (value: string) => REACTION_DISPLAY[value] ?? value;
 
 const pinnedMessage = useMemo(() => {
+        if (messagesRoomId !== currentRoomId || messagesAccountId !== (user?.id ?? null)) return null;
         const pinned = messages.filter((m) => m.is_pinned);
         if (!pinned.length) return null;
         return pinned.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-    }, [messages]);
+    }, [messages, messagesRoomId, messagesAccountId, currentRoomId, user?.id]);
 
     const renderReactions = (item: MessageDisplay) => {
         if (!item.reactions || item.reactions.length === 0) return null;
@@ -626,14 +728,39 @@ const pinnedMessage = useMemo(() => {
         const isMe = item.is_me;
         const senderName = senderNameOf(item);
         const senderPhoto = photoOf(resolveMessageIdentity(item));
-        const attachmentUrl = item.attachment_url ? absoluteAttachmentUrl(item.attachment_url) : null;
+        const attachmentAvailable = Number.isSafeInteger(item.id) && Number(item.id) > 0 &&
+            item.attachment_url === `/api/v1/messages/${item.id}/attachment/`;
         const openAttachment = async () => {
-            if (!attachmentUrl) return;
+            if (!attachmentAvailable) return;
+            const accountId = user?.id ?? null;
+            const roomId = parseRoomId();
+            const current = () => accountId != null && accountRef.current === accountId && parseRoomId() === roomId;
+            if (!current()) return;
+            let file: File | null = null;
             try {
-                if (!await Linking.canOpenURL(attachmentUrl)) throw new Error('Unsupported attachment URL');
-                await Linking.openURL(attachmentUrl);
+                if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is unavailable on this device.');
+                if (!current()) return;
+                const blob = await downloadChatAttachment(Number(item.id));
+                if (!current()) return;
+                const bytes = await nativeFileBytes(blob);
+                if (!current()) return;
+                if (!bytes.length || bytes.length > 15 * 1024 * 1024) throw new Error('Attachment size is invalid.');
+                const safeName = String(item.attachment_filename || 'attachment')
+                    .replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 90);
+                file = new File(Paths.cache, `chat-${item.id}-${Date.now()}-${safeName}`);
+                file.create({ overwrite: false });
+                await file.write(bytes);
+                if (!current()) return;
+                await Sharing.shareAsync(file.uri, {
+                    dialogTitle: 'Open or share chat attachment',
+                    mimeType: blob.type || 'application/octet-stream',
+                });
             } catch {
-                setSnackbar('Unable to open this attachment.');
+                if (current()) setSnackbar('Unable to open attachment. Check your access and connection.');
+            } finally {
+                if (file) {
+                    try { file.delete(); } catch { /* platform share provider may have moved it */ }
+                }
             }
         };
         return (
@@ -671,22 +798,23 @@ const pinnedMessage = useMemo(() => {
                             {item.is_edited ? ' (edited)' : ''}
                             </Text>
                         </View>
-                    {attachmentUrl ? (
+                    {item.attachment_url && !attachmentAvailable ? (
+                        <Text accessibilityRole="alert" style={styles.attachmentLabel}>Attachment unavailable</Text>
+                    ) : null}
+                    {attachmentAvailable ? (
                         <TouchableOpacity
-                            accessibilityRole="link"
-                            accessibilityLabel={`Open attachment ${item.attachment_filename || ''}`.trim()}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Open or share attachment ${item.attachment_filename || ''}`.trim()}
                             activeOpacity={0.8}
                             onPress={() => void openAttachment()}
                             style={styles.attachment}
                         >
-                            {isImageAttachment(item) ? (
-                                <Image source={{ uri: attachmentUrl }} style={styles.attachmentImage} contentFit="cover" transition={150} />
-                            ) : (
-                                <View style={styles.attachmentFile}>
-                                    <Icon source="file-document-outline" size={22} />
-                                    <Text numberOfLines={2} style={styles.attachmentLabel}>{item.attachment_filename || 'Open attachment'}</Text>
-                                </View>
-                            )}
+                            <View style={styles.attachmentFile}>
+                                <Icon source="file-document-outline" size={22} />
+                                <Text numberOfLines={2} style={styles.attachmentLabel}>
+                                    {item.attachment_filename || 'Open attachment securely'}
+                                </Text>
+                            </View>
                         </TouchableOpacity>
                     ) : null}
                     {renderReactions(item)}
@@ -780,16 +908,42 @@ const pinnedMessage = useMemo(() => {
             <View style={{ flex: 1 }}>
                 <FlatList
                     ref={flatListRef}
-                    data={messages}
+                    data={messagesRoomId === currentRoomId && messagesAccountId === (user?.id ?? null) ? messages : []}
+                    maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+                    onScroll={event => {
+                        const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+                        readerNearBottomRef.current = contentSize.height - contentOffset.y - layoutMeasurement.height < 140;
+                        if (readerNearBottomRef.current && unseenMessages) setUnseenMessages(0);
+                    }}
+                    scrollEventThrottle={100}
+                    ListHeaderComponent={nextHistoryUrl || loadingHistory || historyError ? (
+                        <View style={styles.historyHeader}>
+                            {historyError ? <Text accessibilityRole="alert" style={styles.historyError}>{historyError}</Text> : null}
+                            <Text style={styles.historyHint}>Earlier conversation history</Text>
+                            <IconButton icon={loadingHistory ? 'loading' : 'history'} accessibilityLabel="Load older messages" disabled={loadingHistory} onPress={() => void loadOlderMessages()} />
+                        </View>
+                    ) : undefined}
                     renderItem={renderMessage}
                     keyExtractor={(item, index) => `${item.id ?? 'msg'}-${item.created_at ?? index}`}
                     contentContainerStyle={[styles.listContent, { paddingBottom: 24 + insets.bottom }]}
                     onContentSizeChange={scrollIfNeeded}
                     onLayout={scrollIfNeeded}
                 />
+                {messageLoadError && !loading ? (
+                    <View style={styles.messageLoadError}>
+                        <Text accessibilityRole="alert" style={styles.historyError}>{messageLoadError}</Text>
+                        <IconButton icon="refresh" accessibilityLabel="Retry loading conversation" onPress={() => void fetchMessages()} />
+                    </View>
+                ) : null}
                 {loading ? (
                     <View style={[StyleSheet.absoluteFill, styles.centerContainer]}>
                         <ActivityIndicator size="large" color="#6366F1" />
+                    </View>
+                ) : null}
+                {unseenMessages > 0 ? (
+                    <View style={styles.jumpRow}>
+                        <IconButton icon="arrow-down" accessibilityLabel={`Jump to ${unseenMessages} new messages`} onPress={jumpToLatest} />
+                        <Text onPress={jumpToLatest} accessibilityRole="button">New messages · ${unseenMessages}</Text>
                     </View>
                 ) : null}
             </View>
@@ -812,8 +966,9 @@ const pinnedMessage = useMemo(() => {
                     <TextInput
                         mode="outlined"
                         placeholder={editingId ? 'Edit message...' : 'Type a message...'}
-                        value={newMessage}
+                        value={visibleNewMessage}
                         onChangeText={(text) => {
+                            setComposerScope(currentComposerScope);
                             setNewMessage(text);
                             debouncedTyping();
                         }}
@@ -830,8 +985,8 @@ const pinnedMessage = useMemo(() => {
                             <TextInput.Icon
                                 icon={editingId ? 'check' : 'send'}
                                 onPress={sendMessage}
-                                disabled={sending || !newMessage.trim()}
-                                color={newMessage.trim() ? '#6366F1' : '#9CA3AF'}
+                                disabled={sending || !visibleNewMessage.trim()}
+                                color={visibleNewMessage.trim() ? '#6366F1' : '#9CA3AF'}
                             />
                         }
                     />
@@ -860,6 +1015,11 @@ const styles = StyleSheet.create({
         padding: 12,
         paddingBottom: 24,
     },
+    historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap', paddingVertical: 8 },
+    messageLoadError: { padding: 12, alignItems: 'center', gap: 6 },
+    historyHint: { fontSize: 12, color: '#52617A' },
+    historyError: { color: '#B42318', width: '100%', textAlign: 'center' },
+    jumpRow: { position: 'absolute', right: 16, bottom: 18, borderRadius: 22, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F0FF', borderColor: '#BBCDF9', borderWidth: 1 },
     messageContainer: {
         flexDirection: 'row',
         alignItems: 'flex-start',

@@ -1,7 +1,8 @@
 import { createFriendPillReferralService } from '@chemisttasker/shared-core';
 import { fetchPillBalanceService } from '@chemisttasker/shared-core';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { openWebPage } from '@/features/explore/webLinks';
 import {
   Avatar,
   Button,
@@ -44,7 +45,6 @@ export default function OrganizationProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const can = orgCapabilities(user);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -182,19 +182,15 @@ export default function OrganizationProfileScreen() {
             <List.Item
               title="Notifications"
               left={(props) => <List.Icon {...props} icon="bell" />}
-              right={() => (
-                <Switch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
-                  color="#6366F1"
-                />
-              )}
+              right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => router.push('/notifications' as any)}
             />
             <Divider />
             <List.Item
               title="App Settings"
               left={(props) => <List.Icon {...props} icon="cog" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => router.push('/app-preferences' as any)}
             />
           </Surface>
         </View>
@@ -213,14 +209,14 @@ export default function OrganizationProfileScreen() {
               title="Terms of Service"
               left={(props) => <List.Icon {...props} icon="file-document" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => Linking.openURL(`${webBaseUrl}/terms-of-service`)}
+              onPress={() => openWebPage('/terms-of-service').catch(() => Alert.alert('Website unavailable', 'Please try again.'))}
             />
             <Divider />
             <List.Item
               title="Privacy Policy"
               left={(props) => <List.Icon {...props} icon="shield-check" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => Linking.openURL(`${webBaseUrl}/privacy-policy`)}
+              onPress={() => openWebPage('/privacy-policy').catch(() => Alert.alert('Website unavailable', 'Please try again.'))}
             />
           </Surface>
         </View>

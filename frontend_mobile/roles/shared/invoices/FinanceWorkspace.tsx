@@ -2,11 +2,15 @@ import React, { useCallback, useEffect, useRef, useState, type ReactNode } from 
 import { Alert, Modal, RefreshControl, ScrollView, View, KeyboardAvoidingView, Platform } from 'react-native';
 import { ActivityIndicator, Button, Checkbox, Chip, IconButton, List, Searchbar, Surface, Text, TextInput, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { finance, financeStatus, financeToday, type FinanceCustomer, type FinanceCustomerInput, type FinanceItem, type FinanceItemInput, type FinanceInvoice, type FinanceExpense, type FinanceExpenseInput, type FinanceWorksheet } from '@chemisttasker/shared-core';
 import FinanceInvoiceEditor from './FinanceInvoiceEditor';
+import { receivedInvoiceActions } from './receivedInvoicePolicy';
 import { nativeFileBytes } from '@/features/parity/nativeFileBytes';
+import { colors, font, radius, space, touch } from '@/constants/tokens';
+import { useAuth } from '@/context/AuthContext';
 
 const money = (value: string | number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 // Idempotency identity only; no secrets or authentication use.
@@ -17,6 +21,18 @@ type Form = { title: string; fields: Record<string, string>; booleans: Record<st
 
 export default function FinanceWorkspace({ existingTools, receivedMode = false }: { existingTools?: ReactNode; receivedMode?: boolean }) {
   const theme = useTheme();
+  const router = useRouter();
+  const { user } = useAuth();
+  const ownerScope = `${user?.id ?? 'signed-out'}:${receivedMode ? 'received' : 'issued'}`;
+  const scopeRef = useRef(ownerScope);
+  scopeRef.current = ownerScope;
+  const loadGen = useRef(0);
+  const historyGen = useRef(0);
+  const { invoice: invoiceParam } = useLocalSearchParams<{ invoice?: string | string[] }>();
+  const linkedId = Array.isArray(invoiceParam) ? invoiceParam[0] : invoiceParam;
+  const requestedInvoiceId = typeof linkedId === 'string' && /^[1-9]\d*$/.test(linkedId)
+    ? Number(linkedId) : null;
+  const handledLink = useRef('');
   const tabs = receivedMode ? ownerTabs : workerTabs;
   const [tab, setTab] = useState(receivedMode ? 'Received' : 'Invoices'); const [search, setSearch] = useState(''); const [status, setStatus] = useState('All');
   const [customers, setCustomers] = useState<FinanceCustomer[]>([]); const [items, setItems] = useState<FinanceItem[]>([]);
@@ -25,38 +41,137 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const [editor, setEditor] = useState<{ invoice?: FinanceInvoice; key: string } | null>(null);
   const [form, setForm] = useState<Form | null>(null); const [formError, setFormError] = useState('');
   const [selected, setSelected] = useState<FinanceInvoice | null>(null);
+  const selectedInvoiceRef = useRef<number | null>(null);
+  selectedInvoiceRef.current = selected?.id ?? null;
+  const [historyDocument, setHistoryDocument] = useState<FinanceInvoice | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  useEffect(() => {
+    historyGen.current += 1;
+    setHistoryLoading(false);
+    setHistoryDocument(null);
+    setHistoryError('');
+  }, [selected?.id]);
   const [start, setStart] = useState(`${financeToday().slice(0, 4)}-01-01`); const [end, setEnd] = useState(financeToday());
   const [basis, setBasis] = useState<'cash' | 'accrual'>('cash'); const [worksheet, setWorksheet] = useState<FinanceWorksheet | null>(null);
   const load = useCallback(async () => {
-    if (receivedMode) {
-      setReceivedInvoices(await finance.receivedInvoices());
+    const request = ++loadGen.current;
+    const scope = ownerScope;
+    const current = () => request === loadGen.current && scopeRef.current === scope;
+    try {
+      if (receivedMode) {
+        const nextReceived = await finance.receivedInvoices();
+        if (current()) setReceivedInvoices(nextReceived);
+        return;
+      }
+      const [c, i, inv, e] = await Promise.all([finance.customers(), finance.items(), finance.invoices(), finance.expenses()]);
+      if (!current()) return;
+      setCustomers(c); setItems(i); setInvoices(inv); setExpenses(e);
+    } catch (failure: any) {
+      if (current()) setError(failure?.message || 'Could not refresh finance records.');
+      throw failure;
+    } finally {
+      if (current()) setLoading(false);
+    }
+  }, [receivedMode, ownerScope]);
+  useEffect(() => {
+    // Never show a different account's or persona's finance records while
+    // refreshing the new authorized scope.
+    setInvoices([]); setReceivedInvoices([]); setCustomers([]); setItems([]); setExpenses([]);
+    historyGen.current += 1;
+    handledLink.current = '';
+    setSelected(null); setHistoryDocument(null); setForm(null); setEditor(null);
+    setHistoryLoading(false); setHistoryError(''); setWorksheet(null);
+    setError(''); setLoading(true);
+    void load().catch(() => {});
+    return () => { loadGen.current += 1; historyGen.current += 1; };
+  }, [load]);
+  // Consume ?invoice= only after the authorized finance list has loaded. A
+  // re-fetch or screen re-render must not reopen a dismissed review modal.
+  useEffect(() => {
+    if (requestedInvoiceId == null) { handledLink.current = ''; return; }
+    // A failed fetch or an active retry does not prove this invoice is absent.
+    // Keep the deep link eligible for selection after a successful reload.
+    if (loading || busy || error || !Number.isSafeInteger(requestedInvoiceId)) return;
+    const linkKey = ownerScope + ':' + requestedInvoiceId;
+    if (handledLink.current === linkKey) return;
+    const found = (receivedMode ? receivedInvoices : invoices).find(row => row.id === requestedInvoiceId);
+    if (!found) {
+      setError('Invoice ' + requestedInvoiceId + ' is not available in this finance workspace.');
       return;
     }
-    const [c, i, inv, e] = await Promise.all([finance.customers(), finance.items(), finance.invoices(), finance.expenses()]);
-    setCustomers(c); setItems(i); setInvoices(inv); setExpenses(e);
-  }, [receivedMode]);
-  useEffect(() => { load().catch(e => setError(e.message)).finally(() => setLoading(false)); }, [load]);
+    handledLink.current = linkKey;
+    setTab(receivedMode ? 'Received' : 'Invoices');
+    setHistoryDocument(null);
+    setHistoryError('');
+    setSelected(found);
+  }, [requestedInvoiceId, receivedMode, receivedInvoices, invoices, loading, busy, error, ownerScope]);
+  const clearInvoiceLink = () => {
+    if (requestedInvoiceId != null) router.setParams({ invoice: undefined });
+  };
   const run = async (action: () => Promise<unknown>) => { if (running.current) return; running.current = true; setBusy(true); setError(''); try { await action(); } catch (e: any) { setError(e.message || 'Unable to complete this action.'); } finally { running.current = false; setBusy(false); } };
+  const openHistoricalRevision = async (invoice: FinanceInvoice, version: number) => {
+    if (historyLoading || running.current) return;
+    const requestedScope = ownerScope;
+    const request = ++historyGen.current;
+    const current = () => historyGen.current === request && scopeRef.current === requestedScope && selectedInvoiceRef.current === invoice.id;
+    setHistoryLoading(true);
+    setHistoryError('');
+    setHistoryDocument(null);
+    try {
+      const revision = receivedMode ? await finance.receivedRevision(invoice.id, version) : await finance.invoiceRevision(invoice.id, version);
+      if (!current()) return;
+      if (revision.id === invoice.id && revision.version === version) setHistoryDocument(revision);
+      else setHistoryError('This revision could not be verified. Please retry.');
+    } catch (failure: any) {
+      if (current()) setHistoryError(failure?.message || 'Historical revision could not be opened.');
+    } finally {
+      if (current()) setHistoryLoading(false);
+    }
+  };
   const sharePdf = async (invoice: FinanceInvoice, received = false, version?: number) => {
+    const requestedScope = ownerScope;
+    const current = () => scopeRef.current === requestedScope;
+    if (!current()) return;
     if (!(await Sharing.isAvailableAsync())) throw new Error('PDF sharing is not available on this device.');
+    if (!current()) return;
     const targetVersion = version ?? invoice.version;
     const blob = version == null
       ? (received ? await finance.receivedPdf(invoice.id) : await finance.pdf(invoice.id))
       : (received ? await finance.receivedRevisionPdf(invoice.id, version) : await finance.invoiceRevisionPdf(invoice.id, version));
+    // A previous-account PDF must never enter this account's native share sheet.
+    if (!current()) return;
     const bytes = await nativeFileBytes(blob);
-    const file = new File(Paths.cache, invoice.number + '-revision-' + targetVersion + '.pdf');
-    file.create({ overwrite: true });
-    await file.write(bytes);
-    await Sharing.shareAsync(file.uri, {
-      dialogTitle: 'Share ' + invoice.number + ' revision ' + targetVersion,
-      mimeType: 'application/pdf',
-      UTI: 'com.adobe.pdf',
-    });
+    if (!current()) return;
+    // Do not hand HTML error bodies or other unexpected downloads to the OS
+    // as an invoice. Same PDF signature requirement as the legacy invoice path.
+    if (bytes.length < 5 || bytes[0] !== 37 || bytes[1] !== 80 || bytes[2] !== 68 || bytes[3] !== 70 || bytes[4] !== 45) {
+      throw new Error('The invoice could not be opened as a PDF.');
+    }
+    const safeNumber = String(invoice.number).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+    const file = new File(Paths.cache, `invoice-${invoice.id}-${safeNumber}-revision-${targetVersion}.pdf`);
+    try {
+      file.create({ overwrite: true });
+      await file.write(bytes);
+      if (!current()) return;
+      await Sharing.shareAsync(file.uri, {
+        dialogTitle: 'Share ' + invoice.number + ' revision ' + targetVersion,
+        mimeType: 'application/pdf',
+        UTI: 'com.adobe.pdf',
+      });
+    } finally {
+      // Remove the temporary sensitive document even when the share sheet fails.
+      try { file.delete(); } catch { /* best-effort cleanup */ }
+    }
   };
-  const afterSave = async () => { try { await load(); } catch { setError('Saved. Pull to refresh to update the list.'); } };
+  const afterSave = async () => {
+    const savedScope = ownerScope;
+    try { await load(); }
+    catch { if (scopeRef.current === savedScope) setError('Saved. Pull to refresh to update the list.'); }
+  };
   const ask = (title: string, message: string, action: () => Promise<unknown>) => Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Confirm', onPress: () => void run(action) }]);
   const matches = (...values: string[]) => values.join(' ').toLowerCase().includes(search.toLowerCase());
-  const panel = { padding: 16, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.outlineVariant, marginBottom: 12 };
+  const panel = { padding: space.lg, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceBg, marginBottom: space.md };
   const customerForm = (initial?: FinanceCustomer) => {
     const value: FinanceCustomerInput = initial || { name: '', legal_name: '', abn: '', contact_name: '', email: '', phone: '', address: '', payment_terms_days: 14, notes: '', active: true };
     setFormError(''); setForm({ title: initial ? 'Edit customer' : 'Create customer', fields: { name: value.name, legal_name: value.legal_name, abn: value.abn, contact_name: value.contact_name, email: value.email, phone: value.phone, address: value.address, payment_terms_days: String(value.payment_terms_days), notes: value.notes }, booleans: { active: value.active }, save: (fields, flags) => finance.saveCustomer({ ...value, ...fields, ...flags, payment_terms_days: Number(fields.payment_terms_days) }, initial?.id) });
@@ -71,7 +186,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   };
   const paymentForm = (invoice: FinanceInvoice) => { const requestKey = key(); setSelected(null); setFormError(''); setForm({ title: `Record payment · ${invoice.number}`, fields: { amount: invoice.balance, date: financeToday(), reference: '' }, booleans: invoice.kind === 'super_request' ? { fund_payment_confirmed: false } : {}, save: (fields, flags) => finance.payment(invoice.id, { request_key: requestKey, date: fields.date, amount: fields.amount, reference: fields.reference, fund_payment_confirmed: !!flags.fund_payment_confirmed }) }); };
   const reviewForm = (invoice: FinanceInvoice, kind: 'approve' | 'revise' | 'paid') => {
-    setSelected(null); setFormError('');
+    setSelected(null); clearInvoiceLink(); setFormError('');
     const needsFundConfirmation = kind === 'paid' && invoice.kind === 'super_request';
     setForm({ title: kind === 'revise' ? 'Request invoice revision' : kind === 'paid' ? 'Mark invoice paid' : 'Approve for payment', fields: { note: '' }, booleans: needsFundConfirmation ? { fund_payment_confirmed: false } : {}, save: async (fields, flags) => {
       const note = fields.note.trim();
@@ -83,28 +198,34 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     }});
   };
   const markPaidForm = (invoice: FinanceInvoice) => {
-    setSelected(null); setFormError('');
+    setSelected(null); clearInvoiceLink(); setFormError('');
     setForm({ title: `Mark ${invoice.number} paid`, fields: {}, booleans: { fund_payment_confirmed: false }, save: async (_fields, flags) => {
       if (!flags.fund_payment_confirmed) throw new Error('Confirm the payment went to the super fund.');
       return finance.markPaid(invoice.id, invoice.version, flags.fund_payment_confirmed);
     } });
   };
   const closeForm = () => { if (!busy) Alert.alert('Discard changes?', 'Unsaved changes will be lost.', [{ text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: () => setForm(null) }]); };
-  if (editor) return <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}><FinanceInvoiceEditor requestKey={editor.key} initial={editor.invoice} previous={invoices.find(i => i.kind === 'invoice')} customers={customers} items={items} onClose={() => setEditor(null)} onSaved={afterSave} /></SafeAreaView>;
+  if (editor) return <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}><FinanceInvoiceEditor requestKey={editor.key} initial={editor.invoice} previous={invoices.find(i => i.kind === 'invoice')} customers={customers} items={items} onClose={() => { if (scopeRef.current === ownerScope) setEditor(null); }} onSaved={afterSave} /></SafeAreaView>;
   const fieldOptions: Record<string, string[]> = { tax_code: ['GST', 'GST_FREE', 'INPUT_TAXED', 'OUT_OF_SCOPE'], ...(form?.title.toLowerCase().includes('item') ? { category: ['ProfessionalServices', 'Superannuation', 'Transportation', 'Accommodation', 'Miscellaneous'] } : {}) };
   const labels: Record<string, string> = { name: 'Name', legal_name: 'Legal entity name', abn: 'ABN', contact_name: 'Accounts contact', email: 'Invoice email', phone: 'Phone', address: 'Billing address', payment_terms_days: 'Payment terms (days)', notes: 'Notes', active: 'Active', code: 'Item code (optional)', category: 'Category', unit: 'Unit', unit_price: 'Unit price (AUD)', tax_code: 'Tax treatment', super_eligible: 'Include in reviewed super base', supplier: 'Supplier', description: 'Description', incurred_on: 'Incurred date (YYYY-MM-DD)', paid_on: 'Paid date (YYYY-MM-DD, optional)', amount: 'Amount (AUD)', gst_amount: 'Actual GST (AUD)', business_use_percent: 'Business use %', reference: 'Reference', gst_registered: 'I am registered for GST for this acquisition', evidence_confirmed: 'I hold the required tax invoice / evidence', reimbursable: 'Potentially reimbursable', fund_payment_confirmed: 'Payment went to the super fund', date: 'Payment date (YYYY-MM-DD)' };
   return <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: theme.colors.background }}>
-    <View style={{ padding: 16, flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleLarge" style={{ fontWeight: '700' }}>{receivedMode ? 'Received invoices' : 'Invoices & finances'}</Text><Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>{receivedMode ? 'Review contractor invoices, request corrections and record payment status.' : 'Create, revise, send and track invoices.'}</Text></View>{!receivedMode ? <IconButton icon="plus" accessibilityLabel="Create invoice" disabled={loading || busy} onPress={() => setEditor({ key: key() })} /> : null}</View>
+    <View style={{ padding: 16, flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleLarge" style={{ fontFamily: font.outfit.medium, color: colors.textPrimary }}>{receivedMode ? 'Received invoices' : 'Invoices & finances'}</Text><Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>{receivedMode ? 'Review contractor invoices, request corrections and record payment status.' : 'Create, revise, send and track invoices.'}</Text></View>{!receivedMode ? <IconButton icon="plus" accessibilityLabel="Create invoice" disabled={loading || busy} onPress={() => setEditor({ key: key() })} /> : null}</View>
     <View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}>{tabs.filter(t => t !== 'Existing tools' || existingTools).map(t => <Chip key={t} selected={tab === t} onPress={() => { setTab(t); setSearch(''); }}>{t}</Chip>)}</ScrollView></View>
     {tab === 'Existing tools' ? existingTools : <ScrollView keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void run(load)} />} contentContainerStyle={{ padding: 16 }}>
-      {!!error && <Text accessibilityRole="alert" style={{ color: theme.colors.error, marginBottom: 16 }}>{error}</Text>}
+      {!!error && <Surface elevation={0} style={[panel, { backgroundColor: colors.status.red.bg, borderColor: colors.status.red.fg }]}>
+        <Text accessibilityRole="alert" variant="titleSmall" style={{ color: colors.status.red.fg }}>Could not refresh this workspace</Text>
+        <Text style={{ color: colors.textPrimary, marginTop: space.sm, marginBottom: space.md }}>{error}</Text>
+        <Button mode="outlined" disabled={busy} loading={busy} contentStyle={{ minHeight: touch.min }} onPress={() => void run(load)}>
+          Try again
+        </Button>
+      </Surface>}
       {loading ? <ActivityIndicator accessibilityLabel="Loading finance records" /> : <>
-      {tab !== 'GST / BAS' && <Searchbar placeholder={`Search ${tab.toLowerCase()}`} value={search} onChangeText={setSearch} style={{ borderRadius: 8, marginBottom: 16 }} />}
+      {tab !== 'GST / BAS' && <Searchbar placeholder={`Search ${tab.toLowerCase()}`} value={search} onChangeText={setSearch} style={{ borderRadius: radius.control, marginBottom: space.lg, backgroundColor: colors.surfaceBg }} />}
       {tab === 'Invoices' && <>
         <View style={{ flexDirection: 'row', gap: 24, marginBottom: 20 }}><View><Text variant="labelMedium">Balance due</Text><Text variant="titleLarge">{money(invoices.filter(i => !i.voided && i.kind === 'invoice').reduce((sum, i) => sum + Number(i.balance), 0))}</Text></View><View><Text variant="labelMedium">Saved</Text><Text variant="titleLarge">{invoices.filter(i => financeStatus(i) === 'Saved').length}</Text></View></View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 16 }}>{['All', 'Saved', 'Sent', 'Approved for payment', 'Revision requested', 'Overdue', 'Part paid', 'Paid'].map(s => <Chip key={s} selected={status === s} onPress={() => setStatus(s)}>{s}</Chip>)}</ScrollView>
-        {invoices.filter(i => (status === 'All' || financeStatus(i) === status) && matches(i.number, i.payload.customer?.name || '', i.payload.reference)).map(i => <Surface key={i.id} elevation={0} style={panel}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleMedium">{i.number}</Text><Text>{i.payload.customer?.name}</Text></View><Chip compact>{financeStatus(i)}</Chip></View><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 16 }}><Text variant="bodySmall">Due {i.payload.due_date}</Text><Text variant="titleMedium">{money(i.balance)}</Text></View><Button mode="outlined" onPress={() => setSelected(i)}>View invoice</Button></Surface>)}
-        {!invoices.length && <View style={{ padding: 24, alignItems: 'center', gap: 12 }}><Text variant="titleMedium">Create your first invoice</Text><Text>Save a customer and an item, then bill your work.</Text><Button mode="contained" onPress={() => setEditor({ key: key() })}>Create invoice</Button></View>}
+        {invoices.filter(i => (status === 'All' || financeStatus(i) === status) && matches(i.number, i.payload.customer?.name || '', i.payload.reference)).map(i => <Surface key={i.id} elevation={0} style={panel}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleMedium">{i.number}</Text><Text>{i.payload.customer?.name}</Text></View><Chip compact>{financeStatus(i)}</Chip></View><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 16 }}><Text variant="bodySmall">Due {i.payload.due_date}</Text><Text variant="titleMedium">{money(i.balance)}</Text></View><Button mode="outlined" onPress={() => { setHistoryDocument(null); setHistoryError(''); setSelected(i); }}>View invoice</Button></Surface>)}
+        {!error && !invoices.length && <View style={{ padding: space['2xl'], alignItems: 'center', gap: space.md }}><Text variant="titleMedium">Create your first invoice</Text><Text>Save a customer and an item, then bill your work.</Text><Button mode="contained" onPress={() => setEditor({ key: key() })}>Create invoice</Button></View>}
       </>}
       {tab === 'Received' && <>
         <Text style={{ marginBottom: 12, color: theme.colors.onSurfaceVariant }}>Sent internal ABN invoices appear here. Request a revision when hours, finish time, rate, tax treatment or another detail needs correction.</Text>
@@ -112,9 +233,9 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
           <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleMedium">{i.number}</Text><Text>{i.payload.issuer_name}</Text><Text variant="bodySmall">{i.payload.customer?.name} · revision {i.version}</Text></View><Chip compact>{financeStatus(i)}</Chip></View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 12 }}><Text>Payable</Text><Text variant="titleMedium">{money(i.calculation.payable)}</Text></View>
           {i.last_review_note ? <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 8 }}>{i.last_review_note}</Text> : null}
-          <Button mode="outlined" onPress={() => setSelected(i)}>Review invoice</Button>
+          <Button mode="outlined" onPress={() => { setHistoryDocument(null); setHistoryError(''); setSelected(i); }}>Review invoice</Button>
         </Surface>)}
-        {!receivedInvoices.length && <View style={{ padding: 24, alignItems: 'center' }}><Text variant="titleMedium">No received invoices yet</Text><Text>Internal invoices will appear after the contractor sends them.</Text></View>}
+        {!error && !receivedInvoices.length && <View style={{ padding: space['2xl'], alignItems: 'center' }}><Text variant="titleMedium">No received invoices yet</Text><Text>Internal invoices will appear after the contractor sends them.</Text></View>}
       </>}
       {tab === 'Customers' && <><Button icon="plus" onPress={() => customerForm()} style={{ marginBottom: 16 }}>Create customer</Button>{customers.filter(c => matches(c.name, c.abn)).map(c => <Surface key={c.id} elevation={0} style={panel}><Text variant="titleMedium">{c.name}</Text><Text>{c.email || 'No invoice email'}</Text><Text variant="bodySmall">{c.payment_terms_days}-day terms · ABN {c.abn || 'not supplied'}</Text><View style={{ flexDirection: 'row' }}><Button onPress={() => customerForm(c)}>Edit</Button><Button disabled={busy || !c.abn} onPress={() => void run(async () => { await finance.lookupAbn(c.id); await load(); })}>Check ABN</Button></View></Surface>)}</>}
       {tab === 'Items' && <><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}><Button icon="plus" onPress={() => itemForm()}>Create item</Button><Button disabled={busy} onPress={() => void run(async () => { await finance.seedItems(); await load(); })}>Starter items</Button></View>{items.filter(i => matches(i.code, i.name)).map(i => <Surface key={i.id} elevation={0} style={panel}><Text variant="titleMedium">{i.name}</Text><Text>{i.code} · {money(i.unit_price)} / {i.unit}</Text><Text variant="bodySmall">{i.tax_code.replaceAll('_', ' ')}</Text><Button onPress={() => itemForm(i)}>Edit item</Button></Surface>)}</>}
@@ -122,11 +243,35 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       {tab === 'GST / BAS' && <View style={{ gap: 16 }}><Text variant="titleMedium">GST worksheet</Text><Text>Estimate only. Legacy invoices and unsupported adjustments are excluded; this is not a complete BAS.</Text><TextInput mode="outlined" label="Start (YYYY-MM-DD)" value={start} onChangeText={v => { setStart(v); setWorksheet(null); }} /><TextInput mode="outlined" label="End (YYYY-MM-DD)" value={end} onChangeText={v => { setEnd(v); setWorksheet(null); }} /><View style={{ flexDirection: 'row', gap: 8 }}>{(['cash', 'accrual'] as const).map(b => <Chip key={b} selected={basis === b} onPress={() => { setBasis(b); setWorksheet(null); }}>{b === 'cash' ? 'Cash' : 'Accrual'}</Chip>)}</View><Button mode="contained" disabled={busy} onPress={() => void run(async () => setWorksheet(await finance.worksheet(start, end, basis)))}>Calculate worksheet</Button>{worksheet && <Surface elevation={0} style={panel}>{[['G1 · Sales', worksheet.G1], ['1A · GST on sales', worksheet['1A']], ['1B · GST credits', worksheet['1B']], ['Estimated net GST', worksheet.estimated_gst_net]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }}><Text>{label}</Text><Text>{money(amount)}</Text></View>)}{worksheet.warnings.map(w => <Text key={w} variant="bodySmall">{w}</Text>)}<Text>Excluded legacy invoices: {worksheet.excluded_legacy_invoice_count}</Text></Surface>}</View>}
       </>}
     </ScrollView>}
-    <Modal visible={!!selected} animationType="slide" onRequestClose={() => setSelected(null)}>
+    <Modal visible={!!selected} animationType="slide" onRequestClose={() => { if (!historyLoading) { setHistoryDocument(null); setSelected(null); clearInvoiceLink(); } }}>
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
         <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
-          <Button icon="arrow-left" onPress={() => setSelected(null)}>Back to invoices</Button>
-          {selected ? <>
+          <Button icon="arrow-left" disabled={historyLoading} onPress={() => { if (historyDocument) setHistoryDocument(null); else { setSelected(null); clearInvoiceLink(); } }}>
+            {historyDocument ? 'Back to invoice' : 'Back to invoices'}
+          </Button>
+          {historyError ? <Text accessibilityRole="alert" style={{ color: theme.colors.error }}>{historyError}</Text> : null}
+          {historyLoading ? <ActivityIndicator accessibilityLabel="Loading historical invoice revision" /> : null}
+          {selected && historyDocument ? <>
+            <Text variant="headlineSmall">Revision {historyDocument.version} · {historyDocument.number}</Text>
+            <Chip style={{ alignSelf: 'flex-start' }}>Read-only historical document</Chip>
+            <Text>{historyDocument.payload.customer?.name || historyDocument.payload.issuer_name}</Text>
+            <Text>Issued {historyDocument.payload.invoice_date} · Due {historyDocument.payload.due_date}</Text>
+            {historyDocument.payload.lines.map((line, index) =>
+              <List.Item key={index} title={line.description} description={line.quantity + ' ' + (line.unit || '') + ' × ' + money(line.unit_price)} />
+            )}
+            <Surface elevation={0} style={panel}>
+              <Text variant="titleMedium">Revision totals</Text>
+              <Text>Subtotal {money(historyDocument.calculation.subtotal)}</Text>
+              <Text>GST {money(historyDocument.calculation.gst)}</Text>
+              <Text variant="titleLarge">Payable {money(historyDocument.calculation.payable)}</Text>
+            </Surface>
+            <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected, receivedMode, historyDocument.version))}>
+              Share this revision PDF
+            </Button>
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+              Historical revisions cannot be edited, sent, approved or marked paid from this view.
+            </Text>
+          </> : selected ? <>
             <Text variant="headlineSmall">{selected.number}</Text>
             <Chip style={{ alignSelf: 'flex-start' }}>{financeStatus(selected)}</Chip>
             <Text>{receivedMode ? selected.payload.issuer_name : selected.payload.customer?.name}</Text>
@@ -138,14 +283,20 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
               <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: 8 }}>Revision history</Text>
               {selected.revisions.map(revision => <View key={revision.version} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
                 <View style={{ flex: 1 }}><Text>Revision {revision.version}</Text><Text variant="bodySmall">{revision.invoice_status.replaceAll('_', ' ')} · {money(revision.calculation.payable)}</Text></View>
-                <Button compact disabled={busy} onPress={() => void run(() => sharePdf(selected, receivedMode, revision.version))}>Share PDF</Button>
+                <Button compact disabled={busy || historyLoading} onPress={() => void openHistoricalRevision(selected, revision.version)}>View</Button>
+                <Button compact disabled={busy || historyLoading} onPress={() => void run(() => sharePdf(selected, receivedMode, revision.version))}>Share PDF</Button>
               </View>)}
             </Surface>}
             {receivedMode ? <View style={{ gap: 8 }}>
               <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected, true))}>Share delivered PDF</Button>
-              <Button mode="contained" disabled={selected.is_current === false} onPress={() => reviewForm(selected, 'approve')}>Approve for payment</Button>
-              <Button mode="outlined" disabled={selected.is_current === false} textColor={theme.colors.error} onPress={() => reviewForm(selected, 'revise')}>Request revision</Button>
-              <Button mode="outlined" disabled={selected.is_current === false || selected.status === 'paid'} onPress={() => reviewForm(selected, 'paid')}>Mark paid</Button>
+              <Button mode="contained" contentStyle={{ minHeight: touch.min }} disabled={busy || !receivedInvoiceActions(selected).approve} onPress={() => reviewForm(selected, 'approve')}>Approve for payment</Button>
+              <Button mode="outlined" contentStyle={{ minHeight: touch.min }} disabled={busy || !receivedInvoiceActions(selected).revise} textColor={theme.colors.error} onPress={() => reviewForm(selected, 'revise')}>Request revision</Button>
+              <Button mode="outlined" contentStyle={{ minHeight: touch.min }} disabled={busy || !receivedInvoiceActions(selected).paid} onPress={() => reviewForm(selected, 'paid')}>Mark paid</Button>
+              {!receivedInvoiceActions(selected).approve && (selected.status === 'paid' || selected.review_status === 'APPROVED_FOR_PAYMENT') ? (
+                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+                  {selected.status === 'paid' ? 'Payment is already recorded for this invoice.' : 'This invoice is already approved for payment.'}
+                </Text>
+              ) : null}
             </View> : <>
               <Button mode="contained" onPress={() => { setEditor({ invoice: selected, key: selected.request_key }); setSelected(null); }}>Edit invoice</Button>
               <Button mode="outlined" icon="share-variant" disabled={busy} onPress={() => void run(() => sharePdf(selected))}>Share PDF</Button>

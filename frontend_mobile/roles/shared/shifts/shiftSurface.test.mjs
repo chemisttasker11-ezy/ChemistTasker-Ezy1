@@ -142,7 +142,8 @@ test('persona from the route and from the role', () => {
 });
 
 test('sections per persona, and a stale ?section= falls back to the first', () => {
-  for (const persona of ['owner', 'organization', 'admin']) assert.deepEqual(Array.from(shiftSections({ persona, workspace: null })), ['active', 'confirmed', 'history']);
+  for (const persona of ['owner', 'organization']) assert.deepEqual(Array.from(shiftSections({ persona, workspace: null })), ['active', 'confirmed', 'history', 'public', 'community']);
+  assert.deepEqual(Array.from(shiftSections({ persona: 'admin', workspace: null })), ['active', 'confirmed', 'history']);
   assert.deepEqual(Array.from(shiftSections({ persona: 'pharmacist', workspace: 'platform' })), ['public', 'confirmed', 'history']);
   assert.deepEqual(Array.from(shiftSections({ persona: 'otherstaff', workspace: 'internal' })), ['community', 'confirmed', 'history']);
   assert.deepEqual(Array.from(shiftSections({ persona: 'explorer', workspace: 'platform' })), ['public', 'community', 'confirmed', 'history']);

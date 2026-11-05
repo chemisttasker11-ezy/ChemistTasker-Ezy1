@@ -18,7 +18,6 @@ import {
     fetchSavedShifts,
     fetchShiftInterests,
     acceptShiftOfferService,
-    activateShiftOfferPayrollService,
     declineShiftOfferService,
     saveShift,
     submitShiftCounterOfferService,
@@ -133,8 +132,6 @@ function PublicShiftsBoard({
     const [offersError, setOffersError] = useState(false);
     const [termsState, setTermsState] = useState<TermsAcceptanceState>(() => createTermsAcceptanceState());
     const [termsConfirming, setTermsConfirming] = useState(false);
-    const [payrollActivatingId, setPayrollActivatingId] = useState<number | null>(null);
-    const [payrollNotice, setPayrollNotice] = useState('');
 
     useEffect(() => {
         if (activeTabOverride) {
@@ -241,6 +238,11 @@ function PublicShiftsBoard({
     }, [loadSaved, userId]);
 
     useEffect(() => {
+        // Identity changes revoke the previous worker's verification and cached offers immediately.
+        let current = true;
+        setIsVerified(false);
+        setOffers([]);
+        setPayrollActivationOffers([]);
         const fetchVerification = async () => {
             try {
                 if (!user) return;
@@ -256,13 +258,14 @@ function PublicShiftsBoard({
                     onboarding?.verified ??
                     onboarding?.data?.verified ??
                     (roleKey === 'pharmacist' ? onboarding?.ahpra_verified : undefined);
-                setIsVerified(coerceVerified(verifiedFlag));
+                if (current) setIsVerified(coerceVerified(verifiedFlag));
             } catch (err) {
-                console.warn('Failed to fetch onboarding verification', err);
+                if (current) console.warn('Failed to fetch onboarding verification', err);
             }
         };
-        fetchVerification();
-    }, [user, user?.role]);
+        void fetchVerification();
+        return () => { current = false; };
+    }, [user?.id, user?.role]);
 
     useEffect(() => {
         const handle = setTimeout(() => setDebouncedFilters(filters), 350);
@@ -389,8 +392,8 @@ function PublicShiftsBoard({
                         offer.paymentPreferenceSnapshot === 'TFN'
                         && offer.engagementKind === 'SHIFT_EMPLOYMENT'
                         && !offer.payrollActivatedAt
-                        && offer.settlementChannel !== 'PAYROLL'
-                        && Boolean(preview?.payrollEnabled)
+                        && offer.settlementChannel === 'TIMESHEET_ONLY'
+                        && preview?.payrollActivationRequired === true
                     );
                 })
             );
@@ -512,7 +515,7 @@ function PublicShiftsBoard({
         }
         setTermsConfirming(true);
         try {
-            await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, payload)));
+            await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, { ...payload, termsVersion: offer.engagementTermsPreview?.termsVersion })));
             setTermsState(createTermsAcceptanceState());
             await loadOffers();
         } catch (err) {
@@ -576,28 +579,11 @@ function PublicShiftsBoard({
     };
 
     const openPrivatePaymentProfile = () => {
+        setTermsState((prev) => dismissTermsAcceptance(prev));
         if (workerPaymentPath) {
             router.push(workerPaymentPath as any);
         }
     };
-
-    const handleActivatePayroll = async (offer: ShiftOffer) => {
-        setPayrollActivatingId(offer.id);
-        setPayrollNotice('');
-        try {
-            await activateShiftOfferPayrollService(offer.id);
-            setPayrollNotice('ChemistTasker Payroll is now active for this confirmed shift.');
-            await loadOffers();
-        } catch (err) {
-            showError(errorMessage(
-                err,
-                'Payroll could not be activated yet. Complete your private TFN/super profile and try again.'
-            ));
-        } finally {
-            setPayrollActivatingId(null);
-        }
-    };
-
 
     const slotFilterMode =
         boardTab === 'interested' ? 'interested' : boardTab === 'rejected' ? 'rejected' : 'all';
@@ -628,9 +614,6 @@ function PublicShiftsBoard({
                     />
                 ) : (
                         <View style={styles.offerWorkspace}>
-                            {payrollNotice ? (
-                                <Text style={styles.successText}>{payrollNotice}</Text>
-                            ) : null}
                             {offerShifts.length === 0 ? (
                                 <ContentState
                                     kind="empty"
@@ -692,7 +675,7 @@ function PublicShiftsBoard({
                                                 <View style={styles.chipRow}>
                                                     <Pill label="TFN" tone="violet" />
                                                     <Pill
-                                                        label={ready ? 'Ready to activate payroll' : 'Timesheet only · setup required'}
+                                                        label={ready ? 'Ready for pharmacy activation' : 'Timesheet only · setup required'}
                                                         tone={ready ? 'green' : 'amber'}
                                                     />
                                                 </View>
@@ -725,11 +708,7 @@ function PublicShiftsBoard({
                                                             onPress={openPrivatePaymentProfile}
                                                         />
                                                     ) : null}
-                                                    <KitButton
-                                                        label={payrollActivatingId === offer.id ? 'Activating...' : 'Activate payroll'}
-                                                        disabled={!ready || payrollActivatingId === offer.id}
-                                                        onPress={() => void handleActivatePayroll(offer)}
-                                                    />
+                                                    <Text style={styles.placeholderText}>Your pharmacy manager activates payroll after confirming the requirements.</Text>
                                                 </View>
                                             </View>
                                         );

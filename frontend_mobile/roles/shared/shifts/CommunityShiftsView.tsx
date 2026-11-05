@@ -512,7 +512,7 @@ function CommunityShiftsBoard({
         }
         setTermsConfirming(true);
         try {
-            await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, payload)));
+            await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, { ...payload, termsVersion: offer.engagementTermsPreview?.termsVersion })));
             setTermsState(createTermsAcceptanceState());
             await loadOffers();
         } catch (err) {

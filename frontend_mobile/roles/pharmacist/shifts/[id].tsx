@@ -353,7 +353,7 @@ function ScopedWorkerShiftDetail({ id, offerParam, surface }: { id?: string; off
         setOfferActionBusy(true);
         setOfferActionError(null);
         try {
-            const result = await acceptWorkerShiftOfferService(activeOffer.id, payload);
+            const result = await acceptWorkerShiftOfferService(activeOffer.id, { ...payload, termsVersion: activeOffer.engagementTermsPreview?.termsVersion });
             if (!mutation.isLatest()) return;
             triggerHaptic('success');
             setConfirmAcceptOpen(false);
@@ -490,7 +490,12 @@ function ScopedWorkerShiftDetail({ id, offerParam, surface }: { id?: string; off
                 }}
                 onConfirm={(payload) => executeAcceptOffer(payload)}
                 onRetry={() => void loadShift()}
-                onOpenPaymentProfile={() => { setTermsAcceptOpen(false); router.push(workerPaymentPath as any); }}
+                onOpenPaymentProfile={() => {
+                    if (offerActionBusy) return;
+                    setTermsAcceptOpen(false);
+                    setTermsState((prev) => dismissTermsAcceptance(prev));
+                    if (workerPaymentPath) router.push(workerPaymentPath as any);
+                }}
             />
             <ConfirmDialog
                 open={confirmAcceptOpen}

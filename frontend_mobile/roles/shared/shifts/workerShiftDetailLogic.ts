@@ -449,7 +449,8 @@ export function transitionReloadStart(
   const ids = selectedOffers ? selectedOffers.map((o) => o.id) : state.selectedOfferIds;
   return {
     status: 'reloading',
-    visible: ids.length > 0 ? true : state.visible,
+    // Reload after dismissal must not reopen acceptance or show stale terms.
+    visible: state.visible,
     selectedOfferIds: ids,
     offers: dropCachedOfferPreviews(currentOffers),
     error: state.error,

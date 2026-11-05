@@ -1,0 +1,39 @@
+.ct-mobile-app-offer {
+  position: fixed;
+  z-index: 1900;
+  inset: auto 12px max(12px, env(safe-area-inset-bottom, 0px)) 12px;
+  margin: auto;
+  max-width: 620px;
+  border: 1px solid #d9dfee;
+  border-radius: 18px;
+  box-shadow: 0 14px 48px #06214a2e;
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+  background: #ffffff;
+  color: #06214a;
+  font-family: Inter, sans-serif;
+  text-align: left;
+  line-height: 1.45;
+}
+.ct-mobile-app-offer__copy { display: grid; gap: 4px; }
+.ct-mobile-app-offer__copy strong { font: 600 16px/1.35 Outfit, Inter, sans-serif; }
+.ct-mobile-app-offer__copy span { color: #40526e; font-size: 13px; }
+.ct-mobile-app-offer__actions { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+.ct-mobile-app-offer__actions a, .ct-mobile-app-offer__actions button {
+  flex: 1 1 160px;
+  min-height: 46px;
+  padding: 11px 15px;
+  border-radius: 10px;
+  text-align: center;
+  font: 600 14px/22px Inter, sans-serif;
+  cursor: pointer;
+}
+.ct-mobile-app-offer__install { background: #5222b8; color: #fff !important; border: 2px solid #5222b8; text-decoration: none; }
+.ct-mobile-app-offer__continue { background: #f5f8fc; color: #06214a; border: 2px solid #e2e7f1; }
+.ct-mobile-app-offer__actions a:focus-visible, .ct-mobile-app-offer__actions button:focus-visible {
+  outline: 3px solid #008ddb;
+  outline-offset: 2px;
+}
+@media (min-width: 1024px) { .ct-mobile-app-offer { display: none; } }
+@media (prefers-reduced-motion: reduce) { .ct-mobile-app-offer { transition: none; } }

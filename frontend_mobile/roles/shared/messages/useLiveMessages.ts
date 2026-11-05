@@ -6,7 +6,7 @@ type IncomingHandler = (payload: any) => void;
 
 export function useLiveMessages(
   roomId: number | null,
-  _accessToken: string | null,
+  accessToken: string | null,
   onMessage: IncomingHandler,
   onUnread: (payload: any) => void
 ) {
@@ -24,7 +24,7 @@ export function useLiveMessages(
   useEffect(() => {
     let isCancelled = false;
     const setupWs = async () => {
-      if (!roomId) return;
+      if (!roomId || !accessToken) return;
       try {
         const ticket = await fetchWsTicket();
         if (isCancelled || !ticket) return;
@@ -44,9 +44,10 @@ export function useLiveMessages(
         wsRef.current = ws;
         reconnectAttempts.current = 0;
         ws.onopen = () => {
-          void markRoomAsRead(roomId);
+          if (!isCancelled) void markRoomAsRead(roomId);
         };
         ws.onmessage = (event) => {
+          if (isCancelled) return;
           try {
             const payload = JSON.parse(event.data);
             onMessageRef.current(payload);
@@ -61,6 +62,7 @@ export function useLiveMessages(
           console.error('WS error', err?.message || 'WebSocket connection error.');
         };
         ws.onclose = (event) => {
+          if (isCancelled) return;
           if (__DEV__) {
             console.log(`WS closed. Code: ${event.code}, Reason: ${event.reason}`);
           }
@@ -86,7 +88,7 @@ export function useLiveMessages(
         wsRef.current = null;
       }
     };
-  }, [roomId]);
+  }, [roomId, accessToken]);
 
   return wsRef;
 }

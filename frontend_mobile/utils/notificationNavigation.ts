@@ -23,6 +23,8 @@ type ResolveRouteInput = {
 const ADMIN_GUARDS = {
   shifts: ['MANAGE_ROSTER'],
   calendar: ['MANAGE_COMMUNICATIONS', 'MANAGE_STAFF', 'MANAGE_ROSTER'],
+  hub: ['MANAGE_COMMUNICATIONS', 'MANAGE_STAFF', 'MANAGE_ROSTER'],
+  membership: ['MANAGE_STAFF'],
 } as const;
 
 const activeShell = (
@@ -44,6 +46,8 @@ const ROLE_CALENDAR_ROUTE_MAP: Record<string, string> = {
 
 const ROLE_HUB_ROUTE_MAP: Record<string, string> = {
   owner: '/owner/hub',
+  organization: '/organization/hub',
+  admin: '/admin/hub',
   pharmacist: '/pharmacist/hub',
   otherstaff: '/otherstaff/hub',
 };
@@ -321,9 +325,16 @@ export const resolveHubNotificationRoute = ({
   actionUrl,
   payload,
   userRole,
+  persona,
+  adminCan,
 }: ResolveRouteInput): string | null => {
   const roleSlug = normalizeRoleSlug(userRole);
-  const baseRoute = roleSlug ? ROLE_HUB_ROUTE_MAP[roleSlug] : null;
+  const permittedShell = activeShell(persona, adminCan, 'hub');
+  // A delegated admin stays in /admin only when the current pharmacy allows
+  // communications. Without that grant fall back to their actual worker role.
+  const baseRoute = permittedShell && ROLE_HUB_ROUTE_MAP[permittedShell]
+    ? ROLE_HUB_ROUTE_MAP[permittedShell]
+    : roleSlug ? ROLE_HUB_ROUTE_MAP[roleSlug] : null;
   if (!baseRoute) return null;
 
   const actionParams = parseHubFromActionUrl(actionUrl);
@@ -355,25 +366,23 @@ export const resolveMembershipNotificationRoute = ({
   actionUrl,
   payload,
   userRole,
+  persona,
+  adminCan,
 }: ResolveRouteInput): string | null => {
   const roleSlug = normalizeRoleSlug(userRole);
   const parsed = parseMembershipFromActionUrl(actionUrl) ?? parseMembershipFromPayload(payload);
-  if (!roleSlug || !parsed) return null;
+  if (!parsed) return null;
+  const targetRole = activeShell(persona, adminCan, 'membership') ?? roleSlug;
+  if (!targetRole) return null;
 
-  if (roleSlug === 'pharmacist' || roleSlug === 'otherstaff') {
-    return ROLE_MEMBERSHIP_ROUTE_MAP[roleSlug];
+  if (targetRole === 'pharmacist' || targetRole === 'otherstaff') {
+    return ROLE_MEMBERSHIP_ROUTE_MAP[targetRole];
   }
 
   const pharmacyId = parsed.pharmacyId ?? payload?.pharmacy_id ?? payload?.pharmacyId ?? null;
-  if (roleSlug === 'owner' && pharmacyId != null) {
-    return `/owner/pharmacies/${pharmacyId}`;
-  }
-  if (roleSlug === 'organization' && pharmacyId != null) {
-    return `/organization/pharmacies/${pharmacyId}`;
-  }
-  if (roleSlug === 'admin' && pharmacyId != null) {
-    return `/admin/pharmacies/${pharmacyId}`;
+  if (['owner', 'organization', 'admin'].includes(targetRole) && pharmacyId != null) {
+    return `/${targetRole}/pharmacies/${pharmacyId}`;
   }
 
-  return ROLE_MEMBERSHIP_ROUTE_MAP[roleSlug] ?? null;
+  return ROLE_MEMBERSHIP_ROUTE_MAP[targetRole] ?? null;
 };

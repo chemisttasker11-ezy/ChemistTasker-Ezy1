@@ -23,7 +23,7 @@ export function useTabData(
         async (shift: Shift, levelKey: EscalationLevelKey) => {
             const key = getTabKey(shift.id, levelKey);
             const generation = getNextGeneration(generationsRef.current, key);
-            setTabData(prev => ({ ...prev, [key]: { ...(prev[key] || {}), loading: true, error: null } }));
+            setTabData(prev => ({ ...prev, [key]: { loading: true, error: null } }));
 
             try {
                 if (levelKey === PUBLIC_LEVEL_KEY) {
@@ -55,16 +55,12 @@ export function useTabData(
                         if (slotId == null) {
                             return [Number.NaN, [] as ShiftMemberStatus[]] as const;
                         }
-                        try {
-                            const members = await fetchShiftMemberStatus(shift.id, {
-                                slotId,
-                                visibility: levelKey,
-                            });
-                            return [slotId, members] as const;
-                        } catch (error) {
-                            console.error(`Failed to load members for shift ${shift.id} slot ${slotId}`, error);
-                            return [slotId, [] as ShiftMemberStatus[]] as const;
-                        }
+                        // Do not turn a failed member request into a false "no candidates" result.
+                        const members = await fetchShiftMemberStatus(shift.id, {
+                            slotId,
+                            visibility: levelKey,
+                        });
+                        return [slotId, members] as const;
                     })
                 );
 
@@ -95,7 +91,6 @@ export function useTabData(
                 setTabData(prev => ({
                     ...prev,
                     [key]: {
-                        ...(prev[key] || {}),
                         loading: false,
                         error: error?.message || 'Failed to load candidates',
                     },

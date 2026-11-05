@@ -129,12 +129,17 @@ export const SHIFT_SECTION_LABELS: Record<ShiftSection, string> = {
 
 /**
  * The Shifts screen sections in tab order, from web: posters get the Shift Centre; pharmacists and other staff
- * get Community (internal) or Public (platform) with Confirmed and History; Explorer gets its four routes.
+ * get Community (internal) or Public (platform) with Confirmed and History; Explorer gets four routes.
+ * Owner/organization also retain their web public/community discovery routes.
  */
 export function shiftSections(surface: Pick<ShiftSurface, 'persona' | 'workspace'>): ShiftSection[] {
   const { persona } = surface;
   if (!persona) return [];
-  if (!isWorkerPersona(persona)) return ['active', 'confirmed', 'history'];
+  // Web owner and organization routes also expose public and community boards.
+  // Keep poster management sections first; the existing backend remains the
+  // authority for viewing, interest, offers and each available action.
+  if (persona === 'owner' || persona === 'organization') return ['active', 'confirmed', 'history', 'public', 'community'];
+  if (persona === 'admin') return ['active', 'confirmed', 'history'];
   if (persona === 'explorer') return ['public', 'community', 'confirmed', 'history'];
   return [surface.workspace === 'platform' ? 'public' : 'community', 'confirmed', 'history'];
 }

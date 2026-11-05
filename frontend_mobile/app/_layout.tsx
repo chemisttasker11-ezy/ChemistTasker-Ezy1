@@ -1,15 +1,17 @@
 import { useAhpra } from '../context/AhpraContext';
 import AhpraStatus from '../components/AhpraStatus';
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Platform, StatusBar, View } from 'react-native';
+import { AppState, Linking, Platform, Pressable, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
 import * as Updates from 'expo-updates';
 import * as Notifications from 'expo-notifications';
+import AppLockGate from '@/components/security/AppLockGate';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { WorkspaceProvider, useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../constants/theme';
+import { colors, font, radius, space, touch } from '../constants/tokens';
 import OfflineBanner from '../components/OfflineBanner';
 import '../config/api'; // Configure shared-core on app load
 import { en, registerTranslation } from 'react-native-paper-dates';
@@ -76,14 +78,22 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     if (this.state.hasError) {
       return (
         <SafeAreaProvider>
-          <SafeAreaView
-            style={{ flex: 1, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' }}
-            edges={['top', 'left', 'right']}
-          >
+          <SafeAreaView style={crashRecoveryStyles.root} edges={['top', 'bottom', 'left', 'right']}>
             <StatusBar barStyle="dark-content" />
-            <PaperProvider theme={theme}>
-              <Stack screenOptions={{ headerShown: false }} />
-            </PaperProvider>
+            <View style={crashRecoveryStyles.card} accessibilityRole="alert">
+              <Text style={crashRecoveryStyles.heading}>We could not open this screen</Text>
+              <Text style={crashRecoveryStyles.description}>
+                Your account information is safe. Try opening the app again. If the issue continues, contact ChemistTasker support.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Try opening the app again"
+                onPress={() => this.setState({ hasError: false })}
+                style={crashRecoveryStyles.button}
+              >
+                <Text style={crashRecoveryStyles.buttonText}>Try again</Text>
+              </Pressable>
+            </View>
           </SafeAreaView>
         </SafeAreaProvider>
       );
@@ -91,6 +101,49 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     return this.props.children;
   }
 }
+
+const crashRecoveryStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.pageBg,
+    justifyContent: 'center',
+    padding: space.lg,
+  },
+  card: {
+    backgroundColor: colors.surfaceBg,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.card,
+    padding: space.xl,
+    gap: space.lg,
+  },
+  heading: {
+    color: colors.textPrimary,
+    fontFamily: font.outfit.medium,
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  description: {
+    color: colors.textSecondary,
+    fontFamily: font.inter.regular,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  button: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.control,
+    minHeight: touch.min,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: space.xl,
+    paddingVertical: space.sm,
+  },
+  buttonText: {
+    color: colors.surfaceBg,
+    fontFamily: font.inter.semiBold,
+    fontSize: 16,
+  },
+});
 
 function UpdatePrompt() {
   const [mode, setMode] = useState<'none' | 'store-required' | 'store-optional' | 'ota'>('none');
@@ -231,13 +284,16 @@ function UpdatePrompt() {
 function AuthGate() {
   const router = useRouter();
   const segments = useSegments();
+  // Typed Expo routes can infer a narrow tuple; deep-link matching needs a read-only path array.
+  const routeSegments: readonly string[] = segments;
   const { user, isLoading, hasCapability } = useAuth();
   const { selectedPharmacyId } = useWorkspace();
   const { summary: ahpraSummary, loading: ahpraLoading, refusal: ahpraRefusal, clearRefusal } = useAhpra();
   const ahpraPath = user?.role === 'PHARMACIST' ? '/pharmacist/profile-basic-info' : '/otherstaff/profile-regulatory';
   const onAhpraStep = `/${segments.join('/')}` === ahpraPath;
   // Invitations are never blocked by AHPRA.
-  const onInvitePage = ['/pharmacist/memberships', '/otherstaff/memberships', '/admin-invitations'].includes(`/${segments.join('/')}`);
+  const onInvitePage = ['/pharmacist/memberships', '/otherstaff/memberships', '/admin-invitations'].includes(`/${segments.join('/')}`)
+    || (routeSegments[0] === 'membership' && routeSegments[1] === 'apply' && Boolean(routeSegments[2]));
 
   useEffect(() => {
     if (isLoading || ahpraLoading) return;
@@ -251,12 +307,13 @@ function AuthGate() {
     const second = segmentList[1];
     const third = segmentList[2];
     const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
-    const isPublic = publicRoutes.has(top ?? '');
+    const isExploreRoute = top === 'explore';
+    const isPublic = isExploreRoute || publicRoutes.has(top ?? '') || (top === 'membership' && second === 'apply' && Boolean(third));
 
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
     // It is never included in normal startup or navigation menus.
     const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'kiosk-link', 'attendance-pin', 'my-hours', 'my-roster', 'my-leave', 'workforce-timesheets', 'workforce-settings', 'admin-invitations']);
-    const sharedProductPrefixes = new Set(['workforce', 'manager', 'attendance', 'finance', 'marketplace', 'profile', 'rewards']);
+    const sharedProductPrefixes = new Set(['workforce', 'manager', 'attendance', 'finance', 'marketplace', 'profile', 'rewards', 'settings', 'share', 'next-shifts']);
     const isSharedAuthenticatedRoute = allowAuthenticatedAccess.has(top ?? '') || sharedProductPrefixes.has(top ?? '');
     const isOwnerSetupRoute = top === 'setup' && second === 'owner';
     const expectedTopByRole: Record<string, string> = {
@@ -301,7 +358,7 @@ function AuthGate() {
         return;
       }
 
-      if (user && isPublic && !isSharedAuthenticatedRoute) {
+      if (user && isPublic && !isSharedAuthenticatedRoute && !isExploreRoute) {
         if (hasOrganizationAccess(user) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(String(user.role || '').toUpperCase())) {
           router.replace('/organization/dashboard' as any);
           return;
@@ -322,6 +379,10 @@ function AuthGate() {
       if (user && top) {
         if (isSharedAuthenticatedRoute) {
           const normalizedSharedRole = String(user.role || '').toUpperCase();
+          if (top === 'next-shifts' && !['PHARMACIST', 'OTHER_STAFF'].includes(normalizedSharedRole)) {
+            router.replace(getRoleHome(user.role) as any);
+            return;
+          }
           const ownerAccess = normalizedSharedRole === 'OWNER';
           const storedPersona = await readPersonaSelection(user);
           const activeAdminAssignment = storedPersona?.startsWith('ADMIN:')
@@ -380,7 +441,7 @@ function AuthGate() {
         }
 
         if (hasOrganizationAccess(user)) {
-          if (top === 'organization') return;
+          if (top === 'organization' || isExploreRoute) return;
           if (isPublicShiftRoute(segments)) return;
           if (!['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(normalizedRole)) {
             router.replace('/organization/dashboard' as any);
@@ -408,7 +469,7 @@ function AuthGate() {
             return;
           }
 
-          if (isPublicShiftRoute(segments)) {
+          if (isPublicShiftRoute(segments) || isExploreRoute) {
             return;
           }
 
@@ -425,7 +486,7 @@ function AuthGate() {
           return;
         }
 
-        if (isPublicShiftRoute(segments)) {
+        if (isPublicShiftRoute(segments) || isExploreRoute) {
             return;
           }
 
@@ -500,6 +561,7 @@ export default function RootLayout() {
                       }}
                     />
                     <AuthGate />
+                    <AppLockGate />
                   </WorkspaceProvider>
                 </AuthProvider>
               </UnsavedChangesRegistryProvider>

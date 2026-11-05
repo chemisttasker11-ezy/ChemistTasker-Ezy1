@@ -20,7 +20,8 @@ const ID_PREFIX = 'shift-centre';
 
 /**
  * The Shifts tab for all six personas, from one policy (useShiftSurface): posters get the Shift Centre
- * (Active, Confirmed, History); pharmacists and other staff get their workspace's board (Community or
+ * (Active, Confirmed, History), with Public/Community discovery for owner and organization;
+ * pharmacists and other staff get their workspace's board (Community or
  * Public) with Confirmed and History; explorers get Public, Community, Confirmed and History.
  * The section comes from ?section= (links land there); ?tab=accepted opens the board on Offers.
  */

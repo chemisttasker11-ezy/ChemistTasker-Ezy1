@@ -1,0 +1,299 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { ActivityIndicator, Button, Card, Chip, Switch, Text, TextInput } from 'react-native-paper';
+import { type WorkforceTimesheetDetail, type WorkforceTimesheetCheck, type WorkforceTimesheetDay, workforce } from '@chemisttasker/shared-core';
+import { colors, font, radius, space, touch } from '@/constants/tokens';
+import { ContentState } from '@/components/ui/ContentState';
+import { useAuth } from '@/context/AuthContext';
+import { canApproveTimesheet, formatPharmacyClock, formatTimesheetMinutes, isSourceCorrectionRequired } from './timesheetDetailPolicy';
+import TimesheetAdjustTimesSheet from './TimesheetAdjustTimesSheet';
+
+export default function TimesheetDetailScreen({ managerMode }: { managerMode: boolean }) {
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const router = useRouter();
+  const { hasCapability, user } = useAuth();
+  const accountKey = user ? String(user.id ?? user.email ?? user.username ?? '') : '';
+  const currentAccountRef = useRef(accountKey);
+  currentAccountRef.current = accountKey;
+  const writeGeneration = useRef(0);
+  const timesheetId = Number(id);
+  const valid = Number.isSafeInteger(timesheetId) && timesheetId > 0;
+  const generation = useRef(0);
+  const writeRef = useRef(false);
+  const [data, setData] = useState<WorkforceTimesheetDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [comment, setComment] = useState('');
+  const [workerVisible, setWorkerVisible] = useState(true);
+  const [reasonsByCheck, setReasonsByCheck] = useState<Record<number, string>>({});
+  const [reopenReason, setReopenReason] = useState('');
+  const [missingPunchCheck, setMissingPunchCheck] = useState<WorkforceTimesheetCheck | null>(null);
+  const [missingPunchAt, setMissingPunchAt] = useState('');
+  const [missingPunchReason, setMissingPunchReason] = useState('');
+  const [adjustingDay, setAdjustingDay] = useState<WorkforceTimesheetDay | null>(null);
+  const managerAllowed = Boolean(managerMode && data?.pharmacy?.id && hasCapability('MANAGE_ROSTER', data.pharmacy.id));
+  const periodLocked = data?.period_status === 'LOCKED';
+  const managerCanChange = managerAllowed && !periodLocked;
+  useEffect(() => {
+    // Do not display another account's timesheet or keep its draft corrections.
+    generation.current += 1;
+    writeGeneration.current += 1;
+    writeRef.current = false;
+    setData(null);
+    setLoading(Boolean(accountKey));
+    setBusy('');
+    setError('');
+    setSuccess('');
+    setComment('');
+    setReasonsByCheck({});
+    setReopenReason('');
+    setMissingPunchCheck(null);
+    setMissingPunchAt('');
+    setMissingPunchReason('');
+    setAdjustingDay(null);
+  }, [accountKey]);
+
+  const load = useCallback(async () => {
+    const request = ++generation.current;
+    const requestedAccount = accountKey;
+    const current = () => request === generation.current && currentAccountRef.current === requestedAccount;
+    setLoading(Boolean(requestedAccount));
+    setError('');
+    setData(null);
+    if (!valid || !requestedAccount) {
+      setError(!requestedAccount ? 'Sign in to review this timesheet.' : 'Invalid timesheet link.');
+      setLoading(false);
+      return;
+    }
+    try {
+      const result = await workforce.getTimesheet(timesheetId);
+      if (current()) setData(result);
+    } catch (failure: any) {
+      if (current()) setError(failure?.response?.data?.detail || failure?.message || 'Unable to load the timesheet.');
+    } finally {
+      if (current()) setLoading(false);
+    }
+  }, [timesheetId, valid, accountKey]);
+
+  useFocusEffect(useCallback(() => {
+    void load();
+    return () => { generation.current += 1; };
+  }, [load]));
+
+  const run = async (label: string, action: () => Promise<unknown>, done: string) => {
+    if (writeRef.current || !valid || !accountKey) return false;
+    const requestedAccount = accountKey;
+    const writeRequest = ++writeGeneration.current;
+    const current = () => writeRequest === writeGeneration.current && currentAccountRef.current === requestedAccount;
+    writeRef.current = true;
+    setBusy(label);
+    setError('');
+    setSuccess('');
+    try {
+      await action();
+      if (!current()) return false;
+      setSuccess(done);
+      await load();
+      return current();
+    } catch (failure: any) {
+      if (current()) setError(failure?.response?.data?.error || failure?.response?.data?.detail || failure?.message || 'The action could not be saved.');
+      return false;
+    } finally {
+      if (current()) {
+        writeRef.current = false;
+        setBusy('');
+      }
+    }
+  };
+
+  const decideCheck = (check: WorkforceTimesheetCheck, decision: 'RESOLVED' | 'WAIVED' | 'REOPENED') => {
+    if (!managerCanChange || writeRef.current) return;
+    if (isSourceCorrectionRequired(check)) {
+      setError('Fix this check at its attendance source. It cannot be waived.');
+      return;
+    }
+    const notes = (reasonsByCheck[check.id] ?? '').trim();
+    if (decision !== 'REOPENED' && !notes) {
+      setError('A reason is required to resolve or waive this check.');
+      return;
+    }
+    void run('check', () => workforce.decideTimesheetCheck(check.id, decision, notes || 'Reopened for review'), 'Timesheet check updated.').then(saved => { if (saved) setReasonsByCheck(previous => ({ ...previous, [check.id]: '' })); });
+  };
+
+  const saveMissingPunch = () => {
+    if (!managerCanChange || !missingPunchCheck || writeRef.current) return;
+    const sessionId = Number(missingPunchCheck.details?.session_id);
+    const when = missingPunchAt.trim();
+    const note = missingPunchReason.trim();
+    if (!Number.isSafeInteger(sessionId) || sessionId <= 0) { setError('This check has no attendance session to correct.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when) || !Number.isFinite(Date.parse(when))) { setError('Enter a valid local date and time in YYYY-MM-DDTHH:mm format.'); return; }
+    if (!note) { setError('A reason is required for this attendance correction.'); return; }
+    const eventType = missingPunchCheck.code === 'MISSING_CLOCK_IN' ? 'CLOCK_IN' : 'CLOCK_OUT';
+    void run('punch', () => workforce.addMissingPunch(timesheetId, { session_id: sessionId, event_type: eventType, occurred_at_local: when, reason: note }), 'Missing attendance time added for review.').then(saved => {
+      if (saved) { setMissingPunchCheck(null); setMissingPunchAt(''); setMissingPunchReason(''); }
+    });
+  };
+
+  const approve = () => {
+    if (!managerCanChange || !data || !canApproveTimesheet(data, periodLocked) || writeRef.current) return;
+    const revision = data.revision_number!;
+    Alert.alert('Approve timesheet?', `Approve reviewed hours for version ${revision}? Reopening later requires an audit reason.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Approve', onPress: () => void run('approve', () => workforce.approveTimesheet(timesheetId, revision), 'Timesheet approved.') },
+    ]);
+  };
+
+  const timeZone = data?.period_timezone || data?.snapshot?.period?.timezone || 'Australia/Brisbane';
+  if (managerMode && data && !managerAllowed) {
+    return <ContentState kind="forbidden" title="Timesheet management unavailable" description="You do not have roster management permission for this pharmacy." />;
+  }
+
+  return (
+    <ScrollView style={styles.page} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <Button icon="arrow-left" mode="text" style={styles.back} onPress={() => router.back()}>Back to timesheets</Button>
+      <Text variant="headlineSmall" style={styles.title}>{data?.worker?.name || 'Timesheet detail'}</Text>
+      <Text style={styles.subtitle}>{data?.pharmacy?.name || 'Review worked and rostered hours'}{data?.snapshot?.period ? ` · ${data.snapshot.period.start_date} to ${data.snapshot.period.end_date}` : ''}</Text>
+      {error ? <ContentState kind="error" title="Action requires attention" description={error} actionLabel="Retry loading" onAction={() => void load()} /> : null}
+      {success ? <Text style={styles.success} accessibilityRole="alert">{success}</Text> : null}
+      {loading ? <ActivityIndicator style={styles.loading} color={colors.primary} /> : null}
+      {!loading && data ? <>
+        <View style={styles.statuses}>
+          <Chip compact>{String(data.status).replaceAll('_', ' ')}</Chip>
+          {data.needs_rebuild ? <Chip compact style={styles.warning}>Recalculation needed</Chip> : null}
+          {periodLocked ? <Chip compact style={styles.warning}>Payroll period locked</Chip> : null}
+          {(data.effective_blocking_checks ?? data.blocking_checks) > 0 ? <Chip compact style={styles.danger}>{data.effective_blocking_checks ?? data.blocking_checks} blockers</Chip> : null}
+          {data.revision_number != null ? <Chip compact>Version {data.revision_number}</Chip> : null}
+        </View>
+        <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
+          <Text style={styles.sectionTitle}>Reviewed hours</Text>
+          <View style={styles.metrics}>
+            {([
+              ['Worked', data.worked_minutes], ['Rostered', data.rostered_minutes],
+              ['Planned breaks', data.planned_break_minutes], ['Contracted', data.contracted_minutes],
+              ['Approved leave', data.approved_leave_minutes], ['Reviewed', data.reviewed_minutes],
+            ] as const).map(([label, amount]) => <View key={label} style={styles.metric}><Text style={styles.small}>{label}</Text><Text style={styles.metricValue}>{formatTimesheetMinutes(amount)}</Text></View>)}
+          </View>
+        </Card.Content></Card>
+
+        <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
+          <Text style={styles.sectionTitle}>Daily attendance</Text>
+          <Text style={styles.small}>Times shown in {timeZone}, the pharmacy's timezone.</Text>
+          {!data.snapshot ? <Text style={styles.subtitle}>No calculated revision yet. Ask the pharmacy manager to recalculate this timesheet before reviewing the hours.</Text> : data.snapshot.days.length === 0 ? <Text style={styles.subtitle}>No rostered or worked days in this period.</Text> : data.snapshot.days.map((day, index) =>
+            <View key={`${day.date}-${day.session_id ?? 'roster'}-${index}`} style={styles.record}>
+              <View style={styles.headingRow}><Text style={styles.day}>{day.date}</Text><Text style={styles.day}>{formatTimesheetMinutes(day.worked_minutes)} worked</Text></View>
+              <View style={styles.compare}><Text style={styles.small}> </Text><Text style={styles.columnTitle}>Actual</Text><Text style={styles.columnTitle}>Rostered</Text></View>
+              <View style={styles.compare}><Text style={styles.small}>Start</Text><Text style={styles.value}>{formatPharmacyClock(day.actual_start, timeZone)}</Text><Text style={styles.value}>{formatPharmacyClock(day.rostered_start, timeZone)}</Text></View>
+              <View style={styles.compare}><Text style={styles.small}>Finish</Text><Text style={styles.value}>{formatPharmacyClock(day.actual_end, timeZone)}</Text><Text style={styles.value}>{formatPharmacyClock(day.rostered_end, timeZone)}</Text></View>
+              <View style={styles.compare}><Text style={styles.small}>Break</Text><Text style={styles.value}>{day.recorded_break_minutes} min</Text><Text style={styles.value}>{day.planned_break_minutes} min</Text></View>
+              {managerCanChange && data.status !== 'APPROVED' && day.session_id != null ?
+                <Button mode="outlined" disabled={busy !== ''} onPress={() => setAdjustingDay(day)}>Adjust times</Button> : null}
+            </View>)}
+        </Card.Content></Card>
+
+        {managerCanChange && data.status !== 'APPROVED' && adjustingDay?.session_id != null ?
+          <TimesheetAdjustTimesSheet
+            timesheetId={timesheetId} sessionId={adjustingDay.session_id}
+            pharmacyId={data.pharmacy.id} workerId={data.worker.id}
+            timeZone={timeZone} onClose={() => setAdjustingDay(null)}
+            onSaved={async () => { if (currentAccountRef.current !== accountKey) return; setAdjustingDay(null); await load(); }}
+          /> : null}
+        <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
+          <Text style={styles.sectionTitle}>Checks and exceptions</Text>
+          {data.checks.length === 0 ? <Text style={styles.subtitle}>No checks on this revision.</Text> :
+            data.checks.map(check => {
+              const resolved = ['RESOLVED', 'WAIVED'].includes(check.decision?.decision ?? '');
+              const sourceRequired = isSourceCorrectionRequired(check);
+              return <View key={check.id} style={styles.record}>
+                <View style={styles.headingRow}><Text style={styles.day}>{check.severity}</Text><Chip compact>{check.decision?.decision || 'Open'}</Chip></View>
+                <Text style={styles.value}>{check.message}</Text>
+                {check.work_date ? <Text style={styles.small}>{check.work_date}</Text> : null}
+                {managerCanChange && sourceRequired && !resolved ? <>
+                  <Text style={styles.warningText}>This exception requires correcting the source attendance. It cannot be waived.</Text>
+                  <Button mode="outlined" onPress={() => check.code === 'UNRESOLVED_PROVISIONAL_ATTENDANCE' ? router.push('/attendance/reviews' as any) : (setMissingPunchCheck(check), setMissingPunchAt(''), setMissingPunchReason(''))}>Fix attendance</Button>
+                </> : null}
+                {managerCanChange && !sourceRequired ? <>
+                  <TextInput mode="outlined" dense label={resolved ? 'Reason to reopen (optional)' : 'Reason to resolve or waive'} value={reasonsByCheck[check.id] ?? ''} onChangeText={value => setReasonsByCheck(previous => ({ ...previous, [check.id]: value }))} multiline disabled={busy !== ''} />
+                  <View style={styles.actions}>
+                    {resolved ? <Button mode="outlined" disabled={busy !== ''} onPress={() => decideCheck(check, 'REOPENED')}>Reopen check</Button> : <>
+                      <Button mode="outlined" disabled={!(reasonsByCheck[check.id] ?? '').trim() || busy !== ''} onPress={() => decideCheck(check, 'RESOLVED')}>Resolve</Button>
+                      <Button mode="outlined" disabled={!(reasonsByCheck[check.id] ?? '').trim() || busy !== ''} onPress={() => decideCheck(check, 'WAIVED')}>Waive</Button>
+                    </>}
+                  </View>
+                </> : null}
+              </View>;
+            })}
+        </Card.Content></Card>
+
+        {managerCanChange && missingPunchCheck ? <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
+          <Text style={styles.sectionTitle}>Add missing {missingPunchCheck.code === 'MISSING_CLOCK_IN' ? 'clock-in' : 'clock-out'}</Text>
+          <Text style={styles.subtitle}>Enter the worker's confirmed time in {timeZone}. This appends a manager correction without erasing original attendance.</Text>
+          <TextInput mode="outlined" label="Local date and time (YYYY-MM-DDTHH:mm)" placeholder="2026-11-04T09:00" value={missingPunchAt} onChangeText={setMissingPunchAt} autoCapitalize="none" disabled={busy !== ''} />
+          <TextInput mode="outlined" label="Reason for correction" value={missingPunchReason} onChangeText={setMissingPunchReason} multiline disabled={busy !== ''} />
+          <View style={styles.actions}>
+            <Button mode="outlined" disabled={busy !== ''} onPress={() => setMissingPunchCheck(null)}>Cancel</Button>
+            <Button mode="contained" disabled={busy !== '' || !missingPunchAt.trim() || !missingPunchReason.trim()} onPress={saveMissingPunch}>Save attendance time</Button>
+          </View>
+        </Card.Content></Card> : null}
+        <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
+          <Text style={styles.sectionTitle}>Comments</Text>
+          {data.comments.length === 0 ? <Text style={styles.subtitle}>No comments yet.</Text> : data.comments.filter(row => managerAllowed || row.worker_visible).map(row =>
+            <View key={row.id} style={styles.record}><Text style={styles.day}>{row.author_name}{managerAllowed && !row.worker_visible ? ' · Managers only' : ''}</Text><Text style={styles.value}>{row.body}</Text><Text style={styles.small}>{new Date(row.created_at).toLocaleString('en-AU')}</Text></View>)}
+          <TextInput mode="outlined" label="Add a comment" multiline value={comment} onChangeText={setComment} maxLength={2000} disabled={busy !== ''} />
+          {managerAllowed ? <View style={styles.headingRow}><Text style={styles.small}>Worker can see this comment</Text><Switch value={workerVisible} onValueChange={setWorkerVisible} disabled={busy !== ''} /></View> : null}
+          <Button mode="outlined" disabled={!comment.trim() || busy !== ''} onPress={() => void run('comment', async () => {
+            await workforce.addTimesheetComment(timesheetId, comment.trim(), managerAllowed ? workerVisible : true);
+            setComment('');
+          }, 'Comment added.')}>Add comment</Button>
+        </Card.Content></Card>
+
+        {managerAllowed && periodLocked ? <Text style={styles.warningText}>This payroll period is locked. Corrections require the audited period-correction workflow.</Text> : null}
+        {managerCanChange ? <Card mode="outlined" style={styles.card}><Card.Content style={styles.section}>
+          <Text style={styles.sectionTitle}>Manager decisions</Text>
+          {data.status === 'APPROVED' ? <>
+            <Text style={styles.subtitle}>A reason is required to reopen approved hours. The audit history is preserved.</Text>
+            <TextInput mode="outlined" label="Reason to reopen" multiline value={reopenReason} onChangeText={setReopenReason} disabled={busy !== ''} />
+            <Button mode="outlined" disabled={!reopenReason.trim() || busy !== ''} onPress={() => void run('reopen', () => workforce.reopenTimesheet(timesheetId, reopenReason.trim()), 'Timesheet reopened for review.')}>Reopen timesheet</Button>
+          </> : <>
+            <Button mode="outlined" disabled={busy !== ''} onPress={() => void run('recalculate', () => workforce.recalculateTimesheet(timesheetId), 'Timesheet recalculated.')}>Recalculate from attendance</Button>
+            {!canApproveTimesheet(data, periodLocked) ? <Text style={styles.warningText}>Approval requires a fresh revision with no blocking exceptions.</Text> : null}
+            <Button mode="contained" disabled={busy !== '' || !canApproveTimesheet(data, periodLocked)} onPress={approve} contentStyle={styles.touch}>Approve reviewed hours</Button>
+          </>}
+        </Card.Content></Card> : <>
+          {data.status !== 'APPROVED' && data.status !== 'SUBMITTED' && !periodLocked ? <Button mode="contained" disabled={!data.revision_number || data.needs_rebuild || busy !== ''} onPress={() => void run('submit', () => workforce.submitTimesheet(timesheetId, data.revision_number!), 'Timesheet submitted for review.')}>Submit reviewed hours</Button> : null}
+        </>}
+      </> : null}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: colors.pageBg },
+  content: { padding: space.lg, gap: space.lg, paddingBottom: space['3xl'] },
+  back: { alignSelf: 'flex-start' },
+  title: { fontFamily: font.outfit.semiBold, color: colors.textPrimary },
+  subtitle: { color: colors.textSecondary, lineHeight: 21 },
+  success: { color: colors.status.green.fg },
+  loading: { paddingVertical: space['3xl'] },
+  statuses: { flexDirection: 'row', gap: space.xs, flexWrap: 'wrap' },
+  warning: { backgroundColor: colors.status.amber.bg },
+  danger: { backgroundColor: colors.status.red.bg },
+  warningText: { color: colors.status.amber.fg, lineHeight: 20 },
+  card: { borderColor: colors.border, borderRadius: radius.card, backgroundColor: colors.surfaceBg },
+  section: { gap: space.md },
+  sectionTitle: { color: colors.textPrimary, fontFamily: font.outfit.semiBold, fontSize: 18 },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  metric: { width: '48%', padding: space.md, backgroundColor: colors.subtleBg, borderRadius: radius.nested, gap: space.xs },
+  metricValue: { color: colors.textPrimary, fontFamily: font.outfit.semiBold, fontSize: 19, fontVariant: ['tabular-nums'] },
+  small: { color: colors.textMuted, fontSize: 12 },
+  columnTitle: { flex: 1, color: colors.textSecondary, fontFamily: font.inter.semiBold },
+  value: { flex: 1, color: colors.textPrimary, lineHeight: 20 },
+  compare: { flexDirection: 'row', alignItems: 'baseline', gap: space.md },
+  day: { color: colors.textPrimary, fontFamily: font.inter.semiBold, flexShrink: 1 },
+  headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
+  record: { paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, gap: space.sm },
+  actions: { flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' },
+  touch: { minHeight: touch.min },
+});

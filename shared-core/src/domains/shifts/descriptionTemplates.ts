@@ -9,3 +9,8 @@ export async function listShiftDescriptionTemplates(pharmacy: number, role: stri
 export function saveShiftDescriptionTemplate(pharmacy: number, role: string, description: string): Promise<ShiftDescriptionTemplateApi> {
   return fetchApi('/shift-description-templates/', {method:'POST',body:JSON.stringify({pharmacy,role_needed:role,description})});
 }
+
+/** Remove only a template the server confirms the current user manages. */
+export async function deleteShiftDescriptionTemplate(templateId: number): Promise<void> {
+  await fetchApi(`/shift-description-templates/${encodeURIComponent(templateId)}/`, {method:'DELETE'});
+}

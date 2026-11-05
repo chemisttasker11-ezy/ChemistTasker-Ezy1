@@ -65,6 +65,39 @@ class PharmacyAccessCharacterizationTests(TestCase):
             return client.patch(url, payload or {}, format="json")
         raise AssertionError(method)
 
+    def test_w4_chain_pharmacy_link_is_owner_scoped_for_approved_and_rejected_paths(self):
+        from client_profile.characterization_support import client_for
+
+        chain = Chain.objects.create(owner=self.owned.owner, name="W4 Chain")
+        owner_client = client_for(self.owner)
+        outsider_client = client_for(self.stranger)
+
+        allowed = owner_client.post(
+            f"/api/v1/chains/{chain.pk}/add_pharmacy/",
+            {"pharmacy_id": self.owned.pk}, format="json",
+        )
+        self.assertEqual(allowed.status_code, 200, allowed.data)
+        self.assertEqual(list(chain.pharmacies.values_list("pk", flat=True)), [self.owned.pk])
+
+        denied = owner_client.post(
+            f"/api/v1/chains/{chain.pk}/add_pharmacy/",
+            {"pharmacy_id": self.unrelated.pk}, format="json",
+        )
+        self.assertEqual(denied.status_code, 403, denied.data)
+        denied_unauthorized = outsider_client.post(
+            f"/api/v1/chains/{chain.pk}/add_pharmacy/",
+            {"pharmacy_id": self.unrelated.pk}, format="json",
+        )
+        self.assertIn(denied_unauthorized.status_code, (403, 404))
+        self.assertEqual(list(chain.pharmacies.values_list("pk", flat=True)), [self.owned.pk])
+
+        removed = owner_client.post(
+            f"/api/v1/chains/{chain.pk}/remove_pharmacy/",
+            {"pharmacy_id": self.owned.pk}, format="json",
+        )
+        self.assertEqual(removed.status_code, 200, removed.data)
+        self.assertFalse(chain.pharmacies.exists())
+
     def test_owner_can_read_and_edit_owned_pharmacy(self):
         response = self.request(self.owner, "PATCH", self.owned, {"about": "Owner updated"})
         self.assertEqual(response.status_code, 200, response.content)

@@ -3,7 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { useGuardedNavigation, useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
 import * as Notifications from 'expo-notifications';
-import { Briefcase, CalendarCheck, CalendarDays, Compass, Gift, Heart, LifeBuoy, MessageSquare, ShoppingBag, Sparkles, Star, UserRound } from 'lucide-react-native';
+import { BookOpen, Briefcase, CalendarCheck, CalendarDays, Compass, Gift, Heart, LifeBuoy, MessageSquare, ShoppingBag, Sparkles, Star, UserRound } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { resolveChatNotificationRoomId } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
@@ -21,6 +21,7 @@ const titles: Record<string, string> = {
   'talent-board': 'Talent Board',
   calendar: 'Calendar',
   availability: 'Availability',
+  learning: 'Learning',
   notifications: 'Notifications',
   'profile-basic-info': 'Profile',
   'profile-identity': 'Profile',
@@ -43,7 +44,8 @@ const more: MoreGroup[] = [
   {
     title: 'Grow',
     tone: 'blue',
-    items: [{ label: 'Marketplace', icon: ShoppingBag, route: '/marketplace' }],
+    items: [{ label: 'Marketplace', icon: ShoppingBag, route: '/marketplace' },
+      { label: 'Learning materials', icon: BookOpen, route: '/explorer/learning' }],
   },
 ];
 

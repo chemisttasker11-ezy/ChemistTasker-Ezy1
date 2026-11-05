@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { FlatList, StyleSheet, View, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as WebBrowser from 'expo-web-browser';
 import {
     Card,
     Text,
@@ -837,6 +838,15 @@ export default function StaffManager({
                             style={styles.modalActionButton}
                         >
                             {linkSubmitting ? 'Generating...' : 'Generate'}
+                        </Button>
+                        <Button mode="outlined" disabled={!linkValue} onPress={() => {
+                            const token = linkValue.match(/\/membership\/apply\/([A-Za-z0-9_-]{8,200})(?:$|[?#])/i)?.[1];
+                            if (!token) { setToast({ message: 'Invitation link is not valid for QR sharing.', severity: 'error' }); return; }
+                            const base = new URL(linkValue).origin;
+                            void WebBrowser.openBrowserAsync(base + '/share/qr?kind=pharmacy-invite&token=' + encodeURIComponent(token))
+                              .catch(() => setToast({ message: 'Unable to open the invitation QR.', severity: 'error' }));
+                        }} style={styles.modalActionButton}>
+                            Show invite QR
                         </Button>
                         <Button mode="contained" onPress={handleCopyLink} disabled={!linkValue} style={styles.modalActionButton}>
                             Copy & Close

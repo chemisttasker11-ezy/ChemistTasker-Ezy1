@@ -1,4 +1,4 @@
-import React,{useCallback,useEffect,useState}from'react';
+import React,{useCallback,useEffect,useRef,useState}from'react';
 import{Image,View}from'react-native';
 import{Button,Card,Chip,IconButton,Searchbar,Text}from'react-native-paper';
 import{DatePickerInput,TimePickerModal}from'react-native-paper-dates';
@@ -10,24 +10,56 @@ import{categoriesForSellerContext,clampMaximumAudience,nextMarketplaceAudience,p
 import{ActionButtons,ChoiceChips,DataRow,EmptyState,Field,InfoNote,MetricGrid,ParityPage,Section,palette}from'./ParityUI';
 import{asArray,dateLabel,errorMessage,idempotencyKey,money,replaceUnderscore,toNumber}from'./utils';
 import{clearMarketplaceDraft,emptyMarketplaceDraft,loadMarketplaceDraft,patchMarketplaceDraft,type MarketplaceMobileDraft}from'./marketplaceDraft';
+import{browseModes,browseQuery,categorySlug,normalizeBrowseMode,enquiryValidation,appendBrowsePage,nextBrowsePage,type BrowseMode}from'./marketplaceBrowseModel';
+import { MarketplaceAccessResolution } from './MarketplaceAccessResolution';
 
 type MarketplaceScreen='browse'|'filters'|'item'|'seller'|'category'|'details'|'photos'|'audience'|'review'|'mine'|'mine-detail'|'exchanges'|'exchange-detail'|'report';
 const api=chemistTaskerApi.marketplace;
 
+/** Key sensitive workspace state to the authenticated account; cached private
+ * listings and drafts cannot render for a subsequent signed-in user, even
+ * before asynchronous data-load effects have cleared the previous snapshot.
+ */
 export function MarketplaceParityScreen({screen}:{screen:MarketplaceScreen}){
- const router=useRouter();const{user}=useAuth();const draftScope=String(user?.id??user?.email??user?.username??'anonymous');const params=useLocalSearchParams<{id?:string}>();const id=String(params.id||'');
+ const {user}=useAuth();
+ return <MarketplaceParityContent key={`${user?.id??'signed-out'}:${screen}`} screen={screen}/>;
+}
+function MarketplaceParityContent({screen}:{screen:MarketplaceScreen}){
+ const router=useRouter();const{user}=useAuth();const draftScope=String(user?.id??user?.email??user?.username??'anonymous');const params=useLocalSearchParams<{id?:string;search?:string;category?:string;mode?:string}>();const id=String(params.id||'');
  const[listings,setListings]=useState<MarketplacePublicListing[]>([]),[listing,setListing]=useState<MarketplacePublicListing|null>(null),[categories,setCategories]=useState<MarketplaceCategory[]>([]),[options,setOptions]=useState<MarketplaceListingOptions|null>(null),[mine,setMine]=useState<MarketplaceDashboardListing[]>([]),[exchanges,setExchanges]=useState<MarketplaceExchange[]>([]),[exchange,setExchange]=useState<MarketplaceExchange|null>(null);
- const[draft,setDraft]=useState<MarketplaceMobileDraft>(emptyMarketplaceDraft()),[query,setQuery]=useState(''),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[error,setError]=useState('');
- const load=useCallback(async()=>{setError('');try{
-   if(screen==='browse'||screen==='filters'){const[page,cats]=await Promise.all([api.listListings(query?{search:query}:undefined),api.listCategories()]);setListings(asArray((page as any)?.results??page));setCategories(asArray(cats));}
-   if(screen==='item'||screen==='report')setListing(await api.getListing(id));
-   if(['seller','category','details','photos','audience','review'].includes(screen)){const[d,o]=await Promise.all([loadMarketplaceDraft(draftScope),api.getListingOptions()]);setDraft(d);setOptions(o);setCategories(categoriesForSellerContext(o,d.seller_context));}
-   if(screen==='mine'||screen==='mine-detail')setMine(asArray(await api.getDashboard()));
-   if(screen==='exchanges'||screen==='exchange-detail'){setExchanges(asArray(await api.listExchanges()));if(screen==='exchange-detail'&&id)setExchange(await api.getExchange(id));}
- }catch(e){setError(errorMessage(e,'Unable to load Marketplace.'));}finally{setLoading(false);setRefreshing(false);}},[screen,id,query,draftScope]);
- useEffect(()=>{void load();},[load]);
+ const[draft,setDraft]=useState<MarketplaceMobileDraft>(emptyMarketplaceDraft()),[query,setQuery]=useState(String(params.search||'')),[categoryFilter,setCategoryFilter]=useState(String(params.category||'')),[modeFilter,setModeFilter]=useState<BrowseMode>(normalizeBrowseMode(params.mode)),[listingCount,setListingCount]=useState<number|null>(null),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[error,setError]=useState('');
+ const[nextPage,setNextPage]=useState<number|null>(null),[loadingMore,setLoadingMore]=useState(false),[moreError,setMoreError]=useState('');
+ const requestRef=useRef(0),moreRequestRef=useRef(0),moreBusyRef=useRef(false);
+ useEffect(()=>{setQuery(String(params.search||''));setCategoryFilter(String(params.category||''));setModeFilter(normalizeBrowseMode(params.mode));},[params.search,params.category,params.mode]);
+ const load=useCallback(async()=>{const request=++requestRef.current;
+   if(screen==='browse'||screen==='filters'){moreRequestRef.current+=1;moreBusyRef.current=false;setNextPage(null);setLoadingMore(false);setMoreError('');}
+   if(screen!=='browse'&&screen!=='filters')setLoading(true);setError('');try{
+   if(screen==='browse'||screen==='filters'){const[page,cats]=await Promise.all([api.listListings(browseQuery({search:query,category:categoryFilter,mode:modeFilter})),api.listCategories()]);if(request===requestRef.current){const rows=asArray<MarketplacePublicListing>((page as any)?.results??page);setListings(rows);setListingCount(Number.isFinite(Number((page as any)?.count))?Number((page as any).count):rows.length);setNextPage(nextBrowsePage(page,1));setCategories(asArray(cats));}}
+   if(screen==='item'||screen==='report'){const result=await api.getListing(id);if(request===requestRef.current)setListing(result);}
+   if(['seller','category','details','photos','audience','review'].includes(screen)){const[d,o]=await Promise.all([loadMarketplaceDraft(draftScope),api.getListingOptions()]);if(request===requestRef.current){setDraft(d);setOptions(o);setCategories(categoriesForSellerContext(o,d.seller_context));}}
+   if(screen==='mine'||screen==='mine-detail'){const result=await api.getDashboard();if(request===requestRef.current)setMine(asArray(result));}
+   if(screen==='exchanges'||screen==='exchange-detail'){const result=await api.listExchanges();if(request===requestRef.current)setExchanges(asArray(result));if(screen==='exchange-detail'&&id){const detail=await api.getExchange(id);if(request===requestRef.current)setExchange(detail);}}
+ }catch(e){if(request===requestRef.current){setError(errorMessage(e,'Unable to load Marketplace.'));if(screen==='browse'||screen==='filters'){setListings([]);setListingCount(null);}}}finally{if(request===requestRef.current){setLoading(false);setRefreshing(false);}}},[screen,id,query,categoryFilter,modeFilter,draftScope]);
+ useEffect(()=>{void load();return()=>{requestRef.current+=1;moreRequestRef.current+=1;};},[load]);
 
- if(screen==='seller')return <SellerStep draft={draft} options={options} loading={loading} error={error}/>;
+ const loadMore=async()=>{
+   if(screen!=='browse'||nextPage===null||moreBusyRef.current)return;
+   const parentRequest=requestRef.current;
+   const pageNumber=nextPage;
+   const moreRequest=++moreRequestRef.current;
+   moreBusyRef.current=true;setLoadingMore(true);setMoreError('');
+   try{
+     const page=await api.listListings({...browseQuery({search:query,category:categoryFilter,mode:modeFilter}),page:pageNumber});
+     if(parentRequest!==requestRef.current||moreRequest!==moreRequestRef.current)return;
+     const rows=asArray<MarketplacePublicListing>((page as any)?.results??page);
+     setListings(existing=>appendBrowsePage(existing,rows));
+     if(typeof (page as any)?.count==='number')setListingCount((page as any).count);
+     setNextPage(nextBrowsePage(page,pageNumber));
+   }catch(e){if(parentRequest===requestRef.current&&moreRequest===moreRequestRef.current)setMoreError(errorMessage(e,'More listings could not be loaded.'));}
+   finally{if(moreRequest===moreRequestRef.current){moreBusyRef.current=false;setLoadingMore(false);}}
+ };
+
+ if(screen==='seller')return <SellerStep draft={draft} options={options} loading={loading} error={error} onReload={load}/>;
  if(screen==='category')return <CategoryStep draft={draft} options={options} loading={loading} error={error}/>;
  if(screen==='details')return <DetailsStep draft={draft} options={options} loading={loading} error={error}/>;
  if(screen==='photos')return <PhotosStep draft={draft} loading={loading} error={error}/>;
@@ -37,18 +69,118 @@ export function MarketplaceParityScreen({screen}:{screen:MarketplaceScreen}){
  if(screen==='report')return <ReportListing listing={listing} loading={loading} error={error}/>;
  if(screen==='mine-detail')return <MyListingDetail row={mine.find(x=>String(x.id)===id)} loading={loading} error={error} onReload={load}/>;
  if(screen==='exchange-detail')return <ExchangeDetail row={exchange} loading={loading} error={error} onReload={load}/>;
- if(screen==='filters')return <ParityPage title="Marketplace filters" subtitle="Search the live catalogue." loading={loading} error={error}><Searchbar value={query} onChangeText={setQuery} onSubmitEditing={()=>void load()} placeholder="Search Marketplace"/><Section title="Categories"><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{categories.map(c=><Chip key={c.id} onPress={()=>setQuery(c.name)}>{c.name}</Chip>)}</View></Section><Button mode="contained" onPress={()=>router.replace('/marketplace' as any)}>Show results</Button></ParityPage>;
+ if(screen==='filters')return <ParityPage title="Marketplace filters" subtitle="Narrow approved ordinary goods by category and exchange type." loading={loading} error={error} onRetry={load}><Searchbar value={query} onChangeText={setQuery} placeholder="Search Marketplace"/><Section title="Categories"><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}><Chip selected={!categoryFilter} onPress={()=>setCategoryFilter('')}>All</Chip>{categories.map(category=><Chip key={category.id} selected={categoryFilter===categorySlug(category)} onPress={()=>setCategoryFilter(categorySlug(category))}>{category.name}</Chip>)}</View></Section><Section title="Exchange type"><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{browseModes.map(mode=><Chip key={mode.value||'all'} selected={modeFilter===mode.value} onPress={()=>setModeFilter(mode.value)}>{mode.label}</Chip>)}</View></Section><ActionButtons><Button mode="outlined" onPress={()=>{setQuery('');setCategoryFilter('');setModeFilter('');}}>Clear filters</Button><Button mode="contained" onPress={()=>router.replace({pathname:'/marketplace',params:browseQuery({search:query,category:categoryFilter,mode:modeFilter})} as any)}>Show results</Button></ActionButtons></ParityPage>;
  if(screen==='mine')return <ParityPage title="My Marketplace listings" subtitle="Manage publication and audience escalation." loading={loading} error={error} onRetry={load} right={<IconButton icon="plus" onPress={()=>router.push('/marketplace/new/seller' as any)}/>}><Section title="Listings">{mine.length?mine.map(row=><DataRow key={row.id} title={row.title} subtitle={(row.category?.name||'Marketplace')+' · '+(row.current_circle||'Private')+' · updated '+dateLabel(row.updated_at)} status={replaceUnderscore(row.publication_status)+' / '+replaceUnderscore(row.availability_status)} onPress={()=>router.push(('/marketplace/mine/'+row.id) as any)}/>):<EmptyState title="No listings yet" body="Create your first Marketplace listing." actionLabel="Add item" onAction={()=>router.push('/marketplace/new/seller' as any)}/>}</Section></ParityPage>;
  if(screen==='exchanges')return <ParityPage title="My exchanges" subtitle="Enquiries, agreed terms and transfer state." loading={loading} error={error} onRetry={load}><Section title="Exchanges">{exchanges.length?exchanges.map(row=><DataRow key={row.id} title={row.listing_title||'Marketplace exchange'} subtitle={replaceUnderscore(row.state)+' · updated '+dateLabel(row.updated_at)} status={replaceUnderscore(row.state)} onPress={()=>router.push(('/marketplace/exchanges/'+row.id) as any)}/>):<EmptyState title="No exchanges" body="Marketplace enquiries and agreed exchanges will appear here."/>}</Section></ParityPage>;
- return <ParityPage title="Marketplace" subtitle="Tools, books, fixtures, workwear and approved non-medicine goods." loading={loading} error={error} onRetry={load} onRefresh={()=>{setRefreshing(true);void load();}} refreshing={refreshing} right={<IconButton icon="plus" onPress={()=>router.push('/marketplace/new/seller' as any)}/>}><Searchbar value={query} onChangeText={setQuery} onSubmitEditing={()=>void load()} placeholder="Search listings"/><ActionButtons><Button mode="outlined" icon="filter-variant" onPress={()=>router.push('/marketplace/filters' as any)}>Filters</Button><Button mode="outlined" onPress={()=>router.push('/marketplace/mine' as any)}>My listings</Button><Button mode="outlined" onPress={()=>router.push('/marketplace/exchanges' as any)}>Exchanges</Button></ActionButtons><Section title="Latest listings">{listings.length?listings.map(row=><ListingCard key={row.id} row={row} onPress={()=>router.push(('/marketplace/items/'+row.id) as any)}/>):<EmptyState title="No listings found" body="Try a different search or category."/>}</Section></ParityPage>;
+ return <ParityPage title="Marketplace" subtitle="Tools, books, fixtures, workwear and approved non-medicine goods." loading={loading} error={error} onRetry={load} onRefresh={()=>{setRefreshing(true);void load();}} refreshing={refreshing} right={<IconButton icon="plus" onPress={()=>router.push('/marketplace/new/seller' as any)}/>}><Searchbar value={query} onChangeText={setQuery} onSubmitEditing={()=>void load()} placeholder="Search listings"/><ActionButtons><Button mode="outlined" icon="filter-variant" onPress={()=>router.push({pathname:'/marketplace/filters',params:browseQuery({search:query,category:categoryFilter,mode:modeFilter})} as any)}>Filters</Button><Button mode="outlined" onPress={()=>router.push('/marketplace/mine' as any)}>My listings</Button><Button mode="outlined" onPress={()=>router.push('/marketplace/exchanges' as any)}>Exchanges</Button></ActionButtons><Section title={listingCount===null?'Approved listings':`${listingCount} approved ${listingCount===1?'listing':'listings'}`} description={[categoryFilter?'Category selected':'',modeFilter||''].filter(Boolean).join(' · ')||undefined}>{listings.length?listings.map(row=><ListingCard key={row.id} row={row} onPress={()=>router.push(('/marketplace/items/'+row.id) as any)}/>):<EmptyState title="No listings found" body="Try a different search or category."/>}
+ {moreError?<InfoNote title="More listings unavailable" tone="warning">{moreError}</InfoNote>:null}
+ {(nextPage!==null||loadingMore)?<Button mode="outlined" icon="chevron-down" loading={loadingMore} disabled={loadingMore||nextPage===null} onPress={()=>void loadMore()}>Load more listings</Button>:null}</Section></ParityPage>;
 }
 
 function ListingCard({row,onPress}:{row:MarketplacePublicListing;onPress:()=>void}){const image=row.images?.[0]?.derivative_url;return <Card mode="outlined" onPress={onPress} style={{overflow:'hidden'}}>{image?<Image source={{uri:image}} style={{width:'100%',height:170,backgroundColor:'#EEF2FF'}} resizeMode="cover"/>:null}<Card.Content style={{gap:6,paddingTop:12}}><Text variant="titleMedium">{row.title}</Text><Text variant="bodySmall" style={{color:palette.muted}}>{row.summary||row.description}</Text><View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}><Chip compact>{row.category?.name||replaceUnderscore(row.mode)}</Chip><Text variant="titleSmall">{row.mode==='FREE'?'Free':row.mode==='SWAP'?'Swap':money(row.item_amount)}</Text></View></Card.Content></Card>;}
 
-function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing|null;loading:boolean;error:string}){const router=useRouter();const[busy,setBusy]=useState(false),[localError,setLocalError]=useState('');const enquire=async()=>{if(!listing)return;setBusy(true);setLocalError('');try{await api.createEnquiry(listing.id,{client_request_id:idempotencyKey('enquiry'),message:'Interested via ChemistTasker mobile Marketplace.'});router.push('/marketplace/exchanges' as any);}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};return <ParityPage title="Listing detail" subtitle="Public listing information and eligibility." loading={loading} error={error||localError}>{!listing?<EmptyState title="Listing not found" body="This listing is unavailable."/>:<>{listing.images?.[0]?.derivative_url?<Image source={{uri:listing.images[0].derivative_url}} style={{width:'100%',height:240,borderRadius:16}} resizeMode="cover"/>:null}<Section title={listing.title} description={listing.coarse_location}><Text>{listing.description}</Text><MetricGrid items={[{label:'Condition',value:replaceUnderscore(listing.condition)},{label:'Mode',value:replaceUnderscore(listing.mode)},{label:'Amount',value:listing.mode==='FREE'?'Free':listing.mode==='SWAP'?'Swap':money(listing.item_amount)}]}/><DataRow title="Seller" subtitle={listing.seller_role_label}/><DataRow title="Delivery" subtitle={asArray(listing.delivery_options).map(replaceUnderscore).join(', ')||'Seller arrangements'}/></Section><ActionButtons><Button mode="contained" loading={busy} onPress={()=>void enquire()}>Enquire</Button><Button mode="outlined" onPress={()=>router.push(('/marketplace/items/'+listing.id+'/report') as any)}>Report</Button></ActionButtons></>}</ParityPage>;}
+
+function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing|null;loading:boolean;error:string}){
+ const router=useRouter();const{user}=useAuth();
+ const[busy,setBusy]=useState(false),[localError,setLocalError]=useState(''),[message,setMessage]=useState(''),[buyingPharmacy,setBuyingPharmacy]=useState<number|null>(null);
+ const[access,setAccess]=useState<import('@chemisttasker/shared-core').MarketplaceAccess|null>(null);
+ const[accessLoading,setAccessLoading]=useState(false),[contactOpen,setContactOpen]=useState(false),[submitted,setSubmitted]=useState(false);
+ const requestRef=useRef(0),submittingRef=useRef(false),requestIdRef=useRef(idempotencyKey('enquiry'));
+ useEffect(()=>{
+   const request=++requestRef.current;submittingRef.current=false;setBusy(false);setContactOpen(false);setSubmitted(false);setMessage('');setBuyingPharmacy(null);setAccess(null);setLocalError('');requestIdRef.current=idempotencyKey('enquiry');
+   if(!listing||!user)return()=>{requestRef.current+=1;};
+   setAccessLoading(true);
+   void api.getAccess().then(value=>{if(request===requestRef.current)setAccess(value);}).catch(e=>{if(request===requestRef.current)setLocalError(errorMessage(e,'Trade eligibility could not be checked.'));}).finally(()=>{if(request===requestRef.current)setAccessLoading(false);});
+   return()=>{requestRef.current+=1;};
+ },[listing?.id,user?.id]);
+ const selectedPharmacy=access?.eligible_pharmacies?.find(p=>p.id===buyingPharmacy);
+ const canTrade=Boolean(access&&(access.can_trade_personally||access.can_trade_for_pharmacy));
+ const enquire=async()=>{
+   if(!listing||!canTrade||submittingRef.current)return;
+   const validation=enquiryValidation(message);
+   if(validation){setLocalError(validation);return;}
+   if(buyingPharmacy!=null&&!selectedPharmacy){setLocalError('Choose a pharmacy you are authorized to represent.');return;}
+   if(buyingPharmacy==null&&!access?.can_trade_personally){setLocalError('Select an eligible buying pharmacy for this enquiry.');return;}
+   const request=requestRef.current;
+   submittingRef.current=true;setBusy(true);setLocalError('');
+   try{
+     const eligibility=await api.getEligibility(listing.id,buyingPharmacy!=null?{pharmacy:buyingPharmacy}:undefined);
+     // A user/listing switch invalidates the previous eligibility snapshot before any write.
+     if(request!==requestRef.current)return;
+     if(!eligibility.can_enquire){
+       const blocker=eligibility.blocker;
+       const detail=typeof blocker==='string'?blocker:blocker&&typeof blocker==='object'?(blocker as any).message||(blocker as any).detail||(blocker as any).code:null;
+       throw new Error(detail||'This account cannot enquire about this listing in the selected buying context.');
+     }
+     await api.createEnquiry(listing.id,{
+       client_request_id:requestIdRef.current,
+       buying_pharmacy:buyingPharmacy,
+       message:message.trim(),
+       terms:{intent:'ENQUIRY'},
+     });
+     if(request!==requestRef.current)return;
+     setSubmitted(true);router.push('/marketplace/exchanges' as any);
+   }catch(e){if(request===requestRef.current)setLocalError(errorMessage(e,'Unable to send enquiry.'));}finally{if(request===requestRef.current){submittingRef.current=false;setBusy(false);}}
+ };
+ return <ParityPage title="Listing detail" subtitle="Approved ordinary goods with verified seller and buyer eligibility." loading={loading} error={error} onRetry={()=>router.replace('/marketplace' as any)}>
+  {!listing?<EmptyState title="Listing not found" body="This listing may have been removed or withdrawn." actionLabel="Browse listings" onAction={()=>router.replace('/marketplace' as any)}/>:<>
+   {listing.images?.[0]?.derivative_url?<Image source={{uri:listing.images[0].derivative_url}} style={{width:'100%',height:240,borderRadius:16}} resizeMode="cover"/>:null}
+   <Section title={listing.title} description={listing.coarse_location}>
+     <Text>{listing.description}</Text>
+     <MetricGrid items={[{label:'Condition',value:replaceUnderscore(listing.condition)},{label:'Mode',value:replaceUnderscore(listing.mode)},{label:'Amount',value:listing.mode==='FREE'?'Free':listing.mode==='SWAP'?'Swap':money(listing.item_amount)}]}/>
+     <DataRow title="Seller" subtitle={listing.seller_role_label}/>
+     <DataRow title="Delivery" subtitle={asArray(listing.delivery_options).map(replaceUnderscore).join(', ')||'Seller arrangements'}/>
+     <DataRow title="Eligible buyers" subtitle={asArray(listing.permitted_buyer_labels).join(', ')||'Eligibility checked before contact'}/>
+   </Section>
+   {user==null?<InfoNote title="Sign in to enquire">You can browse approved items without signing in. Sign in with an eligible verified account to contact the seller.</InfoNote>:
+     accessLoading?<InfoNote title="Checking eligibility">Checking current marketplace trading permissions.</InfoNote>:
+     access&&!canTrade?<View style={{gap:12}}><InfoNote title="Trading access required" tone="warning">{access.blockers.map(b=>b.message||b.detail||b.code).join(' · ')||'Complete account verification and accept applicable marketplace terms to contact a seller.'}</InfoNote><MarketplaceAccessResolution access={access} onUpdated={async()=>{const request=requestRef.current;const refreshed=await api.getAccess();if(request===requestRef.current)setAccess(refreshed);}} /></View>:null}
+   {localError?<InfoNote title="Marketplace needs attention" tone="warning">{localError}</InfoNote>:null}
+   {contactOpen&&!submitted&&canTrade?<Section title="Enquire with seller" description="No purchase is committed by sending this enquiry.">
+     <Field label="Message to seller" value={message} onChangeText={setMessage} multiline placeholder="Ask about condition, pickup or delivery arrangements." disabled={busy}/>
+     {access?.eligible_pharmacies?.length?<Section title="Buying context" description="Select a pharmacy only if you are authorized to act on its behalf.">
+       <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+         <Chip selected={buyingPharmacy==null} onPress={()=>setBuyingPharmacy(null)} disabled={busy||!access.can_trade_personally}>Personal</Chip>
+         {access.eligible_pharmacies.map(pharmacy=><Chip key={pharmacy.id} selected={buyingPharmacy===pharmacy.id} disabled={busy} onPress={()=>setBuyingPharmacy(pharmacy.id)}>{pharmacy.label}</Chip>)}
+       </View>
+     </Section>:null}
+     <ActionButtons>
+       <Button mode="outlined" onPress={()=>setContactOpen(false)} disabled={busy}>Cancel</Button>
+       <Button mode="contained" loading={busy} disabled={busy||!!enquiryValidation(message)} onPress={()=>void enquire()}>Send gated enquiry</Button>
+     </ActionButtons>
+   </Section>:null}
+   <ActionButtons>
+     {!contactOpen&&!submitted?<Button mode="contained" loading={accessLoading} disabled={!user||accessLoading||!canTrade} onPress={()=>{setContactOpen(true);setLocalError('');}}>Check eligibility & enquire</Button>:null}
+     <Button mode="outlined" onPress={()=>router.push(('/marketplace/items/'+listing.id+'/report') as any)}>Report listing</Button>
+   </ActionButtons>
+   {submitted?<InfoNote title="Enquiry sent" tone="success">The seller conversation is available in My exchanges.</InfoNote>:null}
+  </>}
+ </ParityPage>;
+}
 
 function useDraftStep(initial:MarketplaceMobileDraft){const{user}=useAuth();const scope=String(user?.id??user?.email??user?.username??'anonymous');const[value,setValue]=useState(initial);useEffect(()=>setValue(initial),[initial]);const patch=async(p:Partial<MarketplaceMobileDraft>)=>{const next={...value,...p};setValue(next);await patchMarketplaceDraft(scope,p);return next;};return{value,patch,scope};}
-function SellerStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string}){const router=useRouter();const{value,patch}=useDraftStep(draft);const pharmacies=asArray<any>(options?.eligible_pharmacies);const changeContext=(v:string)=>void patch({seller_context:v as MarketplaceMobileDraft['seller_context'],pharmacy:v==='PERSONAL'?null:value.pharmacy,category:null,category_name:'',mode:'SELL',allowed_buyer_roles:[],current_circle:'OWNED_CHAIN'});return <ParityPage title="Who is selling?" subtitle="Choose personal or pharmacy seller context." loading={loading} error={error}><ChoiceChips value={value.seller_context} onChange={changeContext} options={[{value:'PERSONAL',label:'Personal'},{value:'PHARMACY',label:'Pharmacy'}]}/>{value.seller_context==='PHARMACY'?<Section title="Eligible pharmacies"><View style={{gap:8}}>{pharmacies.map(p=><Chip key={p.id} selected={value.pharmacy===p.id} onPress={()=>void patch({pharmacy:p.id})}>{p.label}</Chip>)}</View></Section>:null}<Button mode="contained" disabled={value.seller_context==='PHARMACY'&&!value.pharmacy} onPress={()=>router.push('/marketplace/new/category' as any)}>Continue</Button></ParityPage>;}
+function SellerStep({draft,options,loading,error,onReload}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string;onReload:()=>Promise<void>}){
+ const router=useRouter();const{value,patch}=useDraftStep(draft);
+ const pharmacies=asArray<any>(options?.eligible_pharmacies);
+ const canSell=Boolean(options&&(options.can_trade_personally||options.can_trade_for_pharmacy));
+ const changeContext=(next:string)=>void patch({
+   seller_context:next as MarketplaceMobileDraft['seller_context'],
+   pharmacy:next==='PERSONAL'?null:value.pharmacy,
+   category:null,category_name:'',mode:'SELL',allowed_buyer_roles:[],current_circle:'OWNED_CHAIN',
+ });
+ return <ParityPage title="Who is selling?" subtitle="Select the authorized personal or pharmacy seller context." loading={loading} error={error} onRetry={onReload}>
+  {options&&!canSell?<View style={{gap:12}}>
+    <InfoNote title="Trading permission required" tone="warning">{options.blockers.map(blocker=>blocker.message||blocker.detail||blocker.code).join(' · ')||'Complete the current marketplace verification and terms checks before selling.'}</InfoNote>
+    <MarketplaceAccessResolution access={options} onUpdated={onReload}/>
+  </View>:null}
+  {canSell?<><ChoiceChips value={value.seller_context} onChange={changeContext} disabled={loading} options={[
+    ...(options?.can_trade_personally?[{value:'PERSONAL',label:'Personal'}]:[]),
+    ...(options?.can_trade_for_pharmacy?[{value:'PHARMACY',label:'Pharmacy'}]:[]),
+  ]}/>
+  {value.seller_context==='PHARMACY'?<Section title="Eligible pharmacies"><View style={{gap:8}}>{pharmacies.map(pharmacy=><Chip key={pharmacy.id} selected={value.pharmacy===pharmacy.id} onPress={()=>void patch({pharmacy:pharmacy.id})}>{pharmacy.label}</Chip>)}</View></Section>:null}
+  <Button mode="contained" disabled={!canSell||(value.seller_context==='PERSONAL'&&!options?.can_trade_personally)||(value.seller_context==='PHARMACY'&&(!options?.can_trade_for_pharmacy||!value.pharmacy))} onPress={()=>router.push('/marketplace/new/category' as any)}>Continue</Button></>:null}
+ </ParityPage>;
+}
 function CategoryStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string}){const router=useRouter();const{value,patch}=useDraftStep(draft);const categories=categoriesForSellerContext(options,value.seller_context);const choose=(category:MarketplaceCategory)=>{const modes=permittedModesForCategory(category);const roles=permittedBuyerRolesForCategory(category,value.seller_context);void patch({category:category.id,category_name:category.name,mode:modes.includes(value.mode)?value.mode:modes[0],allowed_buyer_roles:roles,current_circle:'OWNED_CHAIN'});};return <ParityPage title="Choose category" subtitle="Only categories permitted for the selected seller context are shown." loading={loading} error={error}><Section title="Categories">{categories.map(category=><DataRow key={category.id} title={category.name} subtitle={category.description} status={value.category===category.id?'Selected':undefined} onPress={()=>choose(category)}/>)}</Section><Button mode="contained" disabled={!value.category} onPress={()=>router.push('/marketplace/new/details' as any)}>Continue</Button></ParityPage>;}
 function DetailsStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string}){
  const router=useRouter();const{value,patch}=useDraftStep(draft);const categories=categoriesForSellerContext(options,value.seller_context);const selectedCategory=categories.find(category=>category.id===value.category);const modeOptions=permittedModesForCategory(selectedCategory).map(mode=>({value:mode,label:mode==='SELL'?'Sell':mode==='FREE'?'Free':'Swap'}));
@@ -98,16 +230,24 @@ function AudienceStep({draft,options,loading,error}:{draft:MarketplaceMobileDraf
 }
 function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:boolean;error:string}){
  const router=useRouter();const{user}=useAuth();const scope=String(user?.id??user?.email??user?.username??'anonymous');const[busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
- const complete=async(submitForReview:boolean)=>{setBusy(true);setLocalError('');try{
+ const submittingRef=useRef(false);const scopeRef=useRef(scope);scopeRef.current=scope;
+ const submissionGeneration=useRef(0);
+ useEffect(()=>{submissionGeneration.current+=1;submittingRef.current=false;setBusy(false);setLocalError('');},[scope]);
+ // A second tap must never start another create/update/upload/submission
+ // while the first attempt is awaiting server responses.
+ const complete=async(submitForReview:boolean)=>{if(submittingRef.current)return;submittingRef.current=true;const targetScope=scope;const attempt=++submissionGeneration.current;const current=()=>scopeRef.current===targetScope&&submissionGeneration.current===attempt;setBusy(true);setLocalError('');try{
    const body:any={client_request_id:draft.create_request_id,seller_context:draft.seller_context,pharmacy:draft.pharmacy,category:draft.category,mode:draft.mode,title:draft.title,description:draft.description,condition:draft.condition,quantity:draft.quantity,unit:draft.unit,amount:draft.mode==='SELL'?draft.amount:'0',desired_swap:draft.desired_swap,suburb:draft.suburb,state:draft.state,postcode:draft.postcode,private_pickup_details:draft.private_pickup_details,allowed_buyer_roles:draft.allowed_buyer_roles,delivery:{method:draft.delivery_method,postage_payer:draft.postage_payer||undefined,postage_organiser:draft.postage_organiser||undefined,known_cost:draft.known_cost||null,quote_required:draft.quote_required}};
    let listingId=draft.created_listing_id;let expectedVersion=draft.created_listing_version;
-   if(listingId&&expectedVersion!=null){const updated=await api.updateListing(listingId,{...body,expected_version:expectedVersion});expectedVersion=updated.version;await patchMarketplaceDraft(scope,{created_listing_version:expectedVersion});}
-   else{const created=await api.createListing(body);listingId=String(created.id);expectedVersion=created.version;await patchMarketplaceDraft(scope,{created_listing_id:listingId,created_listing_version:expectedVersion});}
-   if(draft.seller_context==='PHARMACY'){const audience=await api.updateAudience(listingId,{expected_version:Number(expectedVersion),current_circle:'OWNED_CHAIN',maximum_circle:clampMaximumAudience(draft.maximum_circle)});expectedVersion=audience.version;await patchMarketplaceDraft(scope,{current_circle:'OWNED_CHAIN',created_listing_version:expectedVersion});}
-   let uploaded=[...draft.uploaded_image_uris];for(const uri of draft.image_uris){if(uploaded.includes(uri))continue;const blob=await(await fetch(uri)).blob();const data=new FormData();data.append('image',blob as any,'listing-'+Date.now()+'.jpg');await api.uploadImage(listingId,data);uploaded=[...uploaded,uri];await patchMarketplaceDraft(scope,{uploaded_image_uris:uploaded});}
+   if(listingId&&expectedVersion!=null){const updated=await api.updateListing(listingId,{...body,expected_version:expectedVersion});expectedVersion=updated.version;if(!current())return;await patchMarketplaceDraft(scope,{created_listing_version:expectedVersion});}
+   else{const created=await api.createListing(body);listingId=String(created.id);expectedVersion=created.version;if(!current())return;await patchMarketplaceDraft(scope,{created_listing_id:listingId,created_listing_version:expectedVersion});}
+   if(!current())return;
+   if(draft.seller_context==='PHARMACY'){const audience=await api.updateAudience(listingId,{expected_version:Number(expectedVersion),current_circle:'OWNED_CHAIN',maximum_circle:clampMaximumAudience(draft.maximum_circle)});expectedVersion=audience.version;if(!current())return;await patchMarketplaceDraft(scope,{current_circle:'OWNED_CHAIN',created_listing_version:expectedVersion});}
+   let uploaded=[...draft.uploaded_image_uris];for(const uri of draft.image_uris){if(!current())return;if(uploaded.includes(uri))continue;const blob=await(await fetch(uri)).blob();const data=new FormData();data.append('image',blob as any,'listing-'+Date.now()+'.jpg');await api.uploadImage(listingId,data);if(!current())return;uploaded=[...uploaded,uri];await patchMarketplaceDraft(scope,{uploaded_image_uris:uploaded});}
+   if(!current())return;
    if(submitForReview)await api.actOnListing(listingId,'submit',Number(expectedVersion));
-   await clearMarketplaceDraft(scope);router.replace('/marketplace/mine' as any);
- }catch(e){setLocalError(errorMessage(e,submitForReview?'Unable to submit listing. Your existing draft will be resumed on retry.':'Unable to save listing draft. Your existing draft will be resumed on retry.'));}finally{setBusy(false);}};
+   // Never clear a newly signed-in account's draft or navigate as another user.
+   if(current()){await clearMarketplaceDraft(targetScope);if(current())router.replace('/marketplace/mine' as any);}
+ }catch(e){if(current())setLocalError(errorMessage(e,submitForReview?'Unable to submit listing. Your existing draft will be resumed on retry.':'Unable to save listing draft. Your existing draft will be resumed on retry.'));}finally{if(current()){submittingRef.current=false;setBusy(false);}}};
  const postage=draft.delivery_method!=='PICKUP';
  const disabled=busy||!draft.category||!draft.title||(postage&&(!draft.postage_payer||!draft.postage_organiser));
  return <ParityPage title="Review listing" subtitle="Confirm seller, item, audience and delivery details." loading={loading} error={error||localError}>
@@ -129,19 +269,21 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
  </ParityPage>;
 }
 function MyListingDetail({row,loading,error,onReload}:{row:MarketplaceDashboardListing|undefined;loading:boolean;error:string;onReload:()=>Promise<void>}){
+ const actionBusyRef=useRef(false);
  const[busy,setBusy]=useState(false),[localError,setLocalError]=useState(''),[scheduleAt,setScheduleAt]=useState<Date|undefined>(undefined),[timeOpen,setTimeOpen]=useState(false);
  const labels:Record<string,string>={OWNED_CHAIN:'Owned pharmacies',ORGANISATION:'Organisation',PLATFORM:'Platform owners'};
- const act=async(action:'submit'|'withdraw')=>{if(!row)return;setBusy(true);setLocalError('');try{await api.actOnListing(row.id,action,row.version);await onReload();}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
+ const act=async(action:'submit'|'withdraw')=>{if(!row||actionBusyRef.current)return;actionBusyRef.current=true;setBusy(true);setLocalError('');try{await api.actOnListing(row.id,action,row.version);await onReload();}catch(e){setLocalError(errorMessage(e));}finally{actionBusyRef.current=false;setBusy(false);}};
  const currentCircle=row?.current_circle||'OWNED_CHAIN';
  const next=nextMarketplaceAudience(currentCircle,row?.maximum_circle);
- const widen=async(schedule=false)=>{if(!row||!next)return;setBusy(true);setLocalError('');try{
+ const widen=async(schedule=false)=>{if(!row||!next||actionBusyRef.current)return;actionBusyRef.current=true;setBusy(true);setLocalError('');try{
    if(schedule&&!scheduleAt){setLocalError('Choose a future date and time before scheduling audience widening.');return;}
    if(schedule&&scheduleAt&&scheduleAt.getTime()<=Date.now()){setLocalError('Scheduled widening must be in the future.');return;}
    await api.updateAudience(row.id,{expected_version:row.version,current_circle:schedule?currentCircle:next,maximum_circle:row.maximum_circle||'PLATFORM',...(schedule&&scheduleAt?{schedule:[{target_circle:next,due_at:scheduleAt.toISOString()}]}:{})});
    setScheduleAt(undefined);await onReload();
- }catch(e){setLocalError(errorMessage(e,'Unable to update listing audience.'));}finally{setBusy(false);}};
- return <ParityPage title="Manage listing" subtitle="Publication, availability and audience state." loading={loading} error={error||localError}>
+ }catch(e){setLocalError(errorMessage(e,'Unable to update listing audience.'));}finally{actionBusyRef.current=false;setBusy(false);}};
+ return <ParityPage title="Manage listing" subtitle="Publication, availability and audience state." loading={loading} error={error} onRetry={onReload}>
   {!row?<EmptyState title="Listing not found" body="The listing is unavailable."/>:<>
+   {localError?<InfoNote title="Listing action could not be completed" tone="warning">{localError}</InfoNote>:null}
    <MetricGrid items={[{label:'Publication',value:replaceUnderscore(row.publication_status)},{label:'Availability',value:replaceUnderscore(row.availability_status)},{label:'Audience',value:replaceUnderscore(row.current_circle||'PRIVATE')}]}/>
    <DataRow title={row.title} subtitle={row.category?.name||'Marketplace listing'}/>
    <ActionButtons>

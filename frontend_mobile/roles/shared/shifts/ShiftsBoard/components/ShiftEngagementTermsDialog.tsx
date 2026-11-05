@@ -44,7 +44,7 @@ export default function ShiftEngagementTermsDialog({
       setAccepted(false);
       setContractorConfirmed(false);
     }
-  }, [visible, offers, error]);
+  }, [visible, offers]);
 
   const terms = useMemo(
     () => offers.map(termsFor).filter(Boolean) as ShiftEngagementTerms[],

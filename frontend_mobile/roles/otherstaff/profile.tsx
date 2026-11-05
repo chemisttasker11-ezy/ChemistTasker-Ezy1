@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert, Linking } from 'react-native';
+import { ScrollView, StyleSheet, View, Alert } from 'react-native';
+import { openWebPage } from '@/features/explore/webLinks';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Avatar,
@@ -31,7 +32,6 @@ export default function OtherStaffProfileScreen() {
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const appVersion = typeof Constants?.expoConfig?.version === 'string' ? Constants.expoConfig.version : '';
-  const webBaseUrl = 'https://www.chemisttasker.com.au';
   const imageMediaTypes = (ImagePicker as any).MediaType?.Images ?? ImagePicker.MediaTypeOptions.Images;
   const menuItems = [
     { title: 'Attendance PIN', description: 'Set a terminal PIN for each pharmacy', icon: 'dialpad', route: '/attendance-pin' },
@@ -45,6 +45,7 @@ export default function OtherStaffProfileScreen() {
     { title: 'How you get paid', description: 'ABN or TFN, bank account and super', icon: 'cash-multiple', route: '/otherstaff/profile-payment' },
     { title: 'References', description: 'Optional · earns the References badge', icon: 'account-group-outline', route: '/otherstaff/profile-referees' },
     { title: 'Bio', description: 'Short bio and resume', icon: 'file-account-outline', route: '/otherstaff/profile-bio' },
+    { title: 'App preferences', description: 'Notifications and communication settings', icon: 'cog-outline', route: '/app-preferences' },
   ];
 
   useEffect(() => {
@@ -202,7 +203,10 @@ export default function OtherStaffProfileScreen() {
           </LinearGradient>
         </Card>
 
-        <ProfileVerificationCard roleKey="otherstaff" routes={{ mobile: '/mobile-verify', ahpra: '/otherstaff/profile-regulatory', role: '/otherstaff/profile-regulatory', gov_id: '/otherstaff/profile-identity', referees: '/otherstaff/profile-referees' }} />
+        <Button mode="outlined" icon="qrcode" onPress={() => router.push('/share/worker' as any)} style={{ marginHorizontal: 16, marginVertical: 8 }}>
+          Show my public worker QR
+        </Button>
+        <ProfileVerificationCard roleKey="otherstaff" routes={{ mobile: '/mobile-verify?source=profile', ahpra: '/otherstaff/profile-regulatory', role: '/otherstaff/profile-regulatory', gov_id: '/otherstaff/profile-identity', referees: '/otherstaff/profile-referees' }} />
 
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
@@ -237,14 +241,14 @@ export default function OtherStaffProfileScreen() {
               title="Terms of Service"
               left={(props) => <List.Icon {...props} icon="file-document" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => Linking.openURL(`${webBaseUrl}/terms-of-service`)}
+              onPress={() => openWebPage('/terms-of-service').catch(() => Alert.alert('Website unavailable', 'Please try again.'))}
             />
             <Divider />
             <List.Item
               title="Privacy Policy"
               left={(props) => <List.Icon {...props} icon="shield-check" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => Linking.openURL(`${webBaseUrl}/privacy-policy`)}
+              onPress={() => openWebPage('/privacy-policy').catch(() => Alert.alert('Website unavailable', 'Please try again.'))}
             />
           </Surface>
         </View>

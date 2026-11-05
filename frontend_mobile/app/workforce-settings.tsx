@@ -1,23 +1,30 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Card, Chip, Switch, Text, TextInput } from 'react-native-paper';
 import {
+  canManageKioskDevices,
   fetchPharmaciesService,
   type WorkforceEmploymentEngagement,
   type WorkforcePayrollConfiguration,
   type WorkforceWorkSettings,
   workforce,
 } from '@chemisttasker/shared-core';
+import { colors, font, radius, space, touch } from '@/constants/tokens';
+import { useAuth } from '@/context/AuthContext';
+import { orgCapabilities } from '@/roles/shared/dashboard/ManagerHome';
 
 const hours = (minutes?: number | null) => minutes == null ? '' : (minutes / 60).toFixed(2);
 const pretty = (value?: string | null) => String(value || '').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
 
 export default function WorkforceSettingsScreen() {
   const router = useRouter();
-  const [pharmacies, setPharmacies] = useState<{ id: number; name: string }[]>([]);
+  const { user, hasCapability } = useAuth();
+  const organizationRights = orgCapabilities(user);
+  const isOwner = user?.role === 'OWNER';
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
+  const [pharmacies, setPharmacies] = useState<{ id: number; name: string }[]>([]);
   const [payroll, setPayroll] = useState<WorkforcePayrollConfiguration | null>(null);
   const [staff, setStaff] = useState<WorkforceWorkSettings[]>([]);
   const [engagements, setEngagements] = useState<WorkforceEmploymentEngagement[]>([]);
@@ -26,6 +33,11 @@ export default function WorkforceSettingsScreen() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const requestGeneration = useRef(0);
+  const currentPharmacy = useRef<number | null>(null);
+  currentPharmacy.current = pharmacyId;
+  const canManageRoster = Boolean(pharmacyId && (isOwner || organizationRights.roster || hasCapability('MANAGE_ROSTER', pharmacyId)));
+  const canManageKiosk = Boolean(pharmacyId && canManageKioskDevices(user, pharmacyId));
 
   useEffect(() => {
     fetchPharmaciesService({})
@@ -38,10 +50,21 @@ export default function WorkforceSettingsScreen() {
   }, []);
 
   const load = useCallback(async (pull = false) => {
+    // Save callbacks created for a previous pharmacy cannot replace the new
+    // pharmacy's visible state after a workspace selection change.
+    if (currentPharmacy.current !== pharmacyId) return;
+    const generation = ++requestGeneration.current;
+    const current = () => generation === requestGeneration.current && currentPharmacy.current === pharmacyId;
     if (!pharmacyId) {
-      setPayroll(null); setStaff([]); setEngagements([]); setLoading(false); return;
+      setPayroll(null); setStaff([]); setEngagements([]); setHoursDraft({});
+      setLoading(false); setRefreshing(false);
+      return;
     }
-    if (pull) setRefreshing(true); else setLoading(true);
+    if (pull) setRefreshing(true);
+    else {
+      setLoading(true);
+      setPayroll(null); setStaff([]); setEngagements([]); setHoursDraft({});
+    }
     setError('');
     try {
       const [nextPayroll, nextStaff, nextEngagements] = await Promise.all([
@@ -49,18 +72,22 @@ export default function WorkforceSettingsScreen() {
         workforce.listWorkSettings(pharmacyId),
         workforce.listEmploymentEngagements(pharmacyId),
       ]) as [WorkforcePayrollConfiguration, WorkforceWorkSettings[], WorkforceEmploymentEngagement[]];
+      if (!current()) return;
       setPayroll(nextPayroll);
       setStaff(nextStaff);
       setEngagements(nextEngagements);
       setHoursDraft(Object.fromEntries(nextStaff.map(row => [row.membership_id, hours(row.contracted_weekly_minutes)])));
     } catch (failure: any) {
-      setError(failure?.message || 'Unable to load workforce settings.');
+      if (current()) setError(failure?.message || 'Unable to load workforce settings.');
     } finally {
-      setLoading(false); setRefreshing(false);
+      if (current()) { setLoading(false); setRefreshing(false); }
     }
   }, [pharmacyId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => { requestGeneration.current += 1; };
+  }, [load]);
 
   const currentEngagementByMembership = useMemo(() => {
     const now = new Date();
@@ -88,9 +115,9 @@ export default function WorkforceSettingsScreen() {
         membership_id: row.membership_id,
         contracted_weekly_minutes: numeric == null ? null : Math.round(numeric * 60),
       });
-      await load();
+      if (currentPharmacy.current === pharmacyId) await load();
     } catch (failure: any) {
-      setError(failure?.message || 'Unable to save contracted hours.');
+      if (currentPharmacy.current === pharmacyId) setError(failure?.message || 'Unable to save contracted hours.');
     } finally {
       setBusyKey(null);
     }
@@ -104,10 +131,9 @@ export default function WorkforceSettingsScreen() {
         pharmacy_id: pharmacyId,
         use_chemisttasker_payroll: enabled,
       });
-      setPayroll(next);
-      await load();
+      if (currentPharmacy.current === pharmacyId) { setPayroll(next); await load(); }
     } catch (failure: any) {
-      setError(failure?.message || 'Unable to update payroll configuration.');
+      if (currentPharmacy.current === pharmacyId) setError(failure?.message || 'Unable to update payroll configuration.');
     } finally {
       setBusyKey(null);
     }
@@ -126,7 +152,7 @@ export default function WorkforceSettingsScreen() {
 
         <Text variant="labelLarge">Pharmacy</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {pharmacies.map(pharmacy => <Chip key={pharmacy.id} selected={pharmacyId === pharmacy.id} onPress={() => setPharmacyId(pharmacy.id)}>{pharmacy.name}</Chip>)}
+          {pharmacies.map(pharmacy => <Chip key={pharmacy.id} disabled={busyKey != null} selected={pharmacyId === pharmacy.id} onPress={() => setPharmacyId(pharmacy.id)}>{pharmacy.name}</Chip>)}
         </ScrollView>
 
         {loading ? <ActivityIndicator style={{ marginVertical: 24 }} /> : null}
@@ -150,7 +176,28 @@ export default function WorkforceSettingsScreen() {
           <Text variant="bodySmall" style={styles.subtitle}>Current terms shown here are the same dated EmploymentEngagement records used by roster/timesheet payroll snapshots.</Text>
         </View>
 
-        {!loading && staff.length === 0 && <Card><Card.Content><Text>No eligible staff are available for this pharmacy.</Text></Card.Content></Card>}
+        <Card style={styles.toolCard}>
+          <Card.Content style={styles.toolContent}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>Related workforce tools</Text>
+            <Text variant="bodySmall" style={styles.subtitle}>
+              These tools use your active pharmacy workspace. Check the pharmacy selector when opening them.
+            </Text>
+            {canManageRoster ? <Button mode="outlined" icon="calendar-check" contentStyle={styles.toolButton} onPress={() => router.push('/manager/roster/coverage' as any)}>
+              Coverage requirements
+            </Button> : null}
+            <Button mode="outlined" icon="file-document-edit-outline" contentStyle={styles.toolButton} onPress={() => router.push('/workforce/employment-engagements' as any)}>
+              Edit employment terms
+            </Button>
+            {canManageKiosk ? <Button mode="outlined" icon="cellphone-key" contentStyle={styles.toolButton} onPress={() => router.push('/attendance/kiosk-status' as any)}>
+              Kiosk & device management
+            </Button> : null}
+            {canManageRoster ? <Button mode="outlined" icon="file-export-outline" contentStyle={styles.toolButton} onPress={() => router.push('/workforce/payroll-export' as any)}>
+              Payroll-ready export
+            </Button> : null}
+          </Card.Content>
+        </Card>
+
+        {!loading && !error && staff.length === 0 && <Card><Card.Content><Text>No eligible staff are available for this pharmacy.</Text></Card.Content></Card>}
 
         {staff.map(row => {
           const engagement = currentEngagementByMembership.get(row.membership_id);
@@ -195,18 +242,21 @@ export default function WorkforceSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F7FAFF' },
+  safe: { flex: 1, backgroundColor: colors.pageBg },
   content: { padding: 18, gap: 14, paddingBottom: 48 },
-  title: { fontWeight: '900', color: '#06214A' },
-  subtitle: { color: '#52617A', marginTop: 4 },
-  sectionTitle: { fontWeight: '800', color: '#06214A' },
+  title: { fontFamily: font.outfit.medium, color: colors.brandNavy },
+  subtitle: { color: colors.textSecondary, marginTop: space.xs },
+  sectionTitle: { fontFamily: font.outfit.medium, color: colors.brandNavy },
   chips: { gap: 8, paddingVertical: 4 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   strong: { fontWeight: '800' },
   hoursRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
-  termBox: { marginTop: 14, padding: 12, borderRadius: 10, backgroundColor: '#F8FAFC' },
+  termBox: { marginTop: space.md, padding: space.md, borderRadius: radius.nested, backgroundColor: colors.subtleBg },
   rateGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 12 },
-  warning: { marginTop: 12, backgroundColor: '#FFF7ED' },
-  error: { backgroundColor: '#FFF1F0' },
-  errorText: { color: '#B42318' },
+  warning: { marginTop: space.md, backgroundColor: colors.status.amber.bg },
+  error: { backgroundColor: colors.status.red.bg },
+  errorText: { color: colors.status.red.fg },
+  toolCard: { borderRadius: radius.card, backgroundColor: colors.surfaceBg },
+  toolContent: { gap: space.sm },
+  toolButton: { minHeight: touch.min },
 });

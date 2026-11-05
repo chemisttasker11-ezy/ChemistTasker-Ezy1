@@ -3,9 +3,12 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Alert, View, ScrollView, Linking } from 'react-native';
+import { Plus } from 'lucide-react-native';
 import { Text, Snackbar } from 'react-native-paper';
+import { ScalePressable } from '@/components/ui';
+import { colors } from '@/constants/tokens';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { subscribeShiftSlotActivity } from '@/utils/pushNotifications';
 import {
@@ -54,6 +57,9 @@ import { styles } from './styles';
 import {
     ACTIVE_SHIFT_SLOT_SEEN_KEY_PREFIX,
     getSlotIds,
+    positiveShiftLinkId,
+    getDeepLinkedShiftSlotId,
+    getPosterPostShiftPath,
     findInterestForMember,
     buildPublicSlotSignature,
     buildMemberSlotSignature,
@@ -61,6 +67,7 @@ import {
     buildActiveShiftsScopeKey,
     isCandidateLevelVisible,
     mergeSlotSignatures,
+    getLinkedShiftScrollY,
 } from './utils/activeShiftRuntime';
 
 type ShiftSurface = ReturnType<typeof useShiftSurface>;
@@ -73,18 +80,36 @@ type ActiveShiftsPageProps = {
 type ActiveShiftsCentreProps = {
     surface: ShiftSurface;
     shiftId: number | null;
+    routeSlotId: number | null;
+    notificationKey: string | null;
     title: string;
 };
 
-const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftId, title }) => {
+const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftId, routeSlotId, notificationKey, title }) => {
     const router = useRouter();
     const { user } = useAuth();
     const selectedPharmacyId = surface.scopedPharmacyId;
+    const postShiftPath = getPosterPostShiftPath(surface.persona, selectedPharmacyId);
+    const handlePostShift = useCallback(() => {
+        if (!postShiftPath || !surface.canManageShifts) return;
+        router.push({ pathname: postShiftPath as any, params: selectedPharmacyId != null ? { pharmacyId: String(selectedPharmacyId) } : {} });
+    }, [postShiftPath, router, selectedPharmacyId, surface.canManageShifts]);
 
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [pillPayingShiftId, setPillPayingShiftId] = useState<number | null>(null);
     const [paymentSlotSelection, setPaymentSlotSelection] = useState<Record<number, number[]>>({});
+    // Do not start duplicate fulfilment attempts from rapid taps. The backend
+    // remains responsible for durable payment/booking idempotency.
+    const paymentBusyRef = useRef(false);
+    const paymentContextRef = useRef(`${user?.id ?? 'anonymous'}:${surface.scopeKey}`);
+    const paymentContext = `${user?.id ?? 'anonymous'}:${surface.scopeKey}`;
+    paymentContextRef.current = paymentContext;
+    useEffect(() => () => {
+        // The keyed Shift Centre can unmount without a final render.
+        // Ignore completions from payment attempts and recovery dialogs.
+        paymentContextRef.current = 'disposed';
+    }, []);
 
     const showSnackbar = useCallback((msg: string) => {
         setSnackbarMessage(msg);
@@ -100,6 +125,10 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
     const [expandedShifts, setExpandedShifts] = useState<Set<number>>(new Set());
     const reviewLoadingId: number | null = null;
     const candidateReviewRequest = useRef(0);
+    const appliedShiftLinkRef = useRef<string | null>(null);
+    const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+    const targetOffsetRef = useRef<{ shiftId: number; scopeKey: string; y: number } | null>(null);
+    const scrolledLinkRef = useRef<string | null>(null);
     useEffect(() => () => { candidateReviewRequest.current += 1; }, []);
 
     const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<DeleteConfirmDialogState>({
@@ -123,19 +152,57 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
         [user?.id]
     );
 
+    const linkedShiftSignature = shiftId == null ? null : `${shiftId}:${routeSlotId ?? 'default'}:${notificationKey ?? 'none'}`;
+    const scrollToLinkedShift = useCallback(() => {
+        if (!linkedShiftSignature || scrolledLinkRef.current === linkedShiftSignature) return;
+        const y = getLinkedShiftScrollY(targetOffsetRef.current, shiftId, surface.scopeKey);
+        if (y == null || !scrollRef.current) return;
+        scrollRef.current.scrollTo({ y, animated: true });
+        scrolledLinkRef.current = linkedShiftSignature;
+    }, [linkedShiftSignature, shiftId, surface.scopeKey]);
+    const handleShiftLayout = useCallback((renderedShiftId: number, y: number) => {
+        if (shiftId == null || renderedShiftId !== shiftId) return;
+        targetOffsetRef.current = { shiftId: renderedShiftId, scopeKey: surface.scopeKey, y };
+        // Content-size and row-layout events can arrive in either order on Android/iOS.
+        requestAnimationFrame(scrollToLinkedShift);
+    }, [shiftId, surface.scopeKey, scrollToLinkedShift]);
     const { shifts, setShifts, loading: shiftsLoading, error: shiftsError, loadShifts } = useShiftsData({
         selectedPharmacyId,
         shiftId,
         scopeKey: surface.scopeKey,
+        notificationKey,
     });
     const { tabData, setTabData, loadTabDataForShift } = useTabData(shifts, selectedLevelByShift, getTabKey);
+
+    // Notification links focus the exact shift and slot, without overriding later manual selection.
+    useEffect(() => {
+        if (shiftId == null) return;
+        const shift = shifts.find(item => item.id === shiftId);
+        if (!shift) return;
+        const link = `${shiftId}:${routeSlotId ?? 'default'}`;
+        if (appliedShiftLinkRef.current === link) return;
+        appliedShiftLinkRef.current = link;
+        setExpandedShifts(previous => previous.has(shiftId) ? previous : new Set([...previous, shiftId]));
+        if (!(shift as any).singleUserOnly && !(shift as any).single_user_only) {
+            const slotId = getDeepLinkedShiftSlotId(shift, routeSlotId);
+            if (slotId != null) {
+                setSelectedSlotByShift(previous => previous[shiftId] === slotId ? previous : { ...previous, [shiftId]: slotId });
+            }
+        }
+    }, [shiftId, routeSlotId, shifts]);
     const handlePayWithPills = useCallback(async (shift: Shift, offerIds: number[] = []) => {
+        if (paymentBusyRef.current) return;
+        const requestedContext = paymentContextRef.current;
+        const current = () => paymentContextRef.current === requestedContext;
+        paymentBusyRef.current = true;
         setPillPayingShiftId(shift.id);
         try {
             const res = await payShiftWithPills(shift.id, offerIds);
+            if (!current()) return;
             showSnackbar(res?.detail || 'Shift paid with pills.');
             await loadShifts();
         } catch (err: any) {
+            if (!current()) return;
             const data = err?.response?.data ?? err?.payload;
             const detail = Array.isArray(data?.detail) ? data.detail[0] : data?.detail;
             const message = data?.code === 'insufficient_pills'
@@ -143,13 +210,19 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                 : detail || err?.message || 'Failed to pay with pills.';
             showSnackbar(message);
         } finally {
-            setPillPayingShiftId(null);
+            paymentBusyRef.current = false;
+            if (current()) setPillPayingShiftId(null);
         }
     }, [loadShifts, showSnackbar]);
 
     const handlePayWithStripe = useCallback(async (shift: Shift, offerIds: number[] = []) => {
+        if (paymentBusyRef.current) return;
+        const requestedContext = paymentContextRef.current;
+        const current = () => paymentContextRef.current === requestedContext;
+        paymentBusyRef.current = true;
         try {
             const res = await chargeShiftFulfillment(shift.id, { offerIds, platform: 'mobile' });
+            if (!current()) return;
             if (res?.url) {
                 await Linking.openURL(res.url);
             } else if (res?.free) {
@@ -160,20 +233,27 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
             }
         } catch (err: any) {
             const data = err?.response?.data ?? err?.payload;
-            if (err?.status === 409 && data?.checkout_id) {
+            if (current() && err?.status === 409 && data?.checkout_id) {
                 const recover = async (action: 'resume' | 'expire') => {
+                    if (!current() || paymentBusyRef.current) return;
+                    paymentBusyRef.current = true;
                     try {
                         if (action === 'resume') {
                             const result = await resumeFulfillmentCheckout(shift.id, data.checkout_id);
+                            if (!current()) return;
                             await Linking.openURL(result.url);
                         } else {
                             await expireFulfillmentCheckout(shift.id, data.checkout_id);
+                            if (!current()) return;
                             const result = await chargeShiftFulfillment(shift.id, { offerIds, platform: 'mobile' });
+                            if (!current()) return;
                             if (result.url) await Linking.openURL(result.url);
                             else { showSnackbar(result.message || 'Checkout updated.'); await loadShifts(); }
                         }
                     } catch (error: any) {
-                        showSnackbar(error?.message || 'Checkout recovery could not be confirmed.');
+                        if (current()) showSnackbar(error?.message || 'Checkout recovery could not be confirmed.');
+                    } finally {
+                        paymentBusyRef.current = false;
                     }
                 };
                 Alert.alert('Checkout already in progress',
@@ -182,7 +262,9 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                         { text: 'Expire unpaid and replace', onPress: () => void recover('expire') },
                         { text: 'Continue existing', onPress: () => void recover('resume') },
                     ]);
-            } else showSnackbar(err?.message || 'Failed to initiate payment.');
+            } else if (current()) showSnackbar(err?.message || 'Failed to initiate payment.');
+        } finally {
+            paymentBusyRef.current = false;
         }
     }, [loadShifts, showSnackbar]);
 
@@ -195,7 +277,7 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
         rejectOffer,
         counterActionLoading,
         updateOfferCache,
-    } = useCounterOffers();
+    } = useCounterOffers(surface.scopeKey);
     const { revealInterest, revealingInterestId } = useRevealInterest(getTabKey, setTabData, showSnackbar);
     const {
         summary: workerRatingSummary,
@@ -890,6 +972,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                     kind="empty"
                     title="No active shifts found"
                     description="When you post shifts or receive candidates, they will appear here."
+                    actionLabel={postShiftPath ? 'Post shift' : undefined}
+                    onAction={postShiftPath ? handlePostShift : undefined}
                     style={styles.stateCard}
                 />
             </SafeAreaView>
@@ -898,10 +982,27 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
 
     return (
         <SafeAreaView style={styles.container} edges={['left', 'right']}>
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView
+                ref={scrollRef}
+                contentContainerStyle={styles.content}
+                onContentSizeChange={() => scrollToLinkedShift()}
+            >
                 <View style={styles.pageHeader}>
                     <Text style={styles.title}>{title}</Text>
                     <Text style={styles.subtitle}>Manage and track your live shifts</Text>
+                    {postShiftPath ? (
+                        <ScalePressable
+                            static
+                            pressBg
+                            onPress={handlePostShift}
+                            accessibilityRole="button"
+                            accessibilityLabel="Post a new shift"
+                            style={styles.postShiftAction}
+                        >
+                            <Plus size={18} color={colors.surfaceBg} strokeWidth={2} />
+                            <Text style={styles.postShiftActionText}>Post shift</Text>
+                        </ScalePressable>
+                    ) : null}
                 </View>
                 <ActiveShiftCards
                     data={{
@@ -939,7 +1040,9 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                         handleLevelChange,
                         handleEscalate,
                         loadTabDataForShift,
+                        loadCounterOffers,
                         loadShifts,
+                        onShiftLayout: handleShiftLayout,
                         handleRevealInterest,
                         handleSlotSelection,
                         handleReviewOffer,
@@ -1016,13 +1119,19 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
 // GAP 1 FIX: Key the whole centre by surface.scopeKey + shiftId so cards and dialogs never survive scope/shift changes
 const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, title = 'Active Shifts' }) => {
     const surface = useShiftSurface();
-    const centreKey = buildActiveShiftsScopeKey(surface.scopeKey, shiftId);
+    const params = useLocalSearchParams<{ shift_id?: string; slot_id?: string; notification_id?: string; _ntf?: string }>();
+    const activeShiftId = positiveShiftLinkId(params.shift_id) ?? shiftId;
+    const slotId = positiveShiftLinkId(params.slot_id);
+    const notificationKey = params.notification_id ?? params._ntf ?? null;
+    const centreKey = buildActiveShiftsScopeKey(surface.scopeKey, activeShiftId);
 
     return (
         <ActiveShiftsCentre
             key={centreKey}
             surface={surface}
-            shiftId={shiftId}
+            shiftId={activeShiftId}
+            routeSlotId={slotId}
+            notificationKey={notificationKey}
             title={title}
         />
     );

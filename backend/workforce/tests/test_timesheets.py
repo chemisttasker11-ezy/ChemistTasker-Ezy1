@@ -96,6 +96,48 @@ class TimesheetProjectionTests(TestCase):
         )
         self.timesheet = Timesheet.objects.create(period=self.period, user=self.worker, membership=self.membership)
 
+    def test_unrevised_detail_keeps_period_scope_and_has_empty_sections(self):
+        from workforce.timesheet_serialization import serialize_timesheet
+
+        detail = serialize_timesheet(self.timesheet, detail=True, user=self.worker)
+        self.assertIsNone(detail["snapshot"])
+        self.assertEqual(detail["checks"], [])
+        self.assertEqual(detail["comments"], [])
+        self.assertEqual(detail["pharmacy"]["id"], self.pharmacy.pk)
+        self.assertEqual(detail["period_status"], TimesheetPeriod.Status.OPEN)
+        self.assertEqual(detail["period_timezone"], "Australia/Brisbane")
+        self.assertIsNone(detail["revision_number"])
+
+        self.period.status = TimesheetPeriod.Status.LOCKED
+        self.period.save(update_fields=["status"])
+        locked = serialize_timesheet(self.timesheet, detail=True, user=self.worker)
+        self.assertEqual(locked["period_status"], TimesheetPeriod.Status.LOCKED)
+        self.assertIsNone(locked["snapshot"])
+
+    def test_check_decisions_respect_period_freeze_and_current_revision(self):
+        from workforce.models import TimesheetCheck
+
+        revision = build_timesheet(self.timesheet.pk, actor=self.owner, force=True)
+        check = TimesheetCheck.objects.create(
+            revision=revision, identity_key="mobile:noncritical:warning",
+            code="MINOR_VARIANCE", severity=TimesheetCheck.Severity.WARNING,
+            message="Review variance", details={},
+        )
+
+        self.period.status = TimesheetPeriod.Status.LOCKED
+        self.period.save(update_fields=["status"])
+        with self.assertRaisesMessage(ValidationError, "Locked periods"):
+            decide_check(check, self.owner, TimesheetCheckDecision.Decision.RESOLVED, "Reviewed")
+
+        self.period.status = TimesheetPeriod.Status.OPEN
+        self.period.save(update_fields=["status"])
+        decision = decide_check(check, self.owner, TimesheetCheckDecision.Decision.RESOLVED, "Reviewed")
+        self.assertEqual(decision.timesheet_check_id, check.pk)
+
+        build_timesheet(self.timesheet.pk, actor=self.owner, force=True)
+        with self.assertRaisesMessage(ValidationError, "earlier revision"):
+            decide_check(check, self.owner, TimesheetCheckDecision.Decision.RESOLVED, "Stale review")
+
     def test_shift_linked_leave_writes_only_canonical_workforce_record(self):
         row = create_leave(
             self.worker,

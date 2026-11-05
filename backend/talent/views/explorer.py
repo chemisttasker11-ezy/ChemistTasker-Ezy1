@@ -63,6 +63,13 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         from ratings.models import Rating
 
         qs = super().get_queryset()
+        if self.action == "public_feed":
+            # Narrow QR lookup BEFORE the visibility walk; the public rule still applies.
+            public_reference = self.request.query_params.get('reference_code')
+            if public_reference is not None:
+                if not isinstance(public_reference, str) or not public_reference or len(public_reference) > 100:
+                    raise ValidationError({'reference_code': 'Invalid public listing reference.'})
+                qs = qs.filter(reference_code=public_reference)
         if self.action == "list" and self.request.query_params.get("mine") == "true":
             qs = qs.filter(Q(author_user=self.request.user) | Q(explorer_profile__user=self.request.user))
         elif self.action not in ("update", "partial_update", "destroy"):
@@ -195,8 +202,14 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
     def public_feed(self, request):
         """
         Public feed for non-authenticated users.
+        A bounded reference-code lookup supports safe QR preview of published posts.
         """
         qs = self.filter_queryset(self.get_queryset())
+        code = request.query_params.get('reference_code')
+        if code is not None:
+            if not isinstance(code, str) or not code or len(code) > 100:
+                raise ValidationError({'reference_code': 'Invalid public listing reference.'})
+            qs = qs.filter(reference_code=code)
         page = self.paginate_queryset(qs)
         ser = PublicExplorerPostReadSerializer(page or qs, many=True, context={"request": request})
         if page is not None:

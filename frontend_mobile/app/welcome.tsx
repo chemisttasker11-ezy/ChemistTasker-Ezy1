@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { openWebPage } from '@/features/explore/webLinks';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeInUp, useReducedMotion } from 'react-native-reanimated';
-import { Building2, Check, LogIn, Search, ShieldCheck, Smartphone, UserPlus, Users } from 'lucide-react-native';
+import { BookOpen, Building2, Check, LogIn, Search, ShieldCheck, Smartphone, UserPlus, Users } from 'lucide-react-native';
 import { Button, IconTile, ScalePressable, type Tone } from '@/components/ui';
 import { AuthLink, BrandBand, BrandStatusStrip, useBrandTopRow } from '@/components/AuthLayout';
 import { colors, font, radius, space, tokens, touch, type } from '@/constants/tokens';
 import { durations, easings } from '@/constants/motion';
 import type { RegisterRole } from '@/utils/registerRole';
 
-const TERMS_URL = 'https://www.chemisttasker.com.au/terms-of-service';
-const PRIVACY_URL = 'https://www.chemisttasker.com.au/privacy-policy';
 const heroPhoto = require('../assets/images/landing/pharmacist-priya.jpg');
 // The light sheet rides up over the band by this much (same as AuthLayout).
 const SHEET_OVERLAP = 24;
@@ -227,11 +226,18 @@ export default function WelcomeScreen() {
                                 ))}
                             </View>
 
+                            <View style={styles.section}>
+                                <Text accessibilityRole="header" style={styles.sectionTitle}>Explore ChemistTasker</Text>
+                                <ScalePressable pressBg onPress={() => router.push('/explore' as any)} accessibilityRole="button" accessibilityLabel="Explore learning, community, blog and news" style={styles.exploreLink}>
+                                    <BookOpen size={22} color={colors.primary} />
+                                    <Text style={styles.exploreText}>Learning, community, blog and news</Text>
+                                </ScalePressable>
+                            </View>
                             {/* Links are 44pt AuthLinks on their own row; inline Text links are too small to tap. */}
                             <Text style={styles.footerText}>By continuing, you agree to our</Text>
                             <View style={styles.legalLinks}>
-                                <AuthLink label="Terms of Service" onPress={() => void Linking.openURL(TERMS_URL).catch(() => {})} />
-                                <AuthLink label="Privacy Policy" onPress={() => void Linking.openURL(PRIVACY_URL).catch(() => {})} />
+                                <AuthLink label="Terms of Service" onPress={() => void openWebPage('/terms-of-service').catch(() => {})} />
+                                <AuthLink label="Privacy Policy" onPress={() => void openWebPage('/privacy-policy').catch(() => {})} />
                             </View>
                         </View>
                     </View>
@@ -348,6 +354,8 @@ const styles = StyleSheet.create({
     },
     sheetColumn: { gap: space['2xl'] },
     section: { gap: space.md },
+    exploreLink: { minHeight: touch.min, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.card, backgroundColor: colors.surfaceBg, borderColor: colors.border, borderWidth: 1 },
+    exploreText: { flex: 1, flexShrink: 1, color: colors.textPrimary, fontFamily: font.inter.semiBold, fontSize: 15 },
     sectionTitle: {
         color: colors.textPrimary,
         fontFamily: type.titleMedium.fontFamily,

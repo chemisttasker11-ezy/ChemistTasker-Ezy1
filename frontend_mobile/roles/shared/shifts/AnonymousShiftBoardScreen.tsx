@@ -48,15 +48,18 @@ export function AnonymousShiftBoardScreen() {
   const { user, hasCapability } = useAuth();
   const { isLoading: workspaceLoading, selectedPharmacyId } = useWorkspace();
 
-  const searchParams = useLocalSearchParams<{ referral_code?: string; referral_event_id?: string; referral_shift_id?: string }>();
+  const searchParams = useLocalSearchParams<{ referral_code?: string; referral_event_id?: string; referral_shift_id?: string; organization?: string }>();
   const referralCode = searchParams.referral_code ?? null;
   const referralEventId = searchParams.referral_event_id ?? null;
   const referralShiftId = searchParams.referral_shift_id ?? null;
+  const organizationId = Number(searchParams.organization);
+  const validOrganizationId = Number.isSafeInteger(organizationId) && organizationId > 0 ? organizationId : null;
 
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [nextPage, setNextPage] = useState<number | null>(null);
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,10 +72,12 @@ export function AnonymousShiftBoardScreen() {
     const gen = ++requestGenRef.current;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setLoadingMore(false);
+    setLoadMoreError(null);
     setError(null);
 
     try {
       const payload: any = { page: 1 };
+      if (validOrganizationId) payload.organization = validOrganizationId;
       if (search.trim()) payload.search = search.trim();
       if (selectedRole !== 'ALL') payload.roles = [selectedRole];
 
@@ -97,15 +102,17 @@ export function AnonymousShiftBoardScreen() {
         setLoadingMore(false);
       }
     }
-  }, [search, selectedRole]);
+  }, [search, selectedRole, validOrganizationId]);
 
   const loadMoreShifts = useCallback(async () => {
     if (!nextPage || loadingMore || loading || refreshing) return;
     const gen = requestGenRef.current;
     setLoadingMore(true);
+    setLoadMoreError(null);
 
     try {
       const payload: any = { page: nextPage };
+      if (validOrganizationId) payload.organization = validOrganizationId;
       if (search.trim()) payload.search = search.trim();
       if (selectedRole !== 'ALL') payload.roles = [selectedRole];
 
@@ -120,14 +127,16 @@ export function AnonymousShiftBoardScreen() {
       setTotalCount(count);
       const nextNum = parseNextPage(response?.next) ?? (response?.next ? nextPage + 1 : null);
       setNextPage(nextNum);
-    } catch {
-      // User can retry by pressing load more or scrolling again
+    } catch (err: any) {
+      if (gen === requestGenRef.current) {
+        setLoadMoreError(err?.message || 'Could not load more shifts. Your current results are still available.');
+      }
     } finally {
       if (gen === requestGenRef.current) {
         setLoadingMore(false);
       }
     }
-  }, [nextPage, loadingMore, loading, refreshing, search, selectedRole]);
+  }, [nextPage, loadingMore, loading, refreshing, search, selectedRole, validOrganizationId]);
 
   useEffect(() => {
     const handle = setTimeout(() => { void loadShifts(false); }, 250);
@@ -232,7 +241,7 @@ export function AnonymousShiftBoardScreen() {
           onRefresh={() => void loadShifts(true)}
           refreshing={refreshing}
           renderItem={renderShiftItem}
-          onEndReached={() => void loadMoreShifts()}
+          onEndReached={() => { if (!loadMoreError) void loadMoreShifts(); }}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
             loadingMore ? (
@@ -242,7 +251,10 @@ export function AnonymousShiftBoardScreen() {
               </View>
             ) : nextPage ? (
               <View style={styles.loadMoreWrap}>
-                <Button label="Load more shifts" onPress={() => void loadMoreShifts()} variant="outlined" />
+                {loadMoreError ? (
+                  <Text accessibilityRole="alert" style={styles.footerLoadingText}>{loadMoreError}</Text>
+                ) : null}
+                <Button label={loadMoreError ? 'Retry loading shifts' : 'Load more shifts'} onPress={() => void loadMoreShifts()} variant="outlined" />
               </View>
             ) : undefined
           }

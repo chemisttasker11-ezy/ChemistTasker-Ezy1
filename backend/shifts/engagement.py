@@ -736,6 +736,14 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
     }
 
 
+def shift_engagement_terms_version(terms):
+    """Stable fingerprint of server-built offer terms shown to the worker."""
+    import hashlib
+    import json
+
+    return hashlib.sha256(json.dumps(terms, sort_keys=True, default=str).encode()).hexdigest()
+
+
 def require_acceptance_payload(*, terms, data):
     if not terms.get("acceptance_required"):
         return

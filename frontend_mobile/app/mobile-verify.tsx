@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, type TextInputInstance, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Globe } from 'lucide-react-native';
 import {
     mobileRequestOtp,
@@ -18,6 +18,8 @@ type PendingAction = 'send' | 'verify' | 'resend' | 'skip';
 
 export default function MobileVerifyScreen() {
     const router = useRouter();
+    const { source } = useLocalSearchParams<{ source?: string }>();
+    const fromProfile = source === 'profile';
     const { logout, markMobileVerified, markMobileCheckSkipped, user } = useAuth();
     const canSkipOverseas = canSkipOverseasMobileCheck(user);
 
@@ -108,7 +110,12 @@ export default function MobileVerifyScreen() {
             });
             setIdentityLocked(true);
             setStatus('Mobile verified! Redirecting...');
-            setTimeout(() => router.replace(getRoleHome(user?.role) as any), 800);
+            const destination = fromProfile
+                ? (user?.role === 'OTHER_STAFF' ? '/otherstaff/profile-basic-info'
+                    : user?.role === 'PHARMACIST' ? '/pharmacist/profile-basic-info'
+                    : getRoleHome(user?.role))
+                : getRoleHome(user?.role);
+            setTimeout(() => router.replace(destination as any), 800);
         } catch (err: any) {
             setError(err?.message || 'Verification failed.');
         } finally {
@@ -160,6 +167,16 @@ export default function MobileVerifyScreen() {
 
     const handleBackToLogin = async () => {
         if (locked) return;
+        // The original onboarding gate still signs out when returning to login.
+        // A verification opened from an authenticated profile must never log
+        // that worker out as a side effect of its Back action.
+        if (fromProfile) {
+            const profile = user?.role === 'OTHER_STAFF' ? '/otherstaff/profile'
+                : user?.role === 'PHARMACIST' ? '/pharmacist/profile'
+                : getRoleHome(user?.role);
+            router.replace(profile as any);
+            return;
+        }
         setLoading(true);
         try {
             await logout();
@@ -183,8 +200,10 @@ export default function MobileVerifyScreen() {
         <AuthLayout
             title="Verify your mobile"
             backDisabled={locked}
-            subtitle="Your email is verified. Confirm your legal name, username and mobile number to open your workspace."
-            footer={<AuthLink label="Back to login" onPress={() => void handleBackToLogin()} disabled={locked} />}
+            subtitle={fromProfile
+                ? 'Confirm your mobile number to complete account verification.'
+                : 'Your email is verified. Confirm your legal name, username and mobile number to open your workspace.'}
+            footer={<AuthLink label={fromProfile ? 'Back to profile' : 'Back to login'} onPress={() => void handleBackToLogin()} disabled={locked} />}
         >
             <Text style={styles.sectionTitle} accessibilityRole="header">Your details</Text>
 

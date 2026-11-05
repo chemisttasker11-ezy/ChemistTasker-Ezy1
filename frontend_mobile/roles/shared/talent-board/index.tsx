@@ -596,10 +596,16 @@ export default function TalentBoard({
   };
 
   const showPitchButton = !publicMode && !hidePitchButton && canPitch;
+  const requestedPitchOpened = useRef(false);
+  useEffect(() => {
+    if (!openPitchOnMount) requestedPitchOpened.current = false;
+  }, [openPitchOnMount]);
 
   useFocusEffect(
     useCallback(() => {
-      if (!openPitchOnMount || publicMode || !canPitch) return;
+      // A deep-link is a one-time create intent, not a request to re-open the dialog on every tab focus.
+      if (!openPitchOnMount || publicMode || !canPitch || requestedPitchOpened.current) return;
+      requestedPitchOpened.current = true;
       setPitchOpen(true);
     }, [canPitch, openPitchOnMount, publicMode])
   );

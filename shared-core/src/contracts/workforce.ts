@@ -138,6 +138,11 @@ export interface WorkforceTimesheetDay {
 }
 
 export interface WorkforceTimesheetDetail extends WorkforceTimesheetRow {
+  /** Authoritative parent period lock; row.status is not the lock indicator. */
+  period_status: WorkforceTimesheetPeriod['status'];
+  period_timezone: string;
+  pharmacy: { id: number; name: string };
+  /** Null until a manager calculates the first revision. */
   snapshot: {
     worker: { id: number; name: string };
     pharmacy: { id: number; name: string };
@@ -146,7 +151,7 @@ export interface WorkforceTimesheetDetail extends WorkforceTimesheetRow {
     days: WorkforceTimesheetDay[];
     leave: unknown[];
     totals: Record<string, number | null>;
-  };
+  } | null;
   checks: WorkforceTimesheetCheck[];
   effective_blocking_checks: number;
   effective_warning_checks: number;

@@ -3,6 +3,10 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, HelperText, Menu, Text, TextInput } from 'react-native-paper';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
+import { ContentState } from '@/components/ui';
+import { colors, font, space, touch } from '@/constants/tokens';
+import ProfileBasicActions from '../../shared/profile/ProfileBasicActions';
+import { formatOnboardingErrors } from '../../shared/forms/formatOnboardingErrors';
 import GooglePlacesInput from '../../shared/pharmacies/GooglePlacesInput';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
 import { useAuth } from '../../../context/AuthContext';
@@ -39,28 +43,31 @@ export default function OtherStaffBasicInfoScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [genderMenuVisible, setGenderMenuVisible] = useState(false);
   const [form, setForm] = useState<ApiData>({});
-  const [lockedNames, setLockedNames] = useState({ first: false, last: false });
   const saveRef = useRef<(() => Promise<boolean | void>) | null>(null);
   const unsaved = useUnsavedChangesGuard(form, { enabled: !loading, onSave: () => saveRef.current?.(), saving });
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const isMobileVerified = Boolean(user?.is_mobile_verified);
+  const lockedNames = { first: isMobileVerified, last: isMobileVerified };
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
+      setLoading(true);
+      setLoadFailed(false);
+      setError('');
       try {
         const data: any = await getOnboardingDetail(roleKey);
         if (!mounted) return;
         setForm(data || {});
-        setLockedNames({
-          first: Boolean(data?.first_name),
-          last: Boolean(data?.last_name),
-        });
         unsaved.markClean(data || {});
       } catch (err: any) {
         if (!mounted) return;
-        setError(err?.response?.data?.detail || err?.message || 'Unable to load basic info.');
+        setLoadFailed(true);
+        setError(formatOnboardingErrors(err?.response?.data, err?.message || 'Unable to load basic info.'));
       } finally {
         if (mounted) setLoading(false);
       }
@@ -69,7 +76,7 @@ export default function OtherStaffBasicInfoScreen() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const setField = (k: keyof ApiData, v: any) => setForm((p) => ({ ...p, [k]: v }));
   const genderLabel = GENDER_OPTIONS.find((g) => g.value === form.gender)?.label || 'Select gender';
@@ -119,20 +126,12 @@ export default function OtherStaffBasicInfoScreen() {
       });
       const res: any = await updateOnboardingForm(roleKey, fd as any);
       setForm(res || {});
-      setLockedNames({
-        first: Boolean(res?.first_name),
-        last: Boolean(res?.last_name),
-      });
       await refreshUser();
       unsaved.markClean(res || {});
       Alert.alert('Saved', submitForVerification ? 'Submitted for verification.' : 'Basic info saved.');
     } catch (err: any) {
       const resp = err?.response?.data;
-      if (resp && typeof resp === 'object') {
-        setError(Object.entries(resp).map(([k, v]) => `${k}: ${(v as any[]).join(', ')}`).join('\n'));
-      } else {
-        setError(err?.message || 'Failed to save basic info.');
-      }
+      setError(formatOnboardingErrors(resp, err?.message || 'Failed to save basic info.'));
       return false;
     } finally {
       setSaving(false);
@@ -151,14 +150,22 @@ export default function OtherStaffBasicInfoScreen() {
     );
   }
 
+  if (loadFailed) {
+    return <SafeAreaView style={styles.container} edges={['left', 'right']}>
+      <ContentState kind="error" title="Basic information unavailable" description={error || 'Your details could not be loaded.'}
+        actionLabel="Try again" onAction={() => setReloadKey(key => key + 1)} />
+    </SafeAreaView>;
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <Text variant="titleLarge" style={styles.title}>Basic Info</Text>
+        <ProfileBasicActions persona="otherstaff" verified={isMobileVerified} phone={form.phone_number || ''} />
         <TextInput mode="outlined" label="First Legal Name" value={form.first_name || ''} onChangeText={(v) => setField('first_name', v)} editable={!lockedNames.first} />
         <TextInput mode="outlined" label="Last Legal Name" value={form.last_name || ''} onChangeText={(v) => setField('last_name', v)} editable={!lockedNames.last} />
         <TextInput mode="outlined" label="Username" value={form.username || ''} onChangeText={(v) => setField('username', v)} />
-        <TextInput mode="outlined" label="Phone Number" value={form.phone_number || ''} onChangeText={(v) => setField('phone_number', v)} />
+        <TextInput mode="outlined" label="Phone Number" value={form.phone_number || ''} onChangeText={(v) => setField('phone_number', v)} editable={!isMobileVerified} keyboardType="phone-pad" />
         <TextInput mode="outlined" label="Date of Birth" value={form.date_of_birth || ''} onChangeText={(v) => setField('date_of_birth', v)} placeholder="YYYY-MM-DD" />
         <WorkRightsMenu value={form.work_rights} onChange={(v) => setField('work_rights', v)} />
         <Menu
@@ -210,12 +217,12 @@ export default function OtherStaffBasicInfoScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.pageBg },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  content: { padding: 16, gap: 12, paddingBottom: 32 },
-  title: { fontWeight: '700', color: '#111827' },
-  sectionTitle: { marginTop: 4, color: '#374151', fontWeight: '600' },
+  content: { padding: space.lg, gap: space.md, paddingBottom: space['3xl'] },
+  title: { fontFamily: font.outfit.medium, color: colors.textPrimary },
+  sectionTitle: { marginTop: space.sm, color: colors.textPrimary, fontFamily: font.inter.semiBold },
   row: { flexDirection: 'row', gap: 8 },
   flex: { flex: 1 },
-  actions: { marginTop: 4, flexDirection: 'row', justifyContent: 'space-between' },
+  actions: { marginTop: space.sm, flexDirection: 'row', flexWrap: 'wrap', gap: space.md, justifyContent: 'space-between', minHeight: touch.min },
 });

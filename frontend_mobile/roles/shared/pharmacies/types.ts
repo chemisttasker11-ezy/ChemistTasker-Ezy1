@@ -27,20 +27,22 @@ export {
     coerceWorkType,
 } from '@chemisttasker/shared-core';
 
-// Mobile-specific surface tokens for consistent styling
+// Legacy pharmacy components keep their existing token names, but use the
+// single approved Expo palette. Do not create a second color system here.
+import { colors } from '@/constants/tokens';
 export const surfaceTokens = {
-    bg: '#FFFFFF',
-    bgDark: '#F9FAFB',
-    subtle: 'rgba(0, 0, 0, 0.04)',
-    hover: 'rgba(99, 102, 241, 0.08)',
-    border: '#E5E7EB',
-    text: '#1F2937',
-    textMuted: 'rgba(0, 0, 0, 0.6)',
-    textSecondary: 'rgba(0, 0, 0, 0.6)',
-    primary: '#6366F1',
-    primaryLight: '#A78BFA',
-    error: '#EF4444',
-    success: '#10B981',
-    warning: '#F59E0B',
-    info: '#3B82F6',
+    bg: colors.surfaceBg,
+    bgDark: colors.pageBg,
+    subtle: colors.subtleBg,
+    hover: colors.primarySoft,
+    border: colors.border,
+    text: colors.textPrimary,
+    textMuted: colors.textSecondary,
+    textSecondary: colors.textSecondary,
+    primary: colors.primary,
+    primaryLight: colors.primarySoft,
+    error: colors.status.red.fg,
+    success: colors.status.green.fg,
+    warning: colors.status.amber.fg,
+    info: colors.tone.blue.fg,
 };

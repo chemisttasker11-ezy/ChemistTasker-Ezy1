@@ -66,6 +66,16 @@ export interface PendingAttendance {
   created_at: string;
 }
 
+export interface AttendanceTimelineEvent {
+  event_id: number;
+  event_type: string;
+  original_timestamp: string;
+  effective_timestamp: string;
+  is_corrected: boolean;
+  correction_id: number | null;
+  correction_reason: string | null;
+}
+
 export interface AttendanceTimeline {
   session_id: number;
   pharmacy_id: number;
@@ -74,7 +84,7 @@ export interface AttendanceTimeline {
   worker_id: number;
   worker_name: string;
   is_provisional: boolean;
-  timeline: JsonValue[];
+  timeline: AttendanceTimelineEvent[];
 }
 
 /** Wire projections from workforce.roster.periods.get_roster_period_grid. */

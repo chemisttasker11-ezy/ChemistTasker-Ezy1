@@ -153,26 +153,33 @@ test('loading older messages preserves the visible message and issues one pagina
   expect(fixture.moreCalls()).toBe(1);
 });
 
-test('chat attachments reject executable schemes and unrelated hosts while retaining backend media links', async ({ page }) => {
+test('chat attachments reject raw storage origins and download via protected message endpoint', async ({ page }) => {
   const messages = [
     { ...message(81, ''), attachment_url: 'javascript:alert(1)//.png', attachment_filename: 'unsafe-script.png' },
     { ...message(82, ''), attachment_url: 'data:image/svg+xml,%3Csvg%20onload%3Dalert(1)%3E', attachment_filename: 'unsafe-data.png' },
     { ...message(83, ''), attachment_url: 'https://untrusted.example/attachment.png', attachment_filename: 'unsafe-host.png' },
-    { ...message(84, ''), attachment_url: '/media/chat/allowed-image.png', attachment_filename: 'allowed-image.png' },
-    { ...message(85, ''), attachment_url: 'http://127.0.0.1:8000/media/chat/allowed-file.pdf', attachment_filename: 'allowed-file.pdf' },
-    { ...message(86, ''), attachment_url: 'https://exampleaccount.blob.core.windows.net/attachments/allowed-azure.png?sv=1', attachment_filename: 'allowed-azure.png' },
+    { ...message(84, ''), attachment_url: '/media/chat/old-public-link.png', attachment_filename: 'old-public-link.png' },
+    { ...message(85, ''), attachment_url: 'https://exampleaccount.blob.core.windows.net/chat/secret.png?sig=token', attachment_filename: 'raw-azure.png' },
+    { ...message(86, ''), attachment_url: '/api/v1/messages/86/attachment/', attachment_filename: 'protected.pdf' },
   ];
+  const downloads = [];
   await openChat(page, { messages });
+  // Install the protected binary handler after the catch-all API fixture:
+  // Playwright resolves the most recently registered matching route first.
+  await page.route('**/api/v1/messages/86/attachment/', route => {
+    downloads.push({ url: route.request().url(), authorization: route.request().headers().authorization });
+    return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/pdf' }, body: '%PDF-1.7\\nprivate\\n' });
+  });
   const log = page.getByRole('log');
-  await expect(log.getByText('Attachment unavailable', { exact: true })).toHaveCount(3);
-  await expect(log.locator('a[href^="javascript:"]')).toHaveCount(0);
-  await expect(log.locator('a[href^="data:"]')).toHaveCount(0);
-  await expect(log.locator('a[href*="untrusted.example"]')).toHaveCount(0);
-  await expect(log.locator('img[src*="untrusted.example"]')).toHaveCount(0);
-  await expect(log.getByRole('link', { name: 'Open image allowed-image.png' }))
-    .toHaveAttribute('href', 'http://127.0.0.1:8000/media/chat/allowed-image.png');
-  await expect(log.getByRole('link', { name: 'allowed-file.pdf' }))
-    .toHaveAttribute('href', 'http://127.0.0.1:8000/media/chat/allowed-file.pdf');
-  await expect(log.getByRole('link', { name: 'Open image allowed-azure.png' }))
-    .toHaveAttribute('href', 'https://exampleaccount.blob.core.windows.net/attachments/allowed-azure.png?sv=1');
+  await expect(log.getByText('Attachment unavailable', { exact: true })).toHaveCount(5);
+  await expect(log.locator('a[href*="/media/chat/"]')).toHaveCount(0);
+  await expect(log.locator('a[href*="blob.core.windows.net"]')).toHaveCount(0);
+  await expect(log.locator('img[src*="blob.core.windows.net"]')).toHaveCount(0);
+  const downloadEvent = page.waitForEvent('download');
+  await log.getByRole('button', { name: 'Download attachment protected.pdf' }).click();
+  const file = await downloadEvent;
+  expect(file.suggestedFilename()).toBe('protected.pdf');
+  expect(downloads).toHaveLength(1);
+  expect(downloads[0].url).toContain('/api/v1/messages/86/attachment/');
+  expect(downloads[0].authorization).toMatch(/^Bearer /);
 });

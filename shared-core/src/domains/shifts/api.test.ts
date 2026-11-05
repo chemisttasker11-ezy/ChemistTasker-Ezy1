@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { configureApi } from '../../transport/application';
-import { getActiveShiftDetail, getCommunityShiftDetail, getPublicShiftDetail } from './api';
+import { deleteShiftDescriptionTemplate } from './descriptionTemplates';
+import { getActiveShiftDetail, getCommunityShiftDetail, getPublicShiftDetail, getActiveShiftsPage, getConfirmedShiftsPage, fetchAllActiveShifts, fetchAllConfirmedShifts, acceptShiftOfferService, fetchDeferredPayrollOffersService } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -21,4 +22,86 @@ it.each([
 
     expect(await loadDetail(42)).toEqual({ id: 42 });
     expect(requests).toEqual([{ url: `https://dashboard.example.test/api/v1/${path}/42/`, method: 'GET' }]);
+});
+
+it.each([
+    ['active', getActiveShiftsPage, fetchAllActiveShifts],
+    ['confirmed', getConfirmedShiftsPage, fetchAllConfirmedShifts],
+] as const)('paginates %s shifts through shared-core with no client-built transport URLs', async (kind, fetchPage, fetchAll) => {
+    const requests: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        requests.push(url);
+        const page = Number(new URL(url).searchParams.get('page') || 1);
+        return new Response(JSON.stringify({
+            results: [{ id: page, pharmacy: 10 }],
+            next: page === 1 ? `https://dashboard.example.test/api/v1/shifts/${kind}/?page=2` : null,
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch;
+    configureApi({ baseURL: 'https://dashboard.example.test/api/v1', getToken: async () => null, fetchImpl });
+    const raw = await fetchPage(3);
+    expect((raw as { results: Array<{ id: number }> }).results[0].id).toBe(3);
+    const all = await fetchAll();
+    expect(all).toHaveLength(2);
+    expect(requests).toEqual([
+        `https://dashboard.example.test/api/v1/shifts/${kind}/?page=3`,
+        `https://dashboard.example.test/api/v1/shifts/${kind}/?page=1`,
+        `https://dashboard.example.test/api/v1/shifts/${kind}/?page=2`,
+    ]);
+});
+
+it('echoes the version of each reviewed shift offer while preserving no-consent acceptance', async () => {
+    const payloads: Array<Record<string, unknown>> = [];
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        payloads.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return new Response(JSON.stringify({ status: 'ACCEPTED_AWAITING_PAYMENT' }), {
+            status: 200, headers: { 'content-type': 'application/json' },
+        });
+    }) as unknown as typeof fetch;
+    configureApi({ baseURL: 'https://dashboard.example.test/api/v1', getToken: async () => null, fetchImpl });
+
+    await acceptShiftOfferService(3, {
+        engagementTermsAccepted: true, independentContractorStatusConfirmed: true,
+        termsVersion: 'reviewed-offer-version-3',
+    });
+    await acceptShiftOfferService(4);
+    expect(payloads[0]).toMatchObject({
+        engagement_terms_accepted: true,
+        independent_contractor_status_confirmed: true,
+        terms_version: 'reviewed-offer-version-3',
+    });
+    expect(payloads[1]).toEqual({
+        engagement_terms_accepted: false,
+        independent_contractor_status_confirmed: false,
+    });
+});
+
+it('deletes a scoped shift-description template through the shared SDK', async () => {
+    const requests: Array<{ url: string; method: string }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({url: String(input), method: init?.method ?? 'GET'});
+        return new Response(null, { status: 204 });
+    }) as unknown as typeof fetch;
+    configureApi({baseURL: 'https://dashboard.example.test/api/v1', getToken: async () => null, fetchImpl});
+    await deleteShiftDescriptionTemplate(31);
+    expect(requests).toEqual([{url: 'https://dashboard.example.test/api/v1/shift-description-templates/31/', method: 'DELETE'}]);
+});
+
+it('paginates both deferred payroll offer states without mobile deep transport imports', async () => {
+    const requested: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        const status = url.searchParams.get('status');
+        const page = Number(url.searchParams.get('page') || 1);
+        requested.push(status + ':' + page);
+        return new Response(JSON.stringify({
+            results: [{ id: page + (status === 'ACCEPTED' ? 10 : 20), payment_preference_snapshot: 'TFN', engagement_terms_preview: {payroll_activation_required: true} }],
+            next: page === 1 ? '?page=2' : null,
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch;
+    configureApi({ baseURL: 'https://dashboard.example.test/api/v1', getToken: async () => null, fetchImpl });
+    const offers = await fetchDeferredPayrollOffersService();
+    expect(offers.map((row) => row.id).sort((a,b) => a-b)).toEqual([11,12,21,22]);
+    expect(offers[0]).toMatchObject({paymentPreferenceSnapshot: 'TFN'});
+    expect(requested.sort()).toEqual(['ACCEPTED:1','ACCEPTED:2','ACCEPTED_AWAITING_PAYMENT:1','ACCEPTED_AWAITING_PAYMENT:2']);
 });

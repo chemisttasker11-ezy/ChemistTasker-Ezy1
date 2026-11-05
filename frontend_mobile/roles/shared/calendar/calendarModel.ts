@@ -22,6 +22,15 @@ export type CalendarItem = {
   noteData?: any;
 };
 
+/** The route may request a pharmacy, but membership scope always wins. */
+export function pickAllowedCalendarPharmacyId(memberships: readonly any[], requested?: unknown): number | null {
+  const allowed = memberships
+    .map((row) => Number(row?.pharmacyId ?? row?.pharmacy_id ?? row?.pharmacyDetail?.id ?? row?.pharmacy?.id))
+    .filter((id) => Number.isInteger(id) && id > 0);
+  const candidate = Number(requested);
+  return allowed.includes(candidate) ? candidate : allowed[0] ?? null;
+}
+
 export const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 export const normalizeList = (data: any) =>

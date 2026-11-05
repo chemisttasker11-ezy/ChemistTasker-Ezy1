@@ -1,6 +1,7 @@
 """Serializers for the chat API."""
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.urls import reverse
 
 User = get_user_model()
 
@@ -60,6 +61,9 @@ class ReactionSerializer(serializers.ModelSerializer):
 
 class MessageSerializer(serializers.ModelSerializer):
     sender = ChatMembershipSerializer(read_only=True)
+    # Do not expose FileField.url (possibly an Azure SAS or publicly served
+    # MEDIA_URL). Both legacy attachment and attachment_url are protected links.
+    attachment = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
     reactions = ReactionSerializer(many=True, read_only=True)
     attachment_filename = serializers.SerializerMethodField()
@@ -82,10 +86,12 @@ class MessageSerializer(serializers.ModelSerializer):
             data["attachment_filename"] = None
         return data
     def get_attachment_url(self, obj):
-        try:
-            return obj.attachment.url if obj.attachment else None
-        except Exception:
+        if obj.is_deleted or not obj.attachment:
             return None
+        return reverse('api_v1:message-attachment', kwargs={'pk': obj.pk})
+
+    def get_attachment(self, obj):
+        return self.get_attachment_url(obj)
  
     def get_attachment_filename(self, obj):
         if obj.attachment and hasattr(obj.attachment, 'name'):

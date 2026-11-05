@@ -20,6 +20,29 @@ export const getSlotIds = (shift: Shift): number[] => {
         .filter((id: number | null): id is number => id != null);
 };
 
+/** Parse notification ids as positive integers, never as untrusted slot indexes. */
+export const positiveShiftLinkId = (raw: unknown): number | null => {
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if ((typeof value !== 'string' && typeof value !== 'number') || !/^[1-9]\d*$/.test(String(value))) return null;
+    const id = Number(value);
+    return Number.isSafeInteger(id) ? id : null;
+};
+
+/** Only select a slot confirmed to belong to the retrieved authorized shift. */
+export const getDeepLinkedShiftSlotId = (shift: Shift, requestedSlotId: number | null): number | null => {
+    const slotIds = getSlotIds(shift);
+    return requestedSlotId != null && slotIds.includes(requestedSlotId)
+        ? requestedSlotId : slotIds[0] ?? null;
+};
+
+/** Keep Post Shift inside the worker's authorized owner/organization/admin shell. */
+export const getPosterPostShiftPath = (persona: string | null, pharmacyId: number | null): string | null => {
+    if (persona === 'owner') return '/owner/post-shift';
+    if (persona === 'organization') return '/organization/post-shift';
+    if (persona === 'admin' && pharmacyId != null) return `/admin/${pharmacyId}/post-shift`;
+    return null;
+};
+
 export const slotHasAwaitingPayment = (slot: any): boolean => {
     return Boolean(slot?.awaitingPayment ?? slot?.awaiting_payment);
 };
@@ -329,3 +352,13 @@ export const buildActiveShiftsScopeKey = (
         return shiftId != null ? `${scopeKey}:shift:${shiftId}` : `${scopeKey}:all`;
 };
 
+
+/** Only a measured row from the currently authorized workspace can be scrolled into view. */
+export const getLinkedShiftScrollY = (
+    measurement: { shiftId: number; scopeKey: string; y: number } | null,
+    shiftId: number | null,
+    scopeKey: string,
+): number | null => {
+    if (shiftId == null || !measurement || measurement.shiftId !== shiftId || measurement.scopeKey !== scopeKey) return null;
+    return Number.isFinite(measurement.y) ? Math.max(0, measurement.y - 16) : null;
+};

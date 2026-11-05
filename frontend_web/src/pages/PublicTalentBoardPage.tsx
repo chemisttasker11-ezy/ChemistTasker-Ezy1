@@ -69,7 +69,9 @@ export default function PublicTalentBoardPage() {
         ratingAverage: post.rating_average ?? post.ratingAverage ?? null,
         ratingCount: post.rating_count ?? post.ratingCount ?? null,
       }));
-      setPosts(mapped);
+      // A shared QR reference opens only the matching published, public talent listing.
+      const requestedRef = new URLSearchParams(window.location.search).get('reference_code');
+      setPosts(requestedRef ? mapped.filter((post: any) => post.referenceCode === requestedRef) : mapped);
     } catch (err: any) {
       setError(err?.message || "Failed to load talent feed.");
       setPosts([]);

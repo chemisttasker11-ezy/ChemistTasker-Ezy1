@@ -1,6 +1,7 @@
 import { createFriendPillReferralService } from '@chemisttasker/shared-core';
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Linking, Share } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Share } from 'react-native';
+import { openWebPage } from '@/features/explore/webLinks';
 import { Text, Avatar, List, Button, Surface, Divider, Switch, IconButton, Card, Portal, Dialog, TextInput } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +27,6 @@ export default function OwnerProfileScreen() {
   const { logout, refreshUser, updateUserProfilePhoto } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -253,19 +253,15 @@ export default function OwnerProfileScreen() {
             <List.Item
               title="Notifications"
               left={props => <List.Icon {...props} icon="bell" />}
-              right={() => (
-                <Switch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
-                  color="#6366F1"
-                />
-              )}
+              right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => router.push('/notifications' as any)}
             />
             <Divider />
             <List.Item
               title="App Settings"
               left={props => <List.Icon {...props} icon="cog" />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => router.push('/app-preferences' as any)}
             />
           </Surface>
         </View>
@@ -285,7 +281,7 @@ export default function OwnerProfileScreen() {
               left={props => <List.Icon {...props} icon="file-document" />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
               onPress={() => {
-                Linking.openURL(`${webBaseUrl}/terms-of-service`);
+                openWebPage('/terms-of-service').catch(() => Alert.alert('Website unavailable', 'Please try again.'));
               }}
             />
             <Divider />
@@ -294,7 +290,7 @@ export default function OwnerProfileScreen() {
               left={props => <List.Icon {...props} icon="shield-check" />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
               onPress={() => {
-                Linking.openURL(`${webBaseUrl}/privacy-policy`);
+                openWebPage('/privacy-policy').catch(() => Alert.alert('Website unavailable', 'Please try again.'));
               }}
             />
           </Surface>
