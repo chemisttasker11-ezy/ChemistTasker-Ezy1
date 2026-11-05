@@ -269,19 +269,21 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
  </ParityPage>;
 }
 function MyListingDetail({row,loading,error,onReload}:{row:MarketplaceDashboardListing|undefined;loading:boolean;error:string;onReload:()=>Promise<void>}){
+ const actionBusyRef=useRef(false);
  const[busy,setBusy]=useState(false),[localError,setLocalError]=useState(''),[scheduleAt,setScheduleAt]=useState<Date|undefined>(undefined),[timeOpen,setTimeOpen]=useState(false);
  const labels:Record<string,string>={OWNED_CHAIN:'Owned pharmacies',ORGANISATION:'Organisation',PLATFORM:'Platform owners'};
- const act=async(action:'submit'|'withdraw')=>{if(!row)return;setBusy(true);setLocalError('');try{await api.actOnListing(row.id,action,row.version);await onReload();}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
+ const act=async(action:'submit'|'withdraw')=>{if(!row||actionBusyRef.current)return;actionBusyRef.current=true;setBusy(true);setLocalError('');try{await api.actOnListing(row.id,action,row.version);await onReload();}catch(e){setLocalError(errorMessage(e));}finally{actionBusyRef.current=false;setBusy(false);}};
  const currentCircle=row?.current_circle||'OWNED_CHAIN';
  const next=nextMarketplaceAudience(currentCircle,row?.maximum_circle);
- const widen=async(schedule=false)=>{if(!row||!next)return;setBusy(true);setLocalError('');try{
+ const widen=async(schedule=false)=>{if(!row||!next||actionBusyRef.current)return;actionBusyRef.current=true;setBusy(true);setLocalError('');try{
    if(schedule&&!scheduleAt){setLocalError('Choose a future date and time before scheduling audience widening.');return;}
    if(schedule&&scheduleAt&&scheduleAt.getTime()<=Date.now()){setLocalError('Scheduled widening must be in the future.');return;}
    await api.updateAudience(row.id,{expected_version:row.version,current_circle:schedule?currentCircle:next,maximum_circle:row.maximum_circle||'PLATFORM',...(schedule&&scheduleAt?{schedule:[{target_circle:next,due_at:scheduleAt.toISOString()}]}:{})});
    setScheduleAt(undefined);await onReload();
- }catch(e){setLocalError(errorMessage(e,'Unable to update listing audience.'));}finally{setBusy(false);}};
- return <ParityPage title="Manage listing" subtitle="Publication, availability and audience state." loading={loading} error={error||localError}>
+ }catch(e){setLocalError(errorMessage(e,'Unable to update listing audience.'));}finally{actionBusyRef.current=false;setBusy(false);}};
+ return <ParityPage title="Manage listing" subtitle="Publication, availability and audience state." loading={loading} error={error} onRetry={onReload}>
   {!row?<EmptyState title="Listing not found" body="The listing is unavailable."/>:<>
+   {localError?<InfoNote title="Listing action could not be completed" tone="warning">{localError}</InfoNote>:null}
    <MetricGrid items={[{label:'Publication',value:replaceUnderscore(row.publication_status)},{label:'Availability',value:replaceUnderscore(row.availability_status)},{label:'Audience',value:replaceUnderscore(row.current_circle||'PRIVATE')}]}/>
    <DataRow title={row.title} subtitle={row.category?.name||'Marketplace listing'}/>
    <ActionButtons>
