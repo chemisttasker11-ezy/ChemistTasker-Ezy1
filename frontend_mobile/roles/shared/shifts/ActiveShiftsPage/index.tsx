@@ -99,6 +99,12 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [pillPayingShiftId, setPillPayingShiftId] = useState<number | null>(null);
     const [paymentSlotSelection, setPaymentSlotSelection] = useState<Record<number, number[]>>({});
+    // Do not start duplicate fulfilment attempts from rapid taps. The backend
+    // remains responsible for durable payment/booking idempotency.
+    const paymentBusyRef = useRef(false);
+    const paymentContextRef = useRef(`${user?.id ?? 'anonymous'}:${surface.scopeKey}`);
+    const paymentContext = `${user?.id ?? 'anonymous'}:${surface.scopeKey}`;
+    paymentContextRef.current = paymentContext;
 
     const showSnackbar = useCallback((msg: string) => {
         setSnackbarMessage(msg);
@@ -180,12 +186,18 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
         }
     }, [shiftId, routeSlotId, shifts]);
     const handlePayWithPills = useCallback(async (shift: Shift, offerIds: number[] = []) => {
+        if (paymentBusyRef.current) return;
+        const requestedContext = paymentContextRef.current;
+        const current = () => paymentContextRef.current === requestedContext;
+        paymentBusyRef.current = true;
         setPillPayingShiftId(shift.id);
         try {
             const res = await payShiftWithPills(shift.id, offerIds);
+            if (!current()) return;
             showSnackbar(res?.detail || 'Shift paid with pills.');
             await loadShifts();
         } catch (err: any) {
+            if (!current()) return;
             const data = err?.response?.data ?? err?.payload;
             const detail = Array.isArray(data?.detail) ? data.detail[0] : data?.detail;
             const message = data?.code === 'insufficient_pills'
@@ -193,13 +205,19 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                 : detail || err?.message || 'Failed to pay with pills.';
             showSnackbar(message);
         } finally {
-            setPillPayingShiftId(null);
+            paymentBusyRef.current = false;
+            if (current()) setPillPayingShiftId(null);
         }
     }, [loadShifts, showSnackbar]);
 
     const handlePayWithStripe = useCallback(async (shift: Shift, offerIds: number[] = []) => {
+        if (paymentBusyRef.current) return;
+        const requestedContext = paymentContextRef.current;
+        const current = () => paymentContextRef.current === requestedContext;
+        paymentBusyRef.current = true;
         try {
             const res = await chargeShiftFulfillment(shift.id, { offerIds, platform: 'mobile' });
+            if (!current()) return;
             if (res?.url) {
                 await Linking.openURL(res.url);
             } else if (res?.free) {
@@ -210,20 +228,27 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
             }
         } catch (err: any) {
             const data = err?.response?.data ?? err?.payload;
-            if (err?.status === 409 && data?.checkout_id) {
+            if (current() && err?.status === 409 && data?.checkout_id) {
                 const recover = async (action: 'resume' | 'expire') => {
+                    if (!current() || paymentBusyRef.current) return;
+                    paymentBusyRef.current = true;
                     try {
                         if (action === 'resume') {
                             const result = await resumeFulfillmentCheckout(shift.id, data.checkout_id);
+                            if (!current()) return;
                             await Linking.openURL(result.url);
                         } else {
                             await expireFulfillmentCheckout(shift.id, data.checkout_id);
+                            if (!current()) return;
                             const result = await chargeShiftFulfillment(shift.id, { offerIds, platform: 'mobile' });
+                            if (!current()) return;
                             if (result.url) await Linking.openURL(result.url);
                             else { showSnackbar(result.message || 'Checkout updated.'); await loadShifts(); }
                         }
                     } catch (error: any) {
-                        showSnackbar(error?.message || 'Checkout recovery could not be confirmed.');
+                        if (current()) showSnackbar(error?.message || 'Checkout recovery could not be confirmed.');
+                    } finally {
+                        paymentBusyRef.current = false;
                     }
                 };
                 Alert.alert('Checkout already in progress',
@@ -232,7 +257,9 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                         { text: 'Expire unpaid and replace', onPress: () => void recover('expire') },
                         { text: 'Continue existing', onPress: () => void recover('resume') },
                     ]);
-            } else showSnackbar(err?.message || 'Failed to initiate payment.');
+            } else if (current()) showSnackbar(err?.message || 'Failed to initiate payment.');
+        } finally {
+            paymentBusyRef.current = false;
         }
     }, [loadShifts, showSnackbar]);
 
