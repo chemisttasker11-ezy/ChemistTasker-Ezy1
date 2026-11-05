@@ -6,13 +6,21 @@ import{useLocalSearchParams,useRouter}from'expo-router';
 import*as DocumentPicker from'expo-document-picker';
 import{chemistTaskerApi}from'@/config/api';
 import{useWorkspace}from'@/context/WorkspaceContext';
+import{useAuth}from'@/context/AuthContext';
 import{ActionButtons,ChoiceChips,DataRow,EmptyState,Field,InfoNote,MetricGrid,ParityPage,PharmacyRequired,ScreenLink,Section,palette}from'./ParityUI';
 import{asArray,dateFromIso,errorMessage,idempotencyKey,isoDate,money,replaceUnderscore,toNumber}from'./utils';
 
 type EthicalScreen='access'|'grants'|'pharmacy'|'inventory'|'scan'|'import'|'import-review'|'lot'|'listings'|'listing-new'|'listing-s8'|'requests'|'transfers'|'transfer'|'documents'|'complete';
 const api=chemistTaskerApi.ethicalMarketplace;
 
+/** Each account/pharmacy is a separate security principal for private stock.
+ * Destroy the previous React subtree immediately on a scope switch.
+ */
 export function EthicalMarketplaceScreen({screen}:{screen:EthicalScreen}){
+ const {user}=useAuth();const {selectedPharmacyId}=useWorkspace();
+ return <EthicalMarketplaceContent key={`${user?.id??'signed-out'}:${selectedPharmacyId??'none'}:${screen}`} screen={screen}/>;
+}
+function EthicalMarketplaceContent({screen}:{screen:EthicalScreen}){
  const router=useRouter();const params=useLocalSearchParams<{id?:string}>();const id=String(params.id||'');
  const workspace=useWorkspace();const pharmacyId=workspace.selectedPharmacyId;
  const[access,setAccess]=useState<any>(null),[approval,setApproval]=useState<any>(null),[grants,setGrants]=useState<any>(null),[lots,setLots]=useState<any[]>([]),[listings,setListings]=useState<any[]>([]),[transfers,setTransfers]=useState<any[]>([]),[transfer,setTransfer]=useState<any>(null),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[error,setError]=useState('');

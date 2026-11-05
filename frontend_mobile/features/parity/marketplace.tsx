@@ -16,7 +16,15 @@ import { MarketplaceAccessResolution } from './MarketplaceAccessResolution';
 type MarketplaceScreen='browse'|'filters'|'item'|'seller'|'category'|'details'|'photos'|'audience'|'review'|'mine'|'mine-detail'|'exchanges'|'exchange-detail'|'report';
 const api=chemistTaskerApi.marketplace;
 
+/** Key sensitive workspace state to the authenticated account; cached private
+ * listings and drafts cannot render for a subsequent signed-in user, even
+ * before asynchronous data-load effects have cleared the previous snapshot.
+ */
 export function MarketplaceParityScreen({screen}:{screen:MarketplaceScreen}){
+ const {user}=useAuth();
+ return <MarketplaceParityContent key={`${user?.id??'signed-out'}:${screen}`} screen={screen}/>;
+}
+function MarketplaceParityContent({screen}:{screen:MarketplaceScreen}){
  const router=useRouter();const{user}=useAuth();const draftScope=String(user?.id??user?.email??user?.username??'anonymous');const params=useLocalSearchParams<{id?:string;search?:string;category?:string;mode?:string}>();const id=String(params.id||'');
  const[listings,setListings]=useState<MarketplacePublicListing[]>([]),[listing,setListing]=useState<MarketplacePublicListing|null>(null),[categories,setCategories]=useState<MarketplaceCategory[]>([]),[options,setOptions]=useState<MarketplaceListingOptions|null>(null),[mine,setMine]=useState<MarketplaceDashboardListing[]>([]),[exchanges,setExchanges]=useState<MarketplaceExchange[]>([]),[exchange,setExchange]=useState<MarketplaceExchange|null>(null);
  const[draft,setDraft]=useState<MarketplaceMobileDraft>(emptyMarketplaceDraft()),[query,setQuery]=useState(String(params.search||'')),[categoryFilter,setCategoryFilter]=useState(String(params.category||'')),[modeFilter,setModeFilter]=useState<BrowseMode>(normalizeBrowseMode(params.mode)),[listingCount,setListingCount]=useState<number|null>(null),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[error,setError]=useState('');
