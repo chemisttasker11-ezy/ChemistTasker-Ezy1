@@ -168,8 +168,8 @@ function createRosterHarness({
           Text: 'Text',
         };
       }
-      if (id === 'react-native-paper-dates') {
-        return { DatePickerInput: (p) => ({ type: 'DatePickerInput', props: p }) };
+      if (id === '@/components/security/GuardedModal') {
+        return { GuardedDatePickerInput: (p) => ({ type: 'DatePickerInput', props: p }) };
       }
       if (id === '@/context/AuthContext') return { useAuth: () => ({ user: currentUser }) };
       if (id === '@/context/WorkspaceContext') {
