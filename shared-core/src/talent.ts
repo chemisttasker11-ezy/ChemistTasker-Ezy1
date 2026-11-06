@@ -1,7 +1,8 @@
-import { getExplorerPosts } from './domains/talent/api';
+import { getExplorerPosts, getExplorerPostDetail } from './domains/talent/api';
 import { asList, camelCaseKeysDeep } from './utils/serialization';
 
-export async function getExplorerPostForEditing() {
+export async function getExplorerPostForEditing(id?: number) {
+  if (id !== undefined) return camelCaseKeysDeep(await getExplorerPostDetail(id));
   const posts = asList(await getExplorerPosts({ mine: true }));
   return posts.length ? camelCaseKeysDeep(posts[0]) : null;
 }

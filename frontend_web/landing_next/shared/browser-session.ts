@@ -4,7 +4,7 @@ export const SESSION_EVENT='ct:session-changed';
 const EVENT_KEY='ct:session-event';
 // Kept on sign-out: auth mode, theme/layout prefs, kiosk activation, return path, and browser-only data scoped by user id
 // (each user reads only their own key). Server-backed caches and unscoped legacy copies are wiped.
-const DEVICE_KEY=/^(ct_auth_storage|ct-theme-mode|toolpad-mode|mui-.*|ct-dashboard-sidebar-collapsed|ct:session-event|ct:refresh-lease|ct:return-to|ct:last-login-redirect|ctk_kiosk_.*|ct:shift-skill-preset:.*|active_shift_slot_seen_v2:.*|ct:(?:hub|comment)-draft:\d+:.+|saved_shift_ids:\d+)$/;
+const DEVICE_KEY=/^(ct_auth_storage|ct-theme-mode|toolpad-mode|mui-.*|ct-dashboard-sidebar-collapsed|ct:session-event|ct:refresh-lease|ct:return-to|ct:last-login-redirect|ctk_kiosk_.*|ct:shift-skill-preset:.*|active_shift_slot_seen_v2:.*|ct:(?:hub|comment)-draft:\d+:.+|saved_shift_ids:\d+|talent\.pitch\.create:v1:.+)$/;
 const OWNER_KEY='ct:storage-owner';
 const clearStore=(store:Storage)=>{for(const key of Object.keys(store))if(!DEVICE_KEY.test(key))store.removeItem(key);};
 /** Removes every other key (route state, shift markers, page caches) from both storages of this tab. */

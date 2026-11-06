@@ -269,6 +269,10 @@ CELERY_TASK_ROUTES = {
     "onboarding.tasks.verify_skill_certificate_task": {"queue": "ocr"},
 }
 CELERY_BEAT_SCHEDULE = {
+    'cleanup-pitch-receipts-daily': {
+        'task': 'talent.tasks.cleanup_expired_pitch_receipts',
+        'schedule': crontab(hour=2, minute=30),
+    },
     'ahpra-overdue-alerts': {
         'task': 'onboarding.tasks.alert_overdue_ahpra_checks',
         'schedule': crontab(minute='*/15'),
