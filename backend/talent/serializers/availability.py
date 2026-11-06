@@ -15,6 +15,16 @@ class UserAvailabilitySerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
     def validate(self, attrs):
+        scheduling_fields = (
+            'date', 'start_time', 'end_time', 'is_all_day',
+            'is_recurring', 'recurring_days', 'recurring_end_date',
+        )
+        # Metadata PATCHes must keep supported legacy open-ended schedules editable.
+        if self.partial and self.instance is not None and not any(
+            field in attrs and attrs[field] != getattr(self.instance, field) for field in scheduling_fields
+        ):
+            return attrs
+
         start_time = attrs.get('start_time', getattr(self.instance, 'start_time', None))
         end_time = attrs.get('end_time', getattr(self.instance, 'end_time', None))
         if start_time is not None and end_time is not None and end_time <= start_time:
