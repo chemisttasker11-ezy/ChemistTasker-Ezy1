@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
+import { Button, Card, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getPublicOrganization } from '@chemisttasker/shared-core';
 import { colors, radius, space } from '@/constants/tokens';

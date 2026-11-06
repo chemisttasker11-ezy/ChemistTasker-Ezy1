@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { Button, Checkbox, Chip, Divider, IconButton, List, Surface, Text, TextInput, useTheme } from 'react-native-paper';
-import { DatePickerInput, TimePickerModal } from 'react-native-paper-dates';
+import { GuardedDatePickerInput as DatePickerInput } from '@/components/security/GuardedModal';
+import { GuardedTimePickerModal as TimePickerModal } from '@/components/security/GuardedModal';
 import { createFinanceDraft, finance, financeDueDate, financeItemLine, financeStatus, type FinanceCalculation, type FinanceCategory, type FinanceCustomer, type FinanceCustomerInput, type FinanceDraft, type FinanceInternalSource, type FinanceInvoice, type FinanceItem, type FinanceLine, type FinanceTaxCode } from '@chemisttasker/shared-core';
 import { dateFromIso, isoDate } from '@/features/parity/utils';
 import { colors, font, radius, space, touch } from '@/constants/tokens';

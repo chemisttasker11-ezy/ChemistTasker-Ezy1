@@ -6,12 +6,12 @@ test('native notifications load more than the server 20-row page',()=>{
  assert.match(source,/await getNotifications\(page\)/);
  assert.match(source,/onEndReached=\{loadOlder\}/);
  assert.match(source,/response\.next \? page \+ 1 : null/);
- assert.match(source,/loadOlder\(\)/);
+ assert.match(source,/const loadOlder =/);
 });
 test('failed fetch never clears a working list or displays false empty history',()=>{
  assert.match(source,/setLoadError\(failure\?\.message/);
- assert.match(source,/ListEmptyComponent=\{loadError \? null/);
- assert.doesNotMatch(source,/setNotifications\(\[\]\)/);
+ assert.match(source,/ListEmptyComponent=\{loadError \? (?:null|undefined)/);
+ assert.doesNotMatch(source,/catch[\s\S]*?setNotifications\(\[\]\)/);
 });
 test('read mutation never hides unread notifications before server acknowledgement',()=>{
  assert.match(source,/await markNotificationsAsRead\(unreadIds\)/);

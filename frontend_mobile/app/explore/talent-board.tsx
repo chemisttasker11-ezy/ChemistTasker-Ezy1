@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
+import { Button, Card, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getPublicTalentFeed } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';

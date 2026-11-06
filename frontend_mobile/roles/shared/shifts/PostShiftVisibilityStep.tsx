@@ -1,6 +1,7 @@
+import { ResponsiveSegmentedButtons as SegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 import { type Dispatch, type SetStateAction } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Button, Chip, SegmentedButtons, Surface, Switch, Text } from 'react-native-paper';
+import { Button, Chip, Surface, Switch, Text } from 'react-native-paper';
 import { Check } from 'lucide-react-native';
 import { type ShiftEscalationPlan } from '@chemisttasker/shared-core';
 import { colors, radius, space, touch, type } from '@/constants/tokens';
@@ -137,19 +138,19 @@ export default function PostShiftVisibilityStep({
                 value: 'auto',
                 label: 'Automatic',
                 style: { minHeight: touch.min },
-                labelStyle: { minHeight: touch.min, textAlignVertical: 'center', lineHeight: touch.min },
+                labelStyle: { textAlignVertical: 'center' },
               },
               {
                 value: 'custom',
                 label: 'Choose dates',
                 style: { minHeight: touch.min },
-                labelStyle: { minHeight: touch.min, textAlignVertical: 'center', lineHeight: touch.min },
+                labelStyle: { textAlignVertical: 'center' },
               },
               {
                 value: 'off',
                 label: "Don't widen",
                 style: { minHeight: touch.min },
-                labelStyle: { minHeight: touch.min, textAlignVertical: 'center', lineHeight: touch.min },
+                labelStyle: { textAlignVertical: 'center' },
               },
             ]} />
           {mode === 'auto' ? (

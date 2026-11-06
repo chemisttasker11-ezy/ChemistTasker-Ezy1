@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { Modal, Portal, Text, TextInput, Button, Checkbox, ActivityIndicator, HelperText } from 'react-native-paper';
+import { Modal, Portal, Text, TextInput, Button, Checkbox, HelperText } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import type { UserLite } from './types';
 import { searchParticipants } from './hooks';
 import { createOrUpdateGroupRoom } from '@chemisttasker/shared-core';

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Image, View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Surface, ActivityIndicator } from 'react-native-paper';
+import { Text, Surface } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import {
     Users,
     Heart,

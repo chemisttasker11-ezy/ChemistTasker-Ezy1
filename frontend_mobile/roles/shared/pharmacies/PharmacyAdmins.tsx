@@ -4,18 +4,18 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import {
-    Card,
-    Text,
-    Button,
-    Chip,
-    Portal,
-    Modal,
-    TextInput,
-    ActivityIndicator,
-    Snackbar,
-    IconButton,
-    Menu,
+  Card,
+  Text,
+  Button,
+  Chip,
+  Portal,
+  Modal,
+  TextInput,
+  Snackbar,
+  IconButton,
+  Menu,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import {
     MembershipDTO,
     PharmacyAdminDTO,
@@ -197,13 +197,11 @@ export default function PharmacyAdmins({
             <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
                 {showSkeleton ? (
                     <View style={styles.skeletonContainer}>
-                        {[1, 2].map((i) => (
-                            <Card key={i} style={styles.card}>
-                                <Card.Content>
-                                    <ActivityIndicator />
-                                </Card.Content>
-                            </Card>
-                        ))}
+                        <Card style={styles.card}>
+                            <Card.Content style={{ alignItems: 'center', paddingVertical: 32 }}>
+                                <ActivityIndicator size="large" accessibilityLabel="Loading administrators…" />
+                            </Card.Content>
+                        </Card>
                     </View>
                 ) : filteredAdmins.length === 0 ? (
                     <Text style={styles.emptyText}>

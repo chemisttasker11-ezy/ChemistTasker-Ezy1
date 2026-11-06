@@ -44,6 +44,12 @@ apiClient.interceptors.request.use(
         if (IS_WEB && !['get', 'head', 'options'].includes((config.method || 'get').toLowerCase())) {
             config.headers['X-CSRFToken'] = await getBrowserCsrfToken(API_BASE_URL);
         }
+        // Signed-out auth calls need no token. Looking one up can refresh a dead session, and that refresh's
+        // clearStoredSession() bumps the generation, which cancelled the sign-in itself ("canceled" on web).
+        if (isPublicAuthRequest(config.url)) {
+            delete config.headers.Authorization;
+            return config;
+        }
         try {
             const token = await getValidAccessToken(API_BASE_URL);
             if (token) {

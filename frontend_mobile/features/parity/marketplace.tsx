@@ -1,7 +1,7 @@
 import React,{useCallback,useEffect,useRef,useState}from'react';
 import{Image,View}from'react-native';
 import{Button,Card,Chip,IconButton,Searchbar,Text}from'react-native-paper';
-import{DatePickerInput,TimePickerModal}from'react-native-paper-dates';
+import { GuardedDatePickerInput as DatePickerInput, GuardedTimePickerModal as TimePickerModal } from '@/components/security/GuardedModal';
 import{useLocalSearchParams,useRouter}from'expo-router';
 import*as ImagePicker from'expo-image-picker';
 import{chemistTaskerApi}from'@/config/api';

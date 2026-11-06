@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Chip, HelperText, Menu, Text, TextInput, useTheme } from 'react-native-paper';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../forms/useUnsavedChangesGuard';
+import { BrandLoader } from '@/components/ui';
 
 const REL_CHOICES = [
   { value: 'manager', label: 'Manager' },
@@ -111,7 +112,7 @@ export default function RefereesScreen({ roleKey }: { roleKey: RefereeRoleKey })
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['left', 'right']}>
         <View style={styles.loader}>
-          <Text>Loading referees...</Text>
+          <BrandLoader size={44} accessibilityLabel="Loading referees…" />
         </View>
       </SafeAreaView>
     );

@@ -2,7 +2,6 @@ import React, { createContext, type ReactNode, useContext } from 'react';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { HelperText, Icon, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -28,6 +27,7 @@ import { ContentState, PageHeader, Pill, ScalePressable, SectionCard } from '@/c
 import { alpha } from '@/components/ui/tone';
 import { ShellContext } from '@/components/shell/ShellContext';
 import { statusToneFor } from './statusTone';
+import { useRootBackAction } from '@/components/RootPageHeader';
 
 export const palette = {
   primary: colors.primary,
@@ -60,6 +60,7 @@ export function ParityPage({
   onRefresh,
   refreshing = false,
   right,
+  backDisabled = false,
 }: {
   title: string;
   subtitle?: string;
@@ -70,8 +71,8 @@ export function ParityPage({
   onRefresh?: () => void;
   refreshing?: boolean;
   right?: ReactNode;
+  backDisabled?: boolean;
 }) {
-  const router = useRouter();
   const scrollY = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
@@ -86,14 +87,22 @@ export function ParityPage({
 
   // Inside a persona shell (e.g. the worker Roster tab) the shell owns the header, Back and the bottom inset.
   const inShell = useContext(ShellContext) != null;
+  const { handleBack } = useRootBackAction({
+    active: !inShell,
+    disabled: backDisabled,
+  });
 
   return (
     <SafeAreaView style={styles.safe} edges={inShell ? ['left', 'right'] : ['top', 'left', 'right', 'bottom']}>
       {inShell ? null : <View style={styles.header}>
         <ScalePressable
           pressBg
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+          disabled={backDisabled}
+          aria-disabled={backDisabled}
+          accessibilityState={{ disabled: backDisabled }}
+          onPress={handleBack}
           accessibilityLabel="Go back"
+          accessibilityRole="button"
           style={styles.backButton}
         >
           <ChevronLeft size={24} color={colors.textPrimary} strokeWidth={2} />
@@ -369,6 +378,7 @@ export function ChoiceChips({
         <Pill
           key={option.value}
           label={option.label}
+          wrapLabel
           selected={value === option.value}
           disabled={disabled}
           onPress={() => onChange(option.value)}

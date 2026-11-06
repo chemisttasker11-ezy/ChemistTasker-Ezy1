@@ -1,0 +1,52 @@
+diff --git a/node_modules/react-native-google-places-autocomplete/GooglePlacesAutocomplete.js b/node_modules/react-native-google-places-autocomplete/GooglePlacesAutocomplete.js
+--- a/node_modules/react-native-google-places-autocomplete/GooglePlacesAutocomplete.js
++++ b/node_modules/react-native-google-places-autocomplete/GooglePlacesAutocomplete.js
+@@ -144,6 +144,7 @@
+ 
+   // Store active XMLHttpRequest objects - needed to abort requests when component unmounts or new search starts
+   const requestsRef = useRef([]);
++  const detailsRequestRef = useRef(null);
+ 
+   // Track if navigator warning has been shown - prevents duplicate console warnings
+   const hasWarnedAboutNavigator = useRef(false);
+@@ -234,6 +235,7 @@
+   }, [url]);
+ 
+   const _abortRequests = useCallback(() => {
++    detailsRequestRef.current = null;
+     requestsRef.current.forEach((request) => {
+       request.onreadystatechange = null;
+       request.abort();
+@@ -677,11 +679,17 @@
+ 
+       // fetch details
+       const request = new XMLHttpRequest();
++      detailsRequestRef.current = request;
+       requestsRef.current.push(request);
+       request.timeout = timeout;
+-      request.ontimeout = onTimeout;
++      request.ontimeout = function (event) {
++        if (detailsRequestRef.current === request) detailsRequestRef.current = null;
++        onTimeout.call(this, event);
++      };
+       request.onreadystatechange = () => {
+         if (request.readyState !== 4) return;
++        if (detailsRequestRef.current !== request) return;
++        detailsRequestRef.current = null;
+ 
+         if (request.status === 200) {
+           const responseJSON = JSON.parse(request.responseText);
+@@ -783,6 +791,13 @@
+   };
+ 
+   const _handleChangeText = (text) => {
++    if (detailsRequestRef.current) {
++      const request = detailsRequestRef.current;
++      detailsRequestRef.current = null;
++      request.onreadystatechange = null;
++      request.abort();
++      _disableRowLoaders();
++    }
+     _onChangeText(text);
+ 
+     const onChangeText = textInputProps?.onChangeText;

@@ -45,6 +45,8 @@ async function pinScreen() {
     react: hooks, 'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
     'react-native': { ScrollView: 'ScrollView', StyleSheet: { create: styles => styles } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, 'react-native-paper': names,
+    '@/components/RootPageHeader': { RootPageHeader: (props) => ({ type: 'RootPageHeader', props }) },
+    '@/components/ui/BrandActivityIndicator': { BrandActivityIndicator: 'ActivityIndicator', ActivityIndicator: 'ActivityIndicator' },
     'expo-router': { useRouter: () => ({ push: route => routes.push(route), navigate: route => routes.push(route), back() {} }) },
     '@chemisttasker/shared-core': { attendance: {
       getPinPharmacies: () => new Promise((resolve, reject) => requests.push({ resolve, reject })),

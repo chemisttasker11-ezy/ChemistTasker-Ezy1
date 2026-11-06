@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { ReceiptShareSession } from './receiptShare';
 import { Button, Chip, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -226,9 +228,57 @@ function ExpenseReceipt({expense,loading,error,onReload}:{expense?:FinanceExpens
 }
 
 function ReceiptScreen({receiptId,loading,error}:{receiptId:number;loading:boolean;error:string}) {
-  const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
-  const open=async()=>{setBusy(true);setLocalError('');try{const blob=await finance.receipt(receiptId);const bytes=await nativeFileBytes(blob);const file=new File(Paths.cache,`receipt-${receiptId}`);file.create({overwrite:true});await file.write(bytes);if(await Sharing.isAvailableAsync())await Sharing.shareAsync(file.uri,{dialogTitle:'Receipt'});}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
-  return <ParityPage title="Receipt" subtitle="Download or share the stored finance evidence." loading={loading} error={error||localError}><InfoNote title="Receipt evidence">Receipt files remain protected by the authenticated finance API.</InfoNote><Button mode="contained" icon="share-variant" loading={busy} onPress={()=>void open()}>Open / share receipt</Button></ParityPage>;
+  const { user } = useAuth();
+  const accountScope = String(user?.id ?? user?.email ?? user?.username ?? 'anonymous');
+  return <ReceiptScreenInner key={`${accountScope}:${receiptId}`} accountScope={accountScope} receiptId={receiptId} loading={loading} error={error} />;
+}
+
+export function ReceiptScreenInner({accountScope,receiptId,loading,error}:{accountScope:string;receiptId:number;loading:boolean;error:string}) {
+  const [busy, setBusy] = useState(false);
+  const [localError, setLocalError] = useState('');
+  const sessionRef = useRef<ReceiptShareSession | null>(null);
+  if (!sessionRef.current) sessionRef.current = new ReceiptShareSession();
+
+  useEffect(() => {
+    return () => {
+      sessionRef.current?.invalidate();
+    };
+  }, []);
+
+  const open = async () => {
+    if (sessionRef.current?.isBusy) return;
+    setBusy(true);
+    setLocalError('');
+    const res = await sessionRef.current!.openReceipt(accountScope, receiptId);
+    if (!sessionRef.current || !sessionRef.current.isBusy) {
+      setBusy(false);
+    }
+    if (!res.ok && res.error && res.error !== 'Operation already in progress') {
+      setLocalError(res.error);
+    }
+  };
+
+  return (
+    <ParityPage
+      title="Receipt"
+      subtitle="Download or share the stored finance evidence."
+      loading={loading}
+      error={error || localError}
+    >
+      <InfoNote title="Receipt evidence">
+        Receipt files remain protected by the authenticated finance API.
+      </InfoNote>
+      <Button
+        mode="contained"
+        icon="share-variant"
+        loading={busy}
+        disabled={busy || loading}
+        onPress={() => void open()}
+      >
+        Open / share receipt
+      </Button>
+    </ParityPage>
+  );
 }
 
 function BasScreen() {

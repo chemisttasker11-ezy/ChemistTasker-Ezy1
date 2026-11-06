@@ -1,5 +1,5 @@
 import React, { type ReactNode, useEffect } from 'react';
-import { type StyleProp, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import { type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -12,7 +12,7 @@ import { durations, easings } from '@/constants/motion';
 import { sizeIcon } from './icon';
 import { ScalePressable } from './ScalePressable';
 
-export type SegmentTab<T extends string> = { value: T; label: string; icon?: ReactNode };
+export type SegmentTab<T extends string> = { value: T; label: string; accessibilityLabel?: string; icon?: ReactNode };
 
 const tabId = (idPrefix: string, value: string) => `${idPrefix}-tab-${value}`;
 
@@ -28,7 +28,7 @@ export type SegmentTabsProps<T extends string> = {
   /** Names the tab group for screen readers, e.g. "Shift views". */
   label: string;
   idPrefix?: string;
-  /** Wrap 4-5 options onto rows (never scroll sideways). Also automatic for 4+ tabs under 390pt. */
+  /** Retained for callers; tabs always wrap within their available width. */
   mobileWrap?: boolean;
   style?: StyleProp<ViewStyle>;
 };
@@ -36,13 +36,11 @@ export type SegmentTabsProps<T extends string> = {
 function Tab<T extends string>({
   tab,
   selected,
-  wrap,
   idPrefix,
   onChange,
 }: {
   tab: SegmentTab<T>;
   selected: boolean;
-  wrap: boolean;
   idPrefix: string;
   onChange: (value: T) => void;
 }) {
@@ -72,20 +70,19 @@ function Tab<T extends string>({
         if (!selected) onChange(tab.value);
       }}
       accessibilityRole="tab"
-      accessibilityLabel={tab.label}
+      accessibilityLabel={tab.accessibilityLabel ?? tab.label}
       accessibilityState={{ selected }}
-      style={wrap ? styles.wrapped : styles.equal}
+      style={styles.item}
     >
       <Animated.View style={[styles.tab, fill]}>
+        <Animated.Text accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.check, { opacity: selected ? 1 : 0 }]}>✓</Animated.Text>
         {tab.icon ? (
           <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
             {sizeIcon(tab.icon, 16, fg)}
           </View>
         ) : null}
         <Animated.Text
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.15}
-          style={[styles.label, { fontFamily: selected ? font.inter.semiBold : font.inter.medium }, ink]}
+          style={[styles.label, { fontFamily: font.inter.medium }, ink]}
         >
           {tab.label}
         </Animated.Text>
@@ -104,24 +101,20 @@ export function SegmentTabs<T extends string>({
   onChange,
   label,
   idPrefix = 'ct-tabs',
-  mobileWrap = false,
   style,
 }: SegmentTabsProps<T>) {
-  const { width } = useWindowDimensions();
-  const wrap = mobileWrap || (tabs.length >= 4 && width < 390);
 
   return (
     <View
       accessibilityRole="tablist"
       accessibilityLabel={label}
-      style={[styles.container, wrap ? styles.containerWrap : null, style]}
+      style={[styles.container, style]}
     >
       {tabs.map((tab) => (
         <Tab
           key={tab.value}
           tab={tab}
           selected={tab.value === value}
-          wrap={wrap}
           idPrefix={idPrefix}
           onChange={onChange}
         />
@@ -133,6 +126,8 @@ export function SegmentTabs<T extends string>({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'stretch',
     gap: 6,
     padding: 6,
     borderRadius: radius.card,
@@ -140,18 +135,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceBg,
   },
-  containerWrap: { flexWrap: 'wrap' },
-  equal: { flex: 1, minWidth: 0 },
-  wrapped: { flexGrow: 1, flexBasis: '30%', minWidth: 100 },
+  item: { maxWidth: '100%', flexShrink: 1 },
+  check: { width: 18, color: colors.accentStrong, fontSize: 16 },
   tab: {
     flexGrow: 1,
-    minHeight: touch.min,
+    minHeight: Math.max(48, touch.min),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     // Web's phone padding: three icon tabs keep "Active shifts" whole at 360pt.
     gap: 6,
     paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
     borderRadius: radius.nested,
     borderWidth: 1,
   },

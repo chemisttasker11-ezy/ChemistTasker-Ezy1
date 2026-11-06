@@ -1,7 +1,7 @@
 import React, { type ReactNode, useCallback, useEffect, useMemo } from 'react';
+import { GuardedModal as Modal } from '@/components/security/GuardedModal';
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,

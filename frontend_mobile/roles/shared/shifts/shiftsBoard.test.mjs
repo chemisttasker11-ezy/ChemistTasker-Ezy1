@@ -87,16 +87,17 @@ test('?tab=accepted shows the workspace board over ?section=; without it the sec
   // A section tap clears ?tab=, so the requested section shows again.
   assert.equal(shown(internal, 'history', undefined), 'history');
   assert.equal(shown(internal, 'history', 'saved'), 'history');
-  // Posters have no board: ?tab=accepted leaves the Shift Centre section alone.
-  assert.equal(shown({ pathname: '/owner/shifts' }, 'history', 'accepted'), 'history');
-  assert.equal(shown({ pathname: '/owner/shifts' }, null, 'accepted'), null);
+  // Owners have a community board; delegated admins retain their Shift Centre section.
+  assert.equal(shown({ pathname: '/owner/shifts' }, 'history', 'accepted'), 'community');
+  assert.equal(shown({ pathname: '/admin/shifts' }, 'history', 'accepted'), 'history');
+  assert.equal(shown({ pathname: '/admin/shifts' }, null, 'accepted'), null);
 });
 
 test('every persona gets its sections; a worker board follows the workspace', () => {
   const { shiftSections } = surface;
   const sections = (input) => [...shiftSections(resolveShiftSurface(input))];
-  assert.deepEqual(sections({ pathname: '/owner/shifts' }), ['active', 'confirmed', 'history']);
-  assert.deepEqual(sections({ pathname: '/organization/shifts' }), ['active', 'confirmed', 'history']);
+  assert.deepEqual(sections({ pathname: '/owner/shifts' }), ['active', 'confirmed', 'history', 'public', 'community']);
+  assert.deepEqual(sections({ pathname: '/organization/shifts' }), ['active', 'confirmed', 'history', 'public', 'community']);
   assert.deepEqual(sections({ pathname: '/admin/shifts' }), ['active', 'confirmed', 'history']);
   assert.deepEqual(sections({ pathname: '/pharmacist/shifts', workspace: 'internal' }), ['community', 'confirmed', 'history']);
   assert.deepEqual(sections({ pathname: '/otherstaff/shifts', workspace: 'platform', canUsePlatform: true }), ['public', 'confirmed', 'history']);

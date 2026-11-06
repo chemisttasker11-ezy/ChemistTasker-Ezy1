@@ -46,6 +46,43 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
   const {user}=useAuth();
   const workspace=useWorkspace();
   const pharmacyId=workspace.selectedPharmacyId;
+  const accountKey=user ? String(user.id ?? user.email ?? '') : '';
+
+  const detailScope = `${params.id || ''}:${params.sessionId || ''}:${params.eventId || ''}:${params.timesheetId || ''}`;
+  const scopeKey = `${accountKey}:${pharmacyId ?? 'none'}:${screen}:${detailScope}`;
+
+  return (
+    <AttendanceParityContent
+      key={scopeKey}
+      screen={screen}
+      accountKey={accountKey}
+      pharmacyId={pharmacyId}
+      user={user}
+      params={params}
+      router={router}
+    />
+  );
+}
+
+function AttendanceParityContent({
+  screen,
+  accountKey,
+  pharmacyId,
+  user,
+  params,
+  router,
+}:{
+  screen: AttendanceScreen;
+  accountKey: string;
+  pharmacyId: number | null;
+  user: any;
+  params: any;
+  router: any;
+}) {
+  const accountRef=useRef(accountKey);
+  accountRef.current=accountKey;
+  const pharmacyRef=useRef(pharmacyId);
+  pharmacyRef.current=pharmacyId;
   const manager=canManage(user);
   const canManageKiosk=pharmacyId!=null&&canManageKioskDevices(user,pharmacyId);
   const [status,setStatus]=useState<any>(null);
@@ -59,42 +96,93 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const loadSequence=useRef(0);
+  const timelineSequence=useRef(0);
+
+  useEffect(() => {
+    return () => {
+      loadSequence.current += 1;
+      timelineSequence.current += 1;
+    };
+  }, []);
 
   const selectedPending=useMemo(()=>pending.find((row:any)=>String(row.provisional_id||row.id)===String(params.id||''))||null,[pending,params.id]);
 
   const load=useCallback(async()=>{
     const sequence=++loadSequence.current;
+    const currentAccount=accountKey;
+    const currentPharmacy=pharmacyId;
+    const isCurrent=()=>
+      sequence===loadSequence.current &&
+      accountRef.current===currentAccount &&
+      pharmacyRef.current===currentPharmacy;
+
     setError('');
     try{
-      if(screen==='home'||screen==='clock') setStatus(await attendance.getWorkerStatus());
+      if(screen==='home'||screen==='clock') {
+        const nextStatus=await attendance.getWorkerStatus();
+        if(!isCurrent()) return;
+        setStatus(nextStatus);
+      }
       if(screen==='reviews'||screen==='review-detail'||screen==='review-decision'||screen==='exception'){
-        if(manager&&pharmacyId) setPending(asArray(await attendance.getManagerPending(pharmacyId)));
+        if(manager&&pharmacyId) {
+          const nextPending=asArray(await attendance.getManagerPending(pharmacyId));
+          if(!isCurrent()) return;
+          setPending(nextPending);
+        } else {
+          if(!isCurrent()) return;
+          setPending([]);
+        }
       }
       if(screen==='kiosk-status') {
         const result=await attendance.getPinPharmacies();
-        if(sequence!==loadSequence.current) return;
+        if(!isCurrent()) return;
         setPinPharmacies(asArray((result as any)?.pharmacies??result));
         if(canManageKiosk&&pharmacyId){
           const devices=await attendance.getManagerKioskDevices(pharmacyId);
-          if(sequence!==loadSequence.current) return;
+          if(!isCurrent()) return;
           setKioskDevices(asArray((devices as any)?.devices??devices));
         }else{
+          if(!isCurrent()) return;
           setKioskDevices([]);
         }
       }
-      if(screen==='correction'&&!manager) setHours(asArray(await workforce.getMyHours()));
-    }catch(e){if(sequence===loadSequence.current)setError(errorMessage(e,'Unable to load attendance data.'));}
-    finally{if(sequence===loadSequence.current){setLoading(false);setRefreshing(false);}}
-  },[screen,manager,canManageKiosk,pharmacyId]);
+      if(screen==='correction'&&!manager) {
+        const nextHours=asArray(await workforce.getMyHours());
+        if(!isCurrent()) return;
+        setHours(nextHours);
+      }
+    }catch(e){
+      if(isCurrent()) setError(errorMessage(e,'Unable to load attendance data.'));
+    }finally{
+      if(isCurrent()){setLoading(false);setRefreshing(false);}
+    }
+  },[screen,manager,canManageKiosk,pharmacyId,accountKey]);
 
   useEffect(()=>{void load();},[load]);
 
   useEffect(()=>{
+    const seq=++timelineSequence.current;
+    const currentAccount=accountKey;
+    const currentPharmacy=pharmacyId;
     const sessionId=selectedPending?.session_id||toNumber(params.sessionId);
+    setTimeline(null);
     if((screen==='review-detail'||screen==='review-decision'||screen==='exception')&&sessionId){
-      attendance.getManagerTimeline(Number(sessionId)).then(setTimeline).catch((e)=>setError(errorMessage(e,'Unable to load attendance timeline.')));
+      attendance.getManagerTimeline(Number(sessionId))
+        .then((result)=>{
+          if(seq===timelineSequence.current&&accountRef.current===currentAccount&&pharmacyRef.current===currentPharmacy){
+            setTimeline(result);
+          }
+        })
+        .catch((e)=>{
+          if(seq===timelineSequence.current&&accountRef.current===currentAccount&&pharmacyRef.current===currentPharmacy){
+            setError(errorMessage(e,'Unable to load attendance timeline.'));
+          }
+        });
     }
-  },[screen,selectedPending,params.sessionId]);
+    return ()=>{
+      timelineSequence.current+=1;
+    };
+  },[screen,selectedPending,params.sessionId,accountKey,pharmacyId]);
 
   if((screen==='reviews'||screen==='review-detail'||screen==='review-decision'||screen==='exception')&&manager&&!pharmacyId){
     return <ParityPage title={titles[screen]} subtitle="Pharmacy-scoped attendance review"><PharmacyRequired onOpen={()=>router.push('/owner/dashboard' as any)}/></ParityPage>;
@@ -126,7 +214,7 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
       {label:'Break',value:status?.is_on_break?'On break':'Working',tone:status?.is_on_break?'warning':'success'},
     ]}/>
     <ProvisionalNote status={status}/>
-    <CoverTerms/>
+    <CoverTerms key={accountKey}/>
     <Section title="Attendance tools">
       <ScreenLink title="Clock & breaks" subtitle="Clock in/out from a pharmacy QR token and manage breaks." onPress={()=>router.push('/attendance/clock' as any)}/>
       <ScreenLink title="Attendance correction" subtitle={manager?'Append an audited correction to a recorded event.':'Request a missing-punch correction through your timesheet.'} onPress={()=>router.push('/attendance/corrections/new' as any)}/>
@@ -154,6 +242,10 @@ function camelize(value:any):any{
 function CoverTerms() {
   const router=useRouter();
   const {user}=useAuth();
+  const accountKey=user ? String(user.id ?? user.email ?? '') : '';
+  const accountRef=useRef(accountKey);
+  accountRef.current=accountKey;
+  const loadSequence=useRef(0);
   const [covers,setCovers]=useState<WorkerCoverTerms[]>([]);
   const [failed,setFailed]=useState(false);
   const [selectedId,setSelectedId]=useState<number|null>(null);
@@ -162,10 +254,31 @@ function CoverTerms() {
   const acceptingRef=useRef(false);
   const paymentPath=user?.role==='PHARMACIST'?'/pharmacist/profile-payment':user?.role==='OTHER_STAFF'?'/otherstaff/profile-payment':null;
   const loadCovers=useCallback(async()=>{
-    try{setCovers(asArray(await attendance.getWorkerCoverTerms()));setFailed(false);}
-    catch{setFailed(true);}
-  },[]);
-  useEffect(()=>{void loadCovers();},[loadCovers]);
+    const seq=++loadSequence.current;
+    const currentAccount=accountKey;
+    try{
+      const data=asArray(await attendance.getWorkerCoverTerms());
+      if(seq===loadSequence.current&&accountRef.current===currentAccount){
+        setCovers(data);
+        setFailed(false);
+      }
+    }catch{
+      if(seq===loadSequence.current&&accountRef.current===currentAccount){
+        setFailed(true);
+      }
+    }
+  },[accountKey]);
+
+  useEffect(()=>{
+    loadSequence.current+=1;
+    setCovers([]);
+    setFailed(false);
+    void loadCovers();
+    return ()=>{
+      loadSequence.current+=1;
+      acceptingRef.current=false;
+    };
+  },[loadCovers]);
 
   const selected=covers.find((cover)=>cover.assignment_id===selectedId);
   const offers=useMemo(()=>selected?([{engagementTermsPreview:camelize(selected.engagement_terms_preview)}] as unknown as ShiftOffer[]):null,[selected]);

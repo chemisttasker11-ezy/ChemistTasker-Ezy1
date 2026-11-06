@@ -1,7 +1,10 @@
+import { ResponsiveSegmentedButtons as SegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Checkbox, Chip, IconButton, Menu, Modal, Portal, SegmentedButtons, Text, TextInput } from 'react-native-paper';
-import { DatePickerModal } from 'react-native-paper-dates';
+import { Button, Checkbox, Chip, IconButton, Menu, Modal, Portal, Text, TextInput } from 'react-native-paper';
+import { GuardedDatePickerModal as DatePickerModal } from '@/components/security/GuardedModal';
+import { BrandLoader } from '@/components/ui/BrandLoader';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 type PitchAvailabilityEntry = {
   date: string;
@@ -97,46 +100,98 @@ export default function PitchDialog(props: {
   open: boolean;
   isExplorer: boolean;
   existingPostId: number | null;
+  existingReferenceCode?: string | null;
   pitchForm: PitchFormState;
   setPitchForm: React.Dispatch<React.SetStateAction<PitchFormState>>;
+  onSlotDraftDirtyChange?: (dirty: boolean) => void;
+  isSaveInFlight?: () => boolean;
   pitchError: string | null;
   pitchSaving: boolean;
+  defaultsStatus?: 'loading' | 'ready' | 'error';
+  onRetryDefaults?: () => void;
   onClose: () => void;
   onSave: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
+  deleteConfirmOpen?: boolean;
+  deleteBusy?: boolean;
+  capturedPostId?: number | null;
+  capturedReferenceCode?: string | null;
+  capturedHeadline?: string | null;
+  onRequestDelete?: () => void;
+  onConfirmDelete?: () => void;
+  onCancelDelete?: () => void;
 }) {
   const {
     open,
     isExplorer,
     existingPostId,
+    existingReferenceCode,
     pitchForm,
     setPitchForm,
+    onSlotDraftDirtyChange,
+    isSaveInFlight,
     pitchError,
     pitchSaving,
+    defaultsStatus = 'ready',
+    onRetryDefaults,
     onClose,
     onSave,
     onDelete,
+    deleteConfirmOpen = false,
+    deleteBusy = false,
+    capturedPostId = null,
+    capturedReferenceCode = null,
+    capturedHeadline = null,
+    onRequestDelete,
+    onConfirmDelete,
+    onCancelDelete,
   } = props;
 
   const [tabIndex, setTabIndex] = useState(0);
-  const [availabilityEntries, setAvailabilityEntries] = useState<PitchAvailabilityEntry[]>([]);
+  const [availabilityEntries, setRawAvailabilityEntries] = useState<PitchAvailabilityEntry[]>([]);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
-  const [selectedDates, setSelectedDates] = useState<string[]>([]);
-  const [isRecurring, setIsRecurring] = useState(false);
-  const [recurringDays, setRecurringDays] = useState<number[]>([]);
-  const [recurringEndDate, setRecurringEndDate] = useState('');
+  const [selectedDates, setRawSelectedDates] = useState<string[]>([]);
+  const [isRecurring, setRawIsRecurring] = useState(false);
+  const [recurringDays, setRawRecurringDays] = useState<number[]>([]);
+  const [recurringEndDate, setRawRecurringEndDate] = useState('');
   const [recurringEndPickerOpen, setRecurringEndPickerOpen] = useState(false);
   const [travelMenuVisible, setTravelMenuVisible] = useState(false);
   const [engagementMenuVisible, setEngagementMenuVisible] = useState(false);
   const [calendarGridWidth, setCalendarGridWidth] = useState(0);
-  const [currentEntry, setCurrentEntry] = useState<PitchAvailabilityEntry>({
+  const [currentEntry, setRawCurrentEntry] = useState<PitchAvailabilityEntry>({
     date: '',
     startTime: '09:00',
     endTime: '17:00',
     isAllDay: false,
     notes: '',
   });
+
+  const whileNotSaving = <T,>(setter: React.Dispatch<React.SetStateAction<T>>): React.Dispatch<React.SetStateAction<T>> =>
+    (action) => { if (!isSaveInFlight?.()) setter(action); };
+  const setAvailabilityEntries = whileNotSaving(setRawAvailabilityEntries);
+  const setSelectedDates = whileNotSaving(setRawSelectedDates);
+  const setIsRecurring = whileNotSaving(setRawIsRecurring);
+  const setRecurringDays = whileNotSaving(setRawRecurringDays);
+  const setRecurringEndDate = whileNotSaving(setRawRecurringEndDate);
+  const setCurrentEntry = whileNotSaving(setRawCurrentEntry);
+
+  const slotDraftDirty = selectedDates.length > 0 || isRecurring || recurringDays.length > 0 || !!recurringEndDate ||
+    !!currentEntry.date || currentEntry.startTime !== '09:00' || currentEntry.endTime !== '17:00' ||
+    currentEntry.isAllDay || !!currentEntry.notes;
+
+  useEffect(() => {
+    if (!open) {
+      setCurrentEntry({ date: '', startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' });
+      setSelectedDates([]);
+      setIsRecurring(false);
+      setRecurringDays([]);
+      setRecurringEndDate('');
+      onSlotDraftDirtyChange?.(false);
+      return;
+    }
+    onSlotDraftDirtyChange?.(slotDraftDirty);
+  }, [open, slotDraftDirty, onSlotDraftDirtyChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -249,6 +304,10 @@ export default function PitchDialog(props: {
   const lastTabIndex = 2;
   const handleNextTab = () => {
     if (tabIndex >= lastTabIndex) {
+      if (slotDraftDirty) {
+        setAvailabilityError('Add this time slot or clear its details before saving.');
+        return;
+      }
       onSave();
       return;
     }
@@ -260,8 +319,19 @@ export default function PitchDialog(props: {
 
   return (
     <Portal>
-      <Modal visible={open} onDismiss={onClose} contentContainerStyle={styles.modal}>
+      <Modal
+        visible={open}
+        onDismiss={pitchSaving || deleteBusy || deleteConfirmOpen ? undefined : onClose}
+        contentContainerStyle={styles.modal}
+      >
         <Text variant="titleLarge" style={styles.title}>{existingPostId ? 'Update Pitch' : 'Pitch Yourself'}</Text>
+        {defaultsStatus === 'loading' ? <BrandLoader /> : defaultsStatus === 'error' ? (
+          <View style={styles.tabBody}>
+            <Text style={styles.errorText}>{pitchError || 'Failed to load your profile.'}</Text>
+            <Button onPress={onRetryDefaults}>Retry</Button>
+          </View>
+        ) : <>
+        <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" pointerEvents={pitchSaving ? 'none' : 'auto'}>
         <SegmentedButtons
           value={String(tabIndex)}
           onValueChange={(v) => setTabIndex(Number(v))}
@@ -273,7 +343,6 @@ export default function PitchDialog(props: {
           style={{ marginBottom: 10 }}
         />
 
-        <ScrollView>
           {tabIndex === 0 ? (
             <View style={styles.tabBody}>
               {pitchError ? <Text style={styles.errorText}>{pitchError}</Text> : null}
@@ -285,6 +354,7 @@ export default function PitchDialog(props: {
                 label="Headline"
                 value={pitchForm.headline}
                 onChangeText={(value) => setPitchForm((prev) => ({ ...prev, headline: value }))}
+                editable={!pitchSaving}
               />
               <TextInput
                 mode="outlined"
@@ -293,6 +363,7 @@ export default function PitchDialog(props: {
                 numberOfLines={4}
                 value={pitchForm.body}
                 onChangeText={(value) => setPitchForm((prev) => ({ ...prev, body: value }))}
+                editable={!pitchSaving}
               />
             </View>
           ) : null}
@@ -304,6 +375,7 @@ export default function PitchDialog(props: {
                 label="Address"
                 value={pitchForm.streetAddress}
                 onChangeText={(value) => setPitchForm((prev) => ({ ...prev, streetAddress: value }))}
+                editable={!pitchSaving}
               />
               <View style={styles.row}>
                 <TextInput
@@ -312,6 +384,7 @@ export default function PitchDialog(props: {
                   value={pitchForm.suburb}
                   onChangeText={(value) => setPitchForm((prev) => ({ ...prev, suburb: value }))}
                   style={styles.flex}
+                  editable={!pitchSaving}
                 />
                 <TextInput
                   mode="outlined"
@@ -319,6 +392,7 @@ export default function PitchDialog(props: {
                   value={pitchForm.state}
                   onChangeText={(value) => setPitchForm((prev) => ({ ...prev, state: value }))}
                   style={styles.flex}
+                  editable={!pitchSaving}
                 />
               </View>
               <TextInput
@@ -326,6 +400,7 @@ export default function PitchDialog(props: {
                 label="Postcode"
                 value={pitchForm.postcode}
                 onChangeText={(value) => setPitchForm((prev) => ({ ...prev, postcode: value }))}
+                editable={!pitchSaving}
               />
 
               <Text style={styles.label}>Work Travel Radius (km)</Text>
@@ -525,6 +600,7 @@ export default function PitchDialog(props: {
                 value={currentEntry.date}
                 placeholder="YYYY-MM-DD"
                 onChangeText={(value) => syncSelectedDates(value ? [value] : [])}
+                editable={!pitchSaving}
               />
               {selectedDates.length > 0 ? <Text style={styles.hint}>{`Selected dates: ${selectedDates.join(', ')}`}</Text> : null}
               {isRecurring ? (
@@ -577,6 +653,7 @@ export default function PitchDialog(props: {
                   onChangeText={(value) => setCurrentEntry((prev) => ({ ...prev, startTime: value }))}
                   style={styles.flex}
                   disabled={currentEntry.isAllDay}
+                  editable={!pitchSaving}
                 />
                 <TextInput
                   mode="outlined"
@@ -585,6 +662,7 @@ export default function PitchDialog(props: {
                   onChangeText={(value) => setCurrentEntry((prev) => ({ ...prev, endTime: value }))}
                   style={styles.flex}
                   disabled={currentEntry.isAllDay}
+                  editable={!pitchSaving}
                 />
               </View>
               <TextInput
@@ -593,8 +671,18 @@ export default function PitchDialog(props: {
                 multiline
                 value={currentEntry.notes}
                 onChangeText={(value) => setCurrentEntry((prev) => ({ ...prev, notes: value }))}
+                editable={!pitchSaving}
               />
+              <Text style={styles.smallMuted}>Notes added here are public and visible on your pitch.</Text>
               <Button mode="contained" onPress={handleAddAvailability}>Add Availability</Button>
+              {slotDraftDirty ? <Button onPress={() => {
+                setCurrentEntry({ date: '', startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' });
+                setSelectedDates([]);
+                setIsRecurring(false);
+                setRecurringDays([]);
+                setRecurringEndDate('');
+                setAvailabilityError(null);
+              }}>Clear unfinished time slot</Button> : null}
 
               <Text style={styles.label}>Your Time Slots</Text>
               {availabilityEntries.length === 0 ? (
@@ -620,15 +708,25 @@ export default function PitchDialog(props: {
 
         <View style={styles.footer}>
           {existingPostId ? (
-            <Button textColor="#DC2626" onPress={onDelete} disabled={pitchSaving}>Delete Pitch</Button>
+            <Button
+              testID={`pitch-delete-request-${existingPostId}`}
+              accessibilityLabel={`Delete pitch ${existingPostId}`}
+              textColor="#DC2626"
+              onPress={onRequestDelete || onDelete}
+              disabled={pitchSaving || deleteBusy || deleteConfirmOpen}
+            >
+              Delete Pitch
+            </Button>
           ) : <View />}
-          <Button onPress={handleBackTab} disabled={pitchSaving || tabIndex === 0}>Back</Button>
-          <Button mode="contained" onPress={handleNextTab} disabled={pitchSaving}>
+          <Button onPress={handleBackTab} disabled={pitchSaving || deleteBusy || deleteConfirmOpen || tabIndex === 0}>Back</Button>
+          <Button mode="contained" onPress={handleNextTab} disabled={pitchSaving || deleteBusy || deleteConfirmOpen}>
             {pitchSaving ? 'Saving...' : tabIndex === lastTabIndex ? (existingPostId ? 'Update Availability' : 'Post Availability') : 'Next'}
           </Button>
-          <Button onPress={onClose} disabled={pitchSaving}>Cancel</Button>
+          <Button onPress={onClose} disabled={pitchSaving || deleteBusy || deleteConfirmOpen}>Cancel</Button>
         </View>
 
+        </>}
+        {defaultsStatus !== 'ready' ? <Button onPress={onClose}>Cancel</Button> : null}
         <DatePickerModal
           mode="single"
           locale="en"
@@ -641,6 +739,18 @@ export default function PitchDialog(props: {
           }}
         />
       </Modal>
+      <ConfirmDialog
+        open={Boolean(deleteConfirmOpen)}
+        title="Delete this pitch?"
+        body={`Headline: ${capturedHeadline || pitchForm.headline || 'Talent availability'}\nReference: ${capturedReferenceCode || (capturedPostId ? `REF-${capturedPostId}` : (existingPostId ? `REF-${existingPostId}` : 'N/A'))}\nPost ID: ${capturedPostId || existingPostId || 'Unknown'}`}
+        confirmLabel="Delete this pitch"
+        busyLabel="Deleting…"
+        busy={Boolean(deleteBusy)}
+        destructive={true}
+        confirmTestID="pitch-delete-confirm"
+        onConfirm={onConfirmDelete || (() => {})}
+        onClose={onCancelDelete || (() => {})}
+      />
     </Portal>
   );
 }

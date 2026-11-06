@@ -24,7 +24,7 @@ test('scan-to-invite handoff requires a public listing, pharmacy selection and e
  assert.match(handoff,/createMembershipInviteLinkService/);
  assert.match(handoff,/if \(!verified \|\| !pharmacyId/);
  assert.match(handoff,/Alert\.alert\('Generate pharmacy invitation\?'/);
- assert.match(handoff,/worker must submit the form/i);
+ assert.match(handoff,/each application requires pharmacy approval/i);
  assert.doesNotMatch(handoff,/approveMembership\(|createMembership\(|addFavorite\(/);
  assert.doesNotMatch(handoff,/role\.startsWith\('ORG_'\)/);
 });

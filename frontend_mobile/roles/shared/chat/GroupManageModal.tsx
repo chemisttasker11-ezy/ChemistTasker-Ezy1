@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
-import { Modal, Portal, Text, Button, ActivityIndicator, Checkbox, HelperText, TextInput } from 'react-native-paper';
+import { Modal, Portal, Text, Button, Checkbox, HelperText, TextInput } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { fetchChatParticipants } from '@chemisttasker/shared-core';
 import type { ChatRoom } from './types';
 import { searchParticipants } from './hooks';

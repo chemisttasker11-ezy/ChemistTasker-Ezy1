@@ -2,8 +2,10 @@ import React, { useCallback, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
+import { Button, Card, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { colors, radius, space, touch } from '@/constants/tokens';
+import { RootPageHeader } from '@/components/RootPageHeader';
 
 /** Device permission is not a server-side communications preference. Never simulate a mute toggle. */
 export default function AppPreferencesScreen() {
@@ -31,27 +33,32 @@ export default function AppPreferencesScreen() {
     catch (failure: any) { setError(failure?.message || 'Unable to open device settings.'); }
   };
 
-  return <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-    <Text variant="headlineSmall" style={styles.title}>App preferences</Text>
-    <Text style={styles.subtitle}>Choose how ChemistTasker works with notifications and communication on this device.</Text>
-    <Card mode="outlined" style={styles.card}><Card.Content style={styles.cardContent}>
-      <Text variant="titleMedium">Push notifications</Text>
-      <Text style={styles.subtitle}>Delivery is controlled by device permissions. This setting is separate from email and in-app messages.</Text>
-      <View style={styles.row}>
-        <Text style={styles.statusLabel}>Device permission</Text>
-        {loading ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.status}>{status ?? 'Unknown'}</Text>}
-      </View>
-      {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-      <Button mode="contained-tonal" icon="cog" onPress={() => void openDeviceSettings()} contentStyle={styles.action}>Open device notification settings</Button>
-      <Button mode="text" onPress={() => void refresh()}>Refresh permission status</Button>
-    </Card.Content></Card>
-    <Card mode="outlined" style={styles.card}><Card.Content style={styles.cardContent}>
-      <Text variant="titleMedium">In-app messages and alerts</Text>
-      <Text style={styles.subtitle}>Review shift, booking and other in-app notifications. Device notification permission does not delete or silence your in-app notification history.</Text>
-      <Button mode="outlined" icon="bell-outline" onPress={() => router.push('/notifications' as any)} contentStyle={styles.action}>Open notifications</Button>
-      <Button mode="outlined" icon="message-text-outline" onPress={() => router.push('/contact' as any)} contentStyle={styles.action}>Contact support</Button>
-    </Card.Content></Card>
-  </ScrollView>;
+  return (
+    <>
+      <RootPageHeader title="App preferences" />
+      <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+        <Text variant="headlineSmall" style={styles.title}>App preferences</Text>
+        <Text style={styles.subtitle}>Choose how ChemistTasker works with notifications and communication on this device.</Text>
+        <Card mode="outlined" style={styles.card}><Card.Content style={styles.cardContent}>
+          <Text variant="titleMedium">Push notifications</Text>
+          <Text style={styles.subtitle}>Delivery is controlled by device permissions. This setting is separate from email and in-app messages.</Text>
+          <View style={styles.row}>
+            <Text style={styles.statusLabel}>Device permission</Text>
+            {loading ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.status}>{status ?? 'Unknown'}</Text>}
+          </View>
+          {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+          <Button mode="contained-tonal" icon="cog" onPress={() => void openDeviceSettings()} contentStyle={styles.action}>Open device notification settings</Button>
+          <Button mode="text" onPress={() => void refresh()}>Refresh permission status</Button>
+        </Card.Content></Card>
+        <Card mode="outlined" style={styles.card}><Card.Content style={styles.cardContent}>
+          <Text variant="titleMedium">In-app messages and alerts</Text>
+          <Text style={styles.subtitle}>Review shift, booking and other in-app notifications. Device notification permission does not delete or silence your in-app notification history.</Text>
+          <Button mode="outlined" icon="bell-outline" onPress={() => router.push('/notifications' as any)} contentStyle={styles.action}>Open notifications</Button>
+          <Button mode="outlined" icon="message-text-outline" onPress={() => router.push('/contact' as any)} contentStyle={styles.action}>Contact support</Button>
+        </Card.Content></Card>
+      </ScrollView>
+    </>
+  );
 }
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.pageBg },

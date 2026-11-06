@@ -1,7 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { ActivityIndicator, Button, Card, Chip, Text } from 'react-native-paper';
+import { Button, Card, Chip, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { rosterV2 } from '@chemisttasker/shared-core';
 import { ContentState } from '@/components/ui/ContentState';
 import { colors, radius, space, touch } from '@/constants/tokens';

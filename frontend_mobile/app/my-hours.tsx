@@ -2,9 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, Card, Chip, Text } from 'react-native-paper';
+import { Button, Card, Chip, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { formatAttendanceMinutes, workforce } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
+import { RootPageHeader } from '@/components/RootPageHeader';
 
 type Row = {
   id: number;
@@ -21,8 +23,6 @@ type Row = {
   blocking_checks: number;
   warning_checks: number;
 };
-
-
 
 export default function MyHoursScreen() {
   const router = useRouter();
@@ -97,7 +97,8 @@ export default function MyHoursScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
+      <RootPageHeader title="My Hours" disabled={submitting != null} />
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}>
         <Text variant="headlineMedium" style={styles.title}>My Hours</Text>
         <Text variant="bodyMedium" style={styles.subtitle}>Compare rostered and captured hours. Your manager must correct source attendance before approved time changes.</Text>

@@ -10,7 +10,8 @@ import {
   removePharmacyFromChain, updateChainService,
   type Chain, type MembershipSummary, type PharmacySummary,
 } from '@chemisttasker/shared-core';
-import { ActivityIndicator, Button, Chip, Divider, Snackbar, Surface, Text, TextInput } from 'react-native-paper';
+import { Button, Chip, Divider, Snackbar, Surface, Text, TextInput } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ContentState } from '@/components/ui';
 import { colors, font, radius, space, touch, type } from '@/constants/tokens';

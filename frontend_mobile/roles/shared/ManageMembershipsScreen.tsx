@@ -12,6 +12,8 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useAhpra } from '@/context/AhpraContext';
 import { colors, radius, space } from '@/constants/tokens';
+import { BrandActivityIndicator } from '@/components/ui/BrandActivityIndicator';
+import { useUnsavedChangesGuard } from '@/roles/shared/forms/useUnsavedChangesGuard';
 
 type AdminInvitation = {
   id: number;
@@ -82,6 +84,11 @@ export default function ManageMembershipsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [quitTarget, setQuitTarget] = useState<Membership | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  useUnsavedChangesGuard(null, {
+    enabled: false,
+    saving: Boolean(actingKey),
+  });
 
   const loadMemberships = useCallback(async () => {
     const generation = ++generationRef.current;
@@ -211,7 +218,12 @@ export default function ManageMembershipsScreen() {
             </Card.Content>
           </Card>
         ))}
-        {loading ? <Text style={styles.emptyText}>Loading memberships...</Text> : null}
+        {loading ? (
+          <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+            <BrandActivityIndicator size="small" accessibilityLabel="Loading memberships…" />
+            <Text style={[styles.emptyText, { marginTop: 8 }]}>Loading memberships...</Text>
+          </View>
+        ) : null}
         {!loading && loadedOnce && !error && memberships.length === 0 && adminInvitations.length === 0 ? (
           <Card style={[styles.emptyCard, { backgroundColor: theme.colors.surface }]}>
             <Card.Content>

@@ -1,5 +1,6 @@
 import React, { type ReactNode, useCallback, useEffect } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { GuardedModal as Modal } from '@/components/security/GuardedModal';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, elevation, font, radius, space, type } from '@/constants/tokens';
@@ -16,6 +17,7 @@ export type ConfirmDialogProps = {
   busyLabel: string;
   busy: boolean;
   destructive?: boolean;
+  confirmTestID?: string;
   onConfirm: () => void;
   onClose: () => void;
 };
@@ -32,6 +34,7 @@ export function ConfirmDialog({
   busyLabel,
   busy,
   destructive = true,
+  confirmTestID,
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
@@ -90,6 +93,7 @@ export function ConfirmDialog({
           <View style={styles.footer}>
             <Button variant="outlined" label="Cancel" onPress={requestClose} disabled={busy} />
             <Button
+              {...({ testID: confirmTestID } as any)}
               variant={destructive ? 'destructive' : 'primary'}
               label={confirmLabel}
               busy={busy}

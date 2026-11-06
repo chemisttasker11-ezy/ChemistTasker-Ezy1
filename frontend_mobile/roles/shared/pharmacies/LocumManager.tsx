@@ -6,19 +6,19 @@ import { FlatList, StyleSheet, View, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as WebBrowser from 'expo-web-browser';
 import {
-    Card,
-    Text,
-    Button,
-    Chip,
-    Portal,
-    Modal,
-    TextInput,
-    ActivityIndicator,
-    Snackbar,
-    IconButton,
-    Menu,
-    Divider,
+  Card,
+  Text,
+  Button,
+  Chip,
+  Portal,
+  Modal,
+  TextInput,
+  Snackbar,
+  IconButton,
+  Menu,
+  Divider,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import {
     Role,
     WorkType,
@@ -596,13 +596,11 @@ export default function LocumManager({
 
             {showSkeleton ? (
                 <View style={styles.skeletonContainer}>
-                    {[1, 2, 3].map((i) => (
-                        <Card key={i} style={styles.card}>
-                            <Card.Content>
-                                <ActivityIndicator />
-                            </Card.Content>
-                        </Card>
-                    ))}
+                    <Card style={styles.card}>
+                        <Card.Content style={{ alignItems: 'center', paddingVertical: 32 }}>
+                            <ActivityIndicator size="large" accessibilityLabel="Loading locums…" />
+                        </Card.Content>
+                    </Card>
                 </View>
             ) : (
                 <FlatList

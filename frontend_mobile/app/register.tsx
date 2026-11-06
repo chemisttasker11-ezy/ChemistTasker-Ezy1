@@ -1,12 +1,12 @@
 import React, { type ReactElement, useMemo, useRef, useState } from 'react';
+import { GuardedModal as Modal } from '@/components/security/GuardedModal';
 import {
-  ActivityIndicator,
   View,
   StyleSheet,
   Text,
   type TextInputInstance,
-  Modal,
 } from 'react-native';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import {
   Calendar,
   Check,

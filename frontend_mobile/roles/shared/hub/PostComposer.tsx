@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Button, Modal, Portal, Text, TextInput, IconButton, HelperText, Chip, Checkbox } from 'react-native-paper';
 import * as DocumentPicker from 'expo-document-picker';
@@ -13,6 +13,7 @@ import {
 import type { HubPost, HubPostPayload } from './types';
 import { SubmissionNotice, useSubmissionGuard } from './submissionGuard';
 import { useAuth } from '@/context/AuthContext';
+import { BrandActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message.trim()) {
@@ -333,7 +334,10 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
             style={{ marginBottom: 6 }}
           />
           {membersLoading && !members.length ? (
-            <Text style={styles.muted}>Loading members...</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}>
+              <BrandActivityIndicator size="small" accessibilityLabel="Loading members…" />
+              <Text style={styles.muted}>Loading members...</Text>
+            </View>
           ) : memberError ? (
             <HelperText type="error">{memberError}</HelperText>
           ) : visibleMembers.length ? (

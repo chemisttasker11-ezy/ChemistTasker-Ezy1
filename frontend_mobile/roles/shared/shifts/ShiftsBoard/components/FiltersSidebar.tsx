@@ -162,7 +162,7 @@ const FiltersSidebar: React.FC<FiltersSidebarProps> = ({
                     ].map((entry) => {
                         const active = filterConfig.timeOfDay.includes(entry.id as 'morning' | 'afternoon' | 'evening');
                         return (
-                            <Pill key={entry.id} label={entry.label} selected={active} tone="violet" onPress={() => toggleFilter('timeOfDay', entry.id)} />
+                            <Pill key={entry.id} label={entry.label} wrapLabel selected={active} tone="violet" onPress={() => toggleFilter('timeOfDay', entry.id)} />
                         );
                     })}
                 </View>

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, View, ScrollView } from 'react-native';
 import { Button, Chip, Menu, Text, TextInput } from 'react-native-paper';
-import { DatePickerModal } from 'react-native-paper-dates';
+import { GuardedDatePickerModal as DatePickerModal } from '@/components/security/GuardedModal';
 import { useRouter } from 'expo-router';
 import {
   createAsyncScope, deleteRosterAssignmentService, deleteRosterShiftService,
@@ -13,7 +13,7 @@ import {
   approveLeaveRequestService, rejectLeaveRequestService,
 } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { ContentState } from '@/components/ui';
+import { ContentState, BrandLoader } from '@/components/ui';
 import { ParityPage, Section, DataRow, EmptyState } from './ParityUI';
 import { errorMessage, replaceUnderscore, startOfWeek, isoDate } from './utils';
 import { colors, touch, space } from '@/constants/tokens';
@@ -201,7 +201,7 @@ function ScopedLegacyRoster({ pharmacyId, pharmacyName }: { pharmacyId: number |
           <Button mode="outlined" onPress={() => setMembersReloadKey((value) => value + 1)}>
             Could not load eligible staff · Retry
           </Button>
-        ) : membersLoading ? <Text>Loading eligible staff…</Text> : (
+        ) : membersLoading ? <BrandLoader size={24} accessibilityLabel="Loading eligible staff…" /> : (
           <>
             <TextInput mode="outlined" label="Search eligible staff" value={memberSearch}
               onChangeText={setMemberSearch} />

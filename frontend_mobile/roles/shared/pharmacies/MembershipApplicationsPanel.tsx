@@ -4,12 +4,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import {
-    Card,
-    Chip,
-    Text,
-    Button,
-    ActivityIndicator,
+  Card,
+  Chip,
+  Text,
+  Button,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import {
     fetchMembershipApplicationsService,
     rejectMembershipApplicationService,

@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, Modal, RefreshControl, ScrollView, View, KeyboardAvoidingView, Platform } from 'react-native';
-import { ActivityIndicator, Button, Checkbox, Chip, IconButton, List, Searchbar, Surface, Text, TextInput, useTheme } from 'react-native-paper';
+import { GuardedModal as Modal } from '@/components/security/GuardedModal';
+import { Alert, RefreshControl, ScrollView, View, KeyboardAvoidingView, Platform } from 'react-native';
+import { Button, Checkbox, Chip, IconButton, List, Searchbar, Surface, Text, TextInput, useTheme } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { File, Paths } from 'expo-file-system';
@@ -11,6 +13,8 @@ import { receivedInvoiceActions } from './receivedInvoicePolicy';
 import { nativeFileBytes } from '@/features/parity/nativeFileBytes';
 import { colors, font, radius, space, touch } from '@/constants/tokens';
 import { useAuth } from '@/context/AuthContext';
+import { SegmentTabs, tabPanelProps } from '@/components/ui/SegmentTabs';
+import { ResponsiveSegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 
 const money = (value: string | number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 // Idempotency identity only; no secrets or authentication use.
@@ -19,7 +23,7 @@ const workerTabs = ['Invoices', 'Customers', 'Items', 'Expenses', 'GST / BAS', '
 const ownerTabs = ['Received', 'Existing tools'];
 type Form = { title: string; fields: Record<string, string>; booleans: Record<string, boolean>; save: (fields: Record<string, string>, flags: Record<string, boolean>) => Promise<unknown> };
 
-export default function FinanceWorkspace({ existingTools, receivedMode = false }: { existingTools?: ReactNode; receivedMode?: boolean }) {
+export default function FinanceWorkspace({ existingTools, receivedMode = false }: { existingTools?: (header: ReactNode) => ReactNode; receivedMode?: boolean }) {
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuth();
@@ -210,8 +214,11 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const labels: Record<string, string> = { name: 'Name', legal_name: 'Legal entity name', abn: 'ABN', contact_name: 'Accounts contact', email: 'Invoice email', phone: 'Phone', address: 'Billing address', payment_terms_days: 'Payment terms (days)', notes: 'Notes', active: 'Active', code: 'Item code (optional)', category: 'Category', unit: 'Unit', unit_price: 'Unit price (AUD)', tax_code: 'Tax treatment', super_eligible: 'Include in reviewed super base', supplier: 'Supplier', description: 'Description', incurred_on: 'Incurred date (YYYY-MM-DD)', paid_on: 'Paid date (YYYY-MM-DD, optional)', amount: 'Amount (AUD)', gst_amount: 'Actual GST (AUD)', business_use_percent: 'Business use %', reference: 'Reference', gst_registered: 'I am registered for GST for this acquisition', evidence_confirmed: 'I hold the required tax invoice / evidence', reimbursable: 'Potentially reimbursable', fund_payment_confirmed: 'Payment went to the super fund', date: 'Payment date (YYYY-MM-DD)' };
   return <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: theme.colors.background }}>
     <View style={{ padding: 16, flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleLarge" style={{ fontFamily: font.outfit.medium, color: colors.textPrimary }}>{receivedMode ? 'Received invoices' : 'Invoices & finances'}</Text><Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>{receivedMode ? 'Review contractor invoices, request corrections and record payment status.' : 'Create, revise, send and track invoices.'}</Text></View>{!receivedMode ? <IconButton icon="plus" accessibilityLabel="Create invoice" disabled={loading || busy} onPress={() => setEditor({ key: key() })} /> : null}</View>
-    <View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}>{tabs.filter(t => t !== 'Existing tools' || existingTools).map(t => <Chip key={t} selected={tab === t} onPress={() => { setTab(t); setSearch(''); }}>{t}</Chip>)}</ScrollView></View>
-    {tab === 'Existing tools' ? existingTools : <ScrollView keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void run(load)} />} contentContainerStyle={{ padding: 16 }}>
+    {tab === 'Existing tools' && existingTools ? existingTools(
+      <View style={{ padding: 16 }}><SegmentTabs tabs={tabs.filter(t => t !== 'Existing tools' || existingTools).map(t => ({ value: t, label: t }))} value={tab} onChange={t => { setTab(t); setSearch(''); }} label="Finance sections" idPrefix="finance-sections" mobileWrap /></View>
+    ) : <ScrollView keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void run(load)} />} contentContainerStyle={{ padding: 16 }}>
+      <SegmentTabs tabs={tabs.filter(t => t !== 'Existing tools' || existingTools).map(t => ({ value: t, label: t }))} value={tab} onChange={t => { setTab(t); setSearch(''); }} label="Finance sections" idPrefix="finance-sections" mobileWrap />
+      <View {...tabPanelProps('finance-sections', tab)}>
       {!!error && <Surface elevation={0} style={[panel, { backgroundColor: colors.status.red.bg, borderColor: colors.status.red.fg }]}>
         <Text accessibilityRole="alert" variant="titleSmall" style={{ color: colors.status.red.fg }}>Could not refresh this workspace</Text>
         <Text style={{ color: colors.textPrimary, marginTop: space.sm, marginBottom: space.md }}>{error}</Text>
@@ -223,9 +230,9 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       {tab !== 'GST / BAS' && <Searchbar placeholder={`Search ${tab.toLowerCase()}`} value={search} onChangeText={setSearch} style={{ borderRadius: radius.control, marginBottom: space.lg, backgroundColor: colors.surfaceBg }} />}
       {tab === 'Invoices' && <>
         <View style={{ flexDirection: 'row', gap: 24, marginBottom: 20 }}><View><Text variant="labelMedium">Balance due</Text><Text variant="titleLarge">{money(invoices.filter(i => !i.voided && i.kind === 'invoice').reduce((sum, i) => sum + Number(i.balance), 0))}</Text></View><View><Text variant="labelMedium">Saved</Text><Text variant="titleLarge">{invoices.filter(i => financeStatus(i) === 'Saved').length}</Text></View></View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 16 }}>{['All', 'Saved', 'Sent', 'Approved for payment', 'Revision requested', 'Overdue', 'Part paid', 'Paid'].map(s => <Chip key={s} selected={status === s} onPress={() => setStatus(s)}>{s}</Chip>)}</ScrollView>
+        <ResponsiveSegmentedButtons value={status} onValueChange={setStatus} buttons={['All', 'Saved', 'Sent', 'Approved for payment', 'Revision requested', 'Overdue', 'Part paid', 'Paid'].map(value => ({ value, label: value }))} />
         {invoices.filter(i => (status === 'All' || financeStatus(i) === status) && matches(i.number, i.payload.customer?.name || '', i.payload.reference)).map(i => <Surface key={i.id} elevation={0} style={panel}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleMedium">{i.number}</Text><Text>{i.payload.customer?.name}</Text></View><Chip compact>{financeStatus(i)}</Chip></View><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 16 }}><Text variant="bodySmall">Due {i.payload.due_date}</Text><Text variant="titleMedium">{money(i.balance)}</Text></View><Button mode="outlined" onPress={() => { setHistoryDocument(null); setHistoryError(''); setSelected(i); }}>View invoice</Button></Surface>)}
-        {!error && !invoices.length && <View style={{ padding: space['2xl'], alignItems: 'center', gap: space.md }}><Text variant="titleMedium">Create your first invoice</Text><Text>Save a customer and an item, then bill your work.</Text><Button mode="contained" onPress={() => setEditor({ key: key() })}>Create invoice</Button></View>}
+        {!error && !invoices.length && <View style={{ padding: space['2xl'], alignItems: 'center', gap: space.md }}><Text variant="titleMedium" style={{ alignSelf: 'stretch', textAlign: 'center' }}>Create your first invoice</Text><Text>Save a customer and an item, then bill your work.</Text><Button mode="contained" onPress={() => setEditor({ key: key() })}>Create invoice</Button></View>}
       </>}
       {tab === 'Received' && <>
         <Text style={{ marginBottom: 12, color: theme.colors.onSurfaceVariant }}>Sent internal ABN invoices appear here. Request a revision when hours, finish time, rate, tax treatment or another detail needs correction.</Text>
@@ -242,6 +249,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       {tab === 'Expenses' && <><Button icon="plus" onPress={() => expenseForm()} style={{ marginBottom: 16 }}>Create expense</Button>{expenses.filter(e => matches(e.supplier, e.description)).map(e => <Surface key={e.id} elevation={0} style={panel}><Text variant="titleMedium">{e.supplier}</Text><Text>{e.description}</Text><Text>{money(e.amount)} · {e.incurred_on}</Text><Text variant="bodySmall">{e.receipts.length} receipts · {e.paid_on ? 'Paid' : 'Unpaid'}</Text><Button onPress={() => expenseForm(e)}>Edit expense</Button></Surface>)}</>}
       {tab === 'GST / BAS' && <View style={{ gap: 16 }}><Text variant="titleMedium">GST worksheet</Text><Text>Estimate only. Legacy invoices and unsupported adjustments are excluded; this is not a complete BAS.</Text><TextInput mode="outlined" label="Start (YYYY-MM-DD)" value={start} onChangeText={v => { setStart(v); setWorksheet(null); }} /><TextInput mode="outlined" label="End (YYYY-MM-DD)" value={end} onChangeText={v => { setEnd(v); setWorksheet(null); }} /><View style={{ flexDirection: 'row', gap: 8 }}>{(['cash', 'accrual'] as const).map(b => <Chip key={b} selected={basis === b} onPress={() => { setBasis(b); setWorksheet(null); }}>{b === 'cash' ? 'Cash' : 'Accrual'}</Chip>)}</View><Button mode="contained" disabled={busy} onPress={() => void run(async () => setWorksheet(await finance.worksheet(start, end, basis)))}>Calculate worksheet</Button>{worksheet && <Surface elevation={0} style={panel}>{[['G1 · Sales', worksheet.G1], ['1A · GST on sales', worksheet['1A']], ['1B · GST credits', worksheet['1B']], ['Estimated net GST', worksheet.estimated_gst_net]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }}><Text>{label}</Text><Text>{money(amount)}</Text></View>)}{worksheet.warnings.map(w => <Text key={w} variant="bodySmall">{w}</Text>)}<Text>Excluded legacy invoices: {worksheet.excluded_legacy_invoice_count}</Text></Surface>}</View>}
       </>}
+      </View>
     </ScrollView>}
     <Modal visible={!!selected} animationType="slide" onRequestClose={() => { if (!historyLoading) { setHistoryDocument(null); setSelected(null); clearInvoiceLink(); } }}>
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>

@@ -30,7 +30,7 @@ test('closed discussions remain readable and replies reports and comment paginat
  const src = read('features/explore/ArticleDetail.tsx');
  assert.match(src, /Closed discussions remain readable/);
  assert.match(src, /listArticleComments\(slug, \{ page \}\)/);
- assert.match(src, /createArticleComment\(slug, \{ body: message\.trim\(\),/);
+ assert.match(src, /createArticleComment\(slug, \{\s*body: message\.trim\(\),/);
  assert.match(src, /reportArticleComment\(reportId, \{ reason: reason\.trim\(\) \}\)/);
  assert.match(src, /!article\.comments_open \? <Text/);
 });

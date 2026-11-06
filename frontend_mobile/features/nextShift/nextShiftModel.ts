@@ -50,6 +50,11 @@ function zonedInstant(date:string,time:string,zone:string):string|null {
 function nextDate(date:string):string{
  return new Date(Date.parse(date+'T00:00:00Z')+86400000).toISOString().slice(0,10);
 }
+
+export function offlineShiftKey(shift: Pick<OfflineShift, 'shiftId' | 'slotId' | 'wallStart'>): string {
+ return `${shift.shiftId}:${shift.slotId}:${shift.wallStart}`;
+}
+
 export function sanitizeConfirmedShifts(shifts: Shift[], userId?: number | string | null): OfflineShift[] {
  if(userId==null)return [];
  const rows:OfflineShift[]=[];
@@ -76,7 +81,7 @@ export function sanitizeConfirmedShifts(shifts: Shift[], userId?: number | strin
  }
  const seen=new Set<string>();
  return rows.sort((a,b)=>a.start.localeCompare(b.start)).filter(row=>{
-  const key=row.shiftId+':'+row.slotId+':'+row.wallStart;if(seen.has(key))return false;seen.add(key);return true;
+  const key=offlineShiftKey(row);if(seen.has(key))return false;seen.add(key);return true;
  }).slice(0,100);
 }
 export function upcomingShifts(rows:OfflineShift[],now=new Date()):OfflineShift[]{

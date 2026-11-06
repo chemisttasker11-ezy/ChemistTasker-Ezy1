@@ -2,7 +2,8 @@
 // the CV and Message come only with Confirmed (owner decision 2026-10-14); the backend leaves contact out of History.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Dialog, Portal, Text } from 'react-native-paper';
+import { Button, Dialog, Portal, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { FileText, Mail, MessageSquare, Phone } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import type { ShiftUser, ShiftWorkProfile } from '@chemisttasker/shared-core';

@@ -15,7 +15,7 @@ function loadModule(relativePath, modules, globals = {}) {
   return exports;
 }
 
-async function bootstrap(currentUser, { baseURL = 'https://api.example.test', token = 'cached-access', refreshResponse } = {}) {
+async function bootstrap(currentUser, { baseURL = 'https://api.example.test', token = 'cached-access', refreshResponse, onBindSession, onReadStoredSession, onClearStoredSession } = {}) {
   const states = [];
   const effects = [];
   let context;
@@ -40,10 +40,18 @@ async function bootstrap(currentUser, { baseURL = 'https://api.example.test', to
     '../utils/apiUrl': { resolveApiBaseUrl: () => baseURL },
     '../utils/nativeIdentityTransport': { nativeIdentityTransport: { currentUser } },
     '../utils/authSession': {
-      readStoredSession: async () => stored,
+      readStoredSession: async () => {
+        const snapshot = stored;
+        if (onReadStoredSession) await onReadStoredSession();
+        return snapshot;
+      },
       primeInMemorySession: () => {},
       getValidAccessToken: async () => token,
-      clearStoredSession: async () => { generation++; stored = null; },
+      clearStoredSession: async () => {
+        generation++;
+        stored = null;
+        if (onClearStoredSession) await onClearStoredSession();
+      },
       writeStoredSession: async (session, expected = generation) => {
         if (expected !== generation) return false;
         stored = session;
@@ -74,6 +82,7 @@ async function bootstrap(currentUser, { baseURL = 'https://api.example.test', to
       },
     }, { fetch: refreshResponse, Buffer });
   }
+  if (onBindSession) onBindSession(modules['../utils/authSession']);
   const exports = loadModule('../context/AuthContext.tsx', modules);
   exports.AuthProvider({ children: null });
   effects[0]();
@@ -152,4 +161,105 @@ test('a newer login wins over a pending startup refresh rejection', async () => 
   assert.equal(env.states[2].id, 8);
   assert.equal(env.states[3], false);
   assert.equal((await env.stored()).user.id, 8);
+});
+
+test('startup finishes signed out when currentUser interceptor refresh clears session and throws 401', async () => {
+  let sessionApi;
+  const env = await bootstrap(
+    async () => {
+      // Production apiClient response interceptor clears stored session on me401 + refresh401
+      await sessionApi.clearStoredSession();
+      throw Object.assign(new Error('Unauthorized'), { response: { status: 401 } });
+    },
+    {
+      onBindSession: (api) => { sessionApi = api; },
+    }
+  );
+  assert.equal(env.states[0], null);
+  assert.equal(env.states[1], null);
+  assert.equal(env.states[2], null);
+  assert.equal(env.states[3], false);
+  assert.equal(await env.stored(), null);
+});
+
+test('a newer login while startup cleanup is awaited wins over stale session clearing', async () => {
+  let sessionApi;
+  let releaseCleanupRead;
+  const cleanupReadGate = new Promise((resolve) => { releaseCleanupRead = resolve; });
+  let currentUserCalled = false;
+
+  const env = await bootstrap(
+    async () => {
+      currentUserCalled = true;
+      await sessionApi.clearStoredSession();
+      throw Object.assign(new Error('Unauthorized'), { response: { status: 401 } });
+    },
+    {
+      onBindSession: (api) => { sessionApi = api; },
+      onReadStoredSession: async () => {
+        // Pause when readStoredSession is called during cleanup after currentUser cleared the session
+        if (currentUserCalled) {
+          await cleanupReadGate;
+        }
+      },
+    }
+  );
+
+  // While startup cleanup is waiting on readStoredSession, a newer login completes:
+  const newerUser = { id: 9, username: 'newer-login', role: 'PHARMACIST' };
+  await env.context.login('new-access', 'new-refresh', newerUser);
+  assert.equal(env.states[0], 'new-access');
+  assert.equal(env.states[1], 'new-refresh');
+  assert.equal(env.states[2]?.id, 9);
+  assert.equal(env.states[3], false);
+
+  // Now release the pending cleanup read:
+  releaseCleanupRead();
+  await new Promise(setImmediate);
+
+  // Stale cleanup must not clear the newer user or override loading:
+  assert.equal(env.states[0], 'new-access');
+  assert.equal(env.states[1], 'new-refresh');
+  assert.equal(env.states[2]?.id, 9);
+  assert.equal(env.states[3], false);
+  assert.equal((await env.stored())?.user?.id, 9);
+});
+
+test('a newer login while final clearStoredSession is pending wins over stale clearing', async () => {
+  let releaseClear;
+  const clearGate = new Promise((resolve) => { releaseClear = resolve; });
+  let clearStarted = false;
+
+  const env = await bootstrap(
+    // Throws status 500 without clearing session, so bootstrapId stays unchanged and reaches bottom clear
+    async () => {
+      throw Object.assign(new Error('Server error'), { response: { status: 500 } });
+    },
+    {
+      onClearStoredSession: async () => {
+        clearStarted = true;
+        await clearGate;
+      },
+    }
+  );
+
+  assert.equal(clearStarted, true);
+  // While clearStoredSession is pending, a newer login completes:
+  const newerUser = { id: 10, username: 'login-during-clear', role: 'PHARMACIST' };
+  await env.context.login('new-access', 'new-refresh', newerUser);
+  assert.equal(env.states[0], 'new-access');
+  assert.equal(env.states[1], 'new-refresh');
+  assert.equal(env.states[2]?.id, 10);
+  assert.equal(env.states[3], false);
+
+  // Now release the pending clearStoredSession:
+  releaseClear();
+  await new Promise(setImmediate);
+
+  // Verify newer login state and session are preserved:
+  assert.equal(env.states[0], 'new-access');
+  assert.equal(env.states[1], 'new-refresh');
+  assert.equal(env.states[2]?.id, 10);
+  assert.equal(env.states[3], false);
+  assert.equal((await env.stored())?.user?.id, 10);
 });

@@ -2,7 +2,7 @@
 // Mirrors web logic for filters, pagination, and rejections
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Lock } from 'lucide-react-native';
 import { Snackbar } from 'react-native-paper';
@@ -573,29 +573,31 @@ function CommunityShiftsBoard({
 
     if (!userId) return null;
 
+    const boardHeader = !hideTabs ? <BoardTabs value={boardTab} onChange={handleBoardTabChange} savedCount={savedShiftIds.size} /> : null;
+
     return (
         <View style={styles.container}>
-            {!hideTabs && <BoardTabs value={boardTab} onChange={handleBoardTabChange} savedCount={savedShiftIds.size} />}
             {boardTab === 'accepted' ? (
                 offersLoading ? (
-                    <ContentState kind="loading" style={styles.state} />
+                    <ScrollView>{boardHeader}<ContentState kind="loading" style={styles.state} /></ScrollView>
                 ) : offersError ? (
-                    <ContentState
+                    <ScrollView>{boardHeader}<ContentState
                         kind="error"
                         title="Your offers did not load"
                         description="Check your connection, then try again."
                         onAction={() => void loadOffers()}
                         style={styles.state}
-                    />
+                    /></ScrollView>
                 ) : offerShifts.length === 0 ? (
-                    <ContentState
+                    <ScrollView>{boardHeader}<ContentState
                         kind="empty"
                         title="No offers yet"
                         description="When a pharmacy offers you a shift, you confirm it here."
                         style={styles.state}
-                    />
+                    /></ScrollView>
                 ) : (
                         <ShiftsBoard
+                            header={boardHeader}
                             title="Offers"
                             shifts={offerShifts}
                             loading={offersLoading}
@@ -623,15 +625,16 @@ function CommunityShiftsBoard({
                         />
                 )
             ) : loadError ? (
-                <ContentState
+                <ScrollView>{boardHeader}<ContentState
                     kind="error"
                     title="Community shifts did not load"
                     description="Check your connection, then try again."
                     onAction={() => void loadShifts(filters, page)}
                     style={styles.state}
-                />
+                /></ScrollView>
             ) : (
                 <ShiftsBoard
+                    header={boardHeader}
                     title="Community shifts"
                     shifts={shifts}
                     loading={loading}

@@ -13,21 +13,20 @@ import {
     Linking,
 } from 'react-native';
 import {
-    ActivityIndicator,
-    Button,
-    RadioButton,
-    Surface,
-    Text,
-    TextInput,
-    Switch,
-    Chip,
-    Checkbox,
-    Divider,
-    HelperText,
-    Menu,
-    Portal,
+  Button,
+  RadioButton,
+  Surface,
+  Text,
+  TextInput,
+  Switch,
+  Chip,
+  Checkbox,
+  HelperText,
+  Menu,
+  Portal,
 } from 'react-native-paper';
-import { TimePickerModal } from 'react-native-paper-dates';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
+import { GuardedTimePickerModal as TimePickerModal } from '@/components/security/GuardedModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePathname, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
@@ -66,6 +65,7 @@ import {
     formatDateTime,
 } from './PharmacyForm.config';
 import { styles } from './PharmacyForm.styles';
+import { SegmentTabs, tabPanelProps } from '@/components/ui/SegmentTabs';
 import HoursRow from './PharmacyHoursRow';
 
 export default function PharmacyForm({
@@ -867,36 +867,6 @@ export default function PharmacyForm({
                     </View>
                 )}
 
-                {/* TABS */}
-                <View style={styles.tabsOuter}>
-                    <View style={styles.tabsContainer}>
-                        {TABS.map((tab, idx) => {
-                            const active = activeTab === idx;
-                            return (
-                                <TouchableOpacity
-                                    key={tab.label}
-                                    onPress={() => setActiveTab(idx)}
-                                    activeOpacity={0.9}
-                                    style={[
-                                        styles.tabButton,
-                                        active && styles.activeTabButton,
-                                    ]}
-                                >
-                                    <MaterialCommunityIcons
-                                        name={tab.icon as any}
-                                        size={16}
-                                        color={active ? '#143EEA' : '#6D28D9'}
-                                    />
-                                    <Text style={active ? styles.activeTabButtonText : styles.tabButtonText}>
-                                        {tab.shortLabel}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                </View>
-                <Divider />
-
                 {loading ? (
                     <View style={styles.centered}>
                         <ActivityIndicator size="large" color={surfaceTokens.primary} />
@@ -909,13 +879,21 @@ export default function PharmacyForm({
                         nestedScrollEnabled={true}
                         keyboardDismissMode="none"
                     >
+                        <SegmentTabs
+                            tabs={TABS.map((item, index) => ({ value: String(index), label: item.label }))}
+                            value={String(activeTab)}
+                            onChange={(value) => setActiveTab(Number(value))}
+                            label="Pharmacy sections"
+                            idPrefix="pharmacy-form-sections"
+                            mobileWrap
+                        />
                         {error ? <Text style={styles.error}>{error}</Text> : null}
 
                         {/* Django may have saved data before readback fails.
                             Disable editing until GET-only reconciliation finishes;
                             otherwise new draft edits could be falsely marked saved. */}
                         <View pointerEvents={saving || verificationPending ? 'none' : 'auto'}>
-                        <Surface style={styles.card} elevation={1}>
+                        <Surface {...tabPanelProps("pharmacy-form-sections", String(activeTab))} style={styles.card} elevation={1}>
                             {/* TAB 0: GENERAL */}
                             {activeTab === 0 && (
                                 <>
@@ -1058,13 +1036,9 @@ export default function PharmacyForm({
                                         <Surface style={styles.abnCard} elevation={0}>
                                             <Text style={styles.abnCardTitle}>ABN details (from ABR)</Text>
                                             {checkingABN ? (
-                                                <>
-                                                    <ActivityIndicator size="small" color={surfaceTokens.primary} style={styles.abnSpinner} />
-                                                    <View style={styles.abnSkeletonLineLg} />
-                                                    <View style={styles.abnSkeletonLineMd} />
-                                                    <View style={styles.abnSkeletonLineSm} />
-                                                    <View style={styles.abnSkeletonNote} />
-                                                </>
+                                                <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                                                    <ActivityIndicator size="small" accessibilityLabel="Checking ABN details…" style={styles.abnSpinner} />
+                                                </View>
                                             ) : (
                                                 <>
                                                     {abnEntityName ? <Text style={styles.abnCardLine}>Entity name: {abnEntityName}</Text> : null}

@@ -1,7 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { ActivityIndicator, Button, Card, Chip, Text, TextInput } from 'react-native-paper';
+import { Button, Card, Chip, Text, TextInput } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { claimOnboarding, getPharmacyClaims } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { ContentState } from '@/components/ui/ContentState';

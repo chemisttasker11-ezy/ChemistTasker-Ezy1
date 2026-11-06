@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, Chip, HelperText, Text, TextInput } from 'react-native-paper';
@@ -7,17 +7,25 @@ import { useAuth } from '../context/AuthContext';
 import { contactSupport } from '@chemisttasker/shared-core';
 import { colors, radius, space, touch } from '@/constants/tokens';
 import { contactTopics, validateContactForm, type ContactForm } from '@/features/support/contactModel';
+import { RootPageHeader } from '@/components/RootPageHeader';
+import { useUnsavedChangesGuard } from '@/roles/shared/forms/useUnsavedChangesGuard';
 
 export default function ContactScreen() {
   const { user } = useAuth();
   // A route may remain mounted across sign-out / account switching. Remount its
   // form so another user cannot see the previous account's draft or response.
   const sessionKey = user?.id != null ? `user:${user.id}` : user?.email ? `email:${user.email}` : 'guest';
-  return <ContactForm key={sessionKey} user={user} />;
+  return (
+    <>
+      <RootPageHeader title="Contact ChemistTasker" signedOutFallback="/welcome" />
+      <ContactForm key={sessionKey} user={user} />
+    </>
+  );
 }
 
 function ContactForm({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
   const submittingRef = useRef(false);
+  const touchedRef = useRef(false);
   const appVersion = useMemo(() => {
     const expo = Constants?.expoConfig;
     return typeof expo?.version === 'string' ? expo.version : '';
@@ -36,7 +44,20 @@ function ContactForm({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
   const [submitting, setSubmitting] = useState(false);
   const topics = useMemo(() => contactTopics(user?.role), [user?.role]);
 
+  const unsaved = useUnsavedChangesGuard(form, {
+    saving: submitting,
+    title: 'Discard draft?',
+    message: 'You have unsaved changes in your message. If you leave now, your draft will be discarded.',
+  });
+
+  useEffect(() => {
+    if (!touchedRef.current) {
+      unsaved.markClean(form);
+    }
+  });
+
   const updateField = (key: keyof ContactForm) => (value: string) => {
+    touchedRef.current = true;
     setForm(prev => ({ ...prev, [key]: value }));
     setErrors(prev => ({ ...prev, [key]: '' }));
     setFeedback(null);
@@ -65,7 +86,16 @@ function ContactForm({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
       });
       setFeedback({ type: 'success', text: 'Your message has been submitted. Our team can reply using your email address.' });
       // Keep identity context available for subsequent questions; do not make the user retype it.
-      setForm(prev => ({ ...prev, subject: '', message: '' }));
+      const resetForm: ContactForm = {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        subject: '',
+        message: '',
+      };
+      setForm(resetForm);
+      touchedRef.current = false;
+      unsaved.markClean(resetForm);
     } catch (failure: any) {
       setFeedback({ type: 'error', text: failure?.message || 'Your message could not be sent. You can retry without losing your text.' });
     } finally {
@@ -75,7 +105,7 @@ function ContactForm({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.heading}>
           <Text variant="headlineSmall" style={styles.title}>Contact ChemistTasker</Text>

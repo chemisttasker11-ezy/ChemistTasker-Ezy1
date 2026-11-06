@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Button, Dialog, Menu, Portal } from 'react-native-paper';
-import { DatePickerInput, TimePickerModal } from 'react-native-paper-dates';
+import { GuardedDatePickerInput as DatePickerInput, GuardedTimePickerModal as TimePickerModal } from '@/components/security/GuardedModal';
 import { leaveRequestMemberships, workforce, WORKFORCE_LEAVE_TYPE_OPTIONS, type WorkforceLeaveType } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
+import { useUnsavedChangesGuard } from '@/roles/shared/forms/useUnsavedChangesGuard';
 import {
   ChoiceChips,
   DataRow,
@@ -35,12 +36,23 @@ const combine = (day: Date | undefined, text: string) => {
 const pharmacyName = (membership: any) =>
   membership?.pharmacy_name || membership?.pharmacyName || membership?.pharmacy?.name || `Pharmacy #${membership?.pharmacy_id || membership?.pharmacy?.id || ''}`;
 
+export function validateMembershipSelection(memberships: any[], selectedId: number | null): number | null {
+  if (!Array.isArray(memberships) || !memberships.length) return null;
+  const match = memberships.find((m: any) => Number(m.id) === Number(selectedId));
+  return match ? Number(match.id) : Number(memberships[0].id);
+}
+
 export default function MyLeaveScreen() {
   const { user } = useAuth();
+  const accountKey = user ? String(user.id ?? user.email ?? '') : '';
+  return <MyLeaveAccountScreen key={accountKey} accountKey={accountKey} user={user} />;
+}
+
+function MyLeaveAccountScreen({ accountKey, user }: { accountKey: string; user: any }) {
   const memberships = useMemo(() => leaveRequestMemberships((user as any)?.memberships), [user]);
   const [rows, setRows] = useState<any[]>([]);
   const [visible, setVisible] = useState(false);
-  const [membershipId, setMembershipId] = useState<number | null>(memberships[0]?.id ?? null);
+  const [membershipId, setMembershipId] = useState<number | null>(() => validateMembershipSelection(memberships, null));
   const [type, setType] = useState<WorkforceLeaveType>('ANNUAL');
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
@@ -52,22 +64,46 @@ export default function MyLeaveScreen() {
   const [membershipMenu, setMembershipMenu] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const submitRef = useRef(false);
+  const isBusy = busy || Boolean(submitRef.current);
+  useUnsavedChangesGuard(null, { enabled: false, saving: isBusy });
+
+  const loadSequence = useRef(0);
+  const submitSequence = useRef(0);
+  const accountRef = useRef(accountKey);
 
   useEffect(() => {
-    if (!membershipId && memberships.length) setMembershipId(Number(memberships[0].id));
-  }, [membershipId, memberships]);
+    setMembershipId((current) => validateMembershipSelection(memberships, current));
+  }, [memberships]);
+
+  useEffect(() => {
+    return () => {
+      loadSequence.current += 1;
+      submitSequence.current += 1;
+      submitRef.current = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
+    if (!accountKey) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+    const seq = ++loadSequence.current;
+    const currentAccount = accountKey;
+    const isCurrent = () => seq === loadSequence.current && accountRef.current === currentAccount;
     setError('');
     try {
       const result = await workforce.listLeave();
+      if (!isCurrent()) return;
       setRows(Array.isArray(result) ? result : []);
     } catch (e: any) {
-      setError(e?.payload?.error || e?.message || 'Unable to load leave requests.');
+      if (isCurrent()) setError(e?.payload?.error || e?.message || 'Unable to load leave requests.');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, []);
+  }, [accountKey]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -75,10 +111,16 @@ export default function MyLeaveScreen() {
   const end = combine(endDate, endTime);
 
   const submit = async () => {
-    if (!membershipId || !start || !end || end <= start) {
-      setError('Enter a valid start and end date/time.');
+    if (busy || submitRef.current || !membershipId || !start || !end || end <= start) {
+      if (!membershipId || !start || !end || end <= start) {
+        setError('Enter a valid start and end date/time.');
+      }
       return;
     }
+    const seq = ++submitSequence.current;
+    const currentAccount = accountKey;
+    const isCurrent = () => seq === submitSequence.current && accountRef.current === currentAccount;
+    submitRef.current = true;
     setBusy(true);
     setError('');
     try {
@@ -89,26 +131,39 @@ export default function MyLeaveScreen() {
         end_at: end.toISOString(),
         note: note.trim(),
       });
+      if (!isCurrent()) return;
       setVisible(false);
       setNote('');
       await load();
     } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || 'Unable to request leave.');
+      if (isCurrent()) setError(e?.response?.data?.error || e?.payload?.error || e?.message || 'Unable to request leave.');
     } finally {
-      setBusy(false);
+      if (isCurrent()) {
+        submitRef.current = false;
+        setBusy(false);
+      }
     }
   };
 
   const cancel = async (id: number) => {
+    if (busy || submitRef.current) return;
+    const seq = ++submitSequence.current;
+    const currentAccount = accountKey;
+    const isCurrent = () => seq === submitSequence.current && accountRef.current === currentAccount;
+    submitRef.current = true;
     setBusy(true);
     setError('');
     try {
       await workforce.decideLeave(id, 'CANCELLED', 'Cancelled by worker');
+      if (!isCurrent()) return;
       await load();
     } catch (e: any) {
-      setError(e?.payload?.error || e?.message || 'Unable to cancel request.');
+      if (isCurrent()) setError(e?.payload?.error || e?.message || 'Unable to cancel request.');
     } finally {
-      setBusy(false);
+      if (isCurrent()) {
+        submitRef.current = false;
+        setBusy(false);
+      }
     }
   };
 
@@ -123,6 +178,7 @@ export default function MyLeaveScreen() {
       error={error}
       onRetry={load}
       right={<Button compact mode="contained" onPress={() => setVisible(true)}>Request</Button>}
+      backDisabled={isBusy}
     >
       <MetricGrid items={[
         { label: 'Requests', value: rows.length },

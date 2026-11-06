@@ -3,7 +3,8 @@
 // details dialog (address, shift documents, reviews).
 import React, { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Dialog, Portal, Text } from 'react-native-paper';
+import { Button, Dialog, Portal, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { CalendarCheck, FileText, History, MapPin, Star, Store } from 'lucide-react-native';
 import {
   bookedShiftRateLabel,

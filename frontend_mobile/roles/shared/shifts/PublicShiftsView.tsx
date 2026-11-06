@@ -3,7 +3,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, ScrollView, StyleSheet, View } from 'react-native';
 import { Portal, Snackbar, Text } from 'react-native-paper';
 import {
     Shift,
@@ -598,59 +598,7 @@ function PublicShiftsBoard({
 
     if (!userId) return null;
 
-    return (
-        <View style={styles.container}>
-            {!hideTabs && <BoardTabs value={boardTab} onChange={handleBoardTabChange} savedCount={savedShiftIds.size} />}
-            {boardTab === 'accepted' ? (
-                offersLoading ? (
-                    <ContentState kind="loading" style={styles.state} />
-                ) : offersError ? (
-                    <ContentState
-                        kind="error"
-                        title="Your offers did not load"
-                        description="Check your connection, then try again."
-                        onAction={() => void loadOffers()}
-                        style={styles.state}
-                    />
-                ) : (
-                        <View style={styles.offerWorkspace}>
-                            {offerShifts.length === 0 ? (
-                                <ContentState
-                                    kind="empty"
-                                    title="No pending offers"
-                                    description="When a pharmacy offers you a shift, you confirm it here."
-                                    style={styles.state}
-                                />
-                            ) : (
-                                <ShiftsBoard
-                                    title="Offers"
-                                    shifts={offerShifts}
-                                    loading={offersLoading}
-                                    onApplyAll={handleConfirmOfferShift}
-                                    onApplySlot={handleConfirmOfferSlot}
-                                    onSubmitCounterOffer={handleSubmitCounterOffer}
-                                    onRejectShift={handleDeclineOfferShift}
-                                    onRejectSlot={undefined}
-                                    enableSaved={false}
-                                    hideSaveToggle
-                                    hideFiltersAndSort
-                                    hideTabs
-                                    disableLocalPersistence
-                                    applyLabel="Confirm"
-                                    disableActionGuards
-                                    actionDisabledGuard={(shift) =>
-                                        !(offersByShift.get(shift.id) ?? []).some(
-                                            (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
-                                        )
-                                    }
-                                    onRefresh={loadOffers}
-                                    onScroll={onScroll}
-                                    fallbackToAllShiftsWhenEmpty
-                                    showAllSlots
-                                />
-                            )}
-
-                            {payrollActivationOffers.length > 0 ? (
+    const payrollContent = payrollActivationOffers.length > 0 ? (
                                 <View style={styles.payrollSection}>
                                     <Text variant="titleMedium" style={styles.payrollTitle}>
                                         Payroll setup for confirmed shifts
@@ -714,19 +662,78 @@ function PublicShiftsBoard({
                                         );
                                     })}
                                 </View>
-                            ) : null}
-                        </View>
+                            ) : null;
+
+    const boardHeader = !hideTabs ? <BoardTabs value={boardTab} onChange={handleBoardTabChange} savedCount={savedShiftIds.size} /> : null;
+
+    return (
+        <View style={styles.container}>
+            {boardTab === 'accepted' ? (
+                offersLoading ? (
+                    <ScrollView>{boardHeader}<ContentState kind="loading" style={styles.state} /></ScrollView>
+                ) : offersError ? (
+                    <ScrollView>{boardHeader}<ContentState
+                        kind="error"
+                        title="Your offers did not load"
+                        description="Check your connection, then try again."
+                        onAction={() => void loadOffers()}
+                        style={styles.state}
+                    /></ScrollView>
+                ) : (
+                        <>
+                            {offerShifts.length === 0 ? (
+                                <ScrollView>{boardHeader}
+                                <ContentState
+                                    kind="empty"
+                                    title="No pending offers"
+                                    description="When a pharmacy offers you a shift, you confirm it here."
+                                    style={styles.state}
+                                />{payrollContent}</ScrollView>
+                            ) : (
+                                <ShiftsBoard
+                                    header={boardHeader}
+                                    footer={payrollContent}
+                                    title="Offers"
+                                    shifts={offerShifts}
+                                    loading={offersLoading}
+                                    onApplyAll={handleConfirmOfferShift}
+                                    onApplySlot={handleConfirmOfferSlot}
+                                    onSubmitCounterOffer={handleSubmitCounterOffer}
+                                    onRejectShift={handleDeclineOfferShift}
+                                    onRejectSlot={undefined}
+                                    enableSaved={false}
+                                    hideSaveToggle
+                                    hideFiltersAndSort
+                                    hideTabs
+                                    disableLocalPersistence
+                                    applyLabel="Confirm"
+                                    disableActionGuards
+                                    actionDisabledGuard={(shift) =>
+                                        !(offersByShift.get(shift.id) ?? []).some(
+                                            (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
+                                        )
+                                    }
+                                    onRefresh={loadOffers}
+                                    onScroll={onScroll}
+                                    fallbackToAllShiftsWhenEmpty
+                                    showAllSlots
+                                />
+                            )}
+
+
+                        </>
                 )
             ) : loadError ? (
-                <ContentState
+                <ScrollView>{boardHeader}<ContentState
                     kind="error"
                     title="Public shifts did not load"
                     description="Check your connection, then try again."
                     onAction={() => void loadShifts(debouncedFilters, page)}
                     style={styles.state}
-                />
+                /></ScrollView>
             ) : (
                 <ShiftsBoard
+                    header={boardHeader}
                     title="Public shifts"
                     shifts={shifts}
                     loading={loading}

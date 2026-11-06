@@ -1,13 +1,15 @@
 import { useAhpra } from '../context/AhpraContext';
 import AhpraStatus from '../components/AhpraStatus';
+import { BrandLoader } from '../components/ui/BrandLoader';
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform, Pressable, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useLocalSearchParams, usePathname, useRouter, useSegments } from 'expo-router';
 import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
 import * as Updates from 'expo-updates';
 import * as Notifications from 'expo-notifications';
 import AppLockGate from '@/components/security/AppLockGate';
+import { useAppLockState } from '@/utils/appLock';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { WorkspaceProvider, useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../constants/theme';
@@ -16,6 +18,7 @@ import OfflineBanner from '../components/OfflineBanner';
 import '../config/api'; // Configure shared-core on app load
 import { en, registerTranslation } from 'react-native-paper-dates';
 import { getOwnerSetupStatus, ownerSetupPaths } from '../utils/ownerSetup';
+import { sanitizeReturnTo } from '@/utils/authReturnRoute';
 import { initializeMobileSslPinning } from '../utils/sslPinning';
 import { evaluateRouteDecision, isPublicShiftRoute } from '../roles/shared/shifts/publicShiftRoute';
 import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChangesDialogProvider';
@@ -283,6 +286,8 @@ function UpdatePrompt() {
 
 function AuthGate() {
   const router = useRouter();
+  const pathname = usePathname();
+  const localParams = useLocalSearchParams();
   const segments = useSegments();
   // Typed Expo routes can infer a narrow tuple; deep-link matching needs a read-only path array.
   const routeSegments: readonly string[] = segments;
@@ -308,11 +313,12 @@ function AuthGate() {
     const third = segmentList[2];
     const publicRoutes = new Set(['login', 'register', 'welcome', 'verify-otp', 'forgot-password', 'reset-password', 'mobile-verify', 'index', 'contact']);
     const isExploreRoute = top === 'explore';
-    const isPublic = isExploreRoute || publicRoutes.has(top ?? '') || (top === 'membership' && second === 'apply' && Boolean(third));
+    const isMembershipApply = top === 'membership' && second === 'apply' && Boolean(third);
+    const isPublic = isExploreRoute || publicRoutes.has(top ?? '') || isMembershipApply;
 
     // `kiosk-link` is intentionally reachable only by an explicit deep link.
     // It is never included in normal startup or navigation menus.
-    const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'kiosk-link', 'attendance-pin', 'my-hours', 'my-roster', 'my-leave', 'workforce-timesheets', 'workforce-settings', 'admin-invitations']);
+    const allowAuthenticatedAccess = new Set(['contact', 'reset-password', 'notifications', 'app-preferences', 'invoices', 'kiosk-link', 'attendance-pin', 'my-hours', 'my-roster', 'my-leave', 'workforce-timesheets', 'workforce-settings', 'admin-invitations']);
     const sharedProductPrefixes = new Set(['workforce', 'manager', 'attendance', 'finance', 'marketplace', 'profile', 'rewards', 'settings', 'share', 'next-shifts']);
     const isSharedAuthenticatedRoute = allowAuthenticatedAccess.has(top ?? '') || sharedProductPrefixes.has(top ?? '');
     const isOwnerSetupRoute = top === 'setup' && second === 'owner';
@@ -355,6 +361,10 @@ function AuthGate() {
         if (top !== 'mobile-verify') {
           router.replace('/mobile-verify' as any);
         }
+        return;
+      }
+
+      if (user && isMembershipApply) {
         return;
       }
 
@@ -499,7 +509,18 @@ function AuthGate() {
 
       // `/` has no segments; it is the landing (app/index.tsx), which also routes a signed-in user itself.
       if (!user && !isPublic && !isPublicShiftRoute(segments) && top !== undefined) {
-        router.replace('/login');
+        const query = new URLSearchParams();
+        for (const [k, v] of Object.entries(localParams)) {
+          if (typeof v === 'string' && v) query.set(k, v);
+        }
+        const qs = query.toString();
+        const fullCandidate = qs ? `${pathname}?${qs}` : pathname;
+        const returnTo = sanitizeReturnTo(fullCandidate);
+        if (returnTo) {
+          router.replace({ pathname: '/login', params: { returnTo } } as any);
+        } else {
+          router.replace('/login');
+        }
       }
     };
 
@@ -507,11 +528,11 @@ function AuthGate() {
     return () => {
       active = false;
     };
-  }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user, ahpraLoading, ahpraSummary?.frozen, ahpraSummary?.state, ahpraRefusal, clearRefusal, ahpraPath, onAhpraStep, onInvitePage]);
+  }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user, ahpraLoading, ahpraSummary?.frozen, ahpraSummary?.state, ahpraRefusal, clearRefusal, ahpraPath, onAhpraStep, onInvitePage, pathname, localParams]);
 
   if (user && (ahpraLoading || (user.role !== 'OWNER' && ahpraSummary?.state !== 'review' && (ahpraSummary?.frozen || ahpraRefusal) && !onAhpraStep && !onInvitePage))) {
     return <View style={{ position: 'absolute', inset: 0, zIndex: 10000, backgroundColor: '#FFFFFF', padding: 24, justifyContent: 'center' }}>
-      {ahpraLoading ? <Text>Loading AHPRA status...</Text> : <AhpraStatus />}
+      {ahpraLoading ? <BrandLoader size={56} accessibilityLabel="Checking registration status" /> : <AhpraStatus />}
     </View>;
   }
   return null;
@@ -535,6 +556,17 @@ function KioskLinkNotificationGate() {
   return null;
 }
 
+function GuardedRootContent({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const coordinator = useAppLockState();
+  const isLocked = Platform.OS !== 'web' && (coordinator.isLocked || (user?.id != null && coordinator.activeUserId !== user.id));
+  return (
+    <View style={[{ flex: 1 }, isLocked && { opacity: 0 }]} pointerEvents={isLocked ? 'none' : 'auto'} accessibilityElementsHidden={isLocked} importantForAccessibility={isLocked ? 'no-hide-descendants' : 'auto'}>
+      <Portal.Host>{children}</Portal.Host>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   useEffect(() => {
     void initializeMobileSslPinning();
@@ -546,26 +578,22 @@ export default function RootLayout() {
         <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right']}>
           <StatusBar barStyle="dark-content" />
           <PaperProvider theme={theme}>
-            <UnsavedChangesDialogProvider>
-              <UnsavedChangesRegistryProvider>
-                <AuthProvider>
+            <AuthProvider>
+              <UnsavedChangesDialogProvider>
+                <UnsavedChangesRegistryProvider>
                   <WorkspaceProvider>
-                    <KioskLinkNotificationGate />
-                    <UpdatePrompt />
-                    <OfflineBanner />
-                    <Stack
-                      screenOptions={{
-                        headerShown: false,
-                        gestureEnabled: true,
-                        animation: 'slide_from_right',
-                      }}
-                    />
-                    <AuthGate />
+                    <GuardedRootContent>
+                      <KioskLinkNotificationGate />
+                      <UpdatePrompt />
+                      <OfflineBanner />
+                      <Stack screenOptions={{ headerShown: false, gestureEnabled: true, animation: 'slide_from_right' }} />
+                      <AuthGate />
+                    </GuardedRootContent>
                     <AppLockGate />
                   </WorkspaceProvider>
-                </AuthProvider>
-              </UnsavedChangesRegistryProvider>
-            </UnsavedChangesDialogProvider>
+                </UnsavedChangesRegistryProvider>
+              </UnsavedChangesDialogProvider>
+            </AuthProvider>
           </PaperProvider>
         </SafeAreaView>
       </SafeAreaProvider>

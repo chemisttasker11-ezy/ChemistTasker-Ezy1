@@ -72,12 +72,22 @@ function verifyInstalled() {
   assert.equal(merged.debug, false);
   assert.equal({}.isAdmin, undefined);
 
-  // SDK 55 dropped image-size (Metro parses dimensions itself), fast-uri and undici: any returning
+  // expo-mcp 0.2.4 introduced dev-only ajv requiring fast-uri; package.json override pins it to 3.1.9.
+  assert.equal(mobileRequire('fast-uri/package.json').version, '3.1.9');
+  const fastUriCopies = Object.entries(lock.packages).filter(([entry]) => entry.endsWith('node_modules/fast-uri'));
+  assert.deepEqual(fastUriCopies.map(([entry, meta]) => [entry, meta.version]), [['node_modules/fast-uri', '3.1.9']]);
+  const installedFastUri = findInstalledCopies(['fast-uri'], root);
+  assert.ok(installedFastUri.length > 0, 'fast-uri is not installed');
+  for (const copyDir of installedFastUri) {
+    assert.equal(JSON.parse(readFileSync(path.join(copyDir, 'package.json'), 'utf8')).version, '3.1.9');
+  }
+
+  // SDK 55 dropped image-size (Metro parses dimensions itself) and undici: any returning
   // copy fails here until its pin (package.json overrides) and checks are reviewed again. SDK 56 dropped
   // @istanbuljs/load-nyc-config, whose js-yaml 3 range the 4.3.2 override forced across a major. SDK 58
   // expo-router parses queries with URLSearchParams, dropping query-string and its decode-uri-component.
   const gone = [
-    'sprintf-js', 'image-size', 'fast-uri', 'undici', '@istanbuljs/load-nyc-config', 'query-string', 'decode-uri-component',
+    'sprintf-js', 'image-size', 'undici', '@istanbuljs/load-nyc-config', 'query-string', 'decode-uri-component',
   ];
   for (const name of gone) {
     assert.equal(Object.keys(lock.packages).some(entry => entry.endsWith(`node_modules/${name}`)), false, `${name} is back`);

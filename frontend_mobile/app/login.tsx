@@ -7,6 +7,7 @@ import AuthLayout, { AuthLink, AuthNotice, AuthPrompt } from '../components/Auth
 import { Button, TextField } from '@/components/ui';
 import { colors, font, space, type } from '@/constants/tokens';
 import { openWebPage } from '@/features/explore/webLinks';
+import { sanitizeReturnTo } from '@/utils/authReturnRoute';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
 import { hasOrganizationAccess, resolveInitialWorkspace, selectRolePersona } from '../utils/mobilePersona';
 import {
@@ -23,6 +24,7 @@ export default function LoginScreen() {
   const params = useLocalSearchParams<{
     email?: string;
     reset?: string;
+    verified?: string;
     referral_code?: string | string[];
     referral_event_id?: string | string[];
     referral_shift_id?: string | string[];
@@ -31,7 +33,7 @@ export default function LoginScreen() {
 
   const returnParam = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
   // Preserve only first-party native public content routes, never arbitrary redirects.
-  const returnTo = typeof returnParam === 'string' && /^\/explore(?:\/[a-zA-Z0-9_%-]+)*$/.test(returnParam) ? returnParam : null;
+  const returnTo = sanitizeReturnTo(returnParam);
   const referralParams: Record<string, string> = {};
   const refCode = Array.isArray(params.referral_code) ? params.referral_code[0] : params.referral_code;
   const refEventId = Array.isArray(params.referral_event_id) ? params.referral_event_id[0] : params.referral_event_id;
@@ -150,7 +152,7 @@ export default function LoginScreen() {
       // Web parity (login.tsx): an unverified email goes to the code screen. AuthContext keeps only the
       // detail text, so match backend login_security.py's "email address is not verified" as well.
       if (/verify your email|email address is not verified/i.test(String(err?.message || ''))) {
-        router.push({ pathname: '/verify-otp', params: { email: email.toLowerCase(), ...referralParams } } as never);
+        router.push({ pathname: '/verify-otp', params: { email: email.toLowerCase(), ...referralParams, ...(returnTo ? { returnTo } : {}) } } as never);
       }
     } finally {
       setLoading(false);
@@ -216,6 +218,8 @@ export default function LoginScreen() {
         <AuthNotice tone="error" message={error} />
       ) : params.reset === '1' ? (
         <AuthNotice tone="success" message="Password updated. Sign in with your new password." />
+      ) : params.verified === '1' ? (
+        <AuthNotice tone="success" message="Email verified. Sign in with your password to continue." />
       ) : null}
 
       <TextField

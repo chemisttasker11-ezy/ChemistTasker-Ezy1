@@ -1,6 +1,7 @@
 import { createFriendPillReferralService } from '@chemisttasker/shared-core';
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Share } from 'react-native';
+import { BrandLoader } from '@/components/ui/BrandLoader';
 import { openWebPage } from '@/features/explore/webLinks';
 import { Text, Avatar, List, Button, Surface, Divider, Switch, IconButton, Card, Portal, Dialog, TextInput } from 'react-native-paper';
 import { useRouter } from 'expo-router';
@@ -176,7 +177,7 @@ export default function OwnerProfileScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.centerContent}>
-          <Text>Loading profile...</Text>
+          <BrandLoader size={44} accessibilityLabel="Loading profile…" />
         </View>
       </SafeAreaView>
     );

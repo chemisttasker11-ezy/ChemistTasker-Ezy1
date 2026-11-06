@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
+import { Button, Text, TextInput } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { attendance, workforce, type AttendanceTimeline, type AttendanceTimelineEvent } from '@chemisttasker/shared-core';
 import { BottomSheet } from '@/components/ui';
 import { colors, font, space, touch } from '@/constants/tokens';

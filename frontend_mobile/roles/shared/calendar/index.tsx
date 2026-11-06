@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import {
-  ActivityIndicator,
   Button,
   Card,
   Chip,
@@ -17,7 +16,8 @@ import {
   TextInput,
   useTheme,
 } from 'react-native-paper';
-import { DatePickerModal, TimePickerModal } from 'react-native-paper-dates';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
+import { GuardedDatePickerModal as DatePickerModal, GuardedTimePickerModal as TimePickerModal } from '@/components/security/GuardedModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';

@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, FlatList, Pressable, RefreshControl, DeviceEventEmitter } from 'react-native';
-import { Text, Surface, Icon, IconButton, Badge, ActivityIndicator, Button } from 'react-native-paper';
+import { Text, Surface, Icon, IconButton, Badge, Button } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
 import { useFocusEffect, usePathname, useRouter } from 'expo-router';

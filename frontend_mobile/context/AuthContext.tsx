@@ -162,7 +162,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
             // A rejected refresh clears its own session and advances the generation.
             if (!token) {
               const remainingSession = await readStoredSession();
-              if (!remainingSession && getSessionGeneration() === refreshGeneration) setIsLoading(false);
+              if (!remainingSession && getSessionGeneration() === refreshGeneration) {
+                primeInMemorySession(null);
+                setAccess(null);
+                setRefresh(null);
+                setUser(null);
+                setIsLoading(false);
+              }
             }
             return;
           }
@@ -172,17 +178,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
               const currentUser = normalizeUser(meResponse.data);
               const refreshedSession = await readStoredSession();
               if (getSessionGeneration() !== bootstrapId) return;
-              setAccess(refreshedSession?.access || refreshedSession?.tokens?.access || token);
-              setRefresh(refreshedSession?.refresh || refreshedSession?.tokens?.refresh || nextRefresh);
-              setUser(currentUser);
               const saved = await writeStoredSession({
                 access: refreshedSession?.access || refreshedSession?.tokens?.access || token,
                 refresh: refreshedSession?.refresh || refreshedSession?.tokens?.refresh || nextRefresh,
                 user: currentUser,
               }, bootstrapId);
-              if (!saved) return;
-              setIsLoading(false);
-              return;
+              if (saved) {
+                setAccess(refreshedSession?.access || refreshedSession?.tokens?.access || token);
+                setRefresh(refreshedSession?.refresh || refreshedSession?.tokens?.refresh || nextRefresh);
+                setUser(currentUser);
+                setIsLoading(false);
+                return;
+              }
             }
           }
         }
@@ -193,8 +200,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Secure storage can fail (e.g. Keychain unavailable/locked). Never leave the app on the
       // loading screen: an unreadable or unverified session is treated as signed out (B52);
       // a sign-in that started meanwhile bumped the generation and owns the session.
-      if (getSessionGeneration() !== bootstrapId) return;
-      await clearStoredSession().catch(() => undefined);
+      const finalGeneration = getSessionGeneration();
+      if (finalGeneration !== bootstrapId) {
+        const remainingSession = await readStoredSession();
+        if (!remainingSession && getSessionGeneration() === finalGeneration) {
+          primeInMemorySession(null);
+          setAccess(null);
+          setRefresh(null);
+          setUser(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+      const clearPromise = clearStoredSession().catch(() => undefined);
+      const clearGeneration = getSessionGeneration();
+      await clearPromise;
+      if (getSessionGeneration() !== clearGeneration) return;
       primeInMemorySession(null);
       setAccess(null);
       setRefresh(null);

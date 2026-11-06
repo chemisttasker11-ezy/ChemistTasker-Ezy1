@@ -3,7 +3,8 @@
 
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Card, Text, Button, Surface, IconButton, ActivityIndicator, Chip, Divider } from 'react-native-paper';
+import { Card, Text, Button, Surface, IconButton, Chip, Divider } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { PharmacyDTO, surfaceTokens } from './types';
 
 type ClaimStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';

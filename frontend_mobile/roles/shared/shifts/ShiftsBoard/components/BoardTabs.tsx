@@ -1,45 +1,16 @@
 import React from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
-import { Pill } from '@/components/ui';
+import { SegmentTabs, type SegmentTab } from '@/components/ui/SegmentTabs';
 import { space } from '@/constants/tokens';
 
 export type BoardTab = 'browse' | 'saved' | 'interested' | 'rejected' | 'accepted';
 
-const TABS: { value: BoardTab; label: string }[] = [
+export function BoardTabs({ value, onChange, savedCount }: { value: BoardTab; onChange: (tab: BoardTab) => void; savedCount: number }) {
+  const tabs: SegmentTab<BoardTab>[] = [
     { value: 'browse', label: 'Browse' },
-    { value: 'saved', label: 'Saved' },
+    { value: 'saved', label: savedCount > 0 ? `Saved · ${savedCount}` : 'Saved', accessibilityLabel: `Saved, ${savedCount}` },
     { value: 'interested', label: 'Interested' },
     { value: 'rejected', label: 'Rejected' },
     { value: 'accepted', label: 'Offers' },
-];
-
-/** The Public and Community board views (web's board tabs) as one scrolling chip row: five never fit a phone row. */
-export function BoardTabs({ value, onChange, savedCount }: { value: BoardTab; onChange: (tab: BoardTab) => void; savedCount: number }) {
-    return (
-        <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.row}
-            style={styles.scroller}
-            accessibilityLabel="Board views"
-        >
-            {TABS.map((tab) => {
-                const label = tab.value === 'saved' && savedCount > 0 ? `Saved · ${savedCount}` : tab.label;
-                return (
-                    <Pill
-                        key={tab.value}
-                        label={label}
-                        selected={value === tab.value}
-                        onPress={() => onChange(tab.value)}
-                        accessibilityLabel={tab.value === 'saved' ? `Saved, ${savedCount}` : tab.label}
-                    />
-                );
-            })}
-        </ScrollView>
-    );
+  ];
+  return <SegmentTabs tabs={tabs} value={value} onChange={onChange} label="Board views" idPrefix="board-views" style={{ marginHorizontal: space.lg, marginBottom: space.sm }} />;
 }
-
-const styles = StyleSheet.create({
-    scroller: { flexGrow: 0 },
-    row: { gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm },
-});

@@ -6,12 +6,13 @@ const step=code.slice(code.indexOf('function ReviewStep('),code.indexOf('functio
 test('marketplace draft and submit buttons share one synchronous submit mutex',()=>{
  assert.match(step,/const submittingRef=useRef\(false\)/);
  assert.match(step,/if\(submittingRef\.current\)return;submittingRef\.current=true/);
- assert.match(step,/finally\{submittingRef\.current=false/);
+ assert.match(step,/finally\{(?:\s*if\(current\(\)\)\{)?\s*submittingRef\.current=false/);
 });
 test('completion cannot clear a new signed-in account\'s draft',()=>{
  assert.match(step,/const targetScope=scope/);
- assert.match(step,/if\(scopeRef\.current===targetScope\)\{await clearMarketplaceDraft\(targetScope\)/);
- assert.match(step,/if\(scopeRef\.current===targetScope\)setLocalError/);
+ assert.match(step,/scopeRef\.current===targetScope/);
+ assert.match(step,/if\(current\(\)\)\{await clearMarketplaceDraft\(targetScope\)/);
+ assert.match(step,/if\(current\(\)\)setLocalError/);
 });
 test('server owns the same idempotent draft / review pipeline',()=>{
  assert.match(step,/client_request_id:draft\.create_request_id/);

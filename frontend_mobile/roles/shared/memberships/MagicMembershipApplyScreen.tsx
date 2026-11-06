@@ -138,7 +138,13 @@ export default function MagicMembershipApplyScreen() {
         <Button mode="contained" contentStyle={styles.touch} onPress={() => router.push((workerPaymentRoute || '/register') as any)}>
           {workerPaymentRoute ? 'Complete private payment profile' : 'Create worker account'}
         </Button>
-        <Button mode="outlined" contentStyle={styles.touch} onPress={() => router.push((user ? '/my-roster' : '/login') as any)}>
+        <Button mode="outlined" contentStyle={styles.touch} onPress={() => {
+          if (user) {
+            router.push('/my-roster' as any);
+          } else {
+            router.push({ pathname: '/login', params: { returnTo: `/membership/apply/${token}` } } as any);
+          }
+        }}>
           {user ? 'Back to my work' : 'Log in'}
         </Button>
       </Surface> : <>

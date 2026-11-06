@@ -1,9 +1,10 @@
+import { ResponsiveSegmentedButtons as SegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { Text, TextInput, Button, Surface, SegmentedButtons, Menu } from 'react-native-paper';
+import { Text, TextInput, Button, Surface, Menu } from 'react-native-paper';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DatePickerModal } from 'react-native-paper-dates';
+import { GuardedDatePickerModal as DatePickerModal } from '@/components/security/GuardedModal';
 import { Calendar, Store, Clock, DollarSign, Plus } from 'lucide-react-native';
 import { getPharmacies, createShift } from '@chemisttasker/shared-core';
 import { colors, radius, space, touch, type } from '@/constants/tokens';
@@ -276,19 +277,19 @@ export default function CreateShiftScreen() {
                                             value: 'PHARMACIST',
                                             label: 'Pharmacist',
                                             style: { minHeight: touch.min },
-                                            labelStyle: { minHeight: touch.min, textAlignVertical: 'center', lineHeight: touch.min },
+                                            labelStyle: { textAlignVertical: 'center' },
                                         },
                                         {
                                             value: 'INTERN',
                                             label: 'Intern',
                                             style: { minHeight: touch.min },
-                                            labelStyle: { minHeight: touch.min, textAlignVertical: 'center', lineHeight: touch.min },
+                                            labelStyle: { textAlignVertical: 'center' },
                                         },
                                         {
                                             value: 'TECHNICIAN',
                                             label: 'Technician',
                                             style: { minHeight: touch.min },
-                                            labelStyle: { minHeight: touch.min, textAlignVertical: 'center', lineHeight: touch.min },
+                                            labelStyle: { textAlignVertical: 'center' },
                                         },
                                     ]}
                                 />

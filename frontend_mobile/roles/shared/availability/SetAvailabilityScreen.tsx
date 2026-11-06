@@ -3,6 +3,7 @@ import {
   LayoutAnimation,
   LogBox,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   UIManager,
@@ -35,9 +36,7 @@ import AvailabilityRadiusMap from './AvailabilityRadiusMap';
 import {
   type AvailabilityEntry,
   type AvailabilityDraft,
-  type AvailabilityPayload,
   createEmptyEntry,
-  unsavedAvailabilityPayloads,
   weekDays,
   radiusOptions,
   stateOptions,
@@ -45,9 +44,43 @@ import {
   GOOGLE_LIBRARIES,
   DNA,
   type LocationFormState,
+  normalizeOnboardingRole,
+  computeMonthAvailabilityDates,
+  computeMonthRecurringPreviewDates,
+  isValidIsoDate,
+  AvailabilityController,
 } from './availabilityModel';
+import { useUnsavedChangesGuard } from '../forms/useUnsavedChangesGuard';
+import { BrandLoader, ConfirmDialog } from '@/components/ui';
+
+export function formatSlotEnAuDate(iso: string): string {
+  if (!iso) return '';
+  const [y, m, dNum] = iso.split('-').map(Number);
+  if (y && m && dNum) {
+    const d = new Date(y, m - 1, dNum);
+    return d.toLocaleDateString('en-AU', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+  return iso;
+}
+
+type PendingDeleteTarget = {
+  token: number;
+  id: number;
+  generation: number;
+  accountKey: string;
+  slot: AvailabilityEntry;
+};
 
 LogBox.ignoreLogs(['VirtualizedLists should never be nested']);
+
+function manualAddressEdit(form: LocationFormState, field: 'streetAddress' | 'suburb' | 'state' | 'postcode', value: string): LocationFormState {
+  return form[field] === value ? form : { ...form, [field]: value, latitude: null, longitude: null, googlePlaceId: '' };
+}
 
 function AvailabilityWebLocationField({
   placesApiKey,
@@ -93,9 +126,9 @@ function AvailabilityWebLocationField({
       suburb: getLong('locality') || getLong('sublocality') || prev.suburb,
       state: getShort('administrative_area_level_1') || prev.state,
       postcode: getLong('postal_code') || prev.postcode,
-      latitude: place.geometry?.location?.lat?.() ?? prev.latitude,
-      longitude: place.geometry?.location?.lng?.() ?? prev.longitude,
-      googlePlaceId: place.place_id || prev.googlePlaceId,
+      latitude: place.geometry?.location?.lat?.() ?? null,
+      longitude: place.geometry?.location?.lng?.() ?? null,
+      googlePlaceId: place.place_id || '',
     }));
   };
 
@@ -106,11 +139,11 @@ function AvailabilityWebLocationField({
           mode="outlined"
           label="Address"
           value={locationForm.streetAddress}
-          onChangeText={(v) => setLocationForm((p) => ({ ...p, streetAddress: v }))}
+          onChangeText={(v) => setLocationForm((p) => manualAddressEdit(p, 'streetAddress', v))}
           style={styles.input}
           outlineStyle={styles.inputOutline}
         />
-        <HelperText type="info">Google Places key is missing for web.</HelperText>
+        <HelperText type="info">Map unavailable. You can still type your address.</HelperText>
       </>
     );
   }
@@ -125,12 +158,12 @@ function AvailabilityWebLocationField({
             mode="outlined"
             label="Address"
             value={locationForm.streetAddress}
-            onChangeText={(v) => setLocationForm((p) => ({ ...p, streetAddress: v }))}
+            onChangeText={(v) => setLocationForm((p) => manualAddressEdit(p, 'streetAddress', v))}
             style={styles.input}
             outlineStyle={styles.inputOutline}
           />
-          <HelperText type="error">
-            Google Places failed to load. Check EXPO_PUBLIC_WEB_PLACES key and referrer restrictions.
+          <HelperText type="info">
+            Map unavailable. You can still type your address.
           </HelperText>
         </>
       ) : (
@@ -149,9 +182,10 @@ function AvailabilityWebLocationField({
             onChange={(e) => {
               const next = e.target.value;
               setWebAddressInput(next);
-              setLocationForm((p) => ({ ...p, streetAddress: next }));
+              setLocationForm((p) => manualAddressEdit(p, 'streetAddress', next));
             }}
             placeholder="Address"
+            aria-label="Address"
             style={{
               width: '100%',
               height: 46,
@@ -171,7 +205,7 @@ function AvailabilityWebLocationField({
         {placesLoadError ? (
           <View style={styles.mapFallback}>
             <Text style={styles.hint}>
-              Map failed to load. Check EXPO_PUBLIC_WEB_PLACES key and referrer restrictions.
+              Map unavailable. You can still type your address.
             </Text>
           </View>
         ) : isPlacesLoaded ? (
@@ -200,7 +234,7 @@ function AvailabilityWebLocationField({
           </GoogleMap>
         ) : (
           <View style={styles.mapFallback}>
-            <Text style={styles.hint}>Loading map...</Text>
+            <BrandLoader size={24} accessibilityLabel="Loading map…" />
           </View>
         )}
       </View>
@@ -208,16 +242,31 @@ function AvailabilityWebLocationField({
   );
 }
 
-export default function SetAvailabilityScreen() {
+export function SetAvailabilityInner() {
   const { user } = useAuth();
+  const accountKey = `${user?.id ?? 'anon'}:${user?.role ?? 'norole'}`;
+  const [controller] = useState(() => new AvailabilityController(accountKey));
+
   const [availabilityEntries, setAvailabilityEntries] = useState<AvailabilityEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState<AvailabilityDraft>(createEmptyEntry());
   const [notifyNewShifts, setNotifyNewShifts] = useState(false);
+  const notificationEditedRef = useRef(false);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [pendingDeleteTarget, setPendingDeleteTarget] = useState<PendingDeleteTarget | null>(null);
+  const confirmingRef = useRef(false);
+  const nextDeleteTokenRef = useRef(1);
+  const consumedDeleteTokensRef = useRef<Set<number>>(new Set());
+  const isBusy = loading || savingLocation || deleting;
+
+  useEffect(() => {
+    setPendingDeleteTarget(null);
+    consumedDeleteTokensRef.current.clear();
+  }, [user?.id, accountKey]);
   const [calendarMonthAnchor, setCalendarMonthAnchor] = useState<Date>(new Date());
-  const [locationForm, setLocationForm] = useState({
+  const [locationForm, setRawLocationForm] = useState<LocationFormState>({
     streetAddress: '',
     suburb: '',
     state: '',
@@ -229,8 +278,88 @@ export default function SetAvailabilityScreen() {
     googlePlaceId: '',
     coverageRadiusKm: 30,
   });
+  const locationEditRevision = useRef(0);
+  const setLocationForm: React.Dispatch<React.SetStateAction<LocationFormState>> = (action) => {
+    locationEditRevision.current += 1;
+    controller.markLocationDirty();
+    setRawLocationForm(action);
+  };
+
+  const isWriteBusy = loading || savingLocation || deleting;
+
+  const baselineSlotDraftRef = useRef({
+    currentEntry: createEmptyEntry(),
+    selectedDates: [] as string[],
+    notifyNewShifts: false,
+  });
+  const baselineLocationRef = useRef<LocationFormState>({
+    streetAddress: '',
+    suburb: '',
+    state: '',
+    postcode: '',
+    openToTravel: false,
+    travelStates: [],
+    latitude: null,
+    longitude: null,
+    googlePlaceId: '',
+    coverageRadiusKm: 30,
+  });
+
+  const guardedValue = useMemo(() => ({
+    slotDraft: {
+      currentEntry,
+      selectedDates,
+      notifyNewShifts,
+    },
+    location: locationForm,
+  }), [currentEntry, selectedDates, notifyNewShifts, locationForm]);
+
+  const unsaved = useUnsavedChangesGuard(guardedValue, {
+    saving: isWriteBusy,
+    title: 'Discard changes?',
+    message: 'You have unsaved changes. If you leave now, your edits will be discarded.',
+    onDiscard: () => {
+      setRawLocationForm(baselineLocationRef.current);
+      controller.clearLocationDirty();
+      const cleanEntry = createEmptyEntry();
+      setCurrentEntry(cleanEntry);
+      setSelectedDates([]);
+      setNotifyNewShifts(baselineSlotDraftRef.current.notifyNewShifts);
+      notificationEditedRef.current = false;
+      baselineSlotDraftRef.current = {
+        currentEntry: cleanEntry,
+        selectedDates: [],
+        notifyNewShifts: baselineSlotDraftRef.current.notifyNewShifts,
+      };
+    },
+  });
+  const markCleanRef = useRef(unsaved.markClean);
+  markCleanRef.current = unsaved.markClean;
+  const locationSaveInFlightRef = useRef(false);
+  const pendingAvailabilityBaselineRef = useRef(false);
+
+  useEffect(() => {
+    if (!isWriteBusy && pendingAvailabilityBaselineRef.current) {
+      pendingAvailabilityBaselineRef.current = false;
+      markCleanRef.current({
+        slotDraft: baselineSlotDraftRef.current,
+        location: baselineLocationRef.current,
+      });
+    }
+  }, [isWriteBusy]);
+
+  useEffect(() => {
+    markCleanRef.current({
+      slotDraft: baselineSlotDraftRef.current,
+      location: baselineLocationRef.current,
+    });
+  }, []);
+  const [locationLoaded, setLocationLoaded] = useState(false);
+  const [locationLoadError, setLocationLoadError] = useState(false);
+  const [locationReloadKey, setLocationReloadKey] = useState(0);
   const [radiusMenuVisible, setRadiusMenuVisible] = useState(false);
   const [travelMenuVisible, setTravelMenuVisible] = useState(false);
+  const [locationExpanded, setLocationExpanded] = useState(false);
   const placesApiKey = useMemo(
     () => {
       const byPlatform = Platform.select({
@@ -271,7 +400,6 @@ export default function SetAvailabilityScreen() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
-  const [calendarGridWidth, setCalendarGridWidth] = useState(0);
 
   useEffect(() => {
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -285,45 +413,23 @@ export default function SetAvailabilityScreen() {
     setSnackbarOpen(true);
   };
 
-  const savedAvailabilityDateSet = useMemo(() => {
-    const dates = new Set<string>();
-    const maxOccurrences = 180;
-    availabilityEntries.forEach((entry) => {
-      if (!entry.date) return;
-      dates.add(entry.date);
-      if (!entry.isRecurring || !entry.recurringEndDate) return;
-      const days = Array.isArray(entry.recurringDays) ? entry.recurringDays : [];
-      if (!days.length) return;
-      let cursor = new Date(`${entry.date}T00:00:00`);
-      const end = new Date(`${entry.recurringEndDate}T00:00:00`);
-      let count = 0;
-      while (cursor <= end) {
-        if (days.includes(cursor.getDay())) {
-          dates.add(toLocalIsoDate(cursor));
-          count += 1;
-          if (count >= maxOccurrences) break;
-        }
-        cursor.setDate(cursor.getDate() + 1);
-      }
-    });
-    return dates;
-  }, [availabilityEntries]);
+  useEffect(() => {
+    return () => {
+      controller.invalidate();
+    };
+  }, [controller]);
+
+  const savedAvailabilityDateSet = useMemo(
+    () => computeMonthAvailabilityDates(availabilityEntries, calendarMonthAnchor),
+    [availabilityEntries, calendarMonthAnchor]
+  );
 
   const selectedDateSet = useMemo(() => new Set(selectedDates), [selectedDates]);
 
-  const recurringPreviewDateSet = useMemo(() => {
-    const dates = new Set<string>();
-    if (!currentEntry.isRecurring || !currentEntry.date || !currentEntry.recurringEndDate || !currentEntry.recurringDays.length) return dates;
-    let cursor = new Date(`${currentEntry.date}T00:00:00`);
-    const end = new Date(`${currentEntry.recurringEndDate}T00:00:00`);
-    let count = 0;
-    while (cursor <= end && count < 366) {
-      if (currentEntry.recurringDays.includes(cursor.getDay())) dates.add(toLocalIsoDate(cursor));
-      cursor.setDate(cursor.getDate() + 1);
-      count += 1;
-    }
-    return dates;
-  }, [currentEntry.date, currentEntry.isRecurring, currentEntry.recurringDays, currentEntry.recurringEndDate]);
+  const recurringPreviewDateSet = useMemo(
+    () => computeMonthRecurringPreviewDates(currentEntry, calendarMonthAnchor),
+    [currentEntry, calendarMonthAnchor]
+  );
 
   const monthCalendarCells = useMemo(() => {
     const year = calendarMonthAnchor.getFullYear();
@@ -331,7 +437,7 @@ export default function SetAvailabilityScreen() {
     const first = new Date(year, month, 1);
     const leading = (first.getDay() + 6) % 7;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const cells: Array<{ iso: string; day: number; inMonth: boolean }> = [];
+    const cells: { iso: string; day: number; inMonth: boolean }[] = [];
     for (let i = 0; i < leading; i += 1) cells.push({ iso: `pad-prev-${i}`, day: 0, inMonth: false });
     for (let day = 1; day <= daysInMonth; day += 1) {
       cells.push({ iso: toLocalIsoDate(new Date(year, month, day)), day, inMonth: true });
@@ -341,27 +447,40 @@ export default function SetAvailabilityScreen() {
   }, [calendarMonthAnchor]);
 
   const monthLabel = useMemo(
-    () => calendarMonthAnchor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    () => calendarMonthAnchor.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }),
     [calendarMonthAnchor]
   );
 
-  const onboardingRole = useMemo(() => {
-    if (!user?.role) return null;
-    if (user.role === 'PHARMACIST') return 'pharmacist';
-    if (user.role === 'OTHER_STAFF') return 'other_staff';
-    if (user.role === 'EXPLORER') return 'explorer';
-    return null;
-  }, [user?.role]);
+  const onboardingRole = useMemo(() => normalizeOnboardingRole(user?.role), [user?.role]);
+
+  const getCellA11y = (iso: string, isSel: boolean, isSav: boolean, isRep: boolean) => {
+    const parts = iso.split('-');
+    if (parts.length === 3) {
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      const dateStr = d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+      const tags = [isSel && 'selected', isSav && 'saved', isRep && 'repeats'].filter(Boolean);
+      return tags.length ? `${dateStr}, ${tags.join(', ')}` : dateStr;
+    }
+    return iso;
+  };
+  const locationSummary = !locationLoaded
+    ? (locationLoadError ? 'Failed to load location' : 'Loading saved location...')
+    : `${locationForm.suburb || locationForm.streetAddress || 'No address set'} · ${locationForm.openToTravel ? 'Open to travel' : `${locationForm.coverageRadiusKm} km radius`}${controller.isLocationDirty ? ' (Unsaved)' : ''}`;
 
   const [availabilityLoadError, setAvailabilityLoadError] = useState(false);
   const [availabilityReloadKey, setAvailabilityReloadKey] = useState(0);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
+  const availabilityAccountRef = useRef(user?.id);
 
   useEffect(() => {
     let current = true;
     // A different signed-in worker must never see the previous worker's availability.
+    setPendingDeleteTarget(null);
     setAvailabilityEntries([]);
-    setNotifyNewShifts(false);
+    if (availabilityAccountRef.current !== user?.id) {
+      availabilityAccountRef.current = user?.id;
+      setNotifyNewShifts(false);
+    }
     setAvailabilityLoading(true);
     setAvailabilityLoadError(false);
     const fetchAvailability = async () => {
@@ -369,9 +488,19 @@ export default function SetAvailabilityScreen() {
         const entries = await fetchUserAvailabilityService();
         if (!current) return;
         setAvailabilityEntries(entries as AvailabilityEntry[]);
-        setNotifyNewShifts(
-          (entries as any[]).some((entry) => Boolean(entry?.notifyNewShifts ?? entry?.notify_new_shifts))
-        );
+        const serverNotify = (entries as any[]).some((entry) => Boolean(entry?.notifyNewShifts ?? entry?.notify_new_shifts));
+        if (!notificationEditedRef.current) setNotifyNewShifts(serverNotify);
+        if (selectedDates.length === 0 && !currentEntry.date && !currentEntry.isRecurring) {
+          baselineSlotDraftRef.current = {
+            ...baselineSlotDraftRef.current,
+            notifyNewShifts: serverNotify,
+          };
+          if (locationSaveInFlightRef.current) pendingAvailabilityBaselineRef.current = true;
+          else markCleanRef.current({
+            slotDraft: baselineSlotDraftRef.current,
+            location: baselineLocationRef.current,
+          });
+        }
       } catch {
         if (current) setAvailabilityLoadError(true);
       } finally {
@@ -385,35 +514,51 @@ export default function SetAvailabilityScreen() {
 
   useEffect(() => {
     let current = true;
+    setLocationLoadError(false);
     // Clear personal travel details before loading a different account.
-    setLocationForm({
+    setRawLocationForm({
       streetAddress: '', suburb: '', state: '', postcode: '', openToTravel: false,
       travelStates: [], latitude: null, longitude: null, googlePlaceId: '', coverageRadiusKm: 30,
     });
     const fetchLocation = async () => {
       if (!onboardingRole || !user?.id) return;
-      try {
-        const onboarding: any = await getOnboarding(onboardingRole as any);
-        if (!current) return;
-        setLocationForm({
-          streetAddress: onboarding?.street_address || '',
-          suburb: onboarding?.suburb || '',
-          state: onboarding?.state || '',
-          postcode: onboarding?.postcode || '',
-          openToTravel: Boolean(onboarding?.open_to_travel),
-          travelStates: Array.isArray(onboarding?.travel_states) ? onboarding.travel_states : [],
-          latitude: onboarding?.latitude ? Number(onboarding.latitude) : null,
-          longitude: onboarding?.longitude ? Number(onboarding.longitude) : null,
-          googlePlaceId: onboarding?.google_place_id || '',
-          coverageRadiusKm: onboarding?.coverage_radius_km || 30,
-        });
-      } catch {
-        if (current) showSnackbar('Failed to load location from onboarding', 'error');
-      }
+      await controller.loadInitialLocation({
+        onboardingRole,
+        fetchService: getOnboarding as any,
+        onLoaded: (onboarding) => {
+          if (!current) return;
+          setLocationLoaded(true);
+          setLocationLoadError(false);
+          const loadedLocation: LocationFormState = {
+            streetAddress: onboarding?.street_address || '',
+            suburb: onboarding?.suburb || '',
+            state: onboarding?.state || '',
+            postcode: onboarding?.postcode || '',
+            openToTravel: Boolean(onboarding?.open_to_travel),
+            travelStates: Array.isArray(onboarding?.travel_states) ? onboarding.travel_states : [],
+            latitude: onboarding?.latitude ? Number(onboarding.latitude) : null,
+            longitude: onboarding?.longitude ? Number(onboarding.longitude) : null,
+            googlePlaceId: onboarding?.google_place_id || '',
+            coverageRadiusKm: onboarding?.coverage_radius_km || 30,
+          };
+          setRawLocationForm(loadedLocation);
+          baselineLocationRef.current = loadedLocation;
+          markCleanRef.current({
+            slotDraft: baselineSlotDraftRef.current,
+            location: loadedLocation,
+          });
+        },
+        onError: () => {
+          if (current) {
+            setLocationLoadError(true);
+            showSnackbar('Failed to load location from onboarding', 'error');
+          }
+        },
+      });
     };
     void fetchLocation();
     return () => { current = false; };
-  }, [onboardingRole, user?.id]);
+  }, [onboardingRole, user?.id, locationReloadKey, controller]);
 
   const handleNativePlaceSelected = (place: {
     address: string;
@@ -432,119 +577,167 @@ export default function SetAvailabilityScreen() {
       suburb: place.suburb || prev.suburb,
       state: place.state || prev.state,
       postcode: place.postcode || prev.postcode,
-      latitude: place.latitude ?? prev.latitude,
-      longitude: place.longitude ?? prev.longitude,
-      googlePlaceId: place.place_id || prev.googlePlaceId,
+      latitude: place.latitude ?? null,
+      longitude: place.longitude ?? null,
+      googlePlaceId: place.place_id || '',
     }));
   };
 
   const handleSaveLocation = async () => {
-    if (!onboardingRole) return;
+    if (!onboardingRole || controller.isBusy) return;
+    locationSaveInFlightRef.current = true;
     setSavingLocation(true);
-    try {
-      const form = new FormData();
-      form.append('street_address', locationForm.streetAddress || '');
-      form.append('suburb', locationForm.suburb || '');
-      form.append('state', locationForm.state || '');
-      form.append('postcode', locationForm.postcode || '');
-      form.append('open_to_travel', locationForm.openToTravel ? 'true' : 'false');
-      form.append('travel_states', JSON.stringify(locationForm.travelStates || []));
-      if (locationForm.latitude != null) form.append('latitude', String(locationForm.latitude));
-      if (locationForm.longitude != null) form.append('longitude', String(locationForm.longitude));
-      if (locationForm.googlePlaceId) form.append('google_place_id', locationForm.googlePlaceId);
-      form.append('coverage_radius_km', String(locationForm.coverageRadiusKm));
-
-      await updateOnboardingForm(onboardingRole, form);
-      showSnackbar('Location updated', 'success');
-    } catch {
-      showSnackbar('Failed to update location', 'error');
-    } finally {
-      setSavingLocation(false);
-    }
+    const savedRevision = locationEditRevision.current;
+    await controller.saveLocation({
+      form: locationForm,
+      onboardingRole,
+      updateService: updateOnboardingForm as any,
+      onSuccess: () => {
+        showSnackbar('Location updated', 'success');
+        baselineLocationRef.current = locationForm;
+        if (locationEditRevision.current !== savedRevision) controller.markLocationDirty();
+        else controller.clearLocationDirty();
+        markCleanRef.current({
+          slotDraft: baselineSlotDraftRef.current,
+          location: locationForm,
+        });
+      },
+      onError: (msg) => {
+        showSnackbar(msg || 'Failed to update location', 'error');
+      },
+    });
+    locationSaveInFlightRef.current = false;
+    setSavingLocation(false);
   };
-
-  const validateTimeRange = (start: string, end: string) =>
-    new Date(`2025-01-01T${end}`) > new Date(`2025-01-01T${start}`);
 
   const handleAddEntry = async () => {
-    const datesToAdd = currentEntry.isRecurring
-      ? [currentEntry.date].filter(Boolean)
-      : (selectedDates.length ? selectedDates : [currentEntry.date].filter(Boolean));
-
-    if (!datesToAdd.length) return showSnackbar('Please select a date', 'error');
-    if (!currentEntry.startTime || !currentEntry.endTime) return showSnackbar('Please set start and end times', 'error');
-    if (!validateTimeRange(currentEntry.startTime, currentEntry.endTime)) return showSnackbar('End must be after start', 'error');
-    if (currentEntry.isRecurring) {
-      if (!currentEntry.recurringDays.length) return showSnackbar('Select days for repeat', 'error');
-      if (!currentEntry.recurringEndDate) return showSnackbar('Set an end date for repeat', 'error');
-      if (new Date(currentEntry.recurringEndDate) < new Date(currentEntry.date)) return showSnackbar('Repeat end must be after date', 'error');
-    }
-
+    if (controller.isBusy) return;
     setLoading(true);
-    try {
-      const payloads: AvailabilityPayload[] = datesToAdd.map((date) => ({
-        date,
-        start_time: currentEntry.startTime,
-        end_time: currentEntry.endTime,
-        is_all_day: currentEntry.isAllDay,
-        is_recurring: currentEntry.isRecurring,
-        recurring_days: currentEntry.isRecurring ? currentEntry.recurringDays : [],
-        recurring_end_date: currentEntry.isRecurring ? currentEntry.recurringEndDate || null : null,
-        notify_new_shifts: notifyNewShifts,
-        notes: currentEntry.notes,
-      }));
-
-      const remaining = unsavedAvailabilityPayloads(payloads, availabilityEntries);
-      if (!remaining.length) {
-        setCurrentEntry(createEmptyEntry());
-        setSelectedDates([]);
-        showSnackbar('These time slots are already saved', 'success');
-        return;
-      }
-
-      const results = await Promise.allSettled(remaining.map(createUserAvailabilityService));
-      const saved = results.flatMap((result) => result.status === 'fulfilled' ? [result.value as AvailabilityEntry] : []);
-      const hadFailure = results.some((result) => result.status === 'rejected');
-      let authoritative = [...availabilityEntries, ...saved];
-
-      if (hadFailure) {
-        // The server may have committed a request even if its response was lost.
-        // Reconcile before offering another write; never blindly repeat the whole batch.
-        try {
-          const refreshed = await fetchUserAvailabilityService();
-          authoritative = refreshed as AvailabilityEntry[];
-          setAvailabilityLoadError(false);
-        } catch {
-          setAvailabilityLoadError(true);
-        }
-      }
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setAvailabilityEntries(authoritative);
-      const unresolved = unsavedAvailabilityPayloads(payloads, authoritative);
-      if (hadFailure && unresolved.length) {
-        setSelectedDates(unresolved.map((item) => item.date));
-        setCurrentEntry((previous) => ({ ...previous, date: unresolved[0].date }));
-        showSnackbar('Some slots were saved. Review remaining dates and retry.', 'error');
-      } else {
-        setCurrentEntry(createEmptyEntry());
+    await controller.addSlots({
+      draft: currentEntry,
+      selectedDates,
+      notifyNewShifts,
+      currentEntries: availabilityEntries,
+      createService: createUserAvailabilityService as any,
+      refreshService: fetchUserAvailabilityService as any,
+      onSuccess: (_saved, authoritative) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setAvailabilityEntries(authoritative);
+        const cleanEntry = createEmptyEntry();
+        setCurrentEntry(cleanEntry);
         setSelectedDates([]);
         showSnackbar('Time slots saved', 'success');
-      }
-    } catch {
-      showSnackbar('Failed to save slot', 'error');
-    } finally {
-      setLoading(false);
-    }
+        const cleanSlot = {
+          currentEntry: cleanEntry,
+          selectedDates: [],
+          notifyNewShifts,
+        };
+        baselineSlotDraftRef.current = cleanSlot;
+        notificationEditedRef.current = false;
+        markCleanRef.current({
+          slotDraft: cleanSlot,
+          location: baselineLocationRef.current,
+        });
+      },
+      onPartialRetry: (remainingDates, authoritative, savedCount, totalCount) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setAvailabilityEntries(authoritative);
+        setSelectedDates(remainingDates);
+        setCurrentEntry((previous) => ({ ...previous, date: remainingDates[0] || '' }));
+        showSnackbar(`${savedCount} of ${totalCount} time slots saved. Review remaining dates and retry.`, 'error');
+      },
+      onReconcileFailure: () => {
+        setAvailabilityLoadError(true);
+        showSnackbar('Reconciliation failed. Please reload before adding slots.', 'error');
+      },
+      onAlreadySaved: () => {
+        const cleanEntry = createEmptyEntry();
+        setCurrentEntry(cleanEntry);
+        setSelectedDates([]);
+        showSnackbar('These time slots are already saved', 'success');
+        const cleanSlot = {
+          currentEntry: cleanEntry,
+          selectedDates: [],
+          notifyNewShifts,
+        };
+        baselineSlotDraftRef.current = cleanSlot;
+        notificationEditedRef.current = false;
+        markCleanRef.current({
+          slotDraft: cleanSlot,
+          location: baselineLocationRef.current,
+        });
+      },
+      onError: (msg) => {
+        showSnackbar(msg, 'error');
+      },
+    });
+    setLoading(false);
   };
 
-  const handleDeleteEntry = async (id: number) => {
+  const handleRequestDelete = (item: AvailabilityEntry) => {
+    if (deleting || isBusy || controller.isBusy) return;
+    const token = nextDeleteTokenRef.current++;
+    setPendingDeleteTarget({
+      token,
+      id: item.id,
+      generation: controller.currentGeneration,
+      accountKey,
+      slot: item,
+    });
+  };
+
+  const handleCancelDelete = () => {
+    if (deleting || controller.isBusy || confirmingRef.current) return;
+    setPendingDeleteTarget(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteTarget || deleting || isBusy || controller.isBusy || confirmingRef.current) return;
+    if (consumedDeleteTokensRef.current.has(pendingDeleteTarget.token)) return;
+    confirmingRef.current = true;
+    consumedDeleteTokensRef.current.add(pendingDeleteTarget.token);
+    const target = pendingDeleteTarget;
+
+    // Safety checks:
+    // 1. Account generation and account key match captured values
+    if (target.accountKey !== accountKey || target.generation !== controller.currentGeneration) {
+      setPendingDeleteTarget(null);
+      confirmingRef.current = false;
+      return;
+    }
+
+    // 2. Target slot ID must still exist in current rows (never delete by list index or a substituted row)
+    const targetStillExists = availabilityEntries.some((e) => e.id === target.id);
+    if (!targetStillExists) {
+      setPendingDeleteTarget(null);
+      confirmingRef.current = false;
+      return;
+    }
+
+    const generation = controller.currentGeneration;
+    setDeleting(true);
     try {
-      await deleteUserAvailabilityService(id);
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setAvailabilityEntries((prev) => prev.filter((e) => e.id !== id));
-      showSnackbar('Slot deleted', 'success');
-    } catch {
-      showSnackbar('Failed to delete slot', 'error');
+      await controller.deleteSlot({
+        id: target.id,
+        deleteService: deleteUserAvailabilityService as any,
+        onSuccess: () => {
+          if (controller.currentAccountKey !== accountKey || controller.currentGeneration !== generation) return;
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setAvailabilityEntries((prev) => prev.filter((e) => e.id !== target.id));
+          showSnackbar('Slot deleted', 'success');
+        },
+        onError: () => {
+          if (controller.currentAccountKey !== accountKey || controller.currentGeneration !== generation) return;
+          showSnackbar('Failed to delete slot', 'error');
+          setAvailabilityReloadKey((v) => v + 1);
+        },
+      });
+    } finally {
+      confirmingRef.current = false;
+      if (controller.currentGeneration === generation && controller.currentAccountKey === accountKey) {
+        setDeleting(false);
+        setPendingDeleteTarget(null);
+      }
     }
   };
 
@@ -568,32 +761,13 @@ export default function SetAvailabilityScreen() {
   const toggleCalendarDate = (date: string) => {
     syncSelectedDates(selectedDates.includes(date) ? selectedDates.filter((item) => item !== date) : [...selectedDates, date]);
   };
-  const addCalendarDate = (date: string) => {
-    setSelectedDates((prevDates) => {
-      if (prevDates.includes(date)) return prevDates;
-      const sorted = [...prevDates, date].sort();
-      setCurrentEntry((prev) => ({
-        ...prev,
-        date: sorted[0] || '',
-        recurringEndDate: prev.isRecurring ? sorted[sorted.length - 1] || '' : prev.recurringEndDate,
-      }));
-      return sorted;
-    });
-  };
-  const getCalendarDateFromTouch = (locationX: number, locationY: number) => {
-    if (!calendarGridWidth) return null;
-    const cellSize = calendarGridWidth / 7;
-    const column = Math.max(0, Math.min(6, Math.floor(locationX / cellSize)));
-    const row = Math.max(0, Math.floor(locationY / cellSize));
-    const cell = monthCalendarCells[row * 7 + column];
-    return cell?.inMonth ? cell.iso : null;
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text variant="headlineMedium" style={styles.title}>Set Your Availability</Text>
-        {availabilityLoading ? <Text style={styles.hint}>Loading your saved availability...</Text> : null}
+        <Text style={styles.scopeDescription}>Availability dates are managed here; public Talent posts are published separately.</Text>
+        {availabilityLoading ? <BrandLoader size={24} accessibilityLabel="Loading your saved availability…" /> : null}
         {availabilityLoadError ? (
           <Surface style={styles.card} elevation={0}>
             <Text style={styles.hint}>Saved availability could not be loaded. Please retry before making changes.</Text>
@@ -601,181 +775,63 @@ export default function SetAvailabilityScreen() {
           </Surface>
         ) : null}
 
-        <Surface style={styles.notifyCard} elevation={1}>
-          <View style={styles.checkboxRowPlain}>
-            <Checkbox status={notifyNewShifts ? 'checked' : 'unchecked'} onPress={() => setNotifyNewShifts((v) => !v)} />
-            <Text style={styles.rowText}>Notify me when new public shifts match my availability</Text>
-          </View>
-          <Text style={styles.notifyDescription}>
-            By checking this box, you will get an instant notification when a public shift matches any availability dates and times you add.
-          </Text>
-        </Surface>
-
-        <Surface style={styles.card} elevation={2}>
-          <Text style={styles.sectionTitle}>Location & Travel</Text>
-
-          <View style={{ minHeight: 56 }}>
-            {Platform.OS !== 'web' ? (
-              <GooglePlacesInput
-                label="Address"
-                value={locationForm.streetAddress}
-                onPlaceSelected={handleNativePlaceSelected}
-              />
-            ) : (
-              <AvailabilityWebLocationField
-                placesApiKey={placesApiKey}
-                locationForm={locationForm}
-                setLocationForm={setLocationForm}
-              />
-            )}
-          </View>
-
-          {Platform.OS !== 'web' ? (
-            <View style={styles.mapWrap}>
-              {nativeMapPreviewCoordinates ? (
-                <AvailabilityRadiusMap
-                  latitude={nativeMapPreviewCoordinates.latitude}
-                  longitude={nativeMapPreviewCoordinates.longitude}
-                  radiusKm={locationForm.coverageRadiusKm}
-                  style={styles.nativeMap}
-                />
-              ) : (
-                <View style={styles.mapFallback}>
-                  <Text style={styles.hint}>
-                    {locationForm.latitude == null || locationForm.longitude == null
-                      ? 'Select an address to preview the travel radius.'
-                      : !nativeMapPreviewEnabled
-                      ? 'Map preview is disabled in local development until the Android dev build is rebuilt with the native Google Maps key. You can still save your address and radius.'
-                      : nativeMapsKeyConfigured
-                      ? 'Select an address to preview the travel radius.'
-                      : 'Native Google Maps key is not configured for this build yet. Save your address and rebuild the app to enable the map preview.'}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ) : null}
-
-          <View style={styles.row2}>
-            <TextInput mode="outlined" label="Suburb" value={locationForm.suburb} onChangeText={(v) => setLocationForm((p) => ({ ...p, suburb: v }))} style={[styles.input, styles.flex]} outlineStyle={styles.inputOutline} />
-            <TextInput mode="outlined" label="State" value={locationForm.state} onChangeText={(v) => setLocationForm((p) => ({ ...p, state: v }))} style={[styles.input, styles.flex]} outlineStyle={styles.inputOutline} />
-            <TextInput mode="outlined" label="Postcode" value={locationForm.postcode} onChangeText={(v) => setLocationForm((p) => ({ ...p, postcode: v }))} style={[styles.input, styles.flex]} outlineStyle={styles.inputOutline} />
-          </View>
-
-          <Menu
-            visible={radiusMenuVisible}
-            onDismiss={() => setRadiusMenuVisible(false)}
-            anchor={<Button mode="outlined" onPress={() => setRadiusMenuVisible(true)} disabled={locationForm.openToTravel} style={styles.outlineButton}>{`Work Travel Radius: ${locationForm.coverageRadiusKm} km`}</Button>}
-          >
-            {radiusOptions.map((km) => (
-              <Menu.Item
-                key={km}
-                title={`${km} km`}
-                onPress={() => {
-                  setLocationForm((p) => ({ ...p, coverageRadiusKm: km }));
-                  setRadiusMenuVisible(false);
-                }}
-              />
-            ))}
-          </Menu>
-
-          <View style={styles.checkboxRow}>
-            <Checkbox
-              status={locationForm.openToTravel ? 'checked' : 'unchecked'}
-              onPress={() => setLocationForm((p) => ({ ...p, openToTravel: !p.openToTravel, travelStates: !p.openToTravel ? p.travelStates : [] }))}
-            />
-            <Text style={styles.rowText}>Willing to travel/Regional</Text>
-          </View>
-
-          {locationForm.openToTravel ? (
-            <Menu
-              visible={travelMenuVisible}
-              onDismiss={() => setTravelMenuVisible(false)}
-              anchor={<Button mode="outlined" onPress={() => setTravelMenuVisible(true)} style={styles.outlineButton}>{`Travel States: ${locationForm.travelStates.join(', ') || 'Select'}`}</Button>}
-            >
-              {stateOptions.map((st) => {
-                const selected = locationForm.travelStates.includes(st);
-                return (
-                  <Checkbox.Item
-                    key={st}
-                    label={st}
-                    status={selected ? 'checked' : 'unchecked'}
-                    onPress={() =>
-                      setLocationForm((p) => ({
-                        ...p,
-                        travelStates: selected ? p.travelStates.filter((s) => s !== st) : [...p.travelStates, st],
-                      }))
-                    }
-                    position="leading"
-                    style={styles.checkboxItem}
-                  />
-                );
-              })}
-            </Menu>
-          ) : null}
-
-          <Button mode="contained" onPress={handleSaveLocation} disabled={savingLocation || !onboardingRole} loading={savingLocation} style={styles.primaryButton} labelStyle={styles.primaryButtonLabel}>
-            Save Location
-          </Button>
-        </Surface>
-
         <Surface style={styles.card} elevation={2}>
           <Text style={styles.sectionTitle}>Add dates</Text>
 
           <View style={styles.modeRow}>
             <Button
-              mode={currentEntry.isRecurring ? 'contained' : 'outlined'}
-              onPress={() => setCurrentEntry((p) => ({ ...p, isRecurring: true, recurringDays: [], recurringEndDate: selectedDates[selectedDates.length - 1] || '' }))}
-              style={styles.modeButton}
-            >
-              Recurring availability
-            </Button>
-            <Button
               mode={!currentEntry.isRecurring ? 'contained' : 'outlined'}
+              disabled={loading}
               onPress={() => setCurrentEntry((p) => ({ ...p, isRecurring: false, recurringDays: [], recurringEndDate: '' }))}
               style={styles.modeButton}
             >
-              Pick specific dates
+              Specific dates
+            </Button>
+            <Button
+              mode={currentEntry.isRecurring ? 'contained' : 'outlined'}
+              disabled={loading}
+              onPress={() => setCurrentEntry((p) => ({ ...p, isRecurring: true, recurringDays: [], recurringEndDate: selectedDates[selectedDates.length - 1] || '' }))}
+              style={styles.modeButton}
+            >
+              Repeating
             </Button>
           </View>
           <Text style={styles.modeDescription}>
             {currentEntry.isRecurring
-              ? 'Select the start and end date on the calendar, then choose the weekdays you are available. Matching recurring dates will be highlighted before you add them.'
-              : 'Pick the dates you are available on the calendar. Tap a date again to deselect it, or drag across dates to select multiple days.'}
+              ? 'Select start and end dates on the calendar or type below, then choose repeating weekdays.'
+              : 'Select dates on the calendar or type below. Tap a date again to deselect it.'}
           </Text>
 
           <Surface style={styles.calendarPanel} elevation={0}>
             <View style={styles.calendarHeader}>
-              <IconButton icon="chevron-left" size={18} onPress={() => setCalendarMonthAnchor((p) => new Date(p.getFullYear(), p.getMonth() - 1, 1))} />
+              <IconButton icon="chevron-left" size={22} style={styles.iconButton44} disabled={loading} accessibilityLabel="Previous month" onPress={() => setCalendarMonthAnchor((p) => new Date(p.getFullYear(), p.getMonth() - 1, 1))} />
               <Text style={styles.calendarTitle}>{monthLabel}</Text>
-              <IconButton icon="chevron-right" size={18} onPress={() => setCalendarMonthAnchor((p) => new Date(p.getFullYear(), p.getMonth() + 1, 1))} />
+              <IconButton icon="chevron-right" size={22} style={styles.iconButton44} disabled={loading} accessibilityLabel="Next month" onPress={() => setCalendarMonthAnchor((p) => new Date(p.getFullYear(), p.getMonth() + 1, 1))} />
+            </View>
+            <View style={styles.calendarLegend}>
+              <View style={styles.legendItem}><View style={[styles.legendBox, styles.calendarCellSelected]} /><Text style={styles.legendText}>Selected</Text></View>
+              <View style={styles.legendItem}><View style={[styles.legendBox, styles.calendarCellSaved]} /><Text style={styles.legendText}>Saved</Text></View>
+              <View style={styles.legendItem}><View style={[styles.legendBox, styles.calendarCellRecurring]} /><Text style={styles.legendText}>Repeats</Text></View>
             </View>
             <View style={styles.calendarWeekHead}>
               {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, idx) => (
                 <Text key={`${d}-${idx}`} style={styles.calendarWeekText}>{d}</Text>
               ))}
             </View>
-            <View
-              style={styles.calendarGrid}
-              onLayout={(event) => setCalendarGridWidth(event.nativeEvent.layout.width)}
-              onStartShouldSetResponder={() => true}
-              onMoveShouldSetResponder={() => true}
-              onResponderGrant={(event) => {
-                const date = getCalendarDateFromTouch(event.nativeEvent.locationX, event.nativeEvent.locationY);
-                if (date) toggleCalendarDate(date);
-              }}
-              onResponderMove={(event) => {
-                const date = getCalendarDateFromTouch(event.nativeEvent.locationX, event.nativeEvent.locationY);
-                if (date) addCalendarDate(date);
-              }}
-            >
+            <View style={styles.calendarGrid}>
               {monthCalendarCells.map((cell, idx) => {
                 if (!cell.inMonth) return <View key={`${cell.iso}-${idx}`} style={[styles.calendarCell, styles.calendarCellPad]} />;
                 const isSelected = selectedDateSet.has(cell.iso);
                 const isSaved = savedAvailabilityDateSet.has(cell.iso);
                 const recurringPreview = recurringPreviewDateSet.has(cell.iso);
                 return (
-                  <View
+                  <Pressable
                     key={`${cell.iso}-${idx}`}
+                    disabled={loading}
+                    onPress={() => toggleCalendarDate(cell.iso)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    accessibilityLabel={getCellA11y(cell.iso, isSelected, isSaved, recurringPreview)}
                     style={[
                       styles.calendarCell,
                       isSaved && styles.calendarCellSaved,
@@ -784,64 +840,129 @@ export default function SetAvailabilityScreen() {
                     ]}
                   >
                     <Text style={[styles.calendarCellText, recurringPreview && styles.calendarCellTextRecurring, isSelected && styles.calendarCellTextSelected]}>{cell.day}</Text>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
           </Surface>
 
-          {currentEntry.date ? (
-            <Text style={styles.hint}>{`${currentEntry.isRecurring ? 'Start date' : 'Selected date'}: ${currentEntry.date}`}</Text>
+          <View style={styles.row2}>
+            <TextInput
+              mode="outlined"
+              label={currentEntry.isRecurring ? 'Start date' : 'Date'}
+              value={currentEntry.date || ''}
+              editable={!loading}
+              onChangeText={(text) => {
+                const trimmed = text.trim();
+                setCurrentEntry((p) => ({ ...p, date: trimmed }));
+                if (isValidIsoDate(trimmed)) {
+                  setSelectedDates([trimmed]);
+                } else {
+                  setSelectedDates([]);
+                }
+              }}
+              placeholder="YYYY-MM-DD"
+              style={[styles.input, styles.flex]}
+              outlineStyle={styles.inputOutline}
+            />
+            {currentEntry.isRecurring ? (
+              <TextInput
+                mode="outlined"
+                label="End Date"
+                editable={!loading}
+                value={currentEntry.recurringEndDate || ''}
+                onChangeText={(v) => setCurrentEntry((p) => ({ ...p, recurringEndDate: v.trim() }))}
+                placeholder="YYYY-MM-DD"
+                style={[styles.input, styles.flex]}
+                outlineStyle={styles.inputOutline}
+              />
+            ) : null}
+          </View>
+          {currentEntry.isRecurring && isValidIsoDate(currentEntry.date) && isValidIsoDate(currentEntry.recurringEndDate || '') && currentEntry.recurringEndDate! < currentEntry.date ? (
+            <HelperText type="error" visible>Repeat end must be on or after the start date</HelperText>
           ) : null}
-          {selectedDates.length > 0 ? <Text style={styles.hint}>{`Selected dates: ${selectedDates.join(', ')}`}</Text> : null}
+          {selectedDates.length > 0 ? (
+            <View style={styles.selectionSummaryRow}>
+              <Text style={styles.hint}>{selectedDates.length === 1 ? '1 date selected' : `${selectedDates.length} dates selected`}</Text>
+              <Button compact mode="text" disabled={loading} onPress={() => syncSelectedDates([])} accessibilityLabel="Clear selected dates">Clear</Button>
+            </View>
+          ) : null}
+          {currentEntry.isRecurring && (currentEntry.date || currentEntry.recurringEndDate) ? (
+            <Text style={styles.hint}>{`Repeating from ${currentEntry.date || 'start'} to ${currentEntry.recurringEndDate || 'end'}`}</Text>
+          ) : null}
 
           {currentEntry.isRecurring ? (
-            <>
-              <TextInput mode="outlined" label="End Date" value={currentEntry.recurringEndDate || ''} onChangeText={(v) => setCurrentEntry((p) => ({ ...p, recurringEndDate: v }))} placeholder="YYYY-MM-DD" style={styles.input} outlineStyle={styles.inputOutline} />
-              <View style={styles.chipWrap}>
-                {weekDays.map((d) => {
-                  const selected = currentEntry.recurringDays.includes(d.value);
-                  return (
-                    <Chip key={d.value} selected={selected} onPress={() => toggleRecurringDay(d.value)} style={selected ? styles.chipSelected : styles.chip} textStyle={selected ? styles.chipSelectedText : styles.chipText}>
-                      {d.label}
-                    </Chip>
-                  );
-                })}
-              </View>
-            </>
+            <View style={styles.chipWrap}>
+              {weekDays.map((d) => {
+                const selected = currentEntry.recurringDays.includes(d.value);
+                return (
+                  <Chip key={d.value} selected={selected} disabled={loading} onPress={() => toggleRecurringDay(d.value)} style={selected ? styles.chipSelected : styles.chip} textStyle={selected ? styles.chipSelectedText : styles.chipText}>
+                    {d.label}
+                  </Chip>
+                );
+              })}
+            </View>
           ) : null}
 
-          <View style={styles.checkboxRow}>
-            <Checkbox
-              status={currentEntry.isAllDay ? 'checked' : 'unchecked'}
-              onPress={() =>
-                setCurrentEntry((prev) => ({
-                  ...prev,
-                  isAllDay: !prev.isAllDay,
-                  startTime: !prev.isAllDay ? '00:00' : '09:00',
-                  endTime: !prev.isAllDay ? '23:59' : '17:00',
-                }))
-              }
-            />
+          <Pressable
+            style={styles.checkboxRow}
+            disabled={loading || isBusy}
+            onPress={() =>
+              setCurrentEntry((prev) => ({
+                ...prev,
+                isAllDay: !prev.isAllDay,
+                startTime: !prev.isAllDay ? '00:00' : '09:00',
+                endTime: !prev.isAllDay ? '23:59' : '17:00',
+              }))
+            }
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: currentEntry.isAllDay, disabled: loading || isBusy }}
+            accessibilityLabel="All Day"
+          >
+            <View pointerEvents="none">
+              <Checkbox status={currentEntry.isAllDay ? 'checked' : 'unchecked'} disabled={loading || isBusy} />
+            </View>
             <Text style={styles.rowText}>All Day</Text>
-          </View>
+          </Pressable>
 
           <View style={styles.row2}>
-            <TextInput mode="outlined" label="Start Time" value={currentEntry.startTime} disabled={currentEntry.isAllDay} onChangeText={(v) => setCurrentEntry((p) => ({ ...p, startTime: v }))} style={[styles.input, styles.flex]} outlineStyle={styles.inputOutline} />
-            <TextInput mode="outlined" label="End Time" value={currentEntry.endTime} disabled={currentEntry.isAllDay} onChangeText={(v) => setCurrentEntry((p) => ({ ...p, endTime: v }))} style={[styles.input, styles.flex]} outlineStyle={styles.inputOutline} />
+            <TextInput mode="outlined" label="Start Time" value={currentEntry.startTime} editable={!loading && !currentEntry.isAllDay} disabled={currentEntry.isAllDay} onChangeText={(v) => setCurrentEntry((p) => ({ ...p, startTime: v }))} style={[styles.input, styles.flex]} outlineStyle={styles.inputOutline} />
+            <TextInput mode="outlined" label="End Time" value={currentEntry.endTime} editable={!loading && !currentEntry.isAllDay} disabled={currentEntry.isAllDay} onChangeText={(v) => setCurrentEntry((p) => ({ ...p, endTime: v }))} style={[styles.input, styles.flex]} outlineStyle={styles.inputOutline} />
           </View>
-          <HelperText type="info">Use HH:MM format, e.g. 09:00</HelperText>
+          <HelperText type="info" style={styles.helperText}>Use HH:MM format, e.g. 09:00</HelperText>
 
-          <TextInput mode="outlined" label="Notes" multiline numberOfLines={3} value={currentEntry.notes || ''} onChangeText={(v) => setCurrentEntry((p) => ({ ...p, notes: v }))} style={styles.input} outlineStyle={styles.inputOutline} />
+          <TextInput mode="outlined" label="Notes" multiline numberOfLines={3} value={currentEntry.notes || ''} editable={!loading} onChangeText={(v) => setCurrentEntry((p) => ({ ...p, notes: v }))} style={styles.input} outlineStyle={styles.inputOutline} />
 
-          <Button mode="contained" onPress={handleAddEntry} disabled={loading || availabilityLoading || availabilityLoadError} loading={loading} style={styles.primaryButton} labelStyle={styles.primaryButtonLabel}>
+          <Button mode="contained" onPress={handleAddEntry} disabled={isBusy || availabilityLoading || availabilityLoadError} loading={loading} style={styles.primaryButton} labelStyle={styles.primaryButtonLabel}>
             Add Time Slot
           </Button>
         </Surface>
 
+        <Surface style={styles.notifyCard} elevation={1}>
+          <Pressable
+            style={styles.checkboxRowPlain}
+            disabled={loading || isBusy}
+            onPress={() => {
+              notificationEditedRef.current = true;
+              setNotifyNewShifts((v) => !v);
+            }}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: notifyNewShifts, disabled: loading || isBusy }}
+            accessibilityLabel="Notify me when new public shifts match my availability"
+          >
+            <View pointerEvents="none">
+              <Checkbox status={notifyNewShifts ? 'checked' : 'unchecked'} disabled={loading || isBusy} />
+            </View>
+            <Text style={styles.rowText}>Notify me when new public shifts match my availability</Text>
+          </Pressable>
+          <Text style={styles.notifyDescription}>
+            By checking this box, you will get an instant notification when a public shift matches any availability dates and times you add.
+          </Text>
+        </Surface>
+
         <Text style={styles.sectionTitle}>Your Time Slots</Text>
         {availabilityLoading ? (
-          <Text style={styles.empty}>Loading saved time slots...</Text>
+          <BrandLoader size={24} accessibilityLabel="Loading saved time slots…" />
         ) : availabilityLoadError ? (
           <Text style={styles.empty}>Unable to show saved time slots until the request succeeds.</Text>
         ) : availabilityEntries.length === 0 ? (
@@ -849,7 +970,7 @@ export default function SetAvailabilityScreen() {
         ) : (
           availabilityEntries.map((item) => (
             <Surface key={item.id} style={styles.slotItem} elevation={1}>
-              <View style={{ flex: 1 }}>
+              <View style={styles.flex}>
                 <Text style={styles.slotTitle}>{`${item.date} - ${item.isAllDay ? 'All Day' : `${item.startTime}-${item.endTime}`}`}</Text>
                 {item.isRecurring ? (
                   <Text style={styles.slotMeta}>{`Repeats on ${(item.recurringDays || []).map((d) => weekDays[d]?.label || '').filter(Boolean).join(', ')} until ${item.recurringEndDate}`}</Text>
@@ -857,11 +978,240 @@ export default function SetAvailabilityScreen() {
                 {item.notifyNewShifts ? <Text style={[styles.slotMeta, styles.slotMetaSuccess]}>Notifications on for matching public shifts</Text> : null}
                 {item.notes ? <Text style={styles.slotMeta}>{item.notes}</Text> : null}
               </View>
-              <Button textColor="#DC2626" onPress={() => handleDeleteEntry(item.id)}>Delete</Button>
+              <Button
+                testID={`availability-slot-delete-${item.id}`}
+                textColor="#DC2626"
+                disabled={isBusy || controller.isBusy || Boolean(pendingDeleteTarget)}
+                accessibilityLabel={`Delete ${item.isRecurring ? 'repeating ' : ''}slot ${item.date || ''} ${item.isAllDay ? 'All Day' : `${item.startTime}-${item.endTime}`}`}
+                onPress={() => handleRequestDelete(item)}
+              >
+                Delete
+              </Button>
             </Surface>
           ))
         )}
+
+        <Surface style={styles.card} elevation={2}>
+          <Pressable
+            onPress={() => setLocationExpanded((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel={`Location and travel settings: ${locationSummary}. Tap to ${locationExpanded ? 'collapse' : 'expand'}`}
+            style={styles.locationHeaderRow}
+          >
+            <View style={styles.flex}>
+              <Text style={styles.sectionTitle}>Location & Travel</Text>
+              <Text style={styles.hint}>{locationSummary}</Text>
+            </View>
+            <IconButton icon={locationExpanded ? 'chevron-up' : 'chevron-down'} size={24} style={styles.iconButton44} disabled accessible={false} pointerEvents="none" />
+          </Pressable>
+
+          {locationExpanded ? (
+            !locationLoaded ? (
+              locationLoadError ? (
+                <View style={{ gap: 8 }}>
+                  <Text style={[styles.hint, { color: '#DC2626' }]}>Failed to load location.</Text>
+                  <Button mode="outlined" onPress={() => setLocationReloadKey((k) => k + 1)}>Retry location load</Button>
+                </View>
+              ) : (
+                <BrandLoader size={24} accessibilityLabel="Loading saved location…" />
+              )
+            ) : (
+              <>
+                <View style={{ minHeight: 56 }}>
+                  {Platform.OS !== 'web' ? (
+                    <GooglePlacesInput
+                      label="Address"
+                      value={locationForm.streetAddress}
+                      onPlaceSelected={handleNativePlaceSelected}
+                      onChangeText={(streetAddress) => setLocationForm((p) => manualAddressEdit(p, 'streetAddress', streetAddress))}
+                    />
+                  ) : (
+                    <AvailabilityWebLocationField
+                      placesApiKey={placesApiKey}
+                      locationForm={locationForm}
+                      setLocationForm={setLocationForm}
+                    />
+                  )}
+                </View>
+
+                {Platform.OS !== 'web' ? (
+                  <View style={styles.mapWrap}>
+                    {nativeMapPreviewCoordinates ? (
+                      <AvailabilityRadiusMap
+                        latitude={nativeMapPreviewCoordinates.latitude}
+                        longitude={nativeMapPreviewCoordinates.longitude}
+                        radiusKm={locationForm.coverageRadiusKm}
+                        style={styles.nativeMap}
+                      />
+                    ) : (
+                      <View style={styles.mapFallback}>
+                        <Text style={styles.hint}>
+                          {locationForm.latitude == null || locationForm.longitude == null
+                            ? 'Select an address to preview the travel radius.'
+                            : 'Map unavailable. You can still type your address.'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                ) : null}
+
+                <TextInput
+                  mode="outlined"
+                  label="Suburb"
+                  editable={!savingLocation && !isBusy}
+                  value={locationForm.suburb}
+                  onChangeText={(v) => setLocationForm((p) => manualAddressEdit(p, 'suburb', v))}
+                  style={styles.input}
+                  outlineStyle={styles.inputOutline}
+                />
+                <View style={styles.row2}>
+                  <TextInput
+                    mode="outlined"
+                    label="State"
+                    editable={!savingLocation && !isBusy}
+                    value={locationForm.state}
+                    onChangeText={(v) => setLocationForm((p) => manualAddressEdit(p, 'state', v))}
+                    style={[styles.input, styles.flex]}
+                    outlineStyle={styles.inputOutline}
+                  />
+                  <TextInput
+                    mode="outlined"
+                    label="Postcode"
+                    editable={!savingLocation && !isBusy}
+                    value={locationForm.postcode}
+                    onChangeText={(v) => setLocationForm((p) => manualAddressEdit(p, 'postcode', v))}
+                    style={[styles.input, styles.flex]}
+                    outlineStyle={styles.inputOutline}
+                  />
+                </View>
+
+                <Menu
+                  visible={radiusMenuVisible}
+                  onDismiss={() => setRadiusMenuVisible(false)}
+                  anchor={
+                    <Button
+                      mode="outlined"
+                      onPress={() => setRadiusMenuVisible(true)}
+                      disabled={locationForm.openToTravel || savingLocation || isBusy}
+                      style={styles.outlineButton}
+                    >
+                      {`Work Travel Radius: ${locationForm.coverageRadiusKm} km`}
+                    </Button>
+                  }
+                >
+                  {radiusOptions.map((km) => (
+                    <Menu.Item
+                      key={km}
+                      title={`${km} km`}
+                      onPress={() => {
+                        setLocationForm((p) => ({ ...p, coverageRadiusKm: km }));
+                        setRadiusMenuVisible(false);
+                      }}
+                    />
+                  ))}
+                </Menu>
+
+                <Pressable
+                  style={styles.checkboxRow}
+                  disabled={savingLocation || isBusy}
+                  onPress={() =>
+                    setLocationForm((p) => ({
+                      ...p,
+                      openToTravel: !p.openToTravel,
+                      travelStates: !p.openToTravel ? p.travelStates : [],
+                    }))
+                  }
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: locationForm.openToTravel, disabled: savingLocation || isBusy }}
+                  accessibilityLabel="Willing to travel or regional"
+                >
+                  <View pointerEvents="none">
+                    <Checkbox
+                      status={locationForm.openToTravel ? 'checked' : 'unchecked'}
+                      disabled={savingLocation || isBusy}
+                    />
+                  </View>
+                  <Text style={styles.rowText}>Willing to travel/Regional</Text>
+                </Pressable>
+
+                {locationForm.openToTravel ? (
+                  <Menu
+                    visible={travelMenuVisible}
+                    onDismiss={() => setTravelMenuVisible(false)}
+                    anchor={
+                      <Button
+                        mode="outlined"
+                        onPress={() => setTravelMenuVisible(true)}
+                        disabled={savingLocation || isBusy}
+                        style={styles.outlineButton}
+                      >
+                        {`Travel States: ${locationForm.travelStates.join(', ') || 'Select'}`}
+                      </Button>
+                    }
+                  >
+                    {stateOptions.map((st) => {
+                      const selected = locationForm.travelStates.includes(st);
+                      return (
+                        <Checkbox.Item
+                          key={st}
+                          label={st}
+                          status={selected ? 'checked' : 'unchecked'}
+                          disabled={savingLocation || isBusy}
+                          onPress={() =>
+                            setLocationForm((p) => ({
+                              ...p,
+                              travelStates: selected ? p.travelStates.filter((s) => s !== st) : [...p.travelStates, st],
+                            }))
+                          }
+                          position="leading"
+                          style={styles.checkboxItem}
+                        />
+                      );
+                    })}
+                  </Menu>
+                ) : null}
+
+                <Button
+                  mode="outlined"
+                  onPress={handleSaveLocation}
+                  disabled={savingLocation || !onboardingRole || !locationLoaded || locationLoadError || isBusy}
+                  loading={savingLocation}
+                  style={styles.outlineButton}
+                >
+                  Save Location
+                </Button>
+              </>
+            )
+          ) : null}
+        </Surface>
       </ScrollView>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteTarget)}
+        title="Delete availability slot?"
+        body={
+          pendingDeleteTarget?.slot
+            ? `Are you sure you want to delete this availability slot?\n\n${formatSlotEnAuDate(pendingDeleteTarget.slot.date)} · ${
+                pendingDeleteTarget.slot.isAllDay
+                  ? 'All Day'
+                  : `${pendingDeleteTarget.slot.startTime} – ${pendingDeleteTarget.slot.endTime}`
+              }${
+                pendingDeleteTarget.slot.isRecurring
+                  ? `\nRepeats on ${(pendingDeleteTarget.slot.recurringDays || []).map((d) => weekDays[d]?.label || '').filter(Boolean).join(', ')}${
+                      pendingDeleteTarget.slot.recurringEndDate ? ` until ${formatSlotEnAuDate(pendingDeleteTarget.slot.recurringEndDate)}` : ''
+                    }`
+                  : ''
+              }`
+            : ''
+        }
+        confirmLabel="Delete this slot"
+        confirmTestID="availability-delete-confirm"
+        busyLabel="Deleting…"
+        busy={deleting || controller.isBusy}
+        destructive
+        onConfirm={handleConfirmDelete}
+        onClose={handleCancelDelete}
+      />
 
       <Snackbar visible={snackbarOpen} onDismiss={() => setSnackbarOpen(false)} duration={4000}>
         <Text style={{ color: snackbarSeverity === 'error' ? '#FCA5A5' : '#86EFAC' }}>{snackbarMsg}</Text>
@@ -870,10 +1220,17 @@ export default function SetAvailabilityScreen() {
   );
 }
 
+export default function SetAvailabilityScreen() {
+  const { user } = useAuth();
+  const accountKey = `${user?.id ?? 'anon'}:${user?.role ?? 'norole'}`;
+  return <SetAvailabilityInner key={accountKey} />;
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F9FF' },
-  content: { padding: 16, gap: 14, paddingBottom: 32 },
+  content: { paddingHorizontal: 16, paddingVertical: 14, gap: 14, paddingBottom: 32 },
   title: { fontWeight: '900', color: DNA.ink, letterSpacing: -0.4 },
+  scopeDescription: { color: DNA.muted, fontSize: 14, fontWeight: '400', lineHeight: 20 },
   card: {
     borderRadius: 18,
     backgroundColor: '#FFFFFF',
@@ -887,6 +1244,7 @@ const styles = StyleSheet.create({
     shadowRadius: 22,
   },
   sectionTitle: { fontWeight: '900', color: DNA.ink },
+  locationHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 },
   notifyCard: {
     borderRadius: 16,
     backgroundColor: '#F0FDF4',
@@ -895,11 +1253,11 @@ const styles = StyleSheet.create({
     borderColor: '#BBF7D0',
     gap: 4,
   },
-  notifyDescription: { color: DNA.muted, fontSize: 12, fontWeight: '700', paddingLeft: 42 },
+  notifyDescription: { color: DNA.muted, fontSize: 14, fontWeight: '400', paddingLeft: 42 },
   row2: { flexDirection: 'row', gap: 8 },
   modeRow: { flexDirection: 'row', gap: 8, justifyContent: 'center', alignSelf: 'center', maxWidth: 560 },
   modeButton: { flex: 1, borderRadius: 14 },
-  modeDescription: { color: DNA.muted, fontSize: 12, fontWeight: '700', textAlign: 'center', alignSelf: 'center', maxWidth: 560 },
+  modeDescription: { color: DNA.muted, fontSize: 14, fontWeight: '400', textAlign: 'center', alignSelf: 'center', maxWidth: 560 },
   flex: { flex: 1 },
   input: { backgroundColor: '#FFFFFF' },
   inputOutline: { borderRadius: 14, borderColor: '#DCE5F4' },
@@ -911,19 +1269,21 @@ const styles = StyleSheet.create({
     borderColor: '#E5ECF7',
     borderRadius: 14,
     paddingRight: 10,
+    minHeight: 44,
   },
   checkboxRowPlain: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 44,
   },
   rowText: { color: DNA.ink, flexShrink: 1, fontWeight: '700' },
   checkboxItem: { paddingVertical: 0 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: '#F3F6FD' },
-  chipSelected: { backgroundColor: '#EDE9FE' },
+  chip: { backgroundColor: '#F3F6FD', minHeight: 44, justifyContent: 'center' },
+  chipSelected: { backgroundColor: '#EDE9FE', minHeight: 44, justifyContent: 'center' },
   chipText: { color: DNA.ink, fontWeight: '700' },
   chipSelectedText: { color: DNA.violet, fontWeight: '900' },
-  empty: { color: DNA.muted, fontWeight: '700' },
+  empty: { color: DNA.muted, fontWeight: '700', fontSize: 14 },
   slotItem: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -961,12 +1321,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F9FAFB',
+    padding: 12,
   },
   calendarPanel: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 14,
-    padding: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+    minWidth: 310,
     backgroundColor: '#FFFFFF',
     width: '100%',
     maxWidth: 520,
@@ -976,14 +1339,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 16,
   },
-  calendarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  calendarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
   calendarTitle: { fontWeight: '800', color: DNA.ink },
-  calendarWeekHead: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, marginBottom: 4 },
+  calendarLegend: { flexDirection: 'row', justifyContent: 'center', gap: 16, paddingVertical: 4 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendBox: { width: 14, height: 14, borderRadius: 4 },
+  legendText: { fontSize: 14, color: DNA.muted, fontWeight: '400' },
+  calendarWeekHead: { flexDirection: 'row', paddingHorizontal: 0, marginBottom: 4 },
   calendarWeekText: { width: `${100 / 7}%`, textAlign: 'center', color: DNA.muted, fontSize: 12, fontWeight: '800' },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   calendarCell: {
     width: `${100 / 7}%`,
-    height: 32,
+    minHeight: 44,
+    minWidth: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
@@ -991,11 +1359,14 @@ const styles = StyleSheet.create({
   calendarCellPad: { opacity: 0 },
   calendarCellSaved: { borderColor: '#A5B4FC', borderWidth: 2 },
   calendarCellRecurring: { backgroundColor: '#DCFCE7' },
-  calendarCellSelected: { backgroundColor: '#E8F0FF' },
+  calendarCellSelected: { backgroundColor: DNA.blue },
   calendarCellText: { color: DNA.ink, fontWeight: '700' },
   calendarCellTextRecurring: { color: '#166534', fontWeight: '900' },
-  calendarCellTextSelected: { color: DNA.blue, fontWeight: '900' },
-  hint: { color: DNA.muted, fontSize: 12, fontWeight: '700' },
+  calendarCellTextSelected: { color: '#FFFFFF', fontWeight: '900' },
+  hint: { color: DNA.muted, fontSize: 14, fontWeight: '400' },
+  helperText: { fontSize: 14, fontWeight: '400' },
+  selectionSummaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
+  iconButton44: { minWidth: 44, minHeight: 44, margin: 0, justifyContent: 'center', alignItems: 'center' },
   primaryButton: {
     borderRadius: 14,
     backgroundColor: DNA.blue,

@@ -131,6 +131,8 @@ export function PersonaShell({
 }: PersonaShellProps) {
   const { unreadCount, photoUrl, openNotifications } = useShellChrome(notificationsRoute, navigate);
   const allTabs = useMemo(() => [...tabs, MORE_TAB], [tabs]);
+  // SDK 58 redirects hidden/href:null routes. Our custom bar alone limits visible buttons.
+  const secondaryScreens = Object.keys(titles).filter(name => !allTabs.some(tab => tab.name === name) && !React.Children.toArray(children).some(child => React.isValidElement<{ name?: string }>(child) && child.props.name === name));
   const value = {
     tabs: allTabs,
     titles,
@@ -165,10 +167,11 @@ export function PersonaShell({
         sceneStyle: { backgroundColor: colors.pageBg },
       }}
     >
-      {children}
+      {React.Children.toArray(children)}
       {allTabs.map((tab) => (
         <Tabs.Screen key={tab.name} name={tab.name} />
       ))}
+      {secondaryScreens.map(name => <Tabs.Screen key={name} name={name} />)}
     </Tabs>
   );
 

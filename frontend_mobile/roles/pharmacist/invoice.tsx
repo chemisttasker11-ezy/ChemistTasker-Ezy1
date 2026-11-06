@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View, TouchableOpacity } from 'react-native';
-import { Text, Card, Button, ActivityIndicator, Chip, IconButton, FAB } from 'react-native-paper';
+import { Text, Card, Button, Chip, IconButton, FAB } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { useRouter } from 'expo-router';
 import { getInvoices } from '@chemisttasker/shared-core';
 import { SafeAreaView } from 'react-native-safe-area-context';

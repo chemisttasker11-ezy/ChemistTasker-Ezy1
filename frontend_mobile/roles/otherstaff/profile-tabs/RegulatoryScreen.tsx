@@ -16,6 +16,7 @@ import {
   type VerificationRow,
 } from '@chemisttasker/shared-core';
 import { API_BASE_URL } from '@/constants/api';
+import { BrandLoader } from '@/components/ui';
 import { pickSingleDocument, toRNFile } from './shared';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
 import { EvidenceStatus } from '../../shared/skills/VerificationBadges';
@@ -127,7 +128,7 @@ export default function OtherStaffRegulatoryScreen() {
   };
 
   if (loading) {
-    return <SafeAreaView style={styles.container} edges={['left', 'right']}><View style={styles.loader}><Text>Loading your role details…</Text></View></SafeAreaView>;
+    return <SafeAreaView style={styles.container} edges={['left', 'right']}><View style={styles.loader}><BrandLoader size={44} accessibilityLabel="Loading your role details…" /></View></SafeAreaView>;
   }
 
   const evidence = (field: FileField, title: string, purpose: string, code?: string) => {

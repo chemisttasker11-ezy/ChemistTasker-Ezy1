@@ -7,6 +7,7 @@ import { API_BASE_URL } from '@/constants/api';
 import { AUS_STATES, DOC_TYPES, pickSingleDocument, roleKey, toRNFile } from './shared';
 import { EvidenceStatus } from '../../shared/skills/VerificationBadges';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
+import { BrandLoader } from '@/components/ui';
 
 type ApiData = {
   government_id?: string | null;
@@ -127,7 +128,7 @@ export default function PharmacistIdentityScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.loader}>
-          <Text>Loading identity...</Text>
+          <BrandLoader size={44} accessibilityLabel="Loading identity…" />
         </View>
       </SafeAreaView>
     );

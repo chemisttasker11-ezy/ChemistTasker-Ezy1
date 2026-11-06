@@ -41,13 +41,17 @@ const sortOrderLabels: Record<SortKey, [string, string]> = {
 };
 
 /** Keyed by the surface scope: a persona, workspace, pharmacy or account switch starts a clean board. */
-const ShiftsBoard: React.FC<ShiftsBoardProps> = (props) => {
+type BoardPresentationProps = ShiftsBoardProps & { header?: React.ReactNode; footer?: React.ReactNode };
+
+const ShiftsBoard: React.FC<BoardPresentationProps> = (props) => {
     const { scopeKey } = useShiftSurface();
     return <ScopedShiftsBoard key={scopeKey} {...props} scopeKey={scopeKey} />;
 };
 
-const ScopedShiftsBoard: React.FC<ShiftsBoardProps & { scopeKey: string }> = ({
+const ScopedShiftsBoard: React.FC<BoardPresentationProps & { scopeKey: string }> = ({
     scopeKey,
+    header,
+    footer,
     title,
     shifts,
     loading,
@@ -644,6 +648,7 @@ const ScopedShiftsBoard: React.FC<ShiftsBoardProps & { scopeKey: string }> = ({
                 onScroll={onScroll}
                 scrollEventThrottle={16}
             >
+                {header}
                 <View style={styles.header}>
                     <Text accessibilityRole="header" style={styles.title}>{title}</Text>
                     {!loading ? <Text style={styles.subtitle}>{headerSubtitle}</Text> : null}
@@ -760,6 +765,7 @@ const ScopedShiftsBoard: React.FC<ShiftsBoardProps & { scopeKey: string }> = ({
                         />
                     </View>
                 ) : null}
+                {footer}
             </ScrollView>
 
             {!hideFiltersAndSort && (

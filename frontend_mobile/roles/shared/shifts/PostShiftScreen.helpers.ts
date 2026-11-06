@@ -284,12 +284,41 @@ export const toPositiveInt = (value: unknown): number | null => {
 };
 
 /** Strict calendar dates: Date.UTC is used only to validate components, never to display a date. */
-const isValidIsoDay = (value: string): boolean => {
+export const isValidIsoDay = (value: string): boolean => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
     const [year, month, day] = value.split('-').map(Number);
     const parsed = new Date(Date.UTC(year, month - 1, day));
     return parsed.getUTCFullYear() === year && parsed.getUTCMonth() + 1 === month && parsed.getUTCDate() === day;
 };
+
+export const validClock = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
+
+export function validateSlotEntry(entry: Partial<SlotEntry>): string | null {
+    if (!entry.startTime || !entry.endTime || !validClock.test(entry.startTime) || !validClock.test(entry.endTime)) {
+        return 'Set a start and finish time.';
+    }
+    const [sh, sm] = entry.startTime.slice(0, 5).split(':').map(Number);
+    const [eh, em] = entry.endTime.slice(0, 5).split(':').map(Number);
+    if (eh * 60 + em <= sh * 60 + sm) {
+        return 'The finish time must be after the start time.';
+    }
+    if (!entry.date || !isValidIsoDay(entry.date)) {
+        return 'Pick a date first.';
+    }
+    if (entry.isRecurring && (!entry.recurringEndDate || !isValidIsoDay(entry.recurringEndDate) || !entry.recurringDays?.length)) {
+        return 'Pick the weekdays and the date it repeats until.';
+    }
+    return null;
+}
+
+export function validateSlotEntries(entries: SlotEntry[]): string | null {
+    if (!entries.length) return 'Select at least one date from the calendar.';
+    for (const entry of entries) {
+        const error = validateSlotEntry(entry);
+        if (error) return error;
+    }
+    return null;
+}
 
 export function parsePostShiftSearchParams(
     params?: PostShiftRawParams | null,

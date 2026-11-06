@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, type TextInputInstance, View } from 'react-native';
+import { Platform, StyleSheet, Text, type TextInputInstance, View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout, { AuthLink, AuthNotice, AuthPrompt, OtpCodeInput } from '../components/AuthLayout';
@@ -8,7 +8,13 @@ import { colors, font, space, type } from '@/constants/tokens';
 
 export default function VerifyOTPScreen() {
     const router = useRouter();
-    const params = useLocalSearchParams<{ email?: string }>();
+    const params = useLocalSearchParams<{
+        email?: string;
+        returnTo?: string;
+        referral_code?: string;
+        referral_event_id?: string;
+        referral_shift_id?: string;
+    }>();
     const { verifyOTP, resendOTP, user } = useAuth();
     const initialEmail = typeof params.email === 'string' ? params.email : (user?.email || '');
     // Web parity: opened without an email (cold deep link), the screen asks for it instead of sending ''.
@@ -50,7 +56,17 @@ export default function VerifyOTPScreen() {
         try {
             await verifyOTP(code, email);
 
-            // Mirror web flow: after email OTP → go to mobile verification step
+            // Mirror web flow: after email OTP -> go to mobile verification step
+            if (Platform.OS === 'web') {
+                const loginParams: Record<string, string> = { email, verified: '1' };
+                if (params.returnTo) loginParams.returnTo = String(params.returnTo);
+                if (params.referral_code) loginParams.referral_code = String(params.referral_code);
+                if (params.referral_event_id) loginParams.referral_event_id = String(params.referral_event_id);
+                if (params.referral_shift_id) loginParams.referral_shift_id = String(params.referral_shift_id);
+                router.replace({ pathname: '/login', params: loginParams } as any);
+                return;
+            }
+
             router.replace('/mobile-verify' as any);
         } catch (err: any) {
             setError(err.message);
@@ -148,7 +164,7 @@ export default function VerifyOTPScreen() {
             <View style={styles.resend}>
                 <Text style={styles.resendText}>Didn&apos;t receive the code?</Text>
                 <AuthLink
-                    label={resending ? 'Sending…' : 'Resend code'}
+                    label={resending ? 'Sending...' : 'Resend code'}
                     onPress={() => void handleResend()}
                     disabled={busy}
                 />

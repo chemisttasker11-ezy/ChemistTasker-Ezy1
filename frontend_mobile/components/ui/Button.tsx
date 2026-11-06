@@ -1,5 +1,6 @@
 import React, { type ReactNode } from 'react';
-import { ActivityIndicator, type StyleProp, StyleSheet, Text, type ViewStyle } from 'react-native';
+import { type StyleProp, StyleSheet, Text, type ViewStyle } from 'react-native';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { colors, font, radius, space, touch, type } from '@/constants/tokens';
 import { sizeIcon } from './icon';
 import { type HapticFeedbackType, ScalePressable } from './ScalePressable';

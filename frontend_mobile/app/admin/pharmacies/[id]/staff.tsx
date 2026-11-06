@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Text } from 'react-native-paper';
+import { Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import type { MembershipDTO } from '@chemisttasker/shared-core';
 import { fetchMembershipsForPharmacy } from '@/roles/shared/pharmacies/membershipApi';
 import StaffManager from '@/roles/shared/pharmacies/StaffManager';

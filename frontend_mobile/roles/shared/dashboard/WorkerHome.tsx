@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Button } from 'react-native-paper';
 import { useRouter } from 'expo-router';
+import { colors, radius, space } from '@/constants/tokens';
 import {
   CalendarCheck,
   CalendarDays,
@@ -103,6 +106,14 @@ function currentHours(rows: HoursRow[]): HoursRow[] {
  * Pharmacist and other staff Home: one next step (the shift they are on or about to start first), then blocks that
  * follow the workspace switch. Internal: this week's roster, requests, hours. Platform: shifts for you, money.
  */
+/**
+ * Determines whether the next shift hero card is active for an authenticated worker persona
+ * (pharmacist/otherstaff only), indicating a relevant next shift action.
+ */
+export function isNextShiftRelevant(role: string, stepKey?: string | null): boolean {
+  return (role === 'PHARMACIST' || role === 'OTHER_STAFF') && (stepKey === 'soon' || stepKey === 'upcoming');
+}
+
 export default function WorkerHome({ role }: { role: 'PHARMACIST' | 'OTHER_STAFF' }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -256,7 +267,7 @@ export default function WorkerHome({ role }: { role: 'PHARMACIST' | 'OTHER_STAFF
       profile: () => ({
         key: 'profile',
         title: 'Finish your profile',
-        body: `It is ${data.progress}% complete. Pharmacies need a complete, verified profile before they can book you.`,
+        body: `Your profile is ${data.progress}% complete. Add details to help pharmacies get to know you.`,
         action: 'Finish profile',
         icon: <UserRound />,
         onPress: () => go(`/${persona}/profile`),
@@ -303,6 +314,23 @@ export default function WorkerHome({ role }: { role: 'PHARMACIST' | 'OTHER_STAFF
   return (
     <HomeScroll refreshing={refreshing} onRefresh={refresh}>
       <NextStepCard step={step} loading={loading} />
+      {isNextShiftRelevant(role, step?.key) ? (
+        <View style={styles.nextShiftsLinkWrap}>
+          <Button
+            mode="text"
+            compact
+            icon="calendar-check"
+            accessibilityRole="link"
+            accessibilityLabel="View my confirmed shifts"
+            textColor={colors.primary}
+            onPress={() => go('/next-shifts')}
+            style={styles.nextShiftsButton}
+            labelStyle={styles.nextShiftsButtonLabel}
+          >
+            My next shifts
+          </Button>
+        </View>
+      ) : null}
       {platform ? (
         <>
           <ShiftsForYou data={data} loading={loading} now={now} persona={persona} go={go} onRetry={refresh} />
@@ -472,3 +500,18 @@ function Money({ data, loading, persona, go, onRetry }: BlockProps & { persona: 
     </SectionCard>
   );
 }
+
+const styles = StyleSheet.create({
+  nextShiftsLinkWrap: {
+    alignItems: 'flex-start',
+    marginTop: -space.xs,
+    marginBottom: space.xs,
+  },
+  nextShiftsButton: {
+    borderRadius: radius.pill,
+  },
+  nextShiftsButtonLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+});

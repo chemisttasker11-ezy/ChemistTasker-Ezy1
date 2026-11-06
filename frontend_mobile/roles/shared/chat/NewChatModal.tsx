@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { Modal, Portal, Text, TextInput, Button, Avatar, useTheme, HelperText, ActivityIndicator } from 'react-native-paper';
+import { Modal, Portal, Text, TextInput, Button, Avatar, useTheme, HelperText } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import type { UserLite } from './types';
 import { searchParticipants, startDirectChat } from './hooks';
 
