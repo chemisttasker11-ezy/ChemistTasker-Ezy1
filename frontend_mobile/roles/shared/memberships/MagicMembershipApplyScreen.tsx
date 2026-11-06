@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { DatePickerModal } from 'react-native-paper-dates';
+import { GuardedDatePickerModal as DatePickerModal } from '@/components/security/GuardedModal';
 import { Button, Chip, Surface, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { browserMagicMembershipInfo, browserSubmitMagicMembership } from '@chemisttasker/shared-core';

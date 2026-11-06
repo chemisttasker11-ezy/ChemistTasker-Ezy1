@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Chip, Dialog, Portal, Text } from 'react-native-paper';
-import { DatePickerInput } from 'react-native-paper-dates';
+import { GuardedDatePickerInput as DatePickerInput } from '@/components/security/GuardedModal';
 import {
   claimShiftService,
   createLeaveRequestService,

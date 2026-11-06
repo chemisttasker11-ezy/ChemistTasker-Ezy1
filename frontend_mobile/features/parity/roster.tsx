@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
-import { DatePickerInput } from 'react-native-paper-dates';
+import { GuardedDatePickerInput as DatePickerInput } from '@/components/security/GuardedModal';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, createAsyncScope, reviewRosterSelection, prepareRosterPublication, updateRosterShiftService, workforce, type RosterPharmacyMember, type RosterPublicationAttempt, type RosterValidationResult, type WorkerShiftRequest } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';

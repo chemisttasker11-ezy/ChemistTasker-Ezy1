@@ -1,7 +1,7 @@
 import React,{useCallback,useEffect,useMemo,useRef,useState}from'react';
 import{View}from'react-native';
 import{Button,Chip,IconButton}from'react-native-paper';
-import{DatePickerInput}from'react-native-paper-dates';
+import{GuardedDatePickerInput as DatePickerInput}from'@/components/security/GuardedModal';
 import{useLocalSearchParams,useRouter}from'expo-router';
 import*as DocumentPicker from'expo-document-picker';
 import{chemistTaskerApi}from'@/config/api';
