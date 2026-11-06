@@ -28,6 +28,29 @@ runInNewContext(outputText, {
 
 const { EligibilityManager, usePublicAvailabilityEligibility, computeUserKey } = exports;
 
+test('same-user refresh keeps only the latest success or failure generation', async () => {
+  const pending = [];
+  const mgr = new EligibilityManager(() => new Promise((resolve, reject) => pending.push({ resolve, reject })), actualPolicy, () => '2026-11-05');
+  mgr.setUser({ id: 1, role: 'OTHER_STAFF', is_mobile_verified: true, is_active: true });
+  pending[0].resolve({ verified: false });
+  await new Promise(setImmediate);
+  assert.equal(mgr.getState().status, 'ineligible');
+  const older = mgr.load();
+  const newer = mgr.load();
+  pending[2].resolve({ verified: true });
+  await newer;
+  pending[1].reject(new Error('old offline request'));
+  await older;
+  assert.equal(mgr.getState().status, 'verified');
+  const staleSuccess = mgr.load();
+  const latest = mgr.load();
+  pending[4].resolve({ verified: false });
+  await latest;
+  pending[3].resolve({ verified: true });
+  await staleSuccess;
+  assert.equal(mgr.getState().status, 'ineligible');
+});
+
 test('real canPublishTalent policy negatives and positives for both roles', async () => {
   // negatives: otherstaff unverified, inactive, mobilefalse
   let mgr = new EligibilityManager(async () => ({ verified: false }), actualPolicy, () => '2026-11-05');

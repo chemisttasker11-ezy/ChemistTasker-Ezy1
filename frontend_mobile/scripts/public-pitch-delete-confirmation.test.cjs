@@ -29,6 +29,9 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
   const onboardingUpdateCalls = [];
   let onboardingImplementation = async () => ({ skills: [], verified: true });
   let availabilityImplementation = async () => [];
+  const focusCallbacks = [];
+  let focusIndex = 0;
+  let eligibilityHook;
 
   let deleteServiceImplementation = async (id) => {
     deleteCalls.push(id);
@@ -56,6 +59,7 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
   let effectIndex = 0;
 
   const resetIndices = () => {
+    focusIndex = 0;
     stateIndex = 0;
     refIndex = 0;
     effectIndex = 0;
@@ -165,7 +169,7 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
     },
     'expo-router': {
       useIsFocused: () => true,
-      useFocusEffect: () => {},
+      useFocusEffect: (callback) => { focusCallbacks[focusIndex++] = callback; },
       useRouter: () => ({ push: () => {}, replace: () => {} }),
     },
     '@/context/AuthContext': {
@@ -220,7 +224,7 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
       }),
     },
     './publicAvailabilityEligibility': {
-      usePublicAvailabilityEligibility: () => ({
+      usePublicAvailabilityEligibility: (user) => eligibilityHook ? eligibilityHook(user) : ({
         status: 'verified',
         staffPublicAccess: true,
         error: null,
@@ -233,7 +237,7 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
   mocks['expo-router/react-navigation'] = { usePreventRemove: (enabled, callback) => { preventRemove = enabled ? callback : null; } };
   mocks['./UnsavedChangesDialogProvider'] = { useUnsavedChangesDialog: () => null };
   mocks['./UnsavedChangesRegistryProvider'] = { useUnsavedChangesRegistry: () => null };
-  const guardPath = path.resolve(__dirname, '../../../pr249-m1-integration-20261105/frontend_mobile/roles/shared/forms/useUnsavedChangesGuard.ts');
+  const guardPath = path.resolve(__dirname, '../roles/shared/forms/useUnsavedChangesGuard.ts');
   const guardCompiled = ts.transpileModule(fs.readFileSync(guardPath, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
@@ -347,6 +351,19 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
     brandLoader: mocks['@/components/ui/BrandLoader'].BrandLoader,
     walkTree,
     runEffects,
+    focus: () => { for (const callback of focusCallbacks) callback(); },
+    useRealEligibility: () => {
+      const policyModule = { exports: {} };
+      const policySource = fs.readFileSync(path.resolve(__dirname, '../../shared-core/src/talent.ts'), 'utf8');
+      vm.runInNewContext(ts.transpileModule(policySource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText,
+        { exports: policyModule.exports, require: () => ({}) });
+      mocks['@chemisttasker/shared-core'].canPublishTalent = policyModule.exports.canPublishTalent;
+      const eligibilityModule = { exports: {} };
+      const eligibilitySource = fs.readFileSync(path.resolve(__dirname, '../roles/shared/talent-board/publicAvailabilityEligibility.ts'), 'utf8');
+      vm.runInNewContext(ts.transpileModule(eligibilitySource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText,
+        { exports: eligibilityModule.exports, require: customRequire });
+      eligibilityHook = eligibilityModule.exports.usePublicAvailabilityEligibility;
+    },
     unmount,
     findPitchDialog,
     deleteCalls,
@@ -1155,3 +1172,62 @@ test('pitch defaults: closing during load ignores the late result', async () => 
   assert.equal(harness.onboardingUpdateCalls.length, 0);
   assert.equal(harness.createPostCalls.length, 0);
 });
+
+for (const role of ['PHARMACIST', 'OTHER_STAFF']) {
+  for (const trigger of ['focus', 'pull refresh']) {
+    test(`verification return ${trigger} reloads eligibility for ${role} without changing identity`, async () => {
+      const h = createPitchHarness({ id: 7001, role, is_mobile_verified: true, is_active: true });
+      h.useRealEligibility();
+      let verified = false;
+      let checks = 0;
+      h.setOnboardingService(async () => { checks++; return { verified, ahpra_verified: verified, ahpra_expiry_date: '2099-12-31' }; });
+      h.renderInner(); await h.runEffects();
+      let tree = h.renderInner();
+      const warning = () => h.walkTree(tree, n => n.props?.children === 'Public Talent profile verification required');
+      assert.ok(warning());
+      const beforeFocus = checks;
+      verified = true;
+      if (trigger === 'focus') h.focus();
+      else await h.walkTree(tree, n => n.props?.refreshControl).props.refreshControl.props.onRefresh();
+      await h.runEffects();
+      tree = h.renderInner(); await h.runEffects(); tree = h.renderInner();
+      assert.ok(checks > beforeFocus, `${trigger} must reload the same eligibility manager`);
+      assert.equal(warning(), null);
+      assert.equal(h.findPitchDialog(tree).props.open, true, 'newly verified worker can publish');
+      verified = false;
+      await h.walkTree(tree, n => n.props?.refreshControl).props.refreshControl.props.onRefresh();
+      await h.runEffects(); tree = h.renderInner();
+      assert.ok(warning(), 'explicit refresh rechecks eligibility');
+      verified = true;
+      await h.walkTree(tree, n => n.props?.refreshControl).props.refreshControl.props.onRefresh();
+      await h.runEffects(); tree = h.renderInner();
+      assert.equal(warning(), null, 'explicit refresh also recovers publishing access');
+    });
+  }
+}
+
+for (const selection of ['calendar', 'drag', 'typed start']) {
+  test(`pitch ${selection} preserves the chosen repeat end; first selection defaults it`, () => {
+    const h = createPitchHarness();
+    const props = { open: true, isExplorer: false, existingPostId: null, pitchForm: { headline: '', body: '', postKind: 'AVAILABILITY', workTypes: [], travelStates: [], availabilitySlots: [] }, setPitchForm: () => {}, pitchError: null, pitchSaving: false, onClose: () => {}, onSave: () => {} };
+    let tree = h.renderPitchDialogDirect(props);
+    h.walkTree(tree, n => n.props?.buttons?.some(b => b.label === 'Availability')).props.onValueChange('2');
+    tree = h.renderPitchDialogDirect(props);
+    h.walkTree(tree, n => n.props?.buttons?.some(b => b.value === 'recurring')).props.onValueChange('recurring');
+    tree = h.renderPitchDialogDirect(props);
+    const grid = () => h.walkTree(tree, n => typeof n.props?.onResponderMove === 'function');
+    grid().props.onLayout({ nativeEvent: { layout: { width: 350 } } });
+    tree = h.renderPitchDialogDirect(props);
+    h.walkTree(tree, n => n.props?.label === 'Start Date').props.onChangeText('2026-11-10');
+    tree = h.renderPitchDialogDirect(props);
+    assert.equal(h.walkTree(tree, n => n.props?.label === 'End Date').props.value, '2026-11-10');
+    h.walkTree(tree, n => typeof n.props?.onConfirm === 'function').props.onConfirm({ date: new Date(2026, 11, 31) });
+    tree = h.renderPitchDialogDirect(props);
+    assert.equal(h.walkTree(tree, n => n.props?.label === 'End Date').props.value, '2026-12-31', 'own picker sets the end');
+    if (selection === 'calendar') grid().props.onResponderGrant({ nativeEvent: { locationX: 125, locationY: 75 } });
+    else if (selection === 'drag') grid().props.onResponderMove({ nativeEvent: { locationX: 175, locationY: 75 } });
+    else h.walkTree(tree, n => n.props?.label === 'Start Date').props.onChangeText('2026-11-15');
+    tree = h.renderPitchDialogDirect(props);
+    assert.equal(h.walkTree(tree, n => n.props?.label === 'End Date').props.value, '2026-12-31');
+  });
+}

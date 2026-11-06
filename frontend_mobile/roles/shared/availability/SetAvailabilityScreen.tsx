@@ -266,6 +266,8 @@ export function SetAvailabilityInner() {
     consumedDeleteTokensRef.current.clear();
   }, [user?.id, accountKey]);
   const [calendarMonthAnchor, setCalendarMonthAnchor] = useState<Date>(new Date());
+  const calendarGridSize = useRef({ width: 0, height: 0 });
+  const calendarDrag = useRef<{ date: string; pageX: number; pageY: number; x: number; y: number } | null>(null);
   const [locationForm, setRawLocationForm] = useState<LocationFormState>({
     streetAddress: '',
     suburb: '',
@@ -755,11 +757,35 @@ export function SetAvailabilityInner() {
     setCurrentEntry((prev) => ({
       ...prev,
       date: sorted[0] || '',
-      recurringEndDate: prev.isRecurring ? sorted[sorted.length - 1] || '' : prev.recurringEndDate,
+      recurringEndDate: prev.isRecurring ? prev.recurringEndDate || sorted[sorted.length - 1] || '' : prev.recurringEndDate,
     }));
   };
   const toggleCalendarDate = (date: string) => {
     syncSelectedDates(selectedDates.includes(date) ? selectedDates.filter((item) => item !== date) : [...selectedDates, date]);
+  };
+  const addCalendarDate = (date: string) => {
+    setSelectedDates((prevDates) => {
+      if (prevDates.includes(date)) return prevDates;
+      const sorted = [...prevDates, date].sort();
+      setCurrentEntry((prev) => ({
+        ...prev,
+        date: sorted[0] || '',
+        recurringEndDate: prev.isRecurring ? prev.recurringEndDate || sorted[sorted.length - 1] || '' : prev.recurringEndDate,
+      }));
+      return sorted;
+    });
+  };
+  const getCalendarDateFromTouch = (pageX: number, pageY: number) => {
+    const start = calendarDrag.current;
+    const { width, height } = calendarGridSize.current;
+    if (!start || !width || !height) return null;
+    const x = start.x + pageX - start.pageX;
+    const y = start.y + pageY - start.pageY;
+    if (x < 0 || x >= width || y < 0 || y >= height) return null;
+    const column = Math.floor(x / (width / 7));
+    const row = Math.floor(y / (height / (monthCalendarCells.length / 7)));
+    const cell = monthCalendarCells[row * 7 + column];
+    return cell?.inMonth ? cell.iso : null;
   };
 
   return (
@@ -790,7 +816,7 @@ export function SetAvailabilityInner() {
             <Button
               mode={currentEntry.isRecurring ? 'contained' : 'outlined'}
               disabled={loading}
-              onPress={() => setCurrentEntry((p) => ({ ...p, isRecurring: true, recurringDays: [], recurringEndDate: selectedDates[selectedDates.length - 1] || '' }))}
+              onPress={() => setCurrentEntry((p) => ({ ...p, isRecurring: true, recurringDays: [], recurringEndDate: p.recurringEndDate || selectedDates[selectedDates.length - 1] || '' }))}
               style={styles.modeButton}
             >
               Repeating
@@ -798,8 +824,8 @@ export function SetAvailabilityInner() {
           </View>
           <Text style={styles.modeDescription}>
             {currentEntry.isRecurring
-              ? 'Select start and end dates on the calendar or type below, then choose repeating weekdays.'
-              : 'Select dates on the calendar or type below. Tap a date again to deselect it.'}
+              ? 'Select a start date on the calendar or type below, set the end date below, then choose repeating weekdays.'
+              : 'Select dates on the calendar or type below. Tap again to deselect, or drag across dates to select multiple days.'}
           </Text>
 
           <Surface style={styles.calendarPanel} elevation={0}>
@@ -818,7 +844,34 @@ export function SetAvailabilityInner() {
                 <Text key={`${d}-${idx}`} style={styles.calendarWeekText}>{d}</Text>
               ))}
             </View>
-            <View style={styles.calendarGrid}>
+            <View
+              style={styles.calendarGrid}
+              onLayout={(event) => { calendarGridSize.current = event.nativeEvent.layout; }}
+              onStartShouldSetResponder={() => false}
+              onMoveShouldSetResponderCapture={(event) => {
+                const start = calendarDrag.current;
+                if (loading || !start) return false;
+                const dx = Math.abs(event.nativeEvent.pageX - start.pageX);
+                const dy = Math.abs(event.nativeEvent.pageY - start.pageY);
+                // Claim a sideways drag; leave ordinary vertical swipes to the ScrollView.
+                return dx > 8 && dx > dy;
+              }}
+              onResponderGrant={(event) => {
+                if (loading || !calendarDrag.current) return;
+                addCalendarDate(calendarDrag.current.date);
+                const date = getCalendarDateFromTouch(event.nativeEvent.pageX, event.nativeEvent.pageY);
+                if (date) addCalendarDate(date);
+              }}
+              onResponderMove={(event) => {
+                if (loading) return;
+                const date = getCalendarDateFromTouch(event.nativeEvent.pageX, event.nativeEvent.pageY);
+                if (date) addCalendarDate(date);
+              }}
+              onResponderRelease={() => { calendarDrag.current = null; }}
+              onResponderTerminate={() => { calendarDrag.current = null; }}
+              onTouchEnd={() => { calendarDrag.current = null; }}
+              onTouchCancel={() => { calendarDrag.current = null; }}
+            >
               {monthCalendarCells.map((cell, idx) => {
                 if (!cell.inMonth) return <View key={`${cell.iso}-${idx}`} style={[styles.calendarCell, styles.calendarCellPad]} />;
                 const isSelected = selectedDateSet.has(cell.iso);
@@ -828,7 +881,16 @@ export function SetAvailabilityInner() {
                   <Pressable
                     key={`${cell.iso}-${idx}`}
                     disabled={loading}
-                    onPress={() => toggleCalendarDate(cell.iso)}
+                    onPress={() => { calendarDrag.current = null; toggleCalendarDate(cell.iso); }}
+                    onPressIn={(event) => {
+                      const { pageX, pageY, locationX, locationY } = event.nativeEvent;
+                      const { width, height } = calendarGridSize.current;
+                      calendarDrag.current = {
+                        date: cell.iso, pageX, pageY,
+                        x: (idx % 7) * width / 7 + locationX,
+                        y: Math.floor(idx / 7) * height / (monthCalendarCells.length / 7) + locationY,
+                      };
+                    }}
                     accessibilityRole="button"
                     accessibilityState={{ selected: isSelected }}
                     accessibilityLabel={getCellA11y(cell.iso, isSelected, isSaved, recurringPreview)}

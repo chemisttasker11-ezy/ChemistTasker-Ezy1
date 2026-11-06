@@ -226,7 +226,7 @@ export default function PitchDialog(props: {
     const sorted = [...new Set(dates)].sort();
     setSelectedDates(sorted);
     setCurrentEntry((prev) => ({ ...prev, date: sorted[0] || '' }));
-    if (isRecurring) setRecurringEndDate(sorted[sorted.length - 1] || '');
+    if (isRecurring) setRecurringEndDate((prev) => prev || sorted[sorted.length - 1] || '');
   };
   const toggleCalendarDate = (date: string) => {
     syncSelectedDates(selectedDates.includes(date) ? selectedDates.filter((item) => item !== date) : [...selectedDates, date]);
@@ -236,7 +236,7 @@ export default function PitchDialog(props: {
       if (prevDates.includes(date)) return prevDates;
       const sorted = [...prevDates, date].sort();
       setCurrentEntry((prev) => ({ ...prev, date: sorted[0] || '' }));
-      if (isRecurring) setRecurringEndDate(sorted[sorted.length - 1] || '');
+      if (isRecurring) setRecurringEndDate((prev) => prev || sorted[sorted.length - 1] || '');
       return sorted;
     });
   };
@@ -533,7 +533,7 @@ export default function PitchDialog(props: {
                 onValueChange={(value) => {
                   setIsRecurring(value === 'recurring');
                   setRecurringDays([]);
-                  setRecurringEndDate(value === 'recurring' ? selectedDates[selectedDates.length - 1] || '' : '');
+                  setRecurringEndDate((prev) => value === 'recurring' ? prev || selectedDates[selectedDates.length - 1] || '' : '');
                 }}
                 buttons={[
                   { label: 'Recurring availability', value: 'recurring' },
@@ -543,7 +543,7 @@ export default function PitchDialog(props: {
               />
               <Text style={styles.modeDescription}>
                 {isRecurring
-                  ? 'Select the start and end date on the calendar, then choose the weekdays you are available before publishing.'
+                  ? 'Select the start date on the calendar, set the end date below, then choose the weekdays you are available before publishing.'
                   : 'Pick the dates you are available on the calendar. Tap again to deselect, or drag across dates to select multiple days.'}
               </Text>
               <View style={styles.calendarPanel}>

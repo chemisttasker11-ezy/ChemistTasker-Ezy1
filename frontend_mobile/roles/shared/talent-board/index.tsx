@@ -876,6 +876,12 @@ export function TalentBoardInner({
 
   useFocusEffect(
     useCallback(() => {
+      void retryEligibility();
+    }, [retryEligibility])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
       tryOpenRequestedPitch();
     }, [tryOpenRequestedPitch])
   );
@@ -899,7 +905,7 @@ export function TalentBoardInner({
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await reload(); setRefreshing(false); }} tintColor="#6366F1" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); try { await Promise.all([reload(), retryEligibility()]); } finally { setRefreshing(false); } }} tintColor="#6366F1" />}
       >
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {isTalentStaff && eligibilityStatus === 'error' ? (
