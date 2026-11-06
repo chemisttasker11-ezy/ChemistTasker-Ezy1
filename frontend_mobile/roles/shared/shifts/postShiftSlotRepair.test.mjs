@@ -13,7 +13,8 @@ function load(file, extra = {}) {
   return exports;
 }
 
-const helpers = load('./PostShiftScreen.helpers.ts', { '@chemisttasker/shared-core': {} });
+const posting = load('../../../../shared-core/src/domains/shifts/postingDraft.ts');
+const helpers = load('./PostShiftScreen.helpers.ts', { '@chemisttasker/shared-core': posting });
 const { validateSlotEntry, validateSlotEntries } = helpers;
 
 const React = { createElement: (type, props, ...children) => ({ type, props: { ...props, children: children.flat() } }) };
@@ -26,22 +27,81 @@ const progress = load('./PostShiftProgress.tsx', {
   './PostShiftScreen.helpers': helpers,
 }).default;
 
-test('slot validation covers missing/reversed time, recurrence, bad global vs overrides', () => {
+test('slot validation covers missing/equal time, recurrence, bad global vs overrides', () => {
   assert.match(validateSlotEntry({ date: '2026-11-20', startTime: '', endTime: '17:00' }), /start and finish/);
   assert.match(validateSlotEntry({ date: '2026-11-20', startTime: '09:00garbage', endTime: '17:00' }), /start and finish/);
-  assert.match(validateSlotEntry({ date: '2026-11-20', startTime: '17:00', endTime: '09:00' }), /after the start/);
-  assert.match(validateSlotEntry({ date: '2026-11-20', startTime: '09:00', endTime: '09:00' }), /after the start/);
+  assert.equal(validateSlotEntry({ date: '2026-11-20', startTime: '17:00', endTime: '09:00' }), null);
+  assert.match(validateSlotEntry({ date: '2026-11-20', startTime: '09:00', endTime: '09:00' }), /cannot be the same/);
   assert.equal(validateSlotEntry({ date: '2026-11-20', startTime: '09:00', endTime: '17:00', isRecurring: true, recurringDays: [1], recurringEndDate: '2026-12-01' }), null);
   assert.match(validateSlotEntry({ date: '2026-11-20', startTime: '09:00', endTime: '17:00', isRecurring: true, recurringDays: [] }), /repeats until/);
 
-  const badGlobal = { startTime: '17:00', endTime: '09:00' };
+  const badGlobal = { startTime: '09:00', endTime: '09:00' };
   const overrides = { '2026-11-20': { startTime: '09:00', endTime: '17:00' }, '2026-11-21': { startTime: '10:00', endTime: '18:00' } };
   const validBulk = ['2026-11-20', '2026-11-21'].map((d) => ({ date: d, ...(overrides[d] || badGlobal), isRecurring: false, recurringDays: [], recurringEndDate: '' }));
   assert.equal(validateSlotEntries(validBulk), null);
 
   const mixed = [{ date: '2026-11-20', startTime: '09:00', endTime: '17:00' }, { date: '2026-11-21', startTime: '18:00', endTime: '10:00' }];
-  assert.match(validateSlotEntries(mixed), /after the start/);
+  assert.equal(validateSlotEntries(mixed), null);
 });
+
+// Execute the screen's actual add callbacks with state setters captured for assertions.
+const screen = readFileSync(new URL('./PostShiftScreen.tsx', import.meta.url), 'utf8');
+const addCallbacks = screen.slice(screen.indexOf('    const addSlotEntries ='), screen.indexOf('    const removeSlot ='));
+function addSlot(path, times) {
+  const state = { slots: [], error: '' };
+  const date = '2026-11-20';
+  const { outputText } = ts.transpileModule(`${addCallbacks}\nexports.result = ${path === 'bulk' ? 'addAllSelectedSlots()' : path === 'per-date' ? 'addSelectedDateSlot(slotDate)' : 'addManualSlot()'};`, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  });
+  const exports = {};
+  vm.runInNewContext(outputText, {
+    exports, validateSlotEntries, toLocalIsoDate: helpers.toLocalIsoDate,
+    slots: [], slotDate: date, slotStart: path === 'bulk' || path === 'per-date' ? '09:00' : times.startTime,
+    slotEnd: path === 'bulk' || path === 'per-date' ? '09:00' : times.endTime,
+    slotRecurring: path === 'recurring', slotRecurringDays: [5], slotRecurringEnd: '2026-12-04',
+    selectedDates: [date, '2026-11-21'], selectedDateTimes: { [date]: times, '2026-11-21': times },
+    setSlots: (update) => { state.slots = update(state.slots); },
+    setError: (error) => { state.error = error; },
+    setToast: () => {}, setSelectedDates: () => {}, setSelectedDateTimes: () => {},
+    setSlotRecurring: () => {}, setSlotRecurringDays: () => {}, setSlotRecurringEnd: () => {},
+  });
+  return { ...state, result: exports.result };
+}
+
+for (const path of ['single', 'per-date', 'bulk', 'recurring']) {
+  test(`${path} additions accept overnight slots and remain valid for posting`, () => {
+    for (const times of [{ startTime: '22:00', endTime: '06:00' }, { startTime: '22:00:00', endTime: '06:00:00' }]) {
+      const state = addSlot(path, times);
+      assert.equal(state.result, true, state.error);
+      assert.equal(state.error, '');
+      assert.equal(state.slots.length, path === 'bulk' ? 2 : 1);
+      for (const slot of state.slots) {
+        assert.equal(slot.startTime, times.startTime);
+        assert.equal(slot.endTime, times.endTime);
+        assert.equal(slot.isRecurring, path === 'recurring');
+      }
+      assert.equal(posting.validateShiftPostingDraft({ pharmacyId: 1, roleNeeded: 'PHARMACIST', employmentType: 'LOCUM', slots: state.slots }), null);
+    }
+  });
+
+  test(`${path} additions still reject equal and malformed times`, () => {
+    for (const times of [
+      { startTime: '22:00', endTime: '22:00' },
+      { startTime: '22:00:00', endTime: '22:00:30' },
+      { startTime: '', endTime: '06:00' },
+      { startTime: '22:00', endTime: '' },
+      { startTime: '24:00', endTime: '06:00' },
+      { startTime: '22:00', endTime: '06:60' },
+      { startTime: '22:00garbage', endTime: '06:00' },
+      { startTime: '22:00', endTime: '06:00garbage' },
+    ]) {
+      const state = addSlot(path, times);
+      assert.equal(state.result, false, JSON.stringify(times));
+      assert.ok(state.error);
+      assert.equal(state.slots.length, 0);
+    }
+  });
+}
 
 test('progress bar honest step accessibility: past navigable, current selected, future disabled', () => {
   const steps = ['details', 'skills', 'visibility'];

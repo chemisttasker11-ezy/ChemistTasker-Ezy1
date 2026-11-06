@@ -1,4 +1,4 @@
-import { getPharmacyHoursForDate } from '@chemisttasker/shared-core';
+import { getPharmacyHoursForDate, isValidShiftPostingTimeRange } from '@chemisttasker/shared-core';
 export const ROLE_OPTIONS = ['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT'];
 export const EMPLOYMENT_TYPES = ['LOCUM', 'PART_TIME', 'FULL_TIME'];
 export const PRIMARY = '#4F46E5';
@@ -297,10 +297,8 @@ export function validateSlotEntry(entry: Partial<SlotEntry>): string | null {
     if (!entry.startTime || !entry.endTime || !validClock.test(entry.startTime) || !validClock.test(entry.endTime)) {
         return 'Set a start and finish time.';
     }
-    const [sh, sm] = entry.startTime.slice(0, 5).split(':').map(Number);
-    const [eh, em] = entry.endTime.slice(0, 5).split(':').map(Number);
-    if (eh * 60 + em <= sh * 60 + sm) {
-        return 'The finish time must be after the start time.';
+    if (!isValidShiftPostingTimeRange(entry.startTime, entry.endTime)) {
+        return 'The start and finish times cannot be the same.';
     }
     if (!entry.date || !isValidIsoDay(entry.date)) {
         return 'Pick a date first.';
