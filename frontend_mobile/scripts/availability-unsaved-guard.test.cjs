@@ -14,7 +14,7 @@ function getTs() {
 }
 const ts = getTs();
 
-function createTestHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, useProductionGuard = false) {
+function createTestHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, useProductionGuard = false, calendarToday = null) {
   let currentUser = initialUser;
   let capturedGuard = null;
   let fetchAvailability = async () => [];
@@ -244,7 +244,8 @@ function createTestHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, usePr
     module: screenModule,
     exports: screenExports,
     require: customRequire,
-    console, Date, String, Number, Boolean, Array, Object, Set, Map, RegExp, Promise, Error, TypeError, RangeError, setTimeout, clearTimeout,
+    console, Date: calendarToday ? class extends Date { constructor(...args) { super(...(args.length ? args : [calendarToday])); } } : Date,
+    String, Number, Boolean, Array, Object, Set, Map, RegExp, Promise, Error, TypeError, RangeError, setTimeout, clearTimeout,
   });
   vm.runInContext(screenCompiled, screenContext);
 
@@ -432,6 +433,94 @@ test('repeat start edits preserve end and show validation when the range becomes
   assert.equal(h.find(tree, n => n.props?.label === 'End Date').props.value, '2027-02-20');
   assert.ok(h.find(tree, n => n.props?.children === 'Repeat end must be on or after the start date'));
 });
+
+test('calendar taps preserve the chosen repeat end and still initialize an empty end', async () => {
+  const h = createTestHarness(undefined, false, '2026-11-07T12:00:00');
+  h.render(); await h.runEffects();
+  let tree = h.render();
+  const day = (number) => h.find(tree, n => n.props?.accessibilityRole === 'button' && n.props.children?.props?.children === number);
+  h.find(tree, n => n.props?.children === 'Repeating').props.onPress();
+  tree = h.render();
+  day(10).props.onPress();
+  tree = h.render();
+  const firstDate = h.getGuard().value.slotDraft.currentEntry.date;
+  assert.equal(h.find(tree, n => n.props?.label === 'End Date').props.value, firstDate, 'first selection supplies the initial end');
+  const chosenEnd = `${firstDate.slice(0, 4)}-12-31`;
+  h.find(tree, n => n.props?.label === 'End Date').props.onChangeText(chosenEnd);
+  tree = h.render();
+  day(11).props.onPress();
+  tree = h.render();
+  assert.equal(h.find(tree, n => n.props?.label === 'End Date').props.value, chosenEnd);
+  h.find(tree, n => n.props?.accessibilityLabel === 'Clear selected dates').props.onPress();
+  tree = h.render();
+  assert.equal(h.find(tree, n => n.props?.label === 'End Date').props.value, chosenEnd, 'clearing dates does not edit the end');
+});
+
+test('calendar responder drag adds dates, retains accessible taps, and yields vertical scrolling', async () => {
+  const h = createTestHarness(undefined, false, '2026-11-07T12:00:00');
+  h.render(); await h.runEffects();
+  let tree = h.render();
+  h.find(tree, n => n.props?.children === 'Repeating').props.onPress();
+  tree = h.render();
+  h.find(tree, n => n.props?.label === 'End Date').props.onChangeText('2026-12-31');
+  tree = h.render();
+  const grid = () => h.find(tree, n => typeof n.props?.onMoveShouldSetResponderCapture === 'function');
+  const day = (number) => h.find(tree, n => n.props?.accessibilityRole === 'button' && n.props.children?.props?.children === number);
+  assert.ok(grid(), 'calendar must negotiate drag responder ownership');
+  grid().props.onLayout({ nativeEvent: { layout: { width: 350, height: 264 } } });
+  tree = h.render();
+  const event = (pageX, pageY) => ({ nativeEvent: { pageX, pageY, locationX: 25, locationY: 22 } });
+  day(10).props.onPressIn(event(100, 200));
+  assert.equal(grid().props.onStartShouldSetResponder(), false, 'ordinary taps stay with accessible day buttons');
+  assert.equal(grid().props.onMoveShouldSetResponderCapture(event(102, 230)), false, 'vertical swipe stays with ScrollView');
+  assert.equal(grid().props.onMoveShouldSetResponderCapture(event(104, 202)), false, 'small movement stays a tap');
+  assert.equal(grid().props.onMoveShouldSetResponderCapture(event(150, 201)), true);
+  grid().props.onResponderGrant(event(150, 201));
+  tree = h.render();
+  assert.equal(h.getGuard().value.slotDraft.selectedDates.length, 2, 'drag selects starting and next dates');
+  grid().props.onResponderMove(event(150, 201));
+  grid().props.onResponderMove(event(150, 245));
+  grid().props.onResponderMove(event(-1000, 245));
+  tree = h.render();
+  assert.equal(h.getGuard().value.slotDraft.selectedDates.length, 3, 'row height mapping, no duplicates or out-of-bounds selection');
+  assert.equal(h.getGuard().value.slotDraft.currentEntry.recurringEndDate, '2026-12-31', 'drag preserves the chosen repeat end');
+  grid().props.onResponderRelease();
+  assert.equal(grid().props.onMoveShouldSetResponderCapture(event(180, 200)), false, 'release ends drag');
+  day(10).props.onPressIn(event(100, 200));
+  day(10).props.onPress();
+  tree = h.render();
+  assert.equal(day(10).props.accessibilityState.selected, false, 'accessible press can deselect after dragging');
+  assert.equal(grid().props.onMoveShouldSetResponderCapture(event(150, 200)), false, 'a completed tap cannot seed another drag');
+  day(10).props.onPressIn(event(100, 200));
+  grid().props.onResponderTerminate();
+  assert.equal(grid().props.onMoveShouldSetResponderCapture(event(150, 200)), false, 'termination ends drag');
+});
+
+for (const rows of [4, 5]) {
+  test(`calendar drag maps actual row height in a ${rows}-week month`, async () => {
+    const h = createTestHarness(undefined, false, '2026-11-07T12:00:00');
+    h.render(); await h.runEffects();
+    let tree = h.render();
+    const grid = () => h.find(tree, n => typeof n.props?.onMoveShouldSetResponderCapture === 'function');
+    let months = 0;
+    while (grid().props.children.length !== rows * 7 && months++ < 24) {
+      h.find(tree, n => n.props?.accessibilityLabel === 'Next month').props.onPress();
+      tree = h.render();
+    }
+    assert.equal(grid().props.children.length, rows * 7);
+    grid().props.onLayout({ nativeEvent: { layout: { width: 350, height: rows * 44 } } });
+    grid().props.children[8].props.onPressIn({ nativeEvent: { pageX: 100, pageY: 200, locationX: 25, locationY: 22 } });
+    grid().props.onResponderGrant({ nativeEvent: { pageX: 150, pageY: 200 } });
+    tree = h.render();
+    const start = h.getGuard().value.slotDraft.selectedDates[0];
+    grid().props.onResponderMove({ nativeEvent: { pageX: 150, pageY: 244 } });
+    tree = h.render();
+    const dates = h.getGuard().value.slotDraft.selectedDates;
+    const expectedDay = Number(start.slice(-2)) + 8;
+    assert.equal(dates.length, 3);
+    assert.equal(Number(dates[2].slice(-2)), expectedDay, 'moving down one actual row selects the following week');
+  });
+}
 
 test('manual address callback updates screen draft and dirty guard', async () => {
   const h = createTestHarness();

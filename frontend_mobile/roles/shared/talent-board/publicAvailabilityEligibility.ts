@@ -137,8 +137,8 @@ export class EligibilityManager {
     }
   }
 
-  retry(): void {
-    void this.load();
+  retry(): Promise<void> {
+    return this.load();
   }
 }
 
@@ -175,7 +175,7 @@ export function usePublicAvailabilityEligibility(
   ]);
 
   const retry = useCallback(() => {
-    manager.retry();
+    return manager.retry();
   }, [manager]);
 
   const effectiveState: EligibilityState =
