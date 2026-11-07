@@ -109,3 +109,27 @@ test('M5-05 R pay_headings for salaried and award-based roles',()=>{
  const award=walk(Pay({...payProps,roleNeeded:'TECHNICIAN'})).join(' ');
  assert.match(award,/Award rate/);
 });
+
+// Semantic JSX-tree check of the real native screen, not a label/source grep.
+// The footer must be a sibling of the scrolling form inside the keyboard-aware area.
+test('M5-05 R footer stays outside the scroll view, inside keyboard-aware screen',()=>{
+ const file='roles/shared/shifts/PostShiftScreen.tsx';
+ const source=fs.readFileSync(path.join(root,file),'utf8');
+ const tree=ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+ const found=[];
+ function visit(node){
+  if(ts.isJsxElement(node)&&node.openingElement.tagName.getText(tree)==='KeyboardAvoidingView'){
+   const children=node.children.filter(child=>ts.isJsxElement(child));
+   const tags=children.map(child=>child.openingElement.tagName.getText(tree));
+   if(tags.includes('ScrollView')&&tags.includes('View')){
+    const footer=children.find(child=>child.openingElement.tagName.getText(tree)==='View');
+    const props=footer.openingElement.attributes.properties.map(p=>p.getText(tree)).join(' ');
+    if(props.includes('styles.stickyFooter'))found.push({tags,footer:props});
+   }
+  }
+  ts.forEachChild(node,visit);
+ }
+ visit(tree);
+ assert.equal(found.length,1,'one reachable, pinned Back/Next/Post footer exists alongside ScrollView');
+ assert.ok(found[0].tags.indexOf('View')>found[0].tags.indexOf('ScrollView'),'footer follows scroll content');
+});
