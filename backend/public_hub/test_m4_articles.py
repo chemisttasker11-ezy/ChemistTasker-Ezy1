@@ -17,7 +17,8 @@ class PublicArticleDiscoveryContracts(TestCase):
             self.article(number, kind='blog', topic='career',
                          title=f'Career bulletin {number:02d}',
                          body=f'Practical career SEARCHTOKEN {number}')
-        self.article(40, kind='news', topic='tga', title='TGA regulation NEWSMARK')
+        self.article(40, kind='news', topic='tga', title='TGA regulation NEWSMARK',
+                     body='x' * 200)
         self.article(41, kind='blog', topic='practice', title='Practice note')
         self.article(42, kind='blog', topic='career', title='Unpublished secret',
                      status='draft', published_at=None)
@@ -64,7 +65,7 @@ class PublicArticleDiscoveryContracts(TestCase):
         self.assertEqual(http.get(URL, {'kind': 'news', 'topic': 'career'}).data['count'], 0)
         self.assertEqual(http.get(URL, {'kind': 'blog', 'topic': 'career', 'q': 'SEARCHTOKEN'}).data['count'], 14)
         self.assertEqual(http.get(URL, {'kind': 'news', 'topic': 'tga',
-                                        'q': 'NEWSMARK' + 'x' * 250}).data['count'], 1)
+                                        'q': 'x' * 200 + 'IGNORED'}).data['count'], 1)
 
     def test_C_unpublished_scheduled_archived_invisible_and_details_private(self):
         http = client_for()
