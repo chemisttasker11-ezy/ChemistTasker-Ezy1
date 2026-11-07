@@ -230,6 +230,10 @@ function createMarketplace() {
     return match;
   }
   function click(label) { button(label).props.onPress(); }
+  function clickSameRender(label, count = 2) {
+    const action = button(label).props.onPress;
+    for (let i = 0; i < count; i++) action();
+  }
   async function setDraft(scope, patch) {
     const value = { ...draftModule.emptyMarketplaceDraft(),
       seller_context: 'PERSONAL', pharmacy: null, category: 7,
@@ -248,7 +252,7 @@ function createMarketplace() {
   const pauseNextRead = () => { const gate = deferred(); readBarriers.push(gate); return gate; };
   const queuePhoto = next => photoQueue.push(next);
   return { scheduler, env, storage, calls, nav, queue, queueLocal, pauseNextWrite, api,
-    render, currentNodes, button, click, setDraft, getDraft, callsOf, deferred, queuePhoto,
+    render, currentNodes, button, click, clickSameRender, setDraft, getDraft, callsOf, deferred, queuePhoto,
     pauseNextRead, draftModule,
     unmount: scheduler.unmount, flush: scheduler.flush };
 }
