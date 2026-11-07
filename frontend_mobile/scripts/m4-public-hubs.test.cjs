@@ -176,7 +176,7 @@ test('C: closed and server-ineligible poll options never call the voting facade'
   h.render();await h.tick();
   const tree=h.render();
   for(const id of [41,42]){
-    const card=h.find(tree,n=>n.type==='Card').find(n=>
+    const card=h.find(tree,n=>String(n.type)==='Card').find(n=>
       h.find(n,x=>x.type==='Text'&&x.props?.children==='Poll '+id).length===1);
     assert.ok(card,'server poll '+id+' is rendered');
     const action=h.find(card,n=>n.type==='Button'&&String(n.props?.children).includes('Yes'))[0];
@@ -190,7 +190,7 @@ test('C: closed and server-ineligible poll options never call the voting facade'
 
 test('C: account remount refreshes server interaction flags; former account cannot vote',async()=>{
   let permitted=true;
-  const h=env({api:{listCommunityPolls:async()=>page([{...poll(1),can_interact:permitted}])}});
+  const h=env({api:{listCommunityPolls:async(...a)=>{h.calls.polls.push(a);return page([{...poll(1),can_interact:permitted}]);}}});
   h.render();await h.tick();
   const first=h.render();
   const allowed=h.find(first,n=>n.type==='Button'&&String(n.props?.children).includes('Yes'))[0];
@@ -210,7 +210,7 @@ test('C: account remount refreshes server interaction flags; former account cann
   assert.deepEqual(h.calls.votes,[],'former-account vote permission was not reused');
 });
 
-test('C: double-tapping Load more polls from one render sends exactly one page request',async()=>{
+test('R: double-tapping Load more polls from one render sends exactly one page request',async()=>{
   const second=deferred();
   let pageTwoCalls=0;
   const h=env({api:{listCommunityPolls:async(_hub,params)=>{
