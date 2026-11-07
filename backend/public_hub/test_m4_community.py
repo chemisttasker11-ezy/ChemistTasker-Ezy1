@@ -91,3 +91,35 @@ class PublicHubM4Tests(TestCase):
         self.assertEqual(PharmacyHubPollVote.objects.filter(poll=poll).count(),1)
         self.assertEqual(client_for(self.member).post(target,{"option_id":-1},format="json").status_code,400)
         self.assertEqual(PharmacyHubPollVote.objects.filter(poll=poll).count(),1)
+
+    def test_vote_collapses_legacy_user_and_membership_rows_for_one_person(self):
+        """Positive control: two real pharmacy memberships cannot create two identities."""
+        from memberships.models import Membership
+
+        _, second_pharmacy = make_owner_with_pharmacy("M4 second membership pharmacy")
+        first = Membership.objects.create(
+            user=self.member, pharmacy=self.pharmacy, role="PHARMACIST",
+            employment_type="FULL_TIME", status=Membership.Status.ACCEPTED, is_active=True,
+        )
+        second = Membership.objects.create(
+            user=self.member, pharmacy=second_pharmacy, role="PHARMACIST",
+            employment_type="CASUAL", status=Membership.Status.ACCEPTED, is_active=True,
+        )
+        poll = self.public_polls[0]
+        yes = poll.options.first()
+        no = PharmacyHubPollOption.objects.create(poll=poll,label="No")
+        PharmacyHubPollVote.objects.create(poll=poll, option=yes, user=self.member)
+        PharmacyHubPollVote.objects.create(poll=poll, option=yes, membership=second)
+        yes.vote_count = 2
+        yes.save(update_fields=["vote_count"])
+        response = client_for(self.member).post(
+            BASE+f"hub/polls/{poll.pk}/vote/",{"option_id":no.pk},format="json"
+        )
+        self.assertEqual(response.status_code,200,getattr(response,"data",None))
+        votes = PharmacyHubPollVote.objects.filter(poll=poll)
+        self.assertEqual(votes.count(),1)
+        self.assertEqual(votes.get().option_id,no.pk)
+        yes.refresh_from_db()
+        no.refresh_from_db()
+        self.assertEqual((yes.vote_count,no.vote_count),(0,1))
+        self.assertEqual(first.user_id,second.user_id)
