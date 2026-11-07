@@ -62,6 +62,11 @@ class PublicListingSerializer(serializers.ModelSerializer):
         return rows
 
 
+def repair_blank_listing_slug(listing):
+    if not listing.slug:
+        listing.slug = slugify(listing.title)[:160] or "listing"
+
+
 class ListingWriteSerializer(serializers.ModelSerializer):
     allowed_buyer_roles = serializers.ListField(child=serializers.CharField(max_length=32), write_only=True)
     delivery = serializers.DictField(write_only=True)
@@ -121,8 +126,7 @@ class ListingWriteSerializer(serializers.ModelSerializer):
         validated_data.pop("expected_version", None)
         for name, value in validated_data.items():
             setattr(instance, name, value)
-        if not instance.slug:
-            instance.slug = slugify(instance.title)[:160] or "listing"
+        repair_blank_listing_slug(instance)
         instance.version += 1
         instance.full_clean()
         instance.save()

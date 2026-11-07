@@ -112,7 +112,7 @@ export default function AddItemWizard() {
   const [busy, setBusy] = useState(false);
   // One receipt per draft, including retries after an uncertain create response.
   const createReceipt = useRef<string>(crypto.randomUUID());
-  const durable = useRef<{ id: string; version: number; audienceDone: boolean } | null>(null);
+  const durable = useRef<{ id: string; version: number; audienceCircle: string | null } | null>(null);
   const uploaded = useRef(new Set<string>());
   const completing = useRef(false);
   const generation = useRef(0);
@@ -262,17 +262,17 @@ export default function AddItemWizard() {
       } else {
         const listing = await marketplaceApi.createListing(createBody);
         if (!current()) return;
-        receipt = { id: String(listing.id), version: listing.version, audienceDone: false };
+        receipt = { id: String(listing.id), version: listing.version, audienceCircle: null };
         durable.current = receipt;
       }
 
-      if (context === 'PHARMACY' && !receipt.audienceDone) {
+      if (context === 'PHARMACY' && receipt.audienceCircle !== maximumCircle) {
         const audience = await marketplaceApi.updateAudience(receipt.id, {
           expected_version: receipt.version,
           current_circle: 'OWNED_CHAIN', maximum_circle: maximumCircle, schedule: [],
         });
         if (!current()) return;
-        receipt = { ...receipt, version: audience.version, audienceDone: true };
+        receipt = { ...receipt, version: audience.version, audienceCircle: maximumCircle };
         durable.current = receipt;
       }
 
@@ -383,6 +383,9 @@ export default function AddItemWizard() {
               <button
                 className="button secondary"
                 onClick={() => {
+                  durable.current = null;
+                  uploaded.current.clear();
+                  createReceipt.current = crypto.randomUUID();
                   setCreated(undefined);
                   setContext(undefined);
                   setStep(1);
