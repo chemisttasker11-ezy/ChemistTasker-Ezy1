@@ -343,3 +343,65 @@ test('R rating double tap sends one save', async () => {
   save(); save(); await flush();
   assert.equal(h.calls.saved.length, 1);
 });
+
+test('C same-account older direct chat completing last never hijacks navigation', async () => {
+  const requests = [];
+  const h = containerHarness('confirmed', {
+    chat: () => {
+      const pending = deferred();
+      requests.push(pending);
+      return pending.promise;
+    },
+  });
+  h.render(); await flush();
+  const board = one(h.render(), 'Board');
+  const message = board.props.onMessageAssigned;
+  message(41);
+  message(42);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.chats)), [{ userId: 41 }, { userId: 42 }]);
+
+  // The second request is the last action the owner asked for, so its room wins.
+  requests[1].resolve({ id: 502 });
+  await flush();
+  assert.equal(h.calls.navigation.length, 1);
+  assert.equal(h.calls.navigation[0].pathname, '/owner/messages/502');
+
+  // Completing the first request afterwards must not navigate back to it.
+  requests[0].resolve({ id: 501 });
+  await flush();
+  assert.equal(h.calls.navigation.length, 1, 'a stale first request cannot navigate');
+  h.unmount();
+});
+
+test('C deferred payroll activation locks same-render duplicate taps until request settles', async () => {
+  const pending = deferred();
+  const offer = {
+    id: 7,
+    paymentPreferenceSnapshot: 'TFN',
+    engagementKind: 'SHIFT_EMPLOYMENT',
+    settlementChannel: 'TIMESHEET_ONLY',
+    engagementTermsSnapshot: {
+      payrollActivationRequired: true, pharmacyId: 7, workerName: 'Worker 7',
+    },
+  };
+  let h;
+  h = containerHarness('confirmed', {
+    fetchDeferredPayrollOffersService: async () => [offer],
+    activateShiftOfferPayrollService: async id => {
+      h.calls.activation.push(id);
+      return pending.promise;
+    },
+  });
+  h.render(); await flush();
+  const tree = h.render();
+  const action = buttons(tree, 'Activate payroll')[0];
+  assert.ok(action, 'the real confirmed board exposes eligible payroll activation');
+  const tap = action.props.onPress;
+  tap();
+  tap();
+  assert.deepEqual(h.calls.activation, [7], 'two taps from one render must make only one request');
+  pending.resolve();
+  await flush();
+  assert.deepEqual(h.calls.activation, [7]);
+  h.unmount();
+});
