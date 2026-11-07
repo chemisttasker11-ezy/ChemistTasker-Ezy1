@@ -229,43 +229,145 @@ function AudienceStep({draft,options,loading,error}:{draft:MarketplaceMobileDraf
  </ParityPage>;
 }
 function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:boolean;error:string}){
- const router=useRouter();const{user}=useAuth();const scope=String(user?.id??user?.email??user?.username??'anonymous');const[busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
- const submittingRef=useRef(false);const scopeRef=useRef(scope);scopeRef.current=scope;
- const submissionGeneration=useRef(0);
- useEffect(()=>{submissionGeneration.current+=1;submittingRef.current=false;setBusy(false);setLocalError('');},[scope]);
- // A second tap must never start another create/update/upload/submission
- // while the first attempt is awaiting server responses.
- const complete=async(submitForReview:boolean)=>{if(submittingRef.current)return;submittingRef.current=true;const targetScope=scope;const attempt=++submissionGeneration.current;const current=()=>scopeRef.current===targetScope&&submissionGeneration.current===attempt;setBusy(true);setLocalError('');try{
-   const body:any={client_request_id:draft.create_request_id,seller_context:draft.seller_context,pharmacy:draft.pharmacy,category:draft.category,mode:draft.mode,title:draft.title,description:draft.description,condition:draft.condition,quantity:draft.quantity,unit:draft.unit,amount:draft.mode==='SELL'?draft.amount:'0',desired_swap:draft.desired_swap,suburb:draft.suburb,state:draft.state,postcode:draft.postcode,private_pickup_details:draft.private_pickup_details,allowed_buyer_roles:draft.allowed_buyer_roles,delivery:{method:draft.delivery_method,postage_payer:draft.postage_payer||undefined,postage_organiser:draft.postage_organiser||undefined,known_cost:draft.known_cost||null,quote_required:draft.quote_required}};
-   let listingId=draft.created_listing_id;let expectedVersion=draft.created_listing_version;
-   if(listingId&&expectedVersion!=null){const updated=await api.updateListing(listingId,{...body,expected_version:expectedVersion});expectedVersion=updated.version;if(!current())return;await patchMarketplaceDraft(scope,{created_listing_version:expectedVersion});}
-   else{const created=await api.createListing(body);listingId=String(created.id);expectedVersion=created.version;if(!current())return;await patchMarketplaceDraft(scope,{created_listing_id:listingId,created_listing_version:expectedVersion});}
-   if(!current())return;
-   if(draft.seller_context==='PHARMACY'){const audience=await api.updateAudience(listingId,{expected_version:Number(expectedVersion),current_circle:'OWNED_CHAIN',maximum_circle:clampMaximumAudience(draft.maximum_circle)});expectedVersion=audience.version;if(!current())return;await patchMarketplaceDraft(scope,{current_circle:'OWNED_CHAIN',created_listing_version:expectedVersion});}
-   let uploaded=[...draft.uploaded_image_uris];for(const uri of draft.image_uris){if(!current())return;if(uploaded.includes(uri))continue;const blob=await(await fetch(uri)).blob();const data=new FormData();data.append('image',blob as any,'listing-'+Date.now()+'.jpg');await api.uploadImage(listingId,data);if(!current())return;uploaded=[...uploaded,uri];await patchMarketplaceDraft(scope,{uploaded_image_uris:uploaded});}
-   if(!current())return;
-   if(submitForReview)await api.actOnListing(listingId,'submit',Number(expectedVersion));
-   // Never clear a newly signed-in account's draft or navigate as another user.
-   if(current()){await clearMarketplaceDraft(targetScope);if(current())router.replace('/marketplace/mine' as any);}
- }catch(e){if(current())setLocalError(errorMessage(e,submitForReview?'Unable to submit listing. Your existing draft will be resumed on retry.':'Unable to save listing draft. Your existing draft will be resumed on retry.'));}finally{if(current()){submittingRef.current=false;setBusy(false);}}};
+ const router=useRouter();
+ const {user}=useAuth();
+ const scope=String(user?.id??user?.email??user?.username??'anonymous');
+ const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
+ const submittingRef=useRef(false),scopeRef=useRef(scope),submissionGeneration=useRef(0);
+ scopeRef.current=scope;
+ useEffect(()=>{
+   submissionGeneration.current+=1;
+   submittingRef.current=false;
+   setBusy(false);
+   setLocalError('');
+   // The parent keys this content by account, so a previous ReviewStep can
+   // remain in an async closure after unmount. Invalidate it at cleanup.
+   return()=>{submissionGeneration.current+=1;submittingRef.current=false;};
+ },[scope]);
+
+ const complete=async(submitForReview:boolean)=>{
+   if(submittingRef.current)return; // synchronous double-tap mutex
+   submittingRef.current=true;
+   const targetScope=scope,attempt=++submissionGeneration.current;
+   const current=()=>scopeRef.current===targetScope&&submissionGeneration.current===attempt;
+   setBusy(true);setLocalError('');
+   try{
+     // A partial earlier attempt may have persisted the server create receipt
+     // and one image while ReviewStep retained its older draft props.
+     // Merge only durable progress, not unrelated fields or other users' data.
+     const saved=await loadMarketplaceDraft(targetScope);
+     if(!current())return;
+     const progress:MarketplaceMobileDraft={
+       ...draft,
+       created_listing_id:saved.created_listing_id||draft.created_listing_id,
+       created_listing_version:saved.created_listing_version??draft.created_listing_version,
+       uploaded_image_uris:Array.from(new Set([
+         ...(draft.uploaded_image_uris||[]),...(saved.uploaded_image_uris||[]),
+       ])),
+     };
+     const body:any={
+       client_request_id:progress.create_request_id,
+       seller_context:progress.seller_context,pharmacy:progress.pharmacy,
+       category:progress.category,mode:progress.mode,title:progress.title,
+       description:progress.description,condition:progress.condition,
+       quantity:progress.quantity,unit:progress.unit,
+       amount:progress.mode==='SELL'?progress.amount:'0',
+       desired_swap:progress.desired_swap,suburb:progress.suburb,
+       state:progress.state,postcode:progress.postcode,
+       private_pickup_details:progress.private_pickup_details,
+       allowed_buyer_roles:progress.allowed_buyer_roles,
+       delivery:{
+         method:progress.delivery_method,
+         postage_payer:progress.postage_payer||undefined,
+         postage_organiser:progress.postage_organiser||undefined,
+         known_cost:progress.known_cost||null,
+         quote_required:progress.quote_required,
+       },
+     };
+     let listingId=progress.created_listing_id;
+     let expectedVersion=progress.created_listing_version;
+     if(listingId&&expectedVersion!=null){
+       const updated=await api.updateListing(listingId,{...body,expected_version:expectedVersion});
+       if(!current())return;
+       expectedVersion=updated.version;
+       await patchMarketplaceDraft(targetScope,{created_listing_version:expectedVersion});
+       if(!current())return;
+     }else{
+       const created=await api.createListing(body);
+       if(!current())return;
+       listingId=String(created.id);expectedVersion=created.version;
+       await patchMarketplaceDraft(targetScope,{
+         created_listing_id:listingId,created_listing_version:expectedVersion,
+       });
+       if(!current())return;
+     }
+
+     if(progress.seller_context==='PHARMACY'){
+       const audience=await api.updateAudience(listingId,{
+         expected_version:Number(expectedVersion),current_circle:'OWNED_CHAIN',
+         maximum_circle:clampMaximumAudience(progress.maximum_circle),
+       });
+       if(!current())return;
+       expectedVersion=audience.version;
+       await patchMarketplaceDraft(targetScope,{
+         current_circle:'OWNED_CHAIN',created_listing_version:expectedVersion,
+       });
+       if(!current())return;
+     }
+
+     let uploaded=[...progress.uploaded_image_uris];
+     for(const uri of progress.image_uris){
+       if(uploaded.includes(uri))continue;
+       if(!current())return;
+       const response=await fetch(uri);
+       if(!current())return; // Account may switch during the local URI read.
+       const blob=await response.blob();
+       if(!current())return; // Blob conversion is a second asynchronous boundary.
+       const data=new FormData();
+       data.append('image',blob as any,'listing-'+Date.now()+'.jpg');
+       if(!current())return;
+       await api.uploadImage(listingId,data);
+       if(!current())return;
+       uploaded=[...uploaded,uri];
+       await patchMarketplaceDraft(targetScope,{uploaded_image_uris:uploaded});
+       if(!current())return;
+     }
+     if(!current())return;
+     if(submitForReview){
+       await api.actOnListing(listingId,'submit',Number(expectedVersion));
+       if(!current())return;
+     }
+     // Clear only the original account's completed draft, never a new login's.
+     await clearMarketplaceDraft(targetScope);
+     if(current())router.replace('/marketplace/mine' as any);
+   }catch(e){
+     if(current())setLocalError(errorMessage(e,submitForReview
+       ?'Unable to submit listing. Your existing draft will be resumed on retry.'
+       :'Unable to save listing draft. Your existing draft will be resumed on retry.'));
+   }finally{
+     if(current()){submittingRef.current=false;setBusy(false);}
+   }
+ };
  const postage=draft.delivery_method!=='PICKUP';
- const disabled=busy||!draft.category||!draft.title||(postage&&(!draft.postage_payer||!draft.postage_organiser));
- return <ParityPage title="Review listing" subtitle="Confirm seller, item, audience and delivery details." loading={loading} error={error||localError}>
-  <Section title={draft.title||'Untitled listing'} description={draft.category_name}>
-   <DataRow title="Seller" subtitle={draft.seller_context==='PHARMACY'?'Pharmacy #'+draft.pharmacy:'Personal'}/>
-   <DataRow title="Mode" subtitle={draft.mode==='SELL'?money(draft.amount):replaceUnderscore(draft.mode)}/>
-   <DataRow title="Location" subtitle={draft.suburb+', '+draft.state+' '+draft.postcode}/>
-   <DataRow title="Buyer roles" subtitle={draft.allowed_buyer_roles.map(replaceUnderscore).join(', ')}/>
-   {draft.seller_context==='PHARMACY'?<DataRow title="Audience" subtitle={'Owned pharmacies → '+replaceUnderscore(draft.maximum_circle)}/>:null}
-   <DataRow title="Delivery" subtitle={replaceUnderscore(draft.delivery_method)+(postage?' · '+replaceUnderscore(draft.postage_payer)+' pays · '+replaceUnderscore(draft.postage_organiser)+' organises':'')}/>
-   <DataRow title="Photos" subtitle={draft.image_uris.length+' selected'}/>
-  </Section>
-  <InfoNote title="Marketplace policy">Medicines are excluded from the ordinary Marketplace. Use Ethical Marketplace for eligible medicine exchange workflows.</InfoNote>
-  <InfoNote title="Draft or review">A private draft stays unpublished until you explicitly submit it for review.</InfoNote>
-  <ActionButtons>
-   <Button mode="outlined" loading={busy} disabled={disabled} onPress={()=>void complete(false)}>Save private draft</Button>
-   <Button mode="contained" loading={busy} disabled={disabled} onPress={()=>void complete(true)}>Submit for review</Button>
-  </ActionButtons>
+ const disabled=busy||!draft.category||!draft.title||
+   (postage&&(!draft.postage_payer||!draft.postage_organiser));
+ return <ParityPage title="Review listing" subtitle="Confirm seller, item, audience and delivery details."
+   loading={loading} error={error||localError}>
+   <Section title={draft.title||'Untitled listing'} description={draft.category_name}>
+     <DataRow title="Seller" subtitle={draft.seller_context==='PHARMACY'?'Pharmacy #'+draft.pharmacy:'Personal'}/>
+     <DataRow title="Mode" subtitle={draft.mode==='SELL'?money(draft.amount):replaceUnderscore(draft.mode)}/>
+     <DataRow title="Location" subtitle={draft.suburb+', '+draft.state+' '+draft.postcode}/>
+     <DataRow title="Buyer roles" subtitle={draft.allowed_buyer_roles.map(replaceUnderscore).join(', ')}/>
+     {draft.seller_context==='PHARMACY'?<DataRow title="Audience" subtitle={'Owned pharmacies → '+replaceUnderscore(draft.maximum_circle)}/>:null}
+     <DataRow title="Delivery" subtitle={replaceUnderscore(draft.delivery_method)+(postage?' · '+replaceUnderscore(draft.postage_payer)+' pays · '+replaceUnderscore(draft.postage_organiser)+' organises':'')}/>
+     <DataRow title="Photos" subtitle={draft.image_uris.length+' selected'}/>
+   </Section>
+   <InfoNote title="Marketplace policy">Medicines are excluded from the ordinary Marketplace. Use Ethical Marketplace for eligible medicine exchange workflows.</InfoNote>
+   <InfoNote title="Draft or review">A private draft stays unpublished until you explicitly submit it for review.</InfoNote>
+   <ActionButtons>
+     <Button mode="outlined" loading={busy} disabled={disabled} onPress={()=>void complete(false)}>Save private draft</Button>
+     <Button mode="contained" loading={busy} disabled={disabled} onPress={()=>void complete(true)}>Submit for review</Button>
+   </ActionButtons>
  </ParityPage>;
 }
 function MyListingDetail({row,loading,error,onReload}:{row:MarketplaceDashboardListing|undefined;loading:boolean;error:string;onReload:()=>Promise<void>}){
