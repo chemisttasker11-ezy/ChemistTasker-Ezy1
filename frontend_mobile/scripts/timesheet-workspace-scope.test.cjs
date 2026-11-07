@@ -8,7 +8,7 @@ let ts;
 try {
   ts = require('typescript');
 } catch {
-  ts = require(path.resolve(__dirname, '../../../pr249-m1-integration-20261105/frontend_mobile/node_modules/typescript'));
+  ts = require(path.resolve(__dirname, '../node_modules/typescript'));
 }
 
 const text = fs.readFileSync(path.resolve(__dirname, '../app/workforce-timesheets.tsx'), 'utf8');

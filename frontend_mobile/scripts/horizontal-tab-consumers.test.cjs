@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const ts = require(path.resolve(__dirname, '../../../pr249-m1-integration-20261105/frontend_mobile/node_modules/typescript'));
+const ts = require(path.resolve(__dirname, '../node_modules/typescript'));
 const base = path.resolve(__dirname, '..');
 const node = (type, props, ...children) => ({ type, props: { ...props, children: children.length === 1 ? children[0] : children } });
 const find = (tree, predicate) => {
@@ -20,7 +20,7 @@ const groups = [
   { key: 'operations', label: 'Operations & Retail', items: [] },
 ];
 const candidateConfig = path.join(base, 'roles/shared/pharmacies/PharmacyForm.config.ts');
-const activeConfig = path.resolve(__dirname, '../../../pr249-m1-integration-20261105/frontend_mobile/roles/shared/pharmacies/PharmacyForm.config.ts');
+const activeConfig = path.resolve(__dirname, '../roles/shared/pharmacies/PharmacyForm.config.ts');
 const configSource = fs.readFileSync(fs.existsSync(candidateConfig) ? candidateConfig : activeConfig, 'utf8');
 const configModule = { exports: {} };
 vm.runInNewContext(ts.transpileModule(configSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, { module: configModule, exports: configModule.exports });

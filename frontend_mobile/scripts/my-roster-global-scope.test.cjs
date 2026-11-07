@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 // Candidate uses the active assembly's dependencies; the assembled copy uses its own.
 const localTypescript = path.resolve(__dirname, fs.existsSync(path.resolve(__dirname, '../node_modules/typescript')) ? '../node_modules/typescript' : '../frontend_mobile/node_modules/typescript');
-const assemblyTypescript = path.resolve(__dirname, '../../pr249-m1-integration-20261105/frontend_mobile/node_modules/typescript');
+const assemblyTypescript = path.resolve(__dirname, '../node_modules/typescript');
 const ts = require(fs.existsSync(localTypescript) ? localTypescript : assemblyTypescript);
 
 function createHarness() {
