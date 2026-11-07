@@ -408,7 +408,7 @@ test('C deferred payroll activation locks same-render duplicate taps until reque
 
 test('R 360dp large text keeps one full-width slot card and unclipped actions', () => {
   const h = boardHarness(360, 1.3);
-  const params = props('confirmed');
+  const params = props('confirmed', { onMessageAssigned() {} });
   let tree = h.render(params);
   h.find(tree, x => x.type === 'Card')[0].props.onPress();
   tree = h.render(params);
@@ -423,7 +423,7 @@ test('R 360dp large text keeps one full-width slot card and unclipped actions', 
 
 test('R child date and action presses stop parent card toggling', () => {
   const h = boardHarness();
-  const values = props('confirmed');
+  const values = props('confirmed', { onMessageAssigned() {} });
   let tree = h.render(values);
   const dateToggle = buttons(tree, 'View booked dates')[0];
   assert.ok(dateToggle, 'date toggle exists');
