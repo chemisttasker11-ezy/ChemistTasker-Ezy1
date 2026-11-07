@@ -201,8 +201,8 @@ test('R: recurrence projects each overnight occurrence; calendar selection edits
     let saved = host.render();
     assert.equal(saved.slots.length, 2);
     assert.deepEqual(Array.from(saved.expandedSlots, x=>[x.date,x.startTime,x.endTime]),
-      [['2027-01-10','09:00','17:00'],['2027-01-08','22:00','06:00'],
-       ['2027-01-09','22:00','06:00']], 'both recurring dates and the untouched daytime entry survive save');
+      [['2027-01-08','22:00','06:00'],['2027-01-09','22:00','06:00'],
+       ['2027-01-10','09:00','17:00']], 'sorted calendar dates include both recurring dates and untouched daytime entry');
     const payload = slotDomain.buildShiftDraftSlotPayload(saved.slots, saved.expandedSlots,
       saved.expandedSlots.map(() => ({rate:67})));
     assert.deepEqual(Array.from(payload, x=>[x.date,x.start_time,x.end_time,x.is_recurring,x.recurring_end_date]),
