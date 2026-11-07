@@ -33,23 +33,19 @@ const titles: Record<AttendanceScreen,string> = {
   'kiosk-status':'Kiosk & PIN status',
 };
 
-const managerRoles = new Set(['OWNER','ORGANIZATION','ORG_ADMIN','ORG_OWNER','ORG_STAFF','CHIEF_ADMIN','REGION_ADMIN']);
-
-function canManage(user:any) {
-  const role=String(user?.role||'').toUpperCase();
-  return managerRoles.has(role) || (Array.isArray(user?.admin_assignments)&&user.admin_assignments.length>0);
-}
-
 export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
   const router=useRouter();
   const params=useLocalSearchParams<{id?:string;sessionId?:string;eventId?:string;timesheetId?:string}>();
-  const {user}=useAuth();
+  const {user,hasCapability}=useAuth();
   const workspace=useWorkspace();
   const pharmacyId=workspace.selectedPharmacyId;
+  // The selected pharmacy must actually grant roster management. Account roles
+  // and assignments at other sites cannot enable a manager endpoint here.
+  const manager=Boolean(pharmacyId && hasCapability('MANAGE_ROSTER',pharmacyId));
   const accountKey=user ? String(user.id ?? user.email ?? '') : '';
 
   const detailScope = `${params.id || ''}:${params.sessionId || ''}:${params.eventId || ''}:${params.timesheetId || ''}`;
-  const scopeKey = `${accountKey}:${pharmacyId ?? 'none'}:${screen}:${detailScope}`;
+  const scopeKey = `${accountKey}:${pharmacyId ?? 'none'}:${manager?'manager':'worker'}:${screen}:${detailScope}`;
 
   return (
     <AttendanceParityContent
@@ -57,6 +53,7 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
       screen={screen}
       accountKey={accountKey}
       pharmacyId={pharmacyId}
+      manager={manager}
       user={user}
       params={params}
       router={router}
@@ -68,6 +65,7 @@ function AttendanceParityContent({
   screen,
   accountKey,
   pharmacyId,
+  manager,
   user,
   params,
   router,
@@ -75,6 +73,7 @@ function AttendanceParityContent({
   screen: AttendanceScreen;
   accountKey: string;
   pharmacyId: number | null;
+  manager: boolean;
   user: any;
   params: any;
   router: any;
@@ -83,7 +82,6 @@ function AttendanceParityContent({
   accountRef.current=accountKey;
   const pharmacyRef=useRef(pharmacyId);
   pharmacyRef.current=pharmacyId;
-  const manager=canManage(user);
   const canManageKiosk=pharmacyId!=null&&canManageKioskDevices(user,pharmacyId);
   const [status,setStatus]=useState<any>(null);
   const [pending,setPending]=useState<any[]>([]);
@@ -166,7 +164,7 @@ function AttendanceParityContent({
     const currentPharmacy=pharmacyId;
     const sessionId=selectedPending?.session_id||toNumber(params.sessionId);
     setTimeline(null);
-    if((screen==='review-detail'||screen==='review-decision'||screen==='exception')&&sessionId){
+    if(manager && pharmacyId && (screen==='review-detail'||screen==='review-decision'||screen==='exception')&&sessionId){
       attendance.getManagerTimeline(Number(sessionId))
         .then((result)=>{
           if(seq===timelineSequence.current&&accountRef.current===currentAccount&&pharmacyRef.current===currentPharmacy){
@@ -182,14 +180,21 @@ function AttendanceParityContent({
     return ()=>{
       timelineSequence.current+=1;
     };
-  },[screen,selectedPending,params.sessionId,accountKey,pharmacyId]);
+  },[screen,selectedPending,params.sessionId,accountKey,pharmacyId,manager]);
 
-  if((screen==='reviews'||screen==='review-detail'||screen==='review-decision'||screen==='exception')&&manager&&!pharmacyId){
-    return <ParityPage title={titles[screen]} subtitle="Pharmacy-scoped attendance review"><PharmacyRequired onOpen={()=>router.push('/owner/dashboard' as any)}/></ParityPage>;
+  if(screen==='reviews'||screen==='review-detail'||screen==='review-decision'||screen==='exception'){
+    if(!pharmacyId) {
+      return <ParityPage title={titles[screen]} subtitle="Select a pharmacy before reviewing attendance"><PharmacyRequired onOpen={()=>router.push('/my-hours' as any)}/></ParityPage>;
+    }
+    if(!manager) {
+      return <ParityPage title={titles[screen]} subtitle="Roster management is not authorised for this pharmacy">
+        <InfoNote title="No attendance management access" tone="warning">Select a pharmacy where you have MANAGE_ROSTER authority. An assignment at another pharmacy does not grant access here.</InfoNote>
+      </ParityPage>;
+    }
   }
 
   if(screen==='clock') return <ClockScreen status={status} loading={loading} error={error} onReload={load}/>;
-  if(screen==='correction') return <CorrectionScreen manager={manager} rows={hours} params={params} loading={loading} error={error} />;
+  if(screen==='correction') return <CorrectionScreen manager={manager} pharmacyId={pharmacyId} rows={hours} params={params} loading={loading} error={error} />;
   if(screen==='kiosk-status') return <KioskStatus rows={pinPharmacies} devices={kioskDevices} canManageKiosk={canManageKiosk} pharmacyId={pharmacyId} loading={loading} error={error} onReload={load} />;
 
   if(screen==='reviews'){
