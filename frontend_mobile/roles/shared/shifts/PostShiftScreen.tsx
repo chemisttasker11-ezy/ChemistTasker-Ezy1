@@ -17,6 +17,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { ContentState } from '@/components/ui';
+import { space } from '@/constants/tokens';
 import { useShiftSurface } from './useShiftSurface';
 import { shiftRoute } from './shiftSurface';
 import {
