@@ -79,17 +79,16 @@ export function useShellChrome(notificationsRoute: string, navigate: (route: str
   }, [loadUnread]);
 
   // Like web, notifications are read once their list is shown: NotificationsScreen marks them read on focus, and the
-  // badge clears only when that screen is really showing (a refused, guarded navigation leaves both untouched).
+  // badge refreshes only after a successful receipt (or a genuine server reload).
   // Tab moves inside a persona never refocus the shell, so leaving the list refreshes the badge here.
   const pathname = usePathname();
   const prevPathname = useRef(pathname);
   useEffect(() => {
     const left = prevPathname.current === notificationsRoute && pathname !== notificationsRoute;
     prevPathname.current = pathname;
-    if (pathname === notificationsRoute) {
-      generation.current++;
-      setUnreadCount(0);
-    } else if (left) {
+    // Entering the inbox is not a read receipt. A failed mark must retain
+    // the unread badge; only NOTIFICATIONS_READ_EVENT can confirm that change.
+    if (left) {
       void loadUnread();
     }
   }, [pathname, notificationsRoute, loadUnread]);

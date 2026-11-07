@@ -95,10 +95,24 @@ export default function TopBarActions({
   const compactSearch = useMediaQuery(theme.breakpoints.down("xl"));
   const [query, setQuery] = React.useState("");
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
+  const accountKey = String(user?.id ?? "signed-out");
+  const accountScope = React.useRef(accountKey);
+  const listGeneration = React.useRef(0);
+  const receiptGeneration = React.useRef(0);
+  // Invalidate prior auth requests on render, before account-change effects.
+  if (accountScope.current !== accountKey) {
+    accountScope.current = accountKey;
+    listGeneration.current += 1;
+    receiptGeneration.current += 1;
+  }
+  const [notificationOwner, setNotificationOwner] = React.useState(accountKey);
+  const [storedNotifications, setNotifications] = React.useState<NotificationItem[]>([]);
   const [notificationsLoading, setNotificationsLoading] = React.useState(false);
   const [notificationAnchor, setNotificationAnchor] = React.useState<HTMLElement | null>(null);
-  const [unreadNotifications, setUnreadNotifications] = React.useState(0);
+  const [storedUnreadNotifications, setUnreadNotifications] = React.useState(0);
+  // An account switch must not briefly render private rows from another user.
+  const notifications = notificationOwner === accountKey ? storedNotifications : [];
+  const unreadNotifications = notificationOwner === accountKey ? storedUnreadNotifications : 0;
   const [messageAnchor, setMessageAnchor] = React.useState<HTMLElement | null>(null);
   const [messageSummaries, setMessageSummaries] = React.useState<Record<number, MessageSummary>>({});
   const [unreadMessages, setUnreadMessages] = React.useState(0);
@@ -232,33 +246,28 @@ export default function TopBarActions({
       .join("") || "CT";
 
   const loadNotifications = React.useCallback(async (options?: { showLoading?: boolean }) => {
-    if (!user) {
-      setNotifications([]);
-      setUnreadNotifications(0);
-      setNotificationsLoading(false);
-      return;
-    }
-    if (options?.showLoading !== false) {
-      setNotificationsLoading(true);
-    }
+    if (!user?.id || accountScope.current !== accountKey) return;
+    const generation = ++listGeneration.current;
+    const isCurrent = () => generation === listGeneration.current && accountScope.current === accountKey;
+    if (options?.showLoading !== false) setNotificationsLoading(true);
     try {
       const response = await fetchNotifications();
-      const rawList: NotificationItem[] = Array.isArray(response?.results)
-        ? response.results
-        : [];
+      if (!isCurrent()) return;
+      const rawList: NotificationItem[] = Array.isArray(response?.results) ? response.results : [];
       const list = rawList.filter((item) => !isMessageNotification(item));
       setNotifications(list);
+      setNotificationOwner(accountKey);
       setUnreadNotifications(list.filter((item) => !item.readAt).length);
     } catch (error) {
+      if (!isCurrent()) return;
       console.error("Failed to load notifications", error);
       setNotifications([]);
       setUnreadNotifications(0);
+      setNotificationOwner(accountKey);
     } finally {
-      if (options?.showLoading !== false) {
-        setNotificationsLoading(false);
-      }
+      if (isCurrent() && options?.showLoading !== false) setNotificationsLoading(false);
     }
-  }, [user]);
+  }, [accountKey, user?.id]);
 
   React.useEffect(() => {
     const role = onboardingRoleForUserRole(user?.role);
@@ -455,8 +464,20 @@ export default function TopBarActions({
   }, [messageSummaries]);
 
   React.useEffect(() => {
-    loadNotifications().then(() => null);
-  }, [loadNotifications]);
+    // Reset the previous account's rows and pending loading indicator together.
+    listGeneration.current += 1;
+    receiptGeneration.current += 1;
+    setNotificationOwner(accountKey);
+    setNotifications([]);
+    setUnreadNotifications(0);
+    setNotificationsLoading(false);
+    setNotificationAnchor(null);
+    if (user?.id != null) void loadNotifications();
+    return () => {
+      listGeneration.current += 1;
+      receiptGeneration.current += 1;
+    };
+  }, [accountKey, user?.id, loadNotifications]);
 
   React.useEffect(() => {
     if (!user) {
@@ -553,6 +574,7 @@ export default function TopBarActions({
       wsRef.current = socket;
 
       socket.onmessage = (event) => {
+        if (isCancelled || accountScope.current !== accountKey) return;
         try {
           const payload = JSON.parse(event.data);
           switch (payload.type) {
@@ -685,20 +707,21 @@ export default function TopBarActions({
 
   const markAllNotifications = React.useCallback(async () => {
     const unreadIds = notifications.filter((item) => !item.readAt).map((item) => item.id);
-    if (!unreadIds.length) {
-      return;
-    }
+    if (!user?.id || !unreadIds.length || accountScope.current !== accountKey) return;
+    const generation = ++receiptGeneration.current;
+    const isCurrent = () => generation === receiptGeneration.current && accountScope.current === accountKey;
     try {
       const res = await markNotificationsRead(unreadIds);
+      if (!isCurrent()) return;
       const nowIso = new Date().toISOString();
       setUnreadNotifications(res.unread ?? 0);
       setNotifications((prev) =>
-        prev.map((item) => (item.readAt ? item : { ...item, readAt: nowIso }))
+        prev.map((item) => unreadIds.includes(item.id) && !item.readAt ? { ...item, readAt: nowIso } : item)
       );
     } catch (error) {
-      console.error("Failed to mark notifications read", error);
+      if (isCurrent()) console.error("Failed to mark notifications read", error);
     }
-  }, [notifications]);
+  }, [accountKey, notifications, user?.id]);
 
   const handleOpenNotifications = (event: React.MouseEvent<HTMLElement>) => {
     setNotificationAnchor(event.currentTarget);
