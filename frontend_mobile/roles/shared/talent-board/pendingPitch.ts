@@ -1,0 +1,37 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createPendingPitchStore, pitchIntentScope, sendPendingPitch, type PendingPitch, type PitchIntentLock } from '@chemisttasker/shared-core';
+import { idempotencyKey } from '@/features/parity/utils';
+
+const locks = new Map<string, Promise<void>>();
+const lock: PitchIntentLock = async (name, run) => {
+  const previous = locks.get(name) ?? Promise.resolve();
+  let release!: () => void;
+  const next = new Promise<void>((resolve) => { release = resolve; });
+  locks.set(name, next);
+  await previous;
+  try { return await run(); } finally {
+    release();
+    if (locks.get(name) === next) locks.delete(name);
+  }
+};
+
+export const mobilePendingPitchStore = (environment: string, userId: string | number) =>
+  createPendingPitchStore(AsyncStorage, lock, pitchIntentScope(environment, userId), () => idempotencyKey() as `${string}-${string}-${string}-${string}-${string}`);
+
+export async function submitPendingPitch(store: ReturnType<typeof mobilePendingPitchStore>, intent: PendingPitch, isCurrent: () => boolean) {
+  try {
+    return await sendPendingPitch(store, intent, isCurrent);
+  } catch (error: any) {
+    if (!isCurrent()) throw error;
+    const detail = error?.payload ?? error?.response?.data ?? error?.data;
+    const status = error?.status ?? error?.response?.status;
+    const code = detail?.code;
+    if ((status === 409 || status === 410) && ['IDEMPOTENCY_PAYLOAD_MISMATCH', 'PITCH_DELETED', 'IDEMPOTENCY_REPLAY_EXPIRED'].includes(code)) {
+      await store.reconcile(intent.key, code, detail?.post_id);
+      const message = code === 'PITCH_DELETED' ? 'This pitch was deleted.' : code === 'IDEMPOTENCY_REPLAY_EXPIRED' ? 'This pitch retry has expired. Review your saved pitches before starting again.' : 'This save key was used for a different pitch. Review your saved pitches before starting again.';
+      throw new Error(message);
+    }
+    if (status === 400 && code !== 'IDEMPOTENCY_KEY_REQUIRED') await store.reject(intent.key);
+    throw error;
+  }
+}

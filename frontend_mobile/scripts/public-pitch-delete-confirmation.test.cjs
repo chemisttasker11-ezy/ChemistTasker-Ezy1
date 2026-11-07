@@ -29,6 +29,7 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
   const onboardingUpdateCalls = [];
   let onboardingImplementation = async () => ({ skills: [], verified: true });
   let availabilityImplementation = async () => [];
+  let onboardingUpdateImplementation = async () => {};
   const focusCallbacks = [];
   let focusIndex = 0;
   let eligibilityHook;
@@ -185,6 +186,7 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
       ConfirmDialog: (props) => ({ type: 'ConfirmDialog', props }),
     },
     '@chemisttasker/shared-core': {
+      getApiConfig: () => ({ baseURL: 'test' }),
       projectTalentSkills: () => ({ clinicalServices: [], dispenseSoftware: [], expandedScope: [], skills: [] }),
       resolveTalentBookingRole: () => 'PHARMACIST',
       newcomerTypeLabel: () => 'New to pharmacy',
@@ -197,7 +199,7 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
       getRatingsSummary: async () => ({ average: 0, count: 0 }),
       likeExplorerPost: async () => {},
       unlikeExplorerPost: async () => {},
-      updateOnboardingForm: async (role, form) => { onboardingUpdateCalls.push({ role, values: Object.fromEntries(form._entries) }); },
+      updateOnboardingForm: async (role, form) => { onboardingUpdateCalls.push({ role, values: Object.fromEntries(form._entries) }); return onboardingUpdateImplementation(); },
       skills_registry: {},
     },
     '@chemisttasker/shared-core/skills_registry.json': {},
@@ -244,6 +246,29 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
   const guardModule = { exports: {} };
   vm.runInNewContext(guardCompiled, { module: guardModule, exports: guardModule.exports, require: (name) => mocks[name], JSON, Object, Array, Date, Promise });
   mocks['../forms/useUnsavedChangesGuard'] = guardModule.exports;
+
+  const storageData = new Map();
+  const storage = {
+    getItem: async (key) => storageData.get(key) ?? null,
+    setItem: async (key, value) => { storageData.set(key, value); },
+    removeItem: async (key) => { storageData.delete(key); },
+  };
+  const loadTs = (file, requireModule) => {
+    const loaded = { exports: {} };
+    const source = fs.readFileSync(file, 'utf8');
+    const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+    vm.runInNewContext(compiled, { module: loaded, exports: loaded.exports, require: requireModule, Promise, Date, JSON, Number, Error });
+    return loaded.exports;
+  };
+  Object.assign(mocks['@chemisttasker/shared-core'], loadTs(
+    path.resolve(__dirname, '../../shared-core/src/domains/talent/pendingPitch.ts'),
+    () => ({ createExplorerPost: (...args) => mocks['@chemisttasker/shared-core'].createExplorerPost(...args) }),
+  ));
+  mocks['./pendingPitch'] = loadTs(path.resolve(__dirname, '../roles/shared/talent-board/pendingPitch.ts'), (name) => {
+    if (name === '@react-native-async-storage/async-storage') return { __esModule: true, default: storage };
+    if (name === '@/features/parity/utils') return { idempotencyKey: () => '12345678-1234-4123-8123-123456789abc' };
+    return mocks[name] || require(name);
+  });
 
   // Compile candidate PitchDialog
   const dialogPath = path.resolve(__dirname, '../roles/shared/talent-board/components/PitchDialog.tsx');
@@ -372,6 +397,8 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
     createPostCalls,
     onboardingUpdateCalls,
     setOnboardingService: (fn) => { onboardingImplementation = fn; },
+    setOnboardingUpdateService: (fn) => { onboardingUpdateImplementation = fn; },
+    pendingStore: mocks['./pendingPitch'].mobilePendingPitchStore('test', initialUser.id),
     changeEditorPost: (newPost) => {
       currentPost = newPost;
       stateSlots[12] = newPost ? newPost.id : null;
@@ -1231,3 +1258,18 @@ for (const selection of ['calendar', 'drag', 'typed start']) {
     assert.equal(h.walkTree(tree, n => n.props?.label === 'End Date').props.value, '2026-12-31');
   });
 }
+
+test('onboarding 400 leaves an unrelated pending pitch intact', async () => {
+  const harness = createPitchHarness();
+  const dialog = harness.findPitchDialog(await harness.mountWithPitch());
+  const intent = await harness.pendingStore.acquire({ headline: 'Earlier pitch' }, 'PHARMACIST');
+  harness.setOnboardingUpdateService(async () => { throw { status: 400, payload: { suburb: ['Invalid'] } }; });
+  await dialog.props.onSave();
+  const saved = await harness.pendingStore.read();
+  assert.equal(saved.key, intent.key);
+  assert.equal(saved.rejected, undefined);
+  assert.equal(saved.terminalCode, undefined);
+  assert.equal(harness.onboardingUpdateCalls.length, 1);
+  assert.equal(harness.createPostCalls.length, 0);
+  assert.equal(harness.updatePostCalls.length, 0);
+});

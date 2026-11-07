@@ -2,7 +2,8 @@ import {
   projectTalentSkills,
   resolveTalentBookingRole,
   newcomerTypeLabel,
-  createExplorerPost,
+  getApiConfig,
+  type PendingPitch,
   deleteExplorerPost,
   fetchUserAvailabilityService,
   getExplorerPostForEditing,
@@ -30,6 +31,7 @@ import PitchDialog, { PitchFormState } from './components/PitchDialog';
 import { useUnsavedChangesGuard } from '../forms/useUnsavedChangesGuard';
 import TalentCardV2 from './components/TalentCardV2';
 import { usePublicAvailabilityEligibility } from './publicAvailabilityEligibility';
+import { mobilePendingPitchStore, submitPendingPitch } from './pendingPitch';
 
 const titleCase = (value: string) =>
   value
@@ -391,6 +393,24 @@ export function TalentBoardInner({
   const [pitchSaving, setPitchSaving] = useState(false);
   const [pitchDeleting, setPitchDeleting] = useState(false);
   const [pitchError, setPitchError] = useState<string | null>(null);
+  const pendingStore = useMemo(() => user?.id != null ? mobilePendingPitchStore(getApiConfig().baseURL, user.id) : null, [user?.id]);
+  const [pendingPitch, setPendingPitch] = useState<PendingPitch | null>(null);
+  const [pendingError, setPendingError] = useState<string | null>(null);
+  const [pendingReady, setPendingReady] = useState(false);
+  useEffect(() => {
+    let current = true;
+    setPendingPitch(null);
+    setPendingError(null);
+    setPendingReady(false);
+    if (!pendingStore) return () => { current = false; };
+    void pendingStore.read().then((intent) => {
+      if (current) { setPendingPitch(intent); setPendingReady(true); }
+    }).catch(() => {
+      if (current) setPendingError('Your saved pitch could not be read. Reopen this screen to retry.');
+    });
+    return () => { current = false; };
+  }, [pendingStore]);
+
   const [existingPostId, setExistingPostId] = useState<number | null>(null);
   const [existingReferenceCode, setExistingReferenceCode] = useState<string | null>(null);
   const [deleteConfirmState, setDeleteConfirmState] = useState<{
@@ -632,7 +652,7 @@ export function TalentBoardInner({
     if (saveInFlightRef.current || deleteInFlightRef.current || activeDeleteTokenRef.current !== null || deleteConfirmState.open) {
       return;
     }
-    if (!isMountedRef.current || pitchDefaultsReady.current !== `${user?.id}:${normalizedRole}`) return;
+    if (!isMountedRef.current || !pendingStore || !pendingReady || pitchDefaultsReady.current !== `${user?.id}:${normalizedRole}`) return;
 
     saveInFlightRef.current = true;
     const currentSaveGen = ++saveGeneration.current;
@@ -647,6 +667,12 @@ export function TalentBoardInner({
     setPitchSaving(true);
     setPitchError(null);
     try {
+      const savedIntent = !existingPostId ? await pendingStore.read() : null;
+      if (savedIntent) {
+        if (isCurrentSave()) { setPendingPitch(savedIntent); setPitchError('Finish the saved pitch from the Talent Board before starting another.'); }
+        return;
+      }
+      if (!isCurrentSave()) return;
       if (pitchForm.openToTravel && (pitchForm.travelStates || []).length === 0) {
         if (!isCurrentSave()) return;
         setPitchError('Select at least one travel state.');
@@ -699,7 +725,16 @@ export function TalentBoardInner({
       };
       if (explorerProfileId) payload.explorer_profile = explorerProfileId;
       if (existingPostId) await updateExplorerPost(existingPostId, payload);
-      else await createExplorerPost(payload);
+      else {
+        const intent = await pendingStore.acquire(payload, normalizedRole);
+        if (!isCurrentSave()) return;
+        setPendingPitch(intent);
+        await submitPendingPitch(pendingStore, intent, isCurrentSave);
+        if (!isCurrentSave()) return;
+        await pendingStore.resolve(intent.key);
+        if (!isCurrentSave()) return;
+        setPendingPitch(null);
+      }
       if (!isCurrentSave()) return;
       try {
         await reload();
@@ -709,8 +744,14 @@ export function TalentBoardInner({
       setPitchOpen(false);
     } catch (err: any) {
       if (!isCurrentSave()) return;
-      const detail = err?.response?.data || err?.data || err;
-      if (detail && typeof detail === 'object') {
+      if (pendingStore) {
+        try { const intent = await pendingStore.read(); if (isCurrentSave()) setPendingPitch(intent); } catch {}
+      }
+      if (!isCurrentSave()) return;
+      const detail = err?.payload || err?.response?.data || err?.data || err;
+      if (!existingPostId && err instanceof Error && !(err as any).payload) {
+        setPitchError(err.message);
+      } else if (detail && typeof detail === 'object') {
         const fieldMessages = Object.entries(detail)
           .map(([field, value]) => `${field}: ${Array.isArray(value) ? value.join(', ') : String(value)}`)
           .join(' ');
@@ -725,6 +766,31 @@ export function TalentBoardInner({
           setPitchSaving(false);
         }
       }
+    }
+  };
+
+  const finishPendingPitch = async () => {
+    if (!pendingStore || !pendingPitch || saveInFlightRef.current) return;
+    const accountId = user?.id;
+    const accountRole = normalizedRole;
+    const isCurrent = () => isMountedRef.current && activeUserRef.current.id === accountId && activeUserRef.current.role === accountRole;
+    saveInFlightRef.current = true;
+    setPitchSaving(true);
+    setPendingError(null);
+    try {
+      if (!pendingPitch.terminalCode && !pendingPitch.rejected) await submitPendingPitch(pendingStore, pendingPitch, isCurrent);
+      if (!isCurrent()) return;
+      await pendingStore.resolve(pendingPitch.key);
+      if (!isCurrent()) return;
+      setPendingPitch(null);
+      try { await reload(); } catch {}
+    } catch (err: any) {
+      if (!isCurrent()) return;
+      try { setPendingPitch(await pendingStore.read()); } catch {}
+      if (isCurrent()) setPendingError(err?.message || 'Unable to finish your pitch. Please try again.');
+    } finally {
+      saveInFlightRef.current = false;
+      if (isCurrent()) setPitchSaving(false);
     }
   };
 
@@ -908,6 +974,15 @@ export function TalentBoardInner({
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); try { await Promise.all([reload(), retryEligibility()]); } finally { setRefreshing(false); } }} tintColor="#6366F1" />}
       >
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {pendingPitch || pendingError ? (
+          <View style={styles.emptyBox}>
+            <Text variant="titleMedium" style={{ fontWeight: '700' }}>Saved pitch needs attention</Text>
+            <Text style={styles.subtitle} accessibilityLiveRegion="polite">
+              {pendingError || (pendingPitch?.terminalCode === 'PITCH_DELETED' ? 'This pitch was deleted.' : pendingPitch?.terminalCode === 'IDEMPOTENCY_REPLAY_EXPIRED' ? 'This pitch retry has expired. Review your saved pitches before starting again.' : pendingPitch?.terminalCode ? 'This save key was used for a different pitch. Review your saved pitches before starting again.' : pendingPitch?.rejected ? 'The pitch was rejected. Review your saved pitches before starting again.' : 'A pitch save is waiting to finish. Retry to send the saved pitch.')}
+            </Text>
+            {pendingPitch ? <Button mode="outlined" disabled={pitchSaving} onPress={() => void finishPendingPitch()}>{pendingPitch.terminalCode || pendingPitch.rejected ? 'I have reviewed my pitches' : 'Finish saving pitch'}</Button> : null}
+          </View>
+        ) : null}
         {isTalentStaff && eligibilityStatus === 'error' ? (
           <View style={styles.emptyBox}>
             <Text variant="titleMedium" style={{ fontWeight: '700' }}>Unable to verify publishing eligibility</Text>
