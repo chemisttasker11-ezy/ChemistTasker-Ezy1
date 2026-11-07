@@ -956,8 +956,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
             <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <ContentState
                     kind={isForbidden ? 'forbidden' : 'error'}
-                    title={isForbidden ? 'No shift management access' : 'Could not load active shifts'}
-                    description={shiftsError}
+                    title={isForbidden ? 'No shift management access' : 'Active shifts did not load'}
+                    description={isForbidden ? shiftsError : `${shiftsError.replace(/\.$/, '')}. Check your connection and try again.`}
                     actionLabel="Try again"
                     onAction={loadShifts}
                     style={styles.stateCard}
@@ -971,9 +971,9 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
             <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <ContentState
                     kind="empty"
-                    title="No active shifts found"
-                    description="When you post shifts or receive candidates, they will appear here."
-                    actionLabel={postShiftPath ? 'Post shift' : undefined}
+                    title="No active shifts"
+                    description="Shifts you post appear here while they are being filled."
+                    actionLabel={postShiftPath ? 'Post a shift' : undefined}
                     onAction={postShiftPath ? handlePostShift : undefined}
                     style={styles.stateCard}
                 />

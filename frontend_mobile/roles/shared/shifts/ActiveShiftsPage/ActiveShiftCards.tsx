@@ -30,6 +30,7 @@ import type {
   ShiftInterest,
   ShiftMemberStatus,
 } from '@chemisttasker/shared-core';
+import { getShiftAudienceLevel } from '@chemisttasker/shared-core';
 
 import EscalationStepper from './components/Escalation/EscalationStepper';
 import PublicLevelView from './components/Candidates/PublicLevelView';
@@ -60,6 +61,8 @@ import { customTheme } from './theme';
 import { styles } from './styles';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
+
+const humanize = (value: string) => value.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 
 type DataProps = {
   orderedShifts: Shift[];
@@ -174,6 +177,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                     const isExpanded = expandedShifts.has(shift.id);
                     const isSingleUserShift = Boolean((shift as any).singleUserOnly);
                     const shiftLevel = getCurrentLevelKey(shift);
+                    const audience = getShiftAudienceLevel(shiftLevel);
                     const selectedLevel = selectedLevelByShift[shift.id] ?? shiftLevel;
                     const tabKey = getTabKey(shift.id, selectedLevel);
                     const currentTabData = tabData[tabKey] || { loading: false };
@@ -308,6 +312,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                     const effectivePaymentOfferIds = selectedPaymentOfferIds;
                     const paymentUnitCount = effectivePaymentOfferIds.length;
                     const showPaymentRequired = paymentRequiredOffers.length > 0;
+                    const updatedSlotCount = Object.values(slotHasUpdatesByShift[shift.id] ?? {}).filter(Boolean).length;
                     const candidatesCount = countUniquePeople([
                         ...dedupeMembers(allMembers),
                         ...allInterests,
@@ -405,7 +410,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                             disabled={sharingShiftId === shift.id}
                                             style={localStyles.iconTouchTarget}
                                             accessibilityRole="button"
-                                            accessibilityLabel="Share shift"
+                                            accessibilityLabel="Share shift link"
                                         >
                                             <Share2 size={18} color={tokenColors.textMuted} />
                                         </TouchableOpacity>
@@ -438,10 +443,10 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                 {hasBadges ? (
                                     <View style={styles.badgeRow}>
                                         {roleNeeded && (
-                                            <Pill label={roleNeeded} tone="violet" />
+                                            <Pill label={humanize(String(roleNeeded))} tone="violet" />
                                         )}
                                         {employmentType && (
-                                            <Pill label={employmentType} tone="neutral" />
+                                            <Pill label={humanize(String(employmentType))} tone="neutral" />
                                         )}
                                         {isUrgent && (
                                             <Pill label="Urgent" tone="red" />
@@ -461,7 +466,9 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                 </View>
 
                                 <View style={styles.statsRow}>
-                                    <View style={styles.statBox}>
+                                    <View style={styles.statBox}
+                                        accessible accessibilityLabel={`${slotsCount || '-'} slots`}
+                                        accessibilityHint="Dates in this shift. Each date is filled separately.">
                                         <Calendar size={16} color={tokenColors.primary} style={styles.statIcon} />
                                         <View>
                                             <Text style={styles.statValue}>{slotsCount || '-'}</Text>
@@ -469,7 +476,9 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                         </View>
                                     </View>
                                     <View style={styles.statDivider} />
-                                    <View style={styles.statBox}>
+                                    <View style={styles.statBox}
+                                        accessible accessibilityLabel={`${candidatesCount} candidates`}
+                                        accessibilityHint="Everyone who responded or was invited, across all dates and audiences.">
                                         <Users size={16} color={tokenColors.primary} style={styles.statIcon} />
                                         <View>
                                             <Text style={styles.statValue}>{candidatesCount}</Text>
@@ -477,15 +486,43 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                         </View>
                                     </View>
                                     <View style={styles.statDivider} />
-                                    <View style={styles.statBox}>
+                                    <View style={styles.statBox}
+                                        accessible accessibilityLabel={`${interestsCount} interested`}
+                                        accessibilityHint="Said yes or sent an offer, and are waiting for your review.">
                                         <Heart size={16} color={tokenColors.primary} style={styles.statIcon} />
                                         <View>
                                             <Text style={styles.statValue}>{interestsCount}</Text>
-                                            <Text style={styles.statLabel}>Interests</Text>
+                                            <Text style={styles.statLabel}>Interested</Text>
                                         </View>
                                     </View>
                                 </View>
                                 </TouchableOpacity>
+
+                                <View style={localStyles.statusBar}>
+                                    <View style={localStyles.statusPills}>
+                                        {audience ? (
+                                            <View accessible accessibilityRole="text"
+                                                accessibilityHint={`Visible now to ${audience.reach}.${audience.scope === 'internal' ? ' Escalate inside the card to reach more people.' : ''}`}>
+                                                <Pill tone={audience.scope === 'platform' ? 'cyan' : 'violet'}
+                                                    label={`${audience.scope === 'platform' ? 'Platform' : 'Internal'} · ${audience.label}`} />
+                                            </View>
+                                        ) : null}
+                                        {interestsCount > 0 ? (
+                                            <Pill label={`${interestsCount} waiting for review`} tone="cyan" />
+                                        ) : null}
+                                        {showPaymentRequired ? <Pill label="Payment required" tone="red" /> : null}
+                                        {updatedSlotCount > 0 ? <Pill label="New activity" tone="amber" /> : null}
+                                    </View>
+                                    <Button
+                                        mode="text"
+                                        accessibilityRole="button"
+                                        accessibilityState={{ expanded: isExpanded }}
+                                        onPress={() => toggleShiftExpansion(shift.id)}
+                                        style={localStyles.manageCandidates}
+                                    >
+                                        {isExpanded ? 'Hide candidates' : 'Manage candidates'}
+                                    </Button>
+                                </View>
 
                                 {isDedicated ? (
                                     <View style={styles.directBadgeRow}>
@@ -731,6 +768,9 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
 }
 
 const localStyles = StyleSheet.create({
+  statusBar: { borderTopWidth: 1, borderColor: tokenColors.border, paddingVertical: space.sm, paddingHorizontal: space.md, gap: space.sm },
+  statusPills: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.xs },
+  manageCandidates: { minHeight: touch.min, alignSelf: 'flex-end', justifyContent: 'center' },
   iconTouchTarget: {
     minHeight: touch.min,
     minWidth: touch.min,
