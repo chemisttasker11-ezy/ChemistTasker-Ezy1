@@ -162,7 +162,7 @@ export default function OwnerAssignedShiftBoard({
 }: Props) {
     const [expandedShiftIds, setExpandedShiftIds] = useState<Record<number, boolean>>({});
     const { width: screenWidth } = useWindowDimensions();
-    const useTwoColumnSlots = screenWidth <= 420;
+    const slotColumns = screenWidth <= 420 ? 1 : screenWidth < 768 ? 2 : 3;
 
     const toggleShift = (shiftId: number) => {
         setExpandedShiftIds((prev) => ({
@@ -257,7 +257,7 @@ export default function OwnerAssignedShiftBoard({
                                     accessibilityRole="button"
                                     accessibilityState={{ expanded: isExpanded }}
                                     accessibilityLabel={isExpanded ? 'Hide dates' : mode === 'history' ? 'View dates' : 'View booked dates'}
-                                    onPress={() => toggleShift(shift.id)}
+                                    onPress={(event) => { event?.stopPropagation?.(); toggleShift(shift.id); }}
                                     style={styles.secondaryBtn}
                                 >
                                     {isExpanded ? 'Hide dates' : mode === 'history' ? 'View dates' : 'View booked dates'}
@@ -290,10 +290,10 @@ export default function OwnerAssignedShiftBoard({
                                                     key={`${shift.id}_${slot?.id}`}
                                                     activeOpacity={assigned ? 0.84 : 1}
                                                     disabled={!assigned}
-                                                    onPress={() => assigned ? onViewAssigned(shift.id, slot?.id ?? null, userId as number) : undefined}
+                                                    onPress={(event) => { event?.stopPropagation?.(); if (assigned) onViewAssigned(shift.id, slot?.id ?? null, userId as number); }}
                                                     style={[
                                                         styles.slotGridCell,
-                                                        useTwoColumnSlots ? styles.slotGridCellHalf : styles.slotGridCellThird,
+                                                        slotColumns === 1 ? styles.slotGridCellFull : slotColumns === 2 ? styles.slotGridCellHalf : styles.slotGridCellThird,
                                                     ]}
                                                 >
                                                     <Surface
@@ -347,13 +347,13 @@ export default function OwnerAssignedShiftBoard({
                                                         {assigned ? (
                                                             <View style={styles.slotActionRow}>
                                                                 <Button mode="contained"
-                                                                    onPress={() => onViewAssigned(shift.id, slot?.id ?? null, userId as number)}
+                                                                    onPress={(event) => { event?.stopPropagation?.(); onViewAssigned(shift.id, slot?.id ?? null, userId as number); }}
                                                                     style={styles.primaryBtn} labelStyle={styles.primaryBtnText}>
                                                                     View profile
                                                                 </Button>
                                                                 {mode === 'confirmed' && onMessageAssigned ? (
                                                                     <Button mode="outlined" accessibilityLabel="Message"
-                                                                        onPress={() => onMessageAssigned(userId as number)}
+                                                                        onPress={(event) => { event?.stopPropagation?.(); onMessageAssigned(userId as number); }}
                                                                         style={styles.secondaryBtn} labelStyle={styles.secondaryBtnText}>
                                                                         Message
                                                                     </Button>
@@ -361,7 +361,7 @@ export default function OwnerAssignedShiftBoard({
                                                                 {mode === 'history' && onRateAssigned ? (
                                                                     <Button mode="outlined"
                                                                         icon={({ size, color }) => <Star size={size} color={color} />}
-                                                                        onPress={() => onRateAssigned(userId as number)}
+                                                                        onPress={(event) => { event?.stopPropagation?.(); onRateAssigned(userId as number); }}
                                                                         style={styles.secondaryBtn} labelStyle={styles.secondaryBtnText}>
                                                                         Rate
                                                                     </Button>
@@ -563,6 +563,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
         marginBottom: 8,
     },
+    slotGridCellFull: { width: '100%' },
     slotGridCellHalf: {
         width: '50%',
     },
