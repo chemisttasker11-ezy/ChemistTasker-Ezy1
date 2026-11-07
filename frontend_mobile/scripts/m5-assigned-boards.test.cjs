@@ -64,7 +64,7 @@ function textOf(node) {
   if (typeof node.type === 'function') return textOf(node.type(node.props));
   return textOf(node.props && node.props.children);
 }
-function boardHarness() {
+function boardHarness(screenWidth = 360, fontScale = 1) {
   const slots = [];
   let index = 0;
   const react = {
@@ -86,7 +86,7 @@ function boardHarness() {
     'react-native': {
       ScrollView: 'ScrollView', StyleSheet: { create: styles => styles },
       TouchableOpacity: 'TouchableOpacity', View: 'View',
-      useWindowDimensions: () => ({ width: 360, height: 800 }),
+      useWindowDimensions: () => ({ width: screenWidth, height: 800, fontScale }),
     },
     'react-native-paper': paper,
     '@/components/ui/BrandActivityIndicator': { BrandActivityIndicator: 'ActivityIndicator' },
@@ -404,4 +404,40 @@ test('C deferred payroll activation locks same-render duplicate taps until reque
   await flush();
   assert.deepEqual(h.calls.activation, [7]);
   h.unmount();
+});
+
+test('R 360dp large text keeps one full-width slot card and unclipped actions', () => {
+  const h = boardHarness(360, 1.3);
+  const params = props('confirmed');
+  let tree = h.render(params);
+  h.find(tree, x => x.type === 'Card')[0].props.onPress();
+  tree = h.render(params);
+  const cell = h.find(tree, x => x.type === 'TouchableOpacity')[0];
+  assert.ok(cell, 'real mounted board exposes an assigned date cell');
+  const layout = Array.isArray(cell.props.style) ? cell.props.style : [cell.props.style];
+  assert.ok(layout.some(row => row && row.width === '100%'),
+    'at 360 dp and large text, slot cells need a full width to keep actions readable');
+  assert.equal(buttons(tree, 'Message').length, 2, 'contact actions remain available');
+  assert.equal(buttons(tree, 'View profile').length, 2, 'profile actions remain available');
+});
+
+test('R child date and action presses stop parent card toggling', () => {
+  const h = boardHarness();
+  const values = props('confirmed');
+  let tree = h.render(values);
+  const dateToggle = buttons(tree, 'View booked dates')[0];
+  assert.ok(dateToggle, 'date toggle exists');
+  let stopped = false;
+  dateToggle.props.onPress({ stopPropagation: () => { stopped = true; } });
+  assert.equal(stopped, true, 'the date toggle must not bubble to the parent card');
+  tree = h.render(values);
+  const message = buttons(tree, 'Message')[0];
+  assert.ok(message, 'the expanded board exposes a contact action');
+  stopped = false;
+  message.props.onPress({ stopPropagation: () => { stopped = true; } });
+  assert.equal(stopped, true, 'Message action must not collapse the date card');
+  const viewProfile = buttons(tree, 'View profile')[0];
+  stopped = false;
+  viewProfile.props.onPress({ stopPropagation: () => { stopped = true; } });
+  assert.equal(stopped, true, 'View profile must not trigger the parent card');
 });
