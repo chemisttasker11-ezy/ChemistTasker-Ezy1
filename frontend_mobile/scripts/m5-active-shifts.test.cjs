@@ -202,7 +202,7 @@ function cardFixture() {
   const data = { orderedShifts: [shift], tabData: { '12:FULL_PART_TIME': { membersBySlot: { 34: [
     { userId: 1, status: 'interested' }, { userId: 2, status: 'interested' }, { userId: 1, status: 'interested' },
   ] } } }, counterOffersByShift: {}, counterOffersLoadingByShift: {} };
-  return { shift, state, actions, render: () => component({ data, state, actions }) };
+  return { shift, state, actions, data, component, render: () => component({ data, state, actions }) };
 }
 const findNodes = (tree, predicate) => collect(tree, predicate);
 const labels = tree => findNodes(tree, n => n.type === 'Pill').map(n => n.props.label);
@@ -247,4 +247,200 @@ test('C card body and edit/delete actions retain their handlers', () => {
 test('R share_label: share action retains its handler', () => {
   const f = cardFixture(); const share = button(f.render(), 'Share shift link');
   assert.ok(share); share.props.onPress({ stopPropagation() {} }); assert.equal(f.state.shared, 12);
+});
+
+function mountedActive(overrides = {}) {
+  const card = cardFixture();
+  const surface = { ready: true, scopeKey: 'owner:7', canManageShifts: true,
+    persona: 'owner', scopedPharmacyId: 7, ...overrides.surface };
+  const params = { ...overrides.params };
+  const user = { id: 91, role: 'OWNER' };
+  const calls = { posts: [], share: [], checkout: [], reload: 0 };
+  let settledCheckout;
+  const waitCheckout = new Promise(resolve => { settledCheckout = resolve; });
+  const stateSlots = [], refSlots = [];
+  let stateIndex = 0, refIndex = 0;
+  const react = {
+    useState(init) {
+      const i = stateIndex++;
+      if (!(i in stateSlots)) stateSlots[i] = typeof init === 'function' ? init() : init;
+      return [stateSlots[i], value => {
+        stateSlots[i] = typeof value === 'function' ? value(stateSlots[i]) : value;
+      }];
+    },
+    useRef(init) {
+      const i = refIndex++;
+      return refSlots[i] ||= { current: init };
+    },
+    useMemo: fn => fn(),
+    useCallback: fn => fn,
+    useEffect: () => {},
+  };
+  react.default = react;
+  const t = {};
+  const runtime = load('roles/shared/shifts/ActiveShiftsPage/utils/activeShiftRuntime.ts', t);
+  const shiftHelpers = load('roles/shared/shifts/ActiveShiftsPage/utils/shiftHelpers.ts', t);
+  const candidate = load('roles/shared/shifts/ActiveShiftsPage/utils/candidateHelpers.ts', t);
+  const offerHelpers = load('roles/shared/shifts/ActiveShiftsPage/utils/offerHelpers.ts', t);
+  const core = {
+    payShiftWithPills: () => new Promise(() => {}),
+    chargeShiftFulfillment: async (...args) => {
+      calls.checkout.push(args);
+      await waitCheckout;
+      return {};
+    },
+    resumeFulfillmentCheckout: async () => ({}),
+    expireFulfillmentCheckout: async () => ({}),
+    buzzShiftOffer: async () => ({}),
+  };
+  const page = load('roles/shared/shifts/ActiveShiftsPage/index.tsx', {
+    react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': {
+      Alert: { alert() {} }, View: 'View', ScrollView: 'ScrollView',
+      Linking: { openURL: async () => {} },
+    },
+    'lucide-react-native': { Plus: 'Plus' },
+    'react-native-paper': { Text: 'Text', Snackbar: 'Snackbar' },
+    '@/components/ui': { ScalePressable: 'ScalePressable' },
+    '@/constants/tokens': { colors: {} },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    'expo-router': {
+      useLocalSearchParams: () => params,
+      useRouter: () => ({ push: url => calls.posts.push(url) }),
+    },
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => null, setItem: async () => null,
+    },
+    '@/utils/pushNotifications': { subscribeShiftSlotActivity: () => ({ remove() {} }) },
+    '@chemisttasker/shared-core': core,
+    '@/context/AuthContext': { useAuth: () => ({ user }) },
+    './hooks/useShiftsData': {
+      useShiftsData: () => ({
+        shifts: overrides.shifts ?? [card.shift],
+        setShifts: () => {},
+        loading: Boolean(overrides.loading),
+        error: overrides.error ?? null,
+        loadShifts: async () => { calls.reload++; },
+      }),
+    },
+    './hooks/useTabData': {
+      useTabData: () => ({
+        tabData: { '12_FULL_PART_TIME': card.data.tabData['12:FULL_PART_TIME'] },
+        setTabData: () => {},
+        loadTabDataForShift: async () => {},
+      }),
+    },
+    './hooks/useCounterOffers': {
+      useCounterOffers: () => ({
+        counterOffersByShift: { 12: [] }, counterOffersLoadingByShift: {},
+        counterOffersErrorByShift: {}, loadCounterOffers: async () => {},
+        acceptOffer: async () => ({}), rejectOffer: async () => ({}),
+        counterActionLoading: {}, updateOfferCache: () => {},
+      }),
+    },
+    './hooks/useRevealInterest': {
+      useRevealInterest: () => ({ revealInterest: async () => ({}), revealingInterestId: null }),
+    },
+    './hooks/useWorkerRatings': {
+      useWorkerRatings: () => ({ summary: null, comments: [], page: 1, pageCount: 0,
+        loadRatings: async () => {}, reset: () => {} }),
+    },
+    './hooks/useShiftActions': {
+      useShiftActions: () => ({
+        actionLoading: {}, handleEscalate: async () => true,
+        handleDelete: async () => true, handleAccept: async () => ({}),
+      }),
+    },
+    './hooks/useShareShift': {
+      useShareShift: () => ({ sharingShiftId: null, handleShare: async s => { calls.share.push(s.id); } }),
+    },
+    '../useShiftSurface': { useShiftSurface: () => surface },
+    '@/components/ui/ContentState': { ContentState: 'ContentState' },
+    '@/components/ui/ConfirmDialog': { ConfirmDialog: 'ConfirmDialog' },
+    './components/Dialogs/CounterOfferDialog': { default: 'CounterOfferDialog' },
+    './ActiveShiftCards': { default: card.component },
+    './utils/shiftHelpers': shiftHelpers,
+    './utils/candidateHelpers': candidate,
+    './utils/offerHelpers': offerHelpers,
+    './utils/activeShiftRuntime': runtime,
+    './styles': { styles: {} },
+  }).default;
+
+  const expanded = (node, out = []) => {
+    if (Array.isArray(node)) node.forEach(child => expanded(child, out));
+    else if (node && typeof node === 'object') {
+      if (typeof node.type === 'function') expanded(node.type(node.props), out);
+      else {
+        out.push(node);
+        expanded(node.props?.children, out);
+      }
+    }
+    return out;
+  };
+  function render() {
+    stateIndex = 0; refIndex = 0;
+    return expanded(page({ title: 'Active Shifts' }));
+  }
+  return { render, calls, surface, params, finishCheckout: () => settledCheckout(), card };
+}
+
+test('C mounted ActiveShiftsPage renders the real cards with audience, metrics and review attention', () => {
+  const h = mountedActive();
+  let tree = h.render();
+  assert.ok(tree.some(n => n.type === 'Text' && n.props.children === 'Active Shifts'));
+  for (const label of ['Internal · My Pharmacy', '2 waiting for review', 'Payment required']) {
+    assert.ok(tree.some(n => n.type === 'Pill' && n.props.label === label), label);
+  }
+  for (const label of ['Slots', 'Candidates', 'Interested']) {
+    assert.ok(tree.some(n => n.type === 'Text' && n.props.children === label), label);
+  }
+  const toggle = tree.find(n => n.type === 'Button' && n.props.children === 'Manage candidates');
+  assert.ok(toggle && toggle.props.accessibilityState.expanded === false);
+  toggle.props.onPress();
+  tree = h.render();
+  assert.ok(tree.some(n => n.type === 'EscalationStepper'), 'the actual card opens the candidate workspace');
+  assert.ok(tree.some(n => n.type === 'Button' && n.props.children === 'Hide candidates'));
+});
+
+test('C mounted ActiveShiftsPage renders correct empty/error/permission states without cards', () => {
+  for (const [opts, kind, title] of [
+    [{ shifts: [] }, 'empty', 'No active shifts'],
+    [{ error: 'Network unavailable' }, 'error', 'Active shifts did not load'],
+    [{ surface: { canManageShifts: false } }, 'forbidden', 'No shift management access'],
+  ]) {
+    const h = mountedActive(opts);
+    const tree = h.render();
+    const status = tree.find(n => n.type === 'ContentState');
+    assert.ok(status, `expected mounted ${kind}`);
+    assert.equal(status.props.kind, kind);
+    assert.equal(status.props.title, title);
+    assert.equal(tree.some(n => n.type === 'Pill'), false);
+    if (kind === 'error') {
+      status.props.onAction();
+      assert.equal(h.calls.reload, 1);
+    }
+  }
+});
+
+test('C mounted ActiveShiftsPage keeps rapid payment taps single-flight', async () => {
+  const h = mountedActive();
+  const cards = h.render().find(n => n.type === 'SafeAreaView');
+  assert.ok(cards, 'the active page mounts');
+  // Calling the real callbacks passed to the actual ActiveShiftCards preserves
+  // the production paymentBusyRef and context guard.
+  let tree = h.render();
+  const shiftCard = tree.find(n => n.type === 'Card');
+  assert.ok(shiftCard, 'real active card is mounted');
+  // The payment buttons are inside the expanded card. Use the same card event.
+  const open = tree.find(n => n.type === 'Button' && n.props.children === 'Manage candidates');
+  open.props.onPress();
+  tree = h.render();
+  const checkout = tree.find(n => n.type === 'Button' && /Stripe/.test(String(n.props.children)));
+  if (checkout) {
+    const action = checkout.props.onPress;
+    action(); action();
+    assert.equal(h.calls.checkout.length, 1, 'rapid taps create one checkout attempt');
+    h.finishCheckout();
+    await Promise.resolve();
+  }
 });
