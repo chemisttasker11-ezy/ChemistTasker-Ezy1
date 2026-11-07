@@ -22,7 +22,10 @@ import { formatRoleLabel, formatWorkType, mapAvailabilityToPitchSlots, allWorkTy
 import { useAuth } from "../../../../contexts/AuthContext";
 import {
   canPublishTalent,
-  createExplorerPost,
+  createBrowserPendingPitchStore,
+  sendPendingPitch,
+  getApiConfig,
+  type PendingPitch,
   deleteExplorerPost,
   fetchUserAvailabilityService,
   getOnboarding,
@@ -42,6 +45,19 @@ type TalentBoardProps = {
   externalError?: string | null;
   onRequireLogin?: (reason?: "like" | "calendar" | "booking") => void;
 };
+
+const mapSavedPitchSlot = (entry: any) => {
+  if (typeof entry === 'string') {
+    return { date: entry, startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' };
+              }
+              return {
+                date: String(entry?.date || ''),
+                startTime: entry?.start_time || entry?.startTime || '09:00',
+                endTime: entry?.end_time || entry?.endTime || '17:00',
+                isAllDay: Boolean(entry?.is_all_day ?? entry?.isAllDay),
+                notes: entry?.notes || '',
+              };
+            };
 
 const TalentBoard: React.FC<TalentBoardProps> = ({
   publicMode = false,
@@ -442,6 +458,29 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
 
   const [pitchSkills, setPitchSkills] = useState<string[]>([]);
 
+  const [pitchReady, setPitchReady] = useState(false);
+  const [pendingPitch, setPendingPitch] = useState<PendingPitch | null>(null);
+  const [pitchNeedsRecovery, setPitchNeedsRecovery] = useState(false);
+  const pitchSavingRef = useRef(false);
+  const reviewedPostId = useRef<number | undefined>(undefined);
+  const pitchEnvironment = getApiConfig().baseURL;
+  const pitchAccount = JSON.stringify([pitchEnvironment, user?.id, user?.role]);
+  const pitchAccountRef = useRef(pitchAccount);
+  const pitchAbortRef = useRef(new AbortController());
+  if (pitchAccountRef.current !== pitchAccount) {
+    pitchAbortRef.current.abort();
+    pitchAbortRef.current = new AbortController();
+  }
+  pitchAccountRef.current = pitchAccount;
+  useEffect(() => {
+    if (pitchAbortRef.current.signal.aborted) pitchAbortRef.current = new AbortController();
+    const controller = pitchAbortRef.current;
+    return () => controller.abort();
+  }, [pitchAccount]);
+  const pendingStore = useMemo(() => user?.id
+    ? createBrowserPendingPitchStore(pitchEnvironment, user.id) : null, [pitchEnvironment, user?.id]);
+
+
 
   const isExplorer = user?.role === "EXPLORER";
   const isPharmacist = user?.role === "PHARMACIST";
@@ -491,14 +530,42 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
 
   const loadPitchDefaults = useCallback(async () => {
     if (!user) return;
+    const isCurrent = () => pitchAccountRef.current === pitchAccount && !pitchAbortRef.current.signal.aborted;
+    setPitchReady(false);
+    setPitchNeedsRecovery(false);
+    setPendingPitch(null);
     setPitchError(null);
     resetPitchForm();
     let onboardingSkills: string[] = [];
     let inheritedAvailabilitySlots: PitchFormState["availabilitySlots"] = [];
     try {
+      let storageFailed = false;
+      const pending = await pendingStore?.read().catch(() => { storageFailed = true; return null; });
+      if (!isCurrent()) return;
+      setPendingPitch(pending ?? null);
+      if (pending && !pending.acknowledged) {
+        const payload = pending.exactPayload as Record<string, any>;
+        setPitchForm((prev) => ({ ...prev,
+          headline: payload.headline || "", body: payload.body || "", workTypes: payload.work_types || [],
+          postKind: payload.post_kind || "AVAILABILITY", suburb: payload.location_suburb || "",
+          state: payload.location_state || "", postcode: payload.location_postcode || "",
+          openToTravel: Boolean(payload.open_to_travel), coverageRadiusKm: payload.coverage_radius_km || 30,
+          availabilitySlots: (payload.availability_days || []).map(mapSavedPitchSlot),
+        }));
+        setPitchNeedsRecovery(Boolean(pending.terminalCode || pending.rejected));
+        setPitchError(pending.rejected
+          ? "This pitch was refused. Review it before correcting the details."
+          : pending.terminalCode
+          ? "This save needs review. Open your original pitch before starting another one."
+          : "A pitch save is pending. Retry sends the original details shown here, including the original dates.");
+        setPitchReady(true);
+        return;
+      }
       inheritedAvailabilitySlots = mapAvailabilityToPitchSlots(await fetchUserAvailabilityService().catch(() => []));
+      if (!isCurrent()) return;
       if (isExplorer) {
         const onboarding: any = await getOnboarding("explorer");
+        if (!isCurrent()) return;
         setRoleTitle(
           (onboarding?.role_type || "New to pharmacy")
             .replace("_", " ")
@@ -523,6 +590,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         setPitchSkills(Array.isArray(onboarding?.interests) ? onboarding.interests : []);
       } else if (isPharmacist) {
         const onboarding: any = await getOnboarding("pharmacist");
+        if (!isCurrent()) return;
         setRoleTitle("Pharmacist");
         onboardingSkills = Array.isArray(onboarding?.skills) ? onboarding.skills : [];
         setPitchForm((prev) => ({
@@ -541,6 +609,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         }));
       } else if (isOtherStaff) {
         const onboarding: any = await getOnboarding("other_staff");
+        if (!isCurrent()) return;
         setRoleTitle(otherStaffRoleLabel(onboarding?.role_type));
         onboardingSkills = Array.isArray(onboarding?.skills) ? onboarding.skills : [];
         setPitchForm((prev) => ({
@@ -558,7 +627,8 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           googlePlaceId: onboarding?.google_place_id || "",
         }));
       }
-      const mine = await getExplorerPostForEditing();
+      const mine = await getExplorerPostForEditing(reviewedPostId.current ?? pending?.resultId);
+      if (!isCurrent()) return;
       if (mine) {
         const minePostKind =
           mine.postKind ||
@@ -579,18 +649,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             mine.coverageRadiusKm != null ? Number(mine.coverageRadiusKm) : prev.coverageRadiusKm,
           availabilitySlots: minePostKind === "FULL_TIME_APPLICATION"
             ? []
-            : Array.isArray(mine.availabilityDays) && mine.availabilityDays.length > 0 ? mine.availabilityDays.map((entry: any) => {
-              if (typeof entry === 'string') {
-                return { date: entry, startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' };
-              }
-              return {
-                date: String(entry?.date || ''),
-                startTime: entry?.start_time || entry?.startTime || '09:00',
-                endTime: entry?.end_time || entry?.endTime || '17:00',
-                isAllDay: Boolean(entry?.is_all_day ?? entry?.isAllDay),
-                notes: entry?.notes || '',
-              };
-            }).filter((slot: any) => slot.date >= todayIso()) : (prev.availabilitySlots.length ? prev.availabilitySlots : inheritedAvailabilitySlots),
+            : Array.isArray(mine.availabilityDays) && mine.availabilityDays.length > 0 ? mine.availabilityDays.map(mapSavedPitchSlot).filter((slot: any) => slot.date >= todayIso()) : (prev.availabilitySlots.length ? prev.availabilitySlots : inheritedAvailabilitySlots),
         }));
       } else if (inheritedAvailabilitySlots.length > 0) {
         setPitchForm((prev) => ({
@@ -604,16 +663,35 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       } else if (onboardingSkills.length > 0) {
         setPitchSkills(onboardingSkills);
       }
+      if (storageFailed && !mine) {
+        setPitchNeedsRecovery(true);
+        setPitchError("Browser storage is unavailable. Review your pitches before creating a new one.");
+      }
+      setPitchReady(true);
     } catch (err: any) {
+      if (!isCurrent()) return;
+      setPitchNeedsRecovery(true);
       setPitchError(err?.message || "Failed to load your profile.");
     }
-  }, [user, isExplorer, isPharmacist, isOtherStaff, resetPitchForm]);
+  }, [user, isExplorer, isPharmacist, isOtherStaff, resetPitchForm, pendingStore, pitchAccount]);
 
   useEffect(() => {
-    if (pitchOpen) {
-      loadPitchDefaults();
-    }
+    reviewedPostId.current = undefined;
+    setPitchReady(false);
+    setPitchSaving(false);
+    setPendingPitch(null);
+    if (pitchOpen) void loadPitchDefaults();
   }, [pitchOpen, loadPitchDefaults]);
+
+  useEffect(() => {
+    const changed = (event: StorageEvent) => {
+      if (pitchOpen && !pitchSavingRef.current && (event.key === pendingStore?.scope || event.key === null)) {
+        void loadPitchDefaults();
+      }
+    };
+    window.addEventListener("storage", changed);
+    return () => window.removeEventListener("storage", changed);
+  }, [pitchOpen, pendingStore, loadPitchDefaults]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -647,16 +725,82 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     await updateOnboardingForm(safeRole, form);
   }, [isOtherStaff, isPharmacist, pitchForm]);
 
+  const handlePitchRecovery = async () => {
+    if (!pendingStore || pitchSavingRef.current) return;
+    const isCurrent = () => pitchAccountRef.current === pitchAccount && !pitchAbortRef.current.signal.aborted;
+    pitchSavingRef.current = true;
+    setPitchSaving(true);
+    try {
+      let pending: PendingPitch | null;
+      try { pending = await pendingStore.read(); }
+      catch {
+        if (!isCurrent()) return;
+        const mine = await getExplorerPostForEditing();
+        if (!isCurrent()) return;
+        if (!window.confirm(mine
+          ? "A saved pitch was found. Confirm you have reviewed your saved pitches and want to recover by editing it."
+          : "No saved pitch was found. Confirm you have reviewed your pitches and want to start a new posting intention.")) return;
+        await pendingStore.recoverCorruptAfterReview();
+        reviewedPostId.current = mine?.id;
+        await loadPitchDefaults();
+        return;
+      }
+      if (!isCurrent()) return;
+      if (!pending) { await loadPitchDefaults(); return; }
+      if (pending.rejected) {
+        if (!window.confirm("The server refused this pitch without saving it. Start a corrected posting intention?")) return;
+        await pendingStore.resolve(pending.key);
+        if (!isCurrent()) return;
+        setPendingPitch(null);
+        setPitchNeedsRecovery(false);
+        setPitchError(null);
+        return;
+      }
+      if (!pending.resultId) throw new Error("Retry the pending save before starting another pitch.");
+      let original = null;
+      try { original = await getExplorerPostForEditing(pending.resultId); }
+      catch (err: any) { if (err?.status !== 404) throw err; }
+      if (!isCurrent()) return;
+      if (!original && !window.confirm("The original pitch no longer exists. Start a new posting intention?")) return;
+      if (!pending.acknowledged && !pending.terminalCode) throw new Error("Retry the pending save first.");
+      await pendingStore.resolve(pending.key);
+      if (!isCurrent()) return;
+      reviewedPostId.current = original?.id;
+      await loadPitchDefaults();
+    } catch (err: any) {
+      if (isCurrent()) setPitchError(err?.message || "Could not review your original pitch.");
+    } finally {
+      pitchSavingRef.current = false;
+      if (isCurrent()) setPitchSaving(false);
+    }
+  };
+
   const handlePitchSave = async () => {
+    if (pitchSavingRef.current || !pendingStore || !pitchReady) return;
+    const isCurrent = () => pitchAccountRef.current === pitchAccount && !pitchAbortRef.current.signal.aborted;
+    const assertAccount = () => { if (!isCurrent()) throw new Error("Your account changed. Reopen your pitch to continue."); };
+    pitchSavingRef.current = true;
     setPitchSaving(true);
     setPitchError(null);
     try {
+      const pending = existingPostId ? null : await pendingStore.read();
+      assertAccount();
+      if (pending && (!pending.acknowledged || pending.resultId !== existingPostId)) {
+        setPendingPitch(pending);
+        const id = await sendPendingPitch(pendingStore, pending, isCurrent, pitchAbortRef.current.signal);
+        assertAccount();
+        setExistingPostId(id);
+        setPitchOpen(false);
+        await reload();
+        return;
+      }
       if (pitchForm.openToTravel && (pitchForm.travelStates || []).length === 0) {
         setPitchError("Select at least one travel state.");
         setPitchSaving(false);
         return;
       }
       await updateOnboardingLocationPrefs();
+      assertAccount();
 
       const isFullTimeApplication = pitchForm.postKind === "FULL_TIME_APPLICATION";
       const normalizedWorkTypes = isFullTimeApplication
@@ -677,6 +821,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             startTime: entry.startTime || entry.start_time || null,
             endTime: entry.endTime || entry.end_time || null,
             isAllDay: Boolean(entry.isAllDay ?? entry.is_all_day),
+            notes: entry.notes || '',
           }));
       if (isExplorer) {
         if (isFullTimeApplication && !pitchForm.headline.trim() && !pitchForm.body.trim()) {
@@ -704,7 +849,12 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         if (existingPostId) {
           await updateExplorerPost(existingPostId, payload);
         } else {
-          await createExplorerPost(payload);
+          const intent = await pendingStore.acquire(payload, user!.role);
+          assertAccount();
+          setPendingPitch(intent);
+          const id = await sendPendingPitch(pendingStore, intent, isCurrent, pitchAbortRef.current.signal);
+          assertAccount();
+          setExistingPostId(id);
         }
       } else {
           const payload: Record<string, any> = {
@@ -728,14 +878,54 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         if (existingPostId) {
           await updateExplorerPost(existingPostId, payload);
         } else {
-          await createExplorerPost(payload);
+          const intent = await pendingStore.acquire(payload, user!.role);
+          assertAccount();
+          setPendingPitch(intent);
+          const id = await sendPendingPitch(pendingStore, intent, isCurrent, pitchAbortRef.current.signal);
+          assertAccount();
+          setExistingPostId(id);
         }
       }
-      await reload();
+      assertAccount();
       setPitchOpen(false);
+      await reload();
     } catch (err: any) {
-      const detail = err?.response?.data || err?.data || err;
-      if (detail && typeof detail === "object") {
+      if (!isCurrent()) return;
+      const detail = err?.payload || err?.response?.data || err?.data;
+      if (!existingPostId && !detail && !err?.status) {
+        try { await pendingStore.read(); }
+        catch { if (isCurrent()) setPitchNeedsRecovery(true); }
+        if (!isCurrent()) return;
+      }
+      if (!existingPostId && err?.status === 400 && detail?.code !== "IDEMPOTENCY_KEY_REQUIRED") {
+        try {
+          const pending = await pendingStore.read();
+          if (!isCurrent()) return;
+          if (pending?.rejected) {
+            setPendingPitch(pending);
+            setPitchNeedsRecovery(true);
+          }
+        } catch {
+          if (isCurrent()) setPitchError("Browser storage is unavailable. Retry to review the same pitch.");
+          return;
+        }
+      }
+      if (!existingPostId && ["IDEMPOTENCY_PAYLOAD_MISMATCH", "PITCH_DELETED", "IDEMPOTENCY_REPLAY_EXPIRED"].includes(detail?.code)) {
+        try {
+          const pending = await pendingStore.read();
+          if (!isCurrent()) return;
+          if (pending?.terminalCode) {
+            setPendingPitch(pending);
+            setPitchNeedsRecovery(true);
+          }
+        } catch {
+          if (isCurrent()) setPitchError("The save needs review, but browser storage is unavailable. Retry to review the same pitch.");
+          return;
+        }
+      }
+      if (typeof detail?.detail === "string") {
+        setPitchError(detail.detail);
+      } else if (detail && typeof detail === "object") {
         const fieldMessages = Object.entries(detail)
           .map(([field, value]) => `${field}: ${Array.isArray(value) ? value.join(", ") : String(value)}`)
           .join(" ");
@@ -744,7 +934,8 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         setPitchError(err?.message || "Failed to save pitch.");
       }
     } finally {
-      setPitchSaving(false);
+      pitchSavingRef.current = false;
+      if (isCurrent()) setPitchSaving(false);
     }
   };
 
@@ -970,9 +1161,15 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           onSave={handlePitchSave}
           onDelete={async () => {
             if (!existingPostId) return;
+            const account = pitchAccount;
             await deleteExplorerPost(existingPostId);
-            await reload();
+            if (pitchAccountRef.current !== account) return;
+            const pending = await pendingStore?.read().catch(() => null);
+            if (pending?.acknowledged && pending.resultId === existingPostId) await pendingStore?.resolve(pending.key).catch((error) => console.warn("Unable to clear deleted pitch intent", error));
+            if (pitchAccountRef.current !== account) return;
+            setExistingPostId(null);
             setPitchOpen(false);
+            await reload();
           }}
           isExplorer={isExplorer}
           existingPostId={existingPostId}
@@ -980,6 +1177,9 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           setPitchForm={setPitchForm}
           pitchError={pitchError}
           pitchSaving={pitchSaving}
+          saveDisabled={!pitchReady || pitchNeedsRecovery}
+          pendingSave={Boolean(pendingPitch && !pendingPitch.acknowledged)}
+          onRecover={pitchNeedsRecovery ? handlePitchRecovery : undefined}
         />
       )}
 

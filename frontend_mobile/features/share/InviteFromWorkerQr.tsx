@@ -5,6 +5,7 @@ import { createMembershipInviteLinkService, fetchPharmaciesService, getPublicTal
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { colors, space } from '@/constants/tokens';
+import { BrandLoader } from '@/components/ui';
 
 type PharmacyChoice = { id: string; name: string };
 type Category = 'FULL_PART_TIME' | 'LOCUM_CASUAL';
@@ -118,7 +119,7 @@ export default function InviteFromWorkerQr({ referenceCode }: { referenceCode: s
   return <View style={styles.group}>
     <Text variant="titleMedium">Create a pharmacy invitation link</Text>
     <Text style={styles.muted}>Public worker reference: {referenceCode}. {verified ? workerLabel : 'Checking listing visibility…'} The QR identifies a public listing only. The invitation is not addressed to that worker, and does not reveal private contact information.</Text>
-    {loading ? <Text style={styles.muted}>Loading authorised pharmacies…</Text> : null}
+    {loading ? <BrandLoader size={24} accessibilityLabel="Loading authorised pharmacies…" /> : null}
     {pharmacies.length && verified ? <>
       <Text style={styles.muted}>Select pharmacy</Text>
       <View style={styles.options}>{pharmacies.map(row =>

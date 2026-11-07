@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, LogIn, Search, UserPlus, X } from 'lucide-react-native';
 import { getPublicJobBoard, type Shift } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
-import { BottomSheet, Button, ContentState, Pill, ScalePressable } from '@/components/ui';
+import { BottomSheet, Button, ContentState, ScalePressable } from '@/components/ui';
 import { colors, font, radius, space, type } from '@/constants/tokens';
 import { ShiftSummary } from './ShiftSummary';
+import { ResponsiveSegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import {
   buildReferralAuthParams,
@@ -186,6 +188,25 @@ export function AnonymousShiftBoardScreen() {
     </View>
   );
 
+  const filterControls = (
+      <View style={styles.filterSection}>
+        <View style={styles.searchRow}>
+          <Search color={colors.textMuted} size={18} style={styles.searchIcon} />
+          <TextInput accessibilityLabel="Search shifts" autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" onChangeText={setSearch} placeholder="Search suburb, city, or pharmacy..." placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
+          {search ? (
+            <ScalePressable accessibilityLabel="Clear search" accessibilityRole="button" onPress={() => setSearch('')} style={styles.clearSearchButton}>
+              <X color={colors.textMuted} size={16} />
+            </ScalePressable>
+          ) : null}
+        </View>
+        <ResponsiveSegmentedButtons
+          value={selectedRole}
+          onValueChange={setSelectedRole}
+          buttons={ROLE_OPTIONS.map((option) => ({ value: option.key, label: option.label }))}
+        />
+      </View>
+  );
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.container}>
       <View style={styles.topBar}>
@@ -203,47 +224,24 @@ export function AnonymousShiftBoardScreen() {
         ) : <View style={styles.backButton} />}
       </View>
 
-      <View style={styles.filterSection}>
-        <View style={styles.searchRow}>
-          <Search color={colors.textMuted} size={18} style={styles.searchIcon} />
-          <TextInput accessibilityLabel="Search shifts" autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" onChangeText={setSearch} placeholder="Search suburb, city, or pharmacy..." placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
-          {search ? (
-            <ScalePressable accessibilityLabel="Clear search" accessibilityRole="button" onPress={() => setSearch('')} style={styles.clearSearchButton}>
-              <X color={colors.textMuted} size={16} />
-            </ScalePressable>
-          ) : null}
-        </View>
-        <ScrollView contentContainerStyle={styles.rolePillsTrack} horizontal showsHorizontalScrollIndicator={false}>
-          {ROLE_OPTIONS.map((opt) => (
-            <Pill key={opt.key} label={opt.label} onPress={() => setSelectedRole(opt.key)} selected={selectedRole === opt.key} tone={selectedRole === opt.key ? 'violet' : 'neutral'} />
-          ))}
-        </ScrollView>
-      </View>
-
-      {loading && !refreshing ? (
-        <View style={styles.centerBox}>
-          <ActivityIndicator color={colors.primary} size="large" />
-          <Text style={styles.loadingText}>Searching available shifts...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.contentWrap}>
-          <ContentState actionLabel="Try again" description={error} kind="error" onAction={() => void loadShifts(false)} title="Could not load shifts" />
-        </View>
-      ) : shifts.length === 0 ? (
-        <View style={styles.contentWrap}>
-          <ContentState actionLabel={search || selectedRole !== 'ALL' ? 'Clear filters' : undefined} description="No open shifts match your search criteria. Try removing filters or checking back soon." kind="empty" onAction={() => { setSearch(''); setSelectedRole('ALL'); }} title="No shifts found" />
-        </View>
-      ) : (
         <FlatList
+          ListHeaderComponent={filterControls}
           contentContainerStyle={[styles.listContainer, compact ? styles.listContainerCompact : null, { paddingBottom: insets.bottom + space['2xl'] }]}
-          data={shifts}
+          data={(loading && !refreshing) || error ? [] : shifts}
           keyExtractor={(item) => String(item.id)}
           onRefresh={() => void loadShifts(true)}
           refreshing={refreshing}
           renderItem={renderShiftItem}
           onEndReached={() => { if (!loadMoreError) void loadMoreShifts(); }}
           onEndReachedThreshold={0.5}
-          ListFooterComponent={
+          ListEmptyComponent={loading && !refreshing ? (
+            <View style={styles.centerBox}><ActivityIndicator color={colors.primary} size="large" /><Text style={styles.loadingText}>Searching available shifts...</Text></View>
+          ) : error ? (
+            <View style={styles.contentWrap}><ContentState actionLabel="Try again" description={error} kind="error" onAction={() => void loadShifts(false)} title="Could not load shifts" /></View>
+          ) : (
+            <View style={styles.contentWrap}><ContentState actionLabel={search || selectedRole !== 'ALL' ? 'Clear filters' : undefined} description="No open shifts match your search criteria. Try removing filters or checking back soon." kind="empty" onAction={() => { setSearch(''); setSelectedRole('ALL'); }} title="No shifts found" /></View>
+          )}
+          ListFooterComponent={!error && shifts.length > 0 ? (
             loadingMore ? (
               <View style={styles.footerLoading}>
                 <ActivityIndicator color={colors.primary} size="small" />
@@ -257,9 +255,8 @@ export function AnonymousShiftBoardScreen() {
                 <Button label={loadMoreError ? 'Retry loading shifts' : 'Load more shifts'} onPress={() => void loadMoreShifts()} variant="outlined" />
               </View>
             ) : undefined
-          }
+          ) : undefined}
         />
-      )}
 
       <BottomSheet
         onClose={() => setSelectedShift(null)}
@@ -293,7 +290,6 @@ const styles = StyleSheet.create({
   searchIcon: { marginRight: space.sm },
   searchInput: { flex: 1, fontFamily: font.inter.regular, fontSize: type.bodyMedium.fontSize, color: colors.textPrimary, height: 44 },
   clearSearchButton: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
-  rolePillsTrack: { flexDirection: 'row', gap: space.xs, paddingVertical: space.xs },
   listContainer: { padding: space.lg, gap: space.lg, maxWidth: 640, width: '100%', alignSelf: 'center' },
   listContainerCompact: { padding: space.md, gap: space.md },
   cardContainer: { backgroundColor: colors.surfaceBg, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, padding: space.md, borderCurve: 'continuous' },

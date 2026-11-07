@@ -31,22 +31,36 @@ export default function PostShiftProgress({ steps, active, onSelect }: {
           <CurrentIcon size={20} color={colors.surfaceBg} strokeWidth={2} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.count}>Step {index + 1} of {steps.length}</Text>
+          <Text style={s.count} accessibilityRole="progressbar" accessibilityLabel={`Step ${index + 1} of ${steps.length}`}
+            accessibilityValue={{ min: 1, max: steps.length, now: index + 1 }}>
+            Step {index + 1} of {steps.length}
+          </Text>
           <Text style={s.title} accessibilityRole="header">{current.label}</Text>
         </View>
         {next ? <Text style={s.next}>Next: {STEP[next].label}</Text> : null}
       </View>
-      <View style={s.bar} accessibilityRole="progressbar" accessibilityLabel={`Step ${index + 1} of ${steps.length}`}
-        accessibilityValue={{ min: 1, max: steps.length, now: index + 1 }}>
-        {steps.map((step, position) => (
-          <Pressable key={step} onPress={() => onSelect(step)} accessibilityRole="button" accessibilityLabel={`Go to ${STEP[step].label}`}
-            style={s.segmentHit}>
-            <View style={[s.segment, {
-              backgroundColor: position < index ? STEP[step].tone : position === index ? colors.primary : colors.border,
-              opacity: position < index ? 0.78 : 1,
-            }]} />
-          </Pressable>
-        ))}
+      <View style={s.bar}>
+        {steps.map((step, position) => {
+          const isPast = position < index;
+          const isCurrent = position === index;
+          const isFuture = position > index;
+          return (
+            <Pressable
+              key={step}
+              disabled={isFuture}
+              onPress={isPast ? () => onSelect(step) : undefined}
+              accessibilityRole="button"
+              accessibilityLabel={isPast ? `Go to ${STEP[step].label}` : STEP[step].label}
+              accessibilityState={{ disabled: isFuture, ...(isCurrent ? { selected: true } : {}) }}
+              style={s.segmentHit}
+            >
+              <View style={[s.segment, {
+                backgroundColor: isPast ? STEP[step].tone : isCurrent ? colors.primary : colors.border,
+                opacity: isPast ? 0.78 : 1,
+              }]} />
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );

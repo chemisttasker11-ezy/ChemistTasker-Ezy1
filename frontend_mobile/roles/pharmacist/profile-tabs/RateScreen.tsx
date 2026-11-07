@@ -5,6 +5,7 @@ import { Button, Checkbox, HelperText, Text, TextInput } from 'react-native-pape
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import { roleKey } from './shared';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
+import { BrandLoader } from '@/components/ui';
 
 type RatePref = {
   weekday: string;
@@ -91,7 +92,7 @@ export default function PharmacistRateScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.loader}>
-          <Text>Loading rates...</Text>
+          <BrandLoader size={44} accessibilityLabel="Loading rates…" />
         </View>
       </SafeAreaView>
     );

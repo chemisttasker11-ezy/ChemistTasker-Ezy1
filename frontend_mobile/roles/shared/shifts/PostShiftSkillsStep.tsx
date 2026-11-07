@@ -1,7 +1,9 @@
+import { ResponsiveSegmentedButtons as SegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 import { useMemo, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, IconButton, Searchbar, SegmentedButtons, Surface, Text } from 'react-native-paper';
+import { GuardedModal as Modal } from '@/components/security/GuardedModal';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Button, IconButton, Searchbar, Surface, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check, Plus, X } from 'lucide-react-native';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
@@ -104,13 +106,13 @@ export default function PostShiftSkillsStep({ roleNeeded, mustHave, setMustHave,
                       value: 'required',
                       label: 'Required',
                       style: { minHeight: touch.min },
-                      labelStyle: { minHeight: touch.min, textAlignVertical: 'center', lineHeight: touch.min },
+                      labelStyle: { textAlignVertical: 'center' },
                     },
                     {
                       value: 'preferred',
                       label: 'Preferred',
                       style: { minHeight: touch.min },
-                      labelStyle: { minHeight: touch.min, textAlignVertical: 'center', lineHeight: touch.min },
+                      labelStyle: { textAlignVertical: 'center' },
                     },
                   ]}
                 />

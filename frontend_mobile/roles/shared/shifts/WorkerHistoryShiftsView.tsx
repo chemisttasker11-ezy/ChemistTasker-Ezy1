@@ -2,7 +2,8 @@
 // rate the pharmacy, see its details.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Dialog, Portal, Snackbar, Text, TextInput } from 'react-native-paper';
+import { Button, Dialog, Portal, Snackbar, Text, TextInput } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { Receipt, Star, Store } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import {

@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
-import { ActivityIndicator, Animated, FlatList, Image, RefreshControl, View, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { Animated, FlatList, Image, RefreshControl, View, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { Button, Text, IconButton, Menu, Modal, Portal, TextInput, HelperText, Divider, Chip, Avatar } from 'react-native-paper';
 import { fetchHubPosts, fetchHubPolls, createHubComment, createHubPollComment, deleteHubComment, fetchHubComments, fetchHubPollComments, reactToHubComment, reactToHubPoll, removeHubCommentReaction, removeHubPollReaction, voteHubPoll, updateHubComment, updateHubPoll, deleteHubPoll } from './api';
 import type { HubPost, HubPoll, HubReactionType } from './types';

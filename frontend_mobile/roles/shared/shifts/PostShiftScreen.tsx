@@ -12,7 +12,7 @@ import {
     HelperText,
     Snackbar,
 } from 'react-native-paper';
-import { DatePickerModal, TimePickerModal } from 'react-native-paper-dates';
+import { GuardedDatePickerModal as DatePickerModal, GuardedTimePickerModal as TimePickerModal } from '@/components/security/GuardedModal';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
@@ -60,6 +60,7 @@ import {
     runPostShiftInitChain,
     shouldTriggerPostShiftInit,
     type PostShiftInitScope,
+    validateSlotEntries,
 } from './PostShiftScreen.helpers';
 import { styles } from './PostShiftScreen.styles';
 import { useUnsavedChangesGuard } from '../forms/useUnsavedChangesGuard';
@@ -1036,6 +1037,12 @@ export default function PostShiftScreen() {
         entries: SlotEntry[],
         options?: { clearDates?: string[]; clearAllSelected?: boolean; resetRecurring?: boolean }
     ) => {
+        const error = validateSlotEntries(entries);
+        if (error) {
+            setError(error);
+            return false;
+        }
+
         const existingKeys = new Set(slots.map((s) => `${s.date}-${s.startTime}-${s.endTime}-${s.isRecurring}-${s.recurringDays.join(',')}`));
         const filtered = entries.filter(
             (entry) => !existingKeys.has(`${entry.date}-${entry.startTime}-${entry.endTime}-${entry.isRecurring}-${entry.recurringDays.join(',')}`)
@@ -1074,23 +1081,6 @@ export default function PostShiftScreen() {
     };
 
     const addManualSlot = () => {
-        if (!slotStart || !slotEnd) {
-            setError('Set a start and finish time.');
-            return false;
-        }
-        if (new Date(`1970-01-01T${slotEnd}:00`).getTime() <= new Date(`1970-01-01T${slotStart}:00`).getTime()) {
-            setError('The finish time must be after the start time.');
-            return false;
-        }
-        if (!slotDate) {
-            setError('Pick a date first.');
-            return false;
-        }
-        if (slotRecurring && (!slotRecurringEnd || slotRecurringDays.length === 0)) {
-            setError('Pick the weekdays and the date it repeats until.');
-            return false;
-        }
-
         return addSlotEntries([{
             date: slotDate,
             startTime: slotStart,
@@ -1102,16 +1092,9 @@ export default function PostShiftScreen() {
     };
 
     const addSelectedDateSlot = (date: string) => {
-        const entry = {
+        return addSlotEntries([{
             date,
             ...(selectedDateTimes[date] || { startTime: slotStart, endTime: slotEnd }),
-        };
-        if (new Date(`1970-01-01T${entry.endTime}:00`).getTime() <= new Date(`1970-01-01T${entry.startTime}:00`).getTime()) {
-            setError('The finish time must be after the start time.');
-            return false;
-        }
-        return addSlotEntries([{
-            ...entry,
             isRecurring: false,
             recurringDays: [],
             recurringEndDate: '',
@@ -1121,10 +1104,6 @@ export default function PostShiftScreen() {
     const addAllSelectedSlots = () => {
         if (!selectedDates.length) {
             setError('Select at least one date from the calendar.');
-            return false;
-        }
-        if (new Date(`1970-01-01T${slotEnd}:00`).getTime() <= new Date(`1970-01-01T${slotStart}:00`).getTime()) {
-            setError('The finish time must be after the start time.');
             return false;
         }
         return addSlotEntries(

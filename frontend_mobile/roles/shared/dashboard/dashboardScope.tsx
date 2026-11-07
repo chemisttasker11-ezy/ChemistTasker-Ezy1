@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { ActivityIndicator, Button, Divider, Icon, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
+import { Button, Divider, Icon, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { usePathname, useRouter } from 'expo-router';
 import { canAccessOrganizationPharmacies, fetchAccessibleOrganizationPharmacies, getOrganizationDashboard, getOwnerDashboard, getPharmacistDashboard, getOtherStaffDashboard, getExplorerDashboard, getOrganizationMembership, getPendingPharmacyAdminInvitations, hasOrganizationAccess, isInternalPharmacyMembership, ORG_PORTAL_ROLES } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
@@ -520,16 +521,8 @@ export function DashboardActivity({ data }: { data: DashboardPayload | null }) {
           </View>
           <ScrollView style={styles.activityModalScroll} showsVerticalScrollIndicator>
             {modalLoading ? (
-              <Surface style={styles.activityCard}>
-                {Array.from({ length: 8 }).map((_, index) => (
-                  <View key={index} style={styles.activitySkeletonRow}>
-                    <View style={styles.activitySkeletonIcon} />
-                    <View style={styles.activitySkeletonCopy}>
-                      <View style={styles.activitySkeletonTitle} />
-                      <View style={styles.activitySkeletonText} />
-                    </View>
-                  </View>
-                ))}
+              <Surface style={[styles.activityCard, { minHeight: 220, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" accessibilityLabel="Loading activity…" />
               </Surface>
             ) : (
               <>

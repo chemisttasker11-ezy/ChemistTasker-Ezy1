@@ -2,7 +2,8 @@
 // opens the screen that completes it) and the badges earned so far. Re-read whenever the screen regains focus.
 import React, { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
+import { Button, Card, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { CheckCircle2, Circle, ChevronRight } from 'lucide-react-native';
 import { colors, font, radius, space, touch } from '@/constants/tokens';
 import { useFocusEffect, useRouter } from 'expo-router';

@@ -14,6 +14,7 @@ function loadTs(path, imports = {}) {
     URL,
     URLSearchParams,
     require: (name) => {
+      if (name === '@/components/ui/BrandActivityIndicator') return { BrandActivityIndicator: 'ActivityIndicator' };
       assert.ok(name in imports, `Unexpected import: ${name}`);
       return imports[name];
     },

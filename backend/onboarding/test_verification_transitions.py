@@ -1,6 +1,7 @@
 """Verification transitions from the senior review of 2026-10-13, with the owner's decisions of the same day:
 AHPRA numbers are for life and unique, an upgraded newcomer's post comes off the board, leaving Overseas cancels the
 mobile skip, and one verification decision serves the screens and the background evaluation."""
+from uuid import uuid4
 from datetime import date
 from io import StringIO
 from unittest import mock, skipUnless
@@ -334,7 +335,7 @@ class NewcomerTransitionTests(TestCase):
         self.assertIsNone(profile.last_talent_post_at)
         client = client_for(user)
         self.assertEqual(client.delete(BASE + f'explorer-posts/{post.pk}/').status_code, 204)
-        response = client.post(BASE + 'explorer-posts/', {'headline': 'Again', 'role_category': 'EXPLORER'}, format='json')
+        response = client.post(BASE + 'explorer-posts/', {'headline': 'Again', 'role_category': 'EXPLORER'}, format='json', HTTP_IDEMPOTENCY_KEY=str(uuid4()))
         self.assertEqual(response.status_code, 201, response.data)
 
 

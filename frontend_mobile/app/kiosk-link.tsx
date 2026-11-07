@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, Card, RadioButton, Text, TextInput } from 'react-native-paper';
+import { Button, Card, RadioButton, Text, TextInput } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
+import { RootPageHeader } from '@/components/RootPageHeader';
 import { attendance } from '@chemisttasker/shared-core';
 
 type Pharmacy = { id: number; name: string; timezone: string };
 export default function KioskLinkPrompt() {
-  const router = useRouter();
   const params = useLocalSearchParams<{ source?: string; pharmacy_id?: string; device_name?: string }>();
   const prompted = params.source === 'kiosk';
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
@@ -49,10 +50,15 @@ export default function KioskLinkPrompt() {
     } catch (e: any) { setError(e?.response?.data?.error || e?.message || 'Unable to create a pairing code.'); }
     finally { setSaving(false); }
   };
-  return <SafeAreaView style={styles.page}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-    <Button icon="arrow-left" onPress={() => router.back()}>Back</Button>
-    <Text variant="headlineMedium" style={styles.heading}>Connect a terminal</Text>
-    {!prompted ? <Text>Scan the setup QR on the desktop kiosk to start linking.</Text> : <>
+  return <SafeAreaView style={styles.page} edges={['left', 'right', 'bottom']}>
+    <RootPageHeader title="Connect a terminal" disabled={saving} />
+    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <Text variant="headlineMedium" style={styles.heading}>Connect a terminal</Text>
+    {!prompted ? <View style={{ gap: 14 }}>
+      <Text style={styles.body}>1. On the pharmacy computer, open ChemistTasker attendance terminal setup.</Text>
+      <Text style={styles.body}>2. Scan its setup QR with your phone camera and open the link in ChemistTasker.</Text>
+      <Text style={styles.body}>3. Confirm the pharmacy and terminal name here, then enter the single-use code on the computer. Both devices must use the same ChemistTasker service.</Text>
+    </View> : <>
       <Text style={styles.body}>Choose the pharmacy where this terminal will record attendance. Each terminal belongs to one pharmacy.</Text>
       {loading && <ActivityIndicator accessibilityLabel="Loading authorized pharmacies" />}
       {error && <View accessibilityLiveRegion="polite"><Text style={styles.error}>{error}</Text><Button onPress={() => setRefresh(v => v + 1)}>Retry</Button></View>}

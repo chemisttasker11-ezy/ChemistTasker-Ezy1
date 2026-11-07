@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Dialog, Portal, Text } from 'react-native-paper';
 import { workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import { useAuth } from '@/context/AuthContext';
 import {
   ActionButtons,
   ChoiceChips,
@@ -26,41 +27,11 @@ const statusOptions = [
 ];
 
 export default function ManagerLeaveScreen() {
+  const { user } = useAuth();
   const workspace = useWorkspace();
   const pharmacyId = workspace.selectedPharmacyId;
+  const accountKey = user ? String(user.id ?? user.email ?? '') : '';
   const [status, setStatus] = useState('PENDING');
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [decisionRow, setDecisionRow] = useState<any | null>(null);
-  const [decision, setDecision] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
-  const [note, setNote] = useState('');
-
-  const load = useCallback(async () => {
-    if (!pharmacyId) {
-      setRows([]);
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
-    setError('');
-    try {
-      const result = await workforce.listLeave({
-        pharmacy_id: pharmacyId,
-        ...(status ? { status } : {}),
-      });
-      setRows(Array.isArray(result) ? result : []);
-    } catch (e) {
-      setError(errorMessage(e, 'Unable to load leave requests.'));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [pharmacyId, status]);
-
-  useEffect(() => { void load(); }, [load]);
 
   if (!pharmacyId) {
     return (
@@ -70,6 +41,85 @@ export default function ManagerLeaveScreen() {
     );
   }
 
+  return (
+    <ManagerLeaveScoped
+      key={`${accountKey}:${pharmacyId}:${status}`}
+      accountKey={accountKey}
+      pharmacyId={pharmacyId}
+      status={status}
+      onStatusChange={setStatus}
+    />
+  );
+}
+
+function ManagerLeaveScoped({
+  accountKey,
+  pharmacyId,
+  status,
+  onStatusChange,
+}: {
+  accountKey: string;
+  pharmacyId: number;
+  status: string;
+  onStatusChange: (status: string) => void;
+}) {
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [decisionRow, setDecisionRow] = useState<any | null>(null);
+  const [decision, setDecision] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
+  const [note, setNote] = useState('');
+
+  const loadSequence = useRef(0);
+  const mutationSequence = useRef(0);
+  const busyRef = useRef(false);
+  const accountRef = useRef(accountKey);
+  const pharmacyRef = useRef(pharmacyId);
+  const statusRef = useRef(status);
+
+  const load = useCallback(async () => {
+    const seq = ++loadSequence.current;
+    const currentAccount = accountKey;
+    const currentPharmacy = pharmacyId;
+    const currentStatus = status;
+    const isCurrent = () =>
+      seq === loadSequence.current &&
+      accountRef.current === currentAccount &&
+      pharmacyRef.current === currentPharmacy &&
+      statusRef.current === currentStatus;
+
+    setError('');
+    try {
+      const result = await workforce.listLeave({
+        pharmacy_id: currentPharmacy,
+        ...(currentStatus ? { status: currentStatus } : {}),
+      });
+      if (!isCurrent()) return;
+      setRows(Array.isArray(result) ? result : []);
+    } catch (e) {
+      if (isCurrent()) setError(errorMessage(e, 'Unable to load leave requests.'));
+    } finally {
+      if (isCurrent()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, [accountKey, pharmacyId, status]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    return () => {
+      loadSequence.current += 1;
+      mutationSequence.current += 1;
+      busyRef.current = false;
+    };
+  }, []);
+
   const openDecision = (row: any, next: 'APPROVED' | 'REJECTED') => {
     setDecisionRow(row);
     setDecision(next);
@@ -77,18 +127,33 @@ export default function ManagerLeaveScreen() {
   };
 
   const submitDecision = async () => {
-    if (!decisionRow?.id || (decision === 'REJECTED' && !note.trim())) return;
+    if (busy || busyRef.current || !decisionRow?.id || (decision === 'REJECTED' && !note.trim())) return;
+    const seq = ++mutationSequence.current;
+    const currentAccount = accountKey;
+    const currentPharmacy = pharmacyId;
+    const currentStatus = status;
+    const isCurrent = () =>
+      seq === mutationSequence.current &&
+      accountRef.current === currentAccount &&
+      pharmacyRef.current === currentPharmacy &&
+      statusRef.current === currentStatus;
+
+    busyRef.current = true;
     setBusy(true);
     setError('');
     try {
       await workforce.decideLeave(Number(decisionRow.id), decision, note.trim());
+      if (!isCurrent()) return;
       setDecisionRow(null);
       setNote('');
       await load();
     } catch (e) {
-      setError(errorMessage(e, 'Unable to update the leave request.'));
+      if (isCurrent()) setError(errorMessage(e, 'Unable to update the leave request.'));
     } finally {
-      setBusy(false);
+      if (isCurrent()) {
+        busyRef.current = false;
+        setBusy(false);
+      }
     }
   };
 
@@ -101,7 +166,10 @@ export default function ManagerLeaveScreen() {
       loading={loading}
       error={error}
       onRetry={load}
-      onRefresh={() => { setRefreshing(true); void load(); }}
+      onRefresh={() => {
+        setRefreshing(true);
+        void load();
+      }}
       refreshing={refreshing}
     >
       <MetricGrid items={[
@@ -110,7 +178,7 @@ export default function ManagerLeaveScreen() {
       ]} />
 
       <Section title="Status filter">
-        <ChoiceChips value={status} options={statusOptions} onChange={setStatus} />
+        <ChoiceChips value={status} options={statusOptions} onChange={onStatusChange} />
       </Section>
 
       <InfoNote title="One leave record">

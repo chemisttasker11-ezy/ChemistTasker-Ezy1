@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   Alert,
   FlatList,
@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ActivityIndicator, Button, Card, IconButton, Menu, Snackbar, Text } from 'react-native-paper';
+import { Button, Card, IconButton, Menu, Snackbar, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useSegments } from 'expo-router';
 import {
@@ -68,12 +69,12 @@ export default function InvoiceList({ basePath }: Props) {
   return (
     <FinanceWorkspace
       receivedMode={managerWorkspace}
-      existingTools={<LegacyInvoiceList basePath={basePath} />}
+      existingTools={(header) => <LegacyInvoiceList basePath={basePath} header={header} />}
     />
   );
 }
 
-function LegacyInvoiceList({ basePath }: Props) {
+function LegacyInvoiceList({ basePath, header }: Props & { header?: ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
   const role = (segments[0] as string) || 'pharmacist';
@@ -379,6 +380,13 @@ function LegacyInvoiceList({ basePath }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
+        <FlatList
+          data={loading && !refreshing ? [] : paginated}
+          keyExtractor={item => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          renderItem={renderItem}
+          ListHeaderComponent={<View>
+            {header}
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text variant="headlineMedium" style={styles.headerTitle}>
@@ -392,18 +400,7 @@ function LegacyInvoiceList({ basePath }: Props) {
         </View>
 
       </View>
-
-      {loading && !refreshing ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#4F46E5" />
-        </View>
-      ) : (
-        <FlatList
-          data={paginated}
-          keyExtractor={item => String(item.id)}
-          contentContainerStyle={styles.listContent}
-          renderItem={renderItem}
-          ListHeaderComponent={<View>
+            {loading && !refreshing ? <View style={styles.loader}><ActivityIndicator size="large" color="#4F46E5" /></View> : null}
             {loadError ? <Card style={styles.errorCard}>
               <Card.Content style={{ gap: space.sm }}>
                 <Text accessibilityRole="alert" variant="titleSmall" style={{ color: colors.status.red.fg }}>
@@ -415,7 +412,7 @@ function LegacyInvoiceList({ basePath }: Props) {
                 </Button>
               </Card.Content>
             </Card> : null}
-            <MobileInvoiceStats
+            {!loading || refreshing ? <MobileInvoiceStats
               invoices={sorted}
               timeframe={timeframe}
               mode={isReceivedMode ? 'received' : 'sent'}
@@ -423,7 +420,7 @@ function LegacyInvoiceList({ basePath }: Props) {
                 setPage(1);
                 setTimeframe(value);
               }}
-            />
+            /> : null}
           </View>}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4F46E5" />
@@ -432,7 +429,7 @@ function LegacyInvoiceList({ basePath }: Props) {
           onEndReached={() => {
             if (paginated.length < filtered.length) setPage(p => p + 1);
           }}
-          ListEmptyComponent={loadError ? undefined : (
+          ListEmptyComponent={loadError || (loading && !refreshing) ? undefined : (
             <View style={styles.empty}>
               <Text variant="titleMedium">No invoices yet</Text>
               <Text variant="bodyMedium" style={styles.sub}>
@@ -443,7 +440,6 @@ function LegacyInvoiceList({ basePath }: Props) {
             </View>
           )}
         />
-      )}
 
       <Snackbar visible={!!snackbar} onDismiss={() => setSnackbar('')} duration={2500}>
         {snackbar}

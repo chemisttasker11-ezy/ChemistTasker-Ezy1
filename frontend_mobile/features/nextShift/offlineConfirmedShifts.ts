@@ -7,9 +7,9 @@ const key = (userId: number | string) => 'ct.offline.confirmed-shifts.v2.' + Str
 
 /** Read-only, minimally scoped display snapshot. Never proof of a live booking. */
 export async function readConfirmedShiftSnapshot(userId: number | string): Promise<Snapshot | null> {
- const raw = await AsyncStorage.getItem(key(userId));
- if (!raw) return null;
  try {
+  const raw = await AsyncStorage.getItem(key(userId));
+  if (!raw) return null;
   const parsed = JSON.parse(raw);
   if (!parsed || !Array.isArray(parsed.rows) || Number.isNaN(Date.parse(parsed.savedAt))) return null;
   const rows: OfflineShift[] = parsed.rows.filter((r: OfflineShift) =>
@@ -21,11 +21,13 @@ export async function readConfirmedShiftSnapshot(userId: number | string): Promi
   return {savedAt:parsed.savedAt,rows};
  } catch {return null;}
 }
+
 export async function saveConfirmedShiftSnapshot(userId: number | string, shifts: Shift[]): Promise<Snapshot> {
  const snapshot: Snapshot = {savedAt:new Date().toISOString(),rows:sanitizeConfirmedShifts(shifts,userId)};
  await AsyncStorage.setItem(key(userId),JSON.stringify(snapshot));
  return snapshot;
 }
+
 export async function clearConfirmedShiftSnapshot(userId: number | string): Promise<void> {
  await AsyncStorage.removeItem(key(userId));
 }

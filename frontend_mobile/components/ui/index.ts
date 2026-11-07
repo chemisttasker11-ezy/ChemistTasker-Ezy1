@@ -22,4 +22,5 @@ export {
 } from './CandidateRow';
 export { ContentState, type ContentStateKind, type ContentStateProps } from './ContentState';
 export { BrandBanner, brandBannerGradientColors, type BannerAction, type BrandBannerProps } from './BrandBanner';
+export { BrandLoader, type BrandLoaderProps } from './BrandLoader';
 export { TextField, type TextFieldProps } from './TextField';

@@ -29,7 +29,7 @@ test('legacy invoices fetch every DRF page while preserving sequence', async () 
 test('legacy list reports API failure and never pretends it has zero invoices', () => {
   assert.match(source, /setLoadError\(err\?\.message/);
   assert.match(source, /Invoice history could not refresh/);
-  assert.match(source, /ListEmptyComponent=\{loadError \? null/);
+  assert.match(source, /ListEmptyComponent=\{loadError \|\| \(loading && !refreshing\) \? (?:null|undefined)/);
   assert.doesNotMatch(source, /setInvoices\(\[\]\);/);
 });
 test('managed PDF uses revision-aware workspace, legacy PDF preserves its endpoint', () => {

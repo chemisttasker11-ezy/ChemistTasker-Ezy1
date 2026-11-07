@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Chip, Dialog, Portal, Text } from 'react-native-paper';
-import { DatePickerInput } from 'react-native-paper-dates';
+import { GuardedDatePickerInput as DatePickerInput } from '@/components/security/GuardedModal';
 import {
   claimShiftService,
   createLeaveRequestService,
@@ -33,6 +33,7 @@ import {
 import { asArray, dateFromIso, errorMessage, isoDate, replaceUnderscore, startOfWeek } from '@/features/parity/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import { useUnsavedChangesGuard } from '@/roles/shared/forms/useUnsavedChangesGuard';
 import { ContentState } from '@/components/ui';
 import { ownRosterAssignments } from '@/roles/shared/dashboard/workerHomeLogic';
 
@@ -79,40 +80,104 @@ export function ShellRosterScreen() {
 
 export default function MyRosterScreen({ scopedPharmacyId }: { scopedPharmacyId?: number | null }) {
   const { user } = useAuth();
+  const { selectedPharmacyId, isLoading: workspaceLoading } = useWorkspace();
+  const accountKey = user ? String(user.id ?? user.email ?? '') : '';
+  const isScoped = scopedPharmacyId !== undefined;
+  return (
+    <MyRosterScreenInner
+      key={`${accountKey}:${scopedPharmacyId ?? 'unscoped'}`}
+      scopedPharmacyId={scopedPharmacyId}
+      preferredPharmacyId={isScoped ? undefined : selectedPharmacyId}
+      workspaceLoading={isScoped ? false : workspaceLoading}
+      user={user}
+      accountKey={accountKey}
+    />
+  );
+}
+
+function MyRosterScreenInner({
+  scopedPharmacyId,
+  preferredPharmacyId,
+  workspaceLoading = false,
+  user,
+  accountKey,
+}: {
+  scopedPharmacyId?: number | null;
+  preferredPharmacyId?: number | null;
+  workspaceLoading?: boolean;
+  user: any;
+  accountKey: string;
+}) {
   const currentUserId = Number(user?.id || 0);
+  const accountRef = useRef(accountKey);
   const [pharmacies, setPharmacies] = useState<any[]>([]);
   const [localPharmacyId, setPharmacyId] = useState<number | null>(null);
   const pharmacyId = scopedPharmacyId !== undefined ? scopedPharmacyId : localPharmacyId;
+  const pharmacyRef = useRef(pharmacyId);
   const [weekStart, setWeekStart] = useState(startOfWeek());
+  const weekRef = useRef(weekStart);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [openShifts, setOpenShifts] = useState<any[]>([]);
   const [requests, setRequests] = useState<WorkerShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const isBusy = busy || Boolean(busyRef.current);
+  useUnsavedChangesGuard(null, { enabled: false, saving: isBusy });
   const [error, setError] = useState('');
   const [edit, setEdit] = useState<EditState>(null);
   const [leaveType, setLeaveType] = useState<WorkforceLeaveType>('ANNUAL');
   const [note, setNote] = useState('');
 
+  const pharmaciesRequestRef = useRef(0);
+  const rosterRequestRef = useRef(0);
+  const actionRequestRef = useRef(0);
+
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
 
   const loadPharmacies = useCallback(async () => {
-    const rows = asArray<any>(await fetchRosterWorkerPharmaciesService());
-    setPharmacies(rows);
-    if (scopedPharmacyId !== undefined) return;
-    setPharmacyId((current) => {
-      if (current && rows.some((row) => pharmacyIdOf(row) === current)) return current;
-      return rows.length ? pharmacyIdOf(rows[0]) : null;
-    });
-    if (rows.length === 0) setLoading(false);
-  }, [scopedPharmacyId]);
+    const seq = ++pharmaciesRequestRef.current;
+    const currentScope = accountKey;
+    const isCurrent = () => seq === pharmaciesRequestRef.current && accountRef.current === currentScope;
+    try {
+      const rows = asArray<any>(await fetchRosterWorkerPharmaciesService());
+      if (!isCurrent()) return;
+      setPharmacies(rows);
+      if (scopedPharmacyId !== undefined) return;
+      setPharmacyId((current) => {
+        if (current && rows.some((row) => pharmacyIdOf(row) === current)) return current;
+        if (preferredPharmacyId && rows.some((row) => pharmacyIdOf(row) === preferredPharmacyId)) {
+          return preferredPharmacyId;
+        }
+        return rows.length ? pharmacyIdOf(rows[0]) : null;
+      });
+      if (rows.length === 0) setLoading(false);
+    } catch (e) {
+      if (isCurrent()) {
+        setError(errorMessage(e, 'Unable to load roster pharmacies.'));
+        setLoading(false);
+      }
+    }
+  }, [scopedPharmacyId, preferredPharmacyId, accountKey]);
 
   const loadRoster = useCallback(async () => {
-    if (!pharmacyId) {
+    const seq = ++rosterRequestRef.current;
+    const currentScope = accountKey;
+    const requestedPharmacy = pharmacyId;
+    const requestedWeek = weekStart;
+    const requestedWeekEnd = weekEnd;
+    const isCurrent = () =>
+      seq === rosterRequestRef.current &&
+      accountRef.current === currentScope &&
+      pharmacyRef.current === requestedPharmacy &&
+      weekRef.current === requestedWeek;
+
+    if (!requestedPharmacy) {
       setAssignments([]);
       setOpenShifts([]);
       setRequests([]);
+      setEdit(null);
       setLoading(false);
       setRefreshing(false);
       return;
@@ -120,37 +185,88 @@ export default function MyRosterScreen({ scopedPharmacyId }: { scopedPharmacyId?
     setError('');
     try {
       const [assignmentRows, openRows, requestRows] = await Promise.all([
-        fetchRosterWorkerAssignments({ pharmacyId, startDate: weekStart, endDate: weekEnd }),
-        fetchCommunityShifts({ pharmacyId, startDate: weekStart, endDate: weekEnd, unassigned: true } as any),
-        fetchWorkerShiftRequestsService({ pharmacyId, startDate: weekStart, endDate: weekEnd }),
+        fetchRosterWorkerAssignments({ pharmacyId: requestedPharmacy, startDate: requestedWeek, endDate: requestedWeekEnd }),
+        fetchCommunityShifts({ pharmacyId: requestedPharmacy, startDate: requestedWeek, endDate: requestedWeekEnd, unassigned: true } as any),
+        fetchWorkerShiftRequestsService({ pharmacyId: requestedPharmacy, startDate: requestedWeek, endDate: requestedWeekEnd }),
       ]);
+      if (!isCurrent()) return;
       // The worker roster endpoint may include a pharmacy-wide schedule for calendar
       // context. Only the authenticated worker's assignments are actionable here.
       setAssignments(ownRosterAssignments(asArray<any>(assignmentRows), currentUserId));
       setOpenShifts(asArray<any>((openRows as any)?.results ?? openRows));
       setRequests(asArray<WorkerShiftRequest>(requestRows));
     } catch (e) {
-      setError(errorMessage(e, 'Unable to load your roster.'));
+      if (isCurrent()) setError(errorMessage(e, 'Unable to load your roster.'));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isCurrent()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [currentUserId, pharmacyId, weekEnd, weekStart]);
+  }, [accountKey, currentUserId, pharmacyId, weekEnd, weekStart]);
 
   useEffect(() => {
+    pharmacyRef.current = pharmacyId;
+    weekRef.current = weekStart;
+  }, [pharmacyId, weekStart]);
+
+  useEffect(() => {
+    if (workspaceLoading) {
+      pharmaciesRequestRef.current += 1;
+      return;
+    }
     void loadPharmacies().catch((e) => {
       setError(errorMessage(e, 'Unable to load roster pharmacies.'));
       setLoading(false);
     });
-  }, [loadPharmacies]);
+  }, [loadPharmacies, workspaceLoading]);
 
   useEffect(() => {
     if (pharmacyId || scopedPharmacyId === null) void loadRoster();
   }, [loadRoster, pharmacyId, scopedPharmacyId]);
 
+  useEffect(() => {
+    return () => {
+      pharmaciesRequestRef.current += 1;
+      rosterRequestRef.current += 1;
+      actionRequestRef.current += 1;
+      busyRef.current = false;
+    };
+  }, []);
+
   const refresh = () => {
     setRefreshing(true);
     void loadRoster();
+  };
+
+  const handlePharmacyChange = (id: number) => {
+    if (busy || busyRef.current || id === localPharmacyId) return;
+    actionRequestRef.current += 1;
+    rosterRequestRef.current += 1;
+    busyRef.current = false;
+    setBusy(false);
+    setAssignments([]);
+    setOpenShifts([]);
+    setRequests([]);
+    setEdit(null);
+    setLoading(true);
+    setPharmacyId(id);
+  };
+
+  const handleWeekChange = (date?: Date) => {
+    if (busy || busyRef.current || !date) return;
+    const nextWeek = startOfWeek(date);
+    if (nextWeek === weekStart) return;
+    actionRequestRef.current += 1;
+    rosterRequestRef.current += 1;
+    busyRef.current = false;
+    setBusy(false);
+    setAssignments([]);
+    setOpenShifts([]);
+    setRequests([]);
+    setEdit(null);
+    setLoading(true);
+    setWeekStart(nextWeek);
   };
 
   const openLeave = (assignment: any) => {
@@ -166,8 +282,20 @@ export default function MyRosterScreen({ scopedPharmacyId }: { scopedPharmacyId?
   };
 
   const saveLeave = async () => {
-    if (!edit || edit.type !== 'leave') return;
-    setBusy(true); setError('');
+    if (!edit || edit.type !== 'leave' || busy || busyRef.current) return;
+    const seq = ++actionRequestRef.current;
+    const currentScope = accountKey;
+    const requestedPharmacy = pharmacyId;
+    const requestedWeek = weekStart;
+    const isCurrent = () =>
+      seq === actionRequestRef.current &&
+      accountRef.current === currentScope &&
+      pharmacyRef.current === requestedPharmacy &&
+      weekRef.current === requestedWeek;
+
+    busyRef.current = true;
+    setBusy(true);
+    setError('');
     try {
       const existingId = Number(edit.existing?.id ?? 0);
       if (existingId) {
@@ -179,26 +307,48 @@ export default function MyRosterScreen({ scopedPharmacyId }: { scopedPharmacyId?
           note: note.trim(),
         });
       }
-      setEdit(null); setNote('');
+      if (!isCurrent()) return;
+      setEdit(null);
+      setNote('');
       await loadRoster();
     } catch (e) {
-      setError(errorMessage(e, 'Unable to save leave request.'));
+      if (isCurrent()) setError(errorMessage(e, 'Unable to save leave request.'));
     } finally {
-      setBusy(false);
+      if (seq === actionRequestRef.current) {
+        busyRef.current = false;
+        setBusy(false);
+      }
     }
   };
 
   const cancelLeave = async () => {
-    if (!edit || edit.type !== 'leave' || !edit.existing?.id) return;
-    setBusy(true); setError('');
+    if (!edit || edit.type !== 'leave' || !edit.existing?.id || busy || busyRef.current) return;
+    const seq = ++actionRequestRef.current;
+    const currentScope = accountKey;
+    const requestedPharmacy = pharmacyId;
+    const requestedWeek = weekStart;
+    const isCurrent = () =>
+      seq === actionRequestRef.current &&
+      accountRef.current === currentScope &&
+      pharmacyRef.current === requestedPharmacy &&
+      weekRef.current === requestedWeek;
+
+    busyRef.current = true;
+    setBusy(true);
+    setError('');
     try {
       await deleteLeaveRequestService(Number(edit.existing.id));
-      setEdit(null); setNote('');
+      if (!isCurrent()) return;
+      setEdit(null);
+      setNote('');
       await loadRoster();
     } catch (e) {
-      setError(errorMessage(e, 'Unable to cancel leave request.'));
+      if (isCurrent()) setError(errorMessage(e, 'Unable to cancel leave request.'));
     } finally {
-      setBusy(false);
+      if (seq === actionRequestRef.current) {
+        busyRef.current = false;
+        setBusy(false);
+      }
     }
   };
 
@@ -214,50 +364,100 @@ export default function MyRosterScreen({ scopedPharmacyId }: { scopedPharmacyId?
   });
 
   const saveCover = async () => {
-    if (!edit || edit.type !== 'cover' || !pharmacyId) return;
-    setBusy(true); setError('');
+    if (!edit || edit.type !== 'cover' || !pharmacyId || busy || busyRef.current) return;
+    const seq = ++actionRequestRef.current;
+    const currentScope = accountKey;
+    const requestedPharmacy = pharmacyId;
+    const requestedWeek = weekStart;
+    const isCurrent = () =>
+      seq === actionRequestRef.current &&
+      accountRef.current === currentScope &&
+      pharmacyRef.current === requestedPharmacy &&
+      weekRef.current === requestedWeek;
+
+    busyRef.current = true;
+    setBusy(true);
+    setError('');
     try {
       const payload = coverPayload(edit.assignment);
       const existingId = Number(edit.existing?.id ?? 0);
       if (existingId) await updateWorkerShiftRequestService(existingId, payload);
       else await createWorkerShiftRequestService(payload);
-      setEdit(null); setNote('');
+      if (!isCurrent()) return;
+      setEdit(null);
+      setNote('');
       await loadRoster();
     } catch (e) {
-      setError(errorMessage(e, 'Unable to save cover request.'));
+      if (isCurrent()) setError(errorMessage(e, 'Unable to save cover request.'));
     } finally {
-      setBusy(false);
+      if (seq === actionRequestRef.current) {
+        busyRef.current = false;
+        setBusy(false);
+      }
     }
   };
 
   const cancelCover = async () => {
-    if (!edit || edit.type !== 'cover' || !edit.existing?.id) return;
-    setBusy(true); setError('');
+    if (!edit || edit.type !== 'cover' || !edit.existing?.id || busy || busyRef.current) return;
+    const seq = ++actionRequestRef.current;
+    const currentScope = accountKey;
+    const requestedPharmacy = pharmacyId;
+    const requestedWeek = weekStart;
+    const isCurrent = () =>
+      seq === actionRequestRef.current &&
+      accountRef.current === currentScope &&
+      pharmacyRef.current === requestedPharmacy &&
+      weekRef.current === requestedWeek;
+
+    busyRef.current = true;
+    setBusy(true);
+    setError('');
     try {
       await deleteWorkerShiftRequestService(Number(edit.existing.id));
-      setEdit(null); setNote('');
+      if (!isCurrent()) return;
+      setEdit(null);
+      setNote('');
       await loadRoster();
     } catch (e) {
-      setError(errorMessage(e, 'Unable to cancel cover request.'));
+      if (isCurrent()) setError(errorMessage(e, 'Unable to cancel cover request.'));
     } finally {
-      setBusy(false);
+      if (seq === actionRequestRef.current) {
+        busyRef.current = false;
+        setBusy(false);
+      }
     }
   };
 
   const claim = async () => {
-    if (!edit || edit.type !== 'claim') return;
+    if (!edit || edit.type !== 'claim' || busy || busyRef.current) return;
     const shiftId = Number(edit.shift?.id);
     const slotId = Number(edit.slot?.id);
     if (!shiftId || !slotId) return;
-    setBusy(true); setError('');
+    const seq = ++actionRequestRef.current;
+    const currentScope = accountKey;
+    const requestedPharmacy = pharmacyId;
+    const requestedWeek = weekStart;
+    const isCurrent = () =>
+      seq === actionRequestRef.current &&
+      accountRef.current === currentScope &&
+      pharmacyRef.current === requestedPharmacy &&
+      weekRef.current === requestedWeek;
+
+    busyRef.current = true;
+    setBusy(true);
+    setError('');
     try {
       await claimShiftService({ shiftId, slotId });
+      if (!isCurrent()) return;
       setEdit(null);
       await loadRoster();
     } catch (e) {
-      setError(errorMessage(e, 'Unable to claim this open shift.'));
+      if (isCurrent()) setError(errorMessage(e, 'Unable to claim this open shift.'));
     } finally {
-      setBusy(false);
+      if (seq === actionRequestRef.current) {
+        busyRef.current = false;
+        setBusy(false);
+      }
     }
   };
 
@@ -268,11 +468,12 @@ export default function MyRosterScreen({ scopedPharmacyId }: { scopedPharmacyId?
     <ParityPage
       title="My roster"
       subtitle="Your assigned shifts, leave and cover requests, and open roster slots."
-      loading={loading}
+      loading={loading || workspaceLoading}
       error={error}
       onRetry={loadRoster}
       onRefresh={refresh}
       refreshing={refreshing}
+      backDisabled={isBusy}
     >
       {scopedPharmacyId !== undefined && pharmacyId == null ? (
         <InfoNote title="Choose a pharmacy">Select a pharmacy in the workspace header to see your roster.</InfoNote>
@@ -281,7 +482,7 @@ export default function MyRosterScreen({ scopedPharmacyId }: { scopedPharmacyId?
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {pharmacies.map((row) => {
               const id = pharmacyIdOf(row);
-              return <Chip key={id} selected={id === pharmacyId} onPress={() => setPharmacyId(id)}>{pharmacyNameOf(row)}</Chip>;
+              return <Chip key={id} disabled={busy} selected={id === pharmacyId} onPress={() => handlePharmacyChange(id)}>{pharmacyNameOf(row)}</Chip>;
             })}
           </View>
         </Section>
@@ -294,8 +495,9 @@ export default function MyRosterScreen({ scopedPharmacyId }: { scopedPharmacyId?
           locale="en-AU"
           label="Week starting"
           value={dateFromIso(weekStart)}
-          onChange={(date) => date && setWeekStart(startOfWeek(date))}
+          onChange={handleWeekChange}
           inputMode="start"
+          disabled={busy}
         />
       </Section>
 

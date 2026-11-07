@@ -6,7 +6,7 @@ import { colors, font, radius, space, type } from '@/constants/tokens';
 import { durations } from '@/constants/motion';
 import { Button } from './Button';
 import { sizeIcon } from './icon';
-import { Skeleton } from './Skeleton';
+import { BrandLoader } from './BrandLoader';
 
 export type ContentStateKind = 'loading' | 'empty' | 'error' | 'offline' | 'forbidden';
 
@@ -77,16 +77,8 @@ export function ContentState({
         accessibilityState={{ busy: true }}
         style={[styles.card, styles.loading, compact ? styles.compact : null, style]}
       >
+        <BrandLoader size={44} accessibilityLabel={label} />
         {title ? <Text style={styles.loadingTitle}>{title}</Text> : null}
-        {Array.from({ length: compact ? 2 : 3 }, (_, index) => (
-          <View key={index} style={styles.skeletonRow}>
-            <Skeleton width={44} height={44} borderRadius={radius.control} />
-            <View style={styles.skeletonText}>
-              <Skeleton width={index === 1 ? '60%' : '45%'} height={16} />
-              <Skeleton width="75%" height={13} />
-            </View>
-          </View>
-        ))}
       </View>
     );
   }
@@ -133,7 +125,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceBg,
   },
-  loading: { gap: 14, padding: space.xl },
+  loading: { alignItems: 'center', justifyContent: 'center', gap: 14, padding: space.xl },
   compact: { padding: space.lg },
   loadingTitle: {
     color: colors.textSecondary,
@@ -141,16 +133,6 @@ const styles = StyleSheet.create({
     fontSize: type.labelLarge.fontSize,
     lineHeight: type.labelLarge.lineHeight,
   },
-  skeletonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: space.md,
-    borderRadius: radius.nested,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  skeletonText: { flex: 1, minWidth: 0, gap: 6 },
   state: { alignItems: 'center', gap: 10, padding: space['2xl'] },
   tile: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   title: {

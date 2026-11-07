@@ -44,7 +44,7 @@ if [ "$warning_count" -gt "${MAX_LINT_WARNINGS:-34}" ]; then
   exit 1
 fi
 
-mapfile -d '' -t tests < <(git ls-files -z --cached --others --exclude-standard -- '*.test.mjs')
+mapfile -d '' -t tests < <(git ls-files -z --cached --others --exclude-standard -- '*.test.mjs' '*.test.cjs')
 if [ "${#tests[@]}" -eq 0 ]; then
   echo "FAILED: no mobile node tests discovered" >&2
   exit 1
@@ -65,7 +65,7 @@ mapfile -d '' -t changed < <(
 for file in "${changed[@]}"; do
   [ -f "$file" ] || continue
   case "$file" in
-    *.ts|*.tsx|*.js|*.mjs|*.json|*.md|*.sh)
+    *.ts|*.tsx|*.js|*.mjs|*.cjs|*.json|*.md|*.sh)
       node - "$file" <<'CHECK_EOL'
 const fs = require('node:fs');
 const file = process.argv[2];

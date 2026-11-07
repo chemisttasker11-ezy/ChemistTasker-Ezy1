@@ -7,6 +7,7 @@ import GooglePlacesInput from '../../shared/pharmacies/GooglePlacesInput';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
 import { useAuth } from '../../../context/AuthContext';
 import { WorkRightsMenu } from '../../shared/forms/WorkRightsMenu';
+import { BrandLoader } from '@/components/ui';
 
 type ExplorerRole = typeof NEWCOMER_TYPES[number]['value'] | '';
 type ApiData = {
@@ -150,7 +151,7 @@ export default function ExplorerBasicInfoScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
-        <View style={styles.loader}><Text>Loading basic info...</Text></View>
+        <View style={styles.loader}><BrandLoader size={44} accessibilityLabel="Loading basic info…" /></View>
       </SafeAreaView>
     );
   }

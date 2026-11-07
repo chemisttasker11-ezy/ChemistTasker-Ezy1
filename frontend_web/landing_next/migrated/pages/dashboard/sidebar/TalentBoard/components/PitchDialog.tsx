@@ -121,6 +121,9 @@ export default function PitchDialog(props: {
   setPitchForm: React.Dispatch<React.SetStateAction<PitchFormState>>;
   pitchError: string | null;
   pitchSaving: boolean;
+  saveDisabled?: boolean;
+  pendingSave?: boolean;
+  onRecover?: () => void;
   onClose: () => void;
   onSave: () => void;
   onDelete: () => void;
@@ -133,6 +136,9 @@ export default function PitchDialog(props: {
     setPitchForm,
     pitchError,
     pitchSaving,
+    saveDisabled,
+    pendingSave,
+    onRecover,
     onClose,
     onSave,
     onDelete,
@@ -304,7 +310,7 @@ export default function PitchDialog(props: {
   };
   const lastTabIndex = 2;
   const handleNextTab = () => {
-    if (tabIndex >= lastTabIndex) {
+    if (pendingSave || tabIndex >= lastTabIndex) {
       onSave();
       return;
     }
@@ -318,6 +324,9 @@ export default function PitchDialog(props: {
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>{existingPostId ? "Update Pitch" : "Pitch Yourself"}</DialogTitle>
       <DialogContent>
+        {pitchError && <Box role="alert" sx={{ color: "error.main", fontSize: 14, mb: 2 }}>{pitchError}</Box>}
+        {onRecover && <Button onClick={onRecover} disabled={pitchSaving}>Review saved pitches</Button>}
+        <Box component="fieldset" disabled={pitchSaving || pendingSave || saveDisabled} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
         <Tabs
           value={tabIndex}
           onChange={(_, next) => setTabIndex(next)}
@@ -331,11 +340,6 @@ export default function PitchDialog(props: {
 
         {tabIndex === 0 && (
           <Stack spacing={2} sx={{ pt: 1 }}>
-            {pitchError && (
-              <Box sx={{ color: "error.main", fontSize: 14 }}>
-                {pitchError}
-              </Box>
-            )}
             <Box
               sx={{
                 bgcolor: "#fff1f2",
@@ -806,6 +810,7 @@ export default function PitchDialog(props: {
             )}
           </Stack>
         )}
+        </Box>
       </DialogContent>
       <DialogActions>
         {existingPostId && (
@@ -816,8 +821,8 @@ export default function PitchDialog(props: {
         <Button onClick={handleBackTab} disabled={pitchSaving || tabIndex === 0}>
           Back
         </Button>
-        <Button onClick={handleNextTab} disabled={pitchSaving} variant="contained">
-          {pitchSaving ? "Saving..." : tabIndex === lastTabIndex ? (existingPostId ? "Update Availability" : "Post Availability") : "Next"}
+        <Button onClick={handleNextTab} disabled={pitchSaving || saveDisabled} variant="contained">
+          {pitchSaving ? "Saving..." : pendingSave ? "Retry pending pitch" : tabIndex === lastTabIndex ? (existingPostId ? "Update Availability" : "Post Availability") : "Next"}
         </Button>
         <Button onClick={onClose} disabled={pitchSaving}>
           Cancel

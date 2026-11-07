@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Checkbox, IconButton, Modal, Portal, Text, TextInput } from 'react-native-paper';
-import { DatePickerModal } from 'react-native-paper-dates';
+import { GuardedDatePickerModal as DatePickerModal } from '@/components/security/GuardedModal';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 import { findSkill, skillLabel, softwareSubgroups } from '@chemisttasker/shared-core';
 import { SkillIcon } from '../../../../components/SkillIcon';

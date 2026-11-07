@@ -421,13 +421,13 @@ jobs:
               permissions:
                 all: allow
           - extendedWaitUntil:
-              visible: "Go to Login|Welcome back"
+              visible: "Sign in|Welcome back"
               timeout: 30000
           - runFlow:
               when:
-                visible: "Go to Login"
+                notVisible: "Welcome back"
               commands:
-                - tapOn: "Go to Login"
+                - tapOn: "Sign in"
           - extendedWaitUntil:
               visible: "Welcome back"
               timeout: 30000
@@ -723,6 +723,32 @@ jobs:
             sleep "$((attempt * 10))"
           done
 
+      - name: Select Xcode 26.2 with Swift 6.2 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          XCODE_PATH="/Applications/Xcode_26.2.app"
+          test -d "$XCODE_PATH" || {
+            echo "Xcode 26.2 not found at $XCODE_PATH" >&2
+            exit 1
+          }
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR="$XCODE_PATH/Contents/Developer"
+          test "$(xcode-select -p)" = "$XCODE_PATH/Contents/Developer"
+          XCODEBUILD_VERSION="$(xcodebuild -version)"
+          echo "$XCODEBUILD_VERSION"
+          echo "$XCODEBUILD_VERSION" | grep -Eq '^Xcode 26\.2' || {
+            echo "Selected xcodebuild is not 26.2: $XCODEBUILD_VERSION" >&2
+            exit 1
+          }
+          SWIFT_VERSION="$(swift --version)"
+          echo "$SWIFT_VERSION"
+          echo "$SWIFT_VERSION" | grep -Eq 'Swift version 6\.2' || {
+            echo "Swift toolchain does not provide Swift 6.2: $SWIFT_VERSION" >&2
+            exit 1
+          }
+
       - name: Install ccache for the iOS native compile
         shell: bash
         run: |
@@ -852,7 +878,7 @@ jobs:
                 all: allow
           - openLink: "frontendmobile://admin/shifts"
           - extendedWaitUntil:
-              visible: 'Open in .*ChemistTasker.*|Go to Login|Welcome back'
+              visible: 'Open in .*ChemistTasker.*|Sign in|Welcome back'
               timeout: 30000
           - runFlow:
               when:
@@ -877,13 +903,13 @@ jobs:
               permissions:
                 all: allow
           - extendedWaitUntil:
-              visible: "Go to Login|Welcome back"
+              visible: "Sign in|Welcome back"
               timeout: 120000
           - runFlow:
               when:
-                visible: "Go to Login"
+                notVisible: "Welcome back"
               commands:
-                - tapOn: "Go to Login"
+                - tapOn: "Sign in"
           - extendedWaitUntil:
               visible: "Welcome back"
               timeout: 30000

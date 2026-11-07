@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Chip, Divider, Surface, Text } from 'react-native-paper';
+import { BrandActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
@@ -232,6 +233,7 @@ export default function PillsScreen() {
           <Divider />
           {loading ? (
             <View style={styles.emptyState}>
+              <BrandActivityIndicator size="small" accessibilityLabel="Loading referral summary…" />
               <Text style={styles.emptyTitle}>Loading referral summary...</Text>
             </View>
           ) : (
@@ -274,6 +276,7 @@ export default function PillsScreen() {
           <Divider />
           {loading ? (
             <View style={styles.emptyState}>
+              <BrandActivityIndicator size="small" accessibilityLabel="Loading referrals…" />
               <Text style={styles.emptyTitle}>Loading referrals...</Text>
             </View>
           ) : pendingReferrals.length === 0 ? (
@@ -317,6 +320,7 @@ export default function PillsScreen() {
           <Divider />
           {loading ? (
             <View style={styles.emptyState}>
+              <BrandActivityIndicator size="small" accessibilityLabel="Loading pill activity…" />
               <Text style={styles.emptyTitle}>Loading pill activity...</Text>
             </View>
           ) : entries.length === 0 ? (

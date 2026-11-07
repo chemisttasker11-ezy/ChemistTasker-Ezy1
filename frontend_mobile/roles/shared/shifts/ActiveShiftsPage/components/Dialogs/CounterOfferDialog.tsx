@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Portal, Dialog, Text, Divider, ActivityIndicator } from 'react-native-paper';
+import { Portal, Dialog, Text, Divider } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import {
     Star,
     Plane,

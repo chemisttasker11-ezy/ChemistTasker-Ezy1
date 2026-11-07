@@ -1,10 +1,14 @@
 """Talent/explorer posts API: feeds, public feed, create/update/delete, views and reactions."""
-from rest_framework import permissions, viewsets
+import json
+
+from rest_framework import permissions, serializers, viewsets
+from rest_framework.renderers import JSONRenderer
+from core.request_fingerprint import request_fingerprint
 from rest_framework.pagination import PageNumberPagination
 from datetime import timedelta
 
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
-from talent.models import ExplorerPost, ExplorerPostReaction
+from talent.models import ExplorerPost, ExplorerPostReaction, PitchCreateRequest
 from django.db import models
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -115,14 +119,56 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated()]
 
 
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        self._require_create_access()
+        # Lock order: user, receipt, then newcomer profile.
+        request.user = type(request.user).objects.select_for_update().get(pk=request.user.pk)
+        self._require_create_access()
+        try:
+            key = serializers.UUIDField().run_validation(request.headers.get('Idempotency-Key'))
+        except ValidationError:
+            return Response({'code': 'IDEMPOTENCY_KEY_REQUIRED',
+                             'detail': 'Please update the app before posting your pitch.'}, status=400)
+        fingerprint = request_fingerprint(request.data)
+        now = timezone.now()
+        receipt, created = PitchCreateRequest.objects.get_or_create(
+            author=request.user, operation='talent.pitch.create', key=key,
+            defaults={'fingerprint': fingerprint, 'created_at': now,
+                      'replay_expires_at': now + timedelta(days=30)},
+        )
+        if not created:
+            # Serialize replay against SET_NULL deletion and receipt cleanup.
+            receipt = PitchCreateRequest.objects.select_for_update().get(pk=receipt.pk)
+            code, detail, status = None, None, 410
+            if receipt.fingerprint != fingerprint:
+                code, detail, status = 'IDEMPOTENCY_PAYLOAD_MISMATCH', 'This pitch was saved with different details. Open the original pitch for editing.', 409
+            elif receipt.post_id is None:
+                code, detail = 'PITCH_DELETED', 'This pitch was deleted. Review your pitches before starting a new one.'
+            elif receipt.response_body is None or receipt.replay_expires_at <= timezone.now():
+                code, detail = 'IDEMPOTENCY_REPLAY_EXPIRED', 'This save receipt has expired. Review the original pitch before starting a new one.'
+            if code:
+                return Response({'code': code, 'detail': detail, 'post_id': receipt.original_post_id}, status=status)
+            return Response(receipt.response_body, status=receipt.response_status, headers=receipt.response_headers)
+        response = super().create(request, *args, **kwargs)
+        receipt.post_id = receipt.original_post_id = response.data['id']
+        receipt.response_status = response.status_code
+        receipt.response_body = json.loads(JSONRenderer().render(response.data))
+        receipt.response_headers = {name: value for name, value in response.items() if name.lower() == 'location'}
+        receipt.save(update_fields=['post', 'original_post_id', 'response_status', 'response_body', 'response_headers'])
+        return response
+
+    def _require_create_access(self):
+        if not (self.request.user.is_explorer() or self.request.user.is_pharmacist() or self.request.user.is_otherstaff()):
+            raise PermissionDenied("Only pharmacists, the pharmacy team and people new to pharmacy can create posts.")
+        self._require_public_staff_access()
+
     def perform_create(self, serializer):
         """
         Enforce that the creating user owns the explorer_profile (if provided)
         and stamp author_user.
         """
-        if not (self.request.user.is_explorer() or self.request.user.is_pharmacist() or self.request.user.is_otherstaff()):
-            raise PermissionDenied("Only pharmacists, the pharmacy team and people new to pharmacy can create posts.")
-        self._require_public_staff_access()
+        self._require_create_access()
         explorer_profile = serializer.validated_data.get("explorer_profile")
         if explorer_profile is not None and explorer_profile.user_id != self.request.user.id:
             raise PermissionDenied("You can only post from your own explorer profile.")

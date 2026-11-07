@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import {
-    ActivityIndicator,
-    Button,
-    Dialog,
-    Portal,
-    Snackbar,
-    Text,
-    TextInput,
+  Button,
+  Dialog,
+  Portal,
+  Snackbar,
+  Text,
+  TextInput,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { Star } from 'lucide-react-native';
 import {
     createRatingService,

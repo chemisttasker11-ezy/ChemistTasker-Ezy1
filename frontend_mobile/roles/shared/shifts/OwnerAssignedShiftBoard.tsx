@@ -1,13 +1,13 @@
 ﻿/*  */import React, { useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import {
-    ActivityIndicator,
-    Button,
-    Card,
-    Chip,
-    Surface,
-    Text,
+  Button,
+  Card,
+  Chip,
+  Surface,
+  Text,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { Calendar, CheckCircle2, Heart, Lock, Star, User, Users } from 'lucide-react-native';
 import type { Shift, ShiftAssignment } from '@chemisttasker/shared-core';
 import { colors, radius, space } from '@/constants/tokens';

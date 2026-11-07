@@ -1,9 +1,11 @@
+import { ResponsiveSegmentedButtons as SegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 // Pharmacy Detail View - Mobile
 // Integrates Staff Manager, Locum Manager, and Pharmacy Admins
 
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { ActivityIndicator, HelperText, SegmentedButtons, Switch, Text } from 'react-native-paper';
+import { HelperText, Switch, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePathname, useRouter } from 'expo-router';
 import { Pencil } from 'lucide-react-native';

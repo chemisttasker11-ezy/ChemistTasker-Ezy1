@@ -71,7 +71,8 @@ function loadTs(path, imports = {}) {
 }
 
 const chatRoutes = loadTs('../../../utils/chatRoutes.ts');
-const confirmedModule = loadTs('./ConfirmedShiftsView.tsx');
+const payrollModule = loadTs('./confirmedPayroll.ts');
+const confirmedModule = loadTs('./ConfirmedShiftsView.tsx', { './confirmedPayroll': payrollModule });
 const boardModule = loadTs('./OwnerAssignedShiftBoard.tsx');
 const bookedModule = loadTs('./WorkerBookedShifts.tsx');
 const surfaceModule = loadTs('./shiftSurface.ts');
@@ -339,7 +340,7 @@ test('pharmacy-scoped confirmed shifts and payroll actions fail closed on missin
   assert.deepEqual([...filterShiftsByPharmacy(shifts, 10).map((s) => s.id)], [2, 3]);
   assert.equal(filterShiftsByPharmacy(shifts, null).length, 5);
   const offer = (id, pharmacyId) => ({
-    id, paymentPreferenceSnapshot: 'TFN', payrollActivatedAt: null,
+    id, paymentPreferenceSnapshot: 'TFN', engagementKind: 'SHIFT_EMPLOYMENT', settlementChannel: 'TIMESHEET_ONLY', payrollActivatedAt: null,
     engagementTermsSnapshot: pharmacyId === undefined
       ? { payrollActivationRequired: true }
       : { payrollActivationRequired: true, pharmacyId },

@@ -3,7 +3,8 @@
 
 import React from 'react';
 import { Image, View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Surface, Text, Divider, ActivityIndicator } from 'react-native-paper';
+import { Surface, Text, Divider } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { Tag, UserCheck, Star } from 'lucide-react-native';
 import { Shift, ShiftInterest } from '@chemisttasker/shared-core';
 import { Pill } from '@/components/ui/Pill';

@@ -10,8 +10,9 @@ test('old pharmacy responses cannot replace the current workforce or payroll sta
   assert.match(source,/if \(current\(\)\) setError/);
   assert.match(source,/requestGeneration\.current \+= 1/);
 });
-test('a pending save disables pharmacy switching and stale refresh callbacks',()=>{
-  assert.match(source,/disabled=\{busyKey != null\} selected=\{pharmacyId === pharmacy\.id\}/);
-  assert.match(source,/if \(currentPharmacy\.current === pharmacyId\) await load\(\)/);
-  assert.match(source,/if \(currentPharmacy\.current === pharmacyId\) \{ setPayroll\(next\); await load\(\); \}/);
+test('source wiring: pending writes lock selection and apply saved rows without reloading other drafts',()=>{
+  assert.match(source,/accessibilityState=\{\{ checked: pharmacyId === pharmacy\.id, disabled: busyKey != null \|\| loading \|\| refreshing \}\} disabled=\{busyKey != null \|\| loading \|\| refreshing\}/);
+  assert.match(source,/if \(!isMountedRef\.current \|\| currentPharmacy\.current !== pharmacyId\) return/);
+  assert.match(source,/const nextBaseline = \{ \.\.\.loadedHoursRef\.current, \[row\.membership_id\]: formatted \}/);
+  assert.doesNotMatch(source.slice(source.indexOf('const saveHours')), /await load\(/);
 });

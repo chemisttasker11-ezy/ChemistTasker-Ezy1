@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { useGuardedNavigation, useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
 import * as Notifications from 'expo-notifications';
@@ -9,6 +9,7 @@ import { resolveChatNotificationRoomId } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
 import { colors } from '@/constants/tokens';
+import { BrandLoader } from '@/components/ui';
 import { type MoreGroup, type MoreItem, PersonaShell, type ShellTab } from '@/components/shell';
 
 const titles: Record<string, string> = {
@@ -149,7 +150,7 @@ export default function ExplorerTabs() {
   if (isLoading || !user || user.role !== 'EXPLORER') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <BrandLoader size={44} accessibilityLabel="Loading workspace" />
       </View>
     );
   }

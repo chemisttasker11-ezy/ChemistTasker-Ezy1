@@ -15,6 +15,8 @@ export * from './financePresentation';
 export * from './api';
 export { getMembershipErrorMessage } from './domains/memberships/errors';
 export * from './talent';
+export * from './domains/talent/pendingPitch';
+export { getApiConfig } from './transport/application';
 
 // Request-scoped/shared transport. Use createApiClient/createChemistTaskerApi
 // for new cross-platform work (especially Next.js SSR).

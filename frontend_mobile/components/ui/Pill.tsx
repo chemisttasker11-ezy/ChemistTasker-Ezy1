@@ -14,13 +14,15 @@ export type PillProps = {
   /** Makes the pill a filter chip: outlined at rest, tinted in `tone` (violet for neutral) when selected. */
   onPress?: () => void;
   selected?: boolean;
+  /** Allow selectable choice labels to wrap and follow the system text size. */
+  wrapLabel?: boolean;
   disabled?: boolean;
   /** Replaces the spoken text when the visible label needs context, e.g. "Status: Booked". */
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 };
 
-function PillLabel({ label, icon, color }: { label: string; icon?: ReactNode; color: string }) {
+function PillLabel({ label, icon, color, wrapLabel = false }: { label: string; icon?: ReactNode; color: string; wrapLabel?: boolean }) {
   return (
     <>
       {icon ? (
@@ -28,7 +30,7 @@ function PillLabel({ label, icon, color }: { label: string; icon?: ReactNode; co
           {sizeIcon(icon, 13, color, 2)}
         </View>
       ) : null}
-      <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={[styles.text, { color }]}>
+      <Text numberOfLines={wrapLabel ? undefined : 1} maxFontSizeMultiplier={wrapLabel ? undefined : 1.2} style={[styles.text, { color }]}>
         {label}
       </Text>
     </>
@@ -43,6 +45,7 @@ export const Pill = memo(function Pill({
   outlined = false,
   onPress,
   selected = false,
+  wrapLabel = false,
   disabled = false,
   accessibilityLabel,
   style,
@@ -63,7 +66,7 @@ export const Pill = memo(function Pill({
         <View
           style={[styles.pill, styles.chip, { backgroundColor: bg, borderColor: selected || disabled ? bg : colors.border }]}
         >
-          <PillLabel label={label} icon={icon} color={fg} />
+          <PillLabel label={label} icon={icon} color={fg} wrapLabel={wrapLabel} />
         </View>
       </ScalePressable>
     );

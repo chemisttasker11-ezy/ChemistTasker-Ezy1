@@ -20,6 +20,7 @@ export function filterDeferredPayrollOffers(
   offers: readonly DeferredPayrollOffer[],
   scopedPharmacyId: number | null,
 ): DeferredPayrollOffer[] {
+  if (!Array.isArray(offers)) return [];
   return offers.filter((offer) => {
     const terms = offer.engagementTermsSnapshot;
     if (

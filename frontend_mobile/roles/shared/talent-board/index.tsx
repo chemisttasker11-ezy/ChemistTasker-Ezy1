@@ -1,14 +1,9 @@
-import { projectTalentSkills, resolveTalentBookingRole, newcomerTypeLabel } from '@chemisttasker/shared-core';
-import { skillId } from '@chemisttasker/shared-core';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, Chip, IconButton, Text } from 'react-native-paper';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '@/context/AuthContext';
 import {
-  canPublishTalent,
-  createExplorerPost,
+  projectTalentSkills,
+  resolveTalentBookingRole,
+  newcomerTypeLabel,
+  getApiConfig,
+  type PendingPitch,
   deleteExplorerPost,
   fetchUserAvailabilityService,
   getExplorerPostForEditing,
@@ -19,6 +14,12 @@ import {
   updateExplorerPost,
   updateOnboardingForm,
 } from '@chemisttasker/shared-core';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Button, Chip, IconButton, Text } from 'react-native-paper';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@/context/AuthContext';
 import { ENGAGEMENT_LABELS } from './constants';
 import { Candidate } from './types';
 import { useTalentFeed } from './useTalentFeed';
@@ -27,7 +28,10 @@ import { BadgeGuideButton } from '../skills/VerificationBadges';
 import AvailabilitySidebar from './components/AvailabilitySidebar';
 import FiltersSidebar, { TalentFilterState } from './components/FiltersSidebar';
 import PitchDialog, { PitchFormState } from './components/PitchDialog';
+import { useUnsavedChangesGuard } from '../forms/useUnsavedChangesGuard';
 import TalentCardV2 from './components/TalentCardV2';
+import { usePublicAvailabilityEligibility } from './publicAvailabilityEligibility';
+import { mobilePendingPitchStore, submitPendingPitch } from './pendingPitch';
 
 const titleCase = (value: string) =>
   value
@@ -80,7 +84,7 @@ const mapAvailabilityToPitchSlots = (entries: any[]) =>
       startTime: entry?.startTime || entry?.start_time || '09:00',
       endTime: entry?.endTime || entry?.end_time || '17:00',
       isAllDay: Boolean(entry?.isAllDay ?? entry?.is_all_day),
-      notes: entry?.notes || '',
+      notes: '',
     }))
   ).filter((slot) => slot.date >= todayIso());
 const allWorkTypes = Object.values(ENGAGEMENT_LABELS);
@@ -99,7 +103,7 @@ type TalentBoardProps = {
   openPitchOnMount?: boolean;
 };
 
-export default function TalentBoard({
+export function TalentBoardInner({
   publicMode = false,
   externalPosts,
   externalLoading,
@@ -279,36 +283,41 @@ export default function TalentBoard({
     [user?.role]
   );
 
-  const isTalentStaff = normalizedRole === 'PHARMACIST' || normalizedRole === 'OTHER_STAFF';
-  const [staffPublicAccess, setStaffPublicAccess] = useState<boolean | null>(null);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!isTalentStaff) {
-        setStaffPublicAccess(null);
-        return undefined;
-      }
-
-      let active = true;
-      setStaffPublicAccess(null);
-      const roleKey = normalizedRole === 'PHARMACIST' ? 'pharmacist' : 'otherstaff';
-      void getOnboarding(roleKey)
-        .then((profile: any) => {
-          if (active) setStaffPublicAccess(canPublishTalent(user, profile, todayIso()));
-        })
-        .catch(() => {
-          if (active) setStaffPublicAccess(false);
-        });
-
-      return () => {
-        active = false;
-      };
-    }, [isTalentStaff, normalizedRole, user?.id, user?.is_mobile_verified])
-  );
+  const {
+    status: eligibilityStatus,
+    staffPublicAccess,
+    error: eligibilityError,
+    retry: retryEligibility,
+    isTalentStaff,
+  } = usePublicAvailabilityEligibility(user);
 
   const canPitch =
     normalizedRole === 'EXPLORER' ||
     (isTalentStaff && staffPublicAccess === true);
+
+  const activeUserRef = useRef({ id: user?.id, role: normalizedRole });
+  activeUserRef.current = { id: user?.id, role: normalizedRole };
+
+  const activeEditorPostIdRef = useRef<number | null>(null);
+  const activeDeleteTokenRef = useRef<number | null>(null);
+  const deleteOperationIdRef = useRef<number>(0);
+
+  const pitchLoadGeneration = useRef(0);
+  const saveGeneration = useRef(0);
+  const saveInFlightRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      pitchLoadGeneration.current += 1;
+      saveGeneration.current += 1;
+      activeDeleteTokenRef.current = null;
+      deleteInFlightRef.current = false;
+      saveInFlightRef.current = false;
+    };
+  }, []);
 
   const canRequestBookingByRole = useMemo(() => {
     if (!normalizedRole) return false;
@@ -382,8 +391,62 @@ export default function TalentBoard({
 
   const [pitchOpen, setPitchOpen] = useState(false);
   const [pitchSaving, setPitchSaving] = useState(false);
+  const [pitchDeleting, setPitchDeleting] = useState(false);
   const [pitchError, setPitchError] = useState<string | null>(null);
+  const pitchAccount = JSON.stringify([getApiConfig().baseURL, user?.id, normalizedRole]);
+  const pitchAccountRef = useRef(pitchAccount);
+  const pitchAbortRef = useRef(new AbortController());
+  if (pitchAccountRef.current !== pitchAccount) {
+    pitchAbortRef.current.abort();
+    pitchAbortRef.current = new AbortController();
+    saveGeneration.current += 1;
+    saveInFlightRef.current = false;
+    pitchLoadGeneration.current += 1;
+  }
+  pitchAccountRef.current = pitchAccount;
+  useEffect(() => {
+    if (pitchAbortRef.current.signal.aborted) pitchAbortRef.current = new AbortController();
+    const controller = pitchAbortRef.current;
+    return () => controller.abort();
+  }, [pitchAccount]);
+  const pendingStore = useMemo(() => user?.id != null ? mobilePendingPitchStore(getApiConfig().baseURL, user.id) : null, [user?.id]);
+  const [pendingPitch, setPendingPitch] = useState<PendingPitch | null>(null);
+  const [pendingError, setPendingError] = useState<string | null>(null);
+  const [pendingReady, setPendingReady] = useState(false);
+  useEffect(() => {
+    let current = true;
+    setPendingPitch(null);
+    setPendingError(null);
+    setPendingReady(false);
+    if (!pendingStore) return () => { current = false; };
+    void pendingStore.read().then((intent) => {
+      if (current) { setPendingPitch(intent); setPendingReady(true); }
+    }).catch(() => {
+      if (current) setPendingError('Your saved pitch could not be read. Review your pitches to recover.');
+    });
+    return () => { current = false; };
+  }, [pendingStore]);
+
   const [existingPostId, setExistingPostId] = useState<number | null>(null);
+  const [existingReferenceCode, setExistingReferenceCode] = useState<string | null>(null);
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{
+    open: boolean;
+    postId: number | null;
+    referenceCode: string | null;
+    headline: string | null;
+    token: number;
+    accountKey: string;
+  }>({
+    open: false,
+    postId: null,
+    referenceCode: null,
+    headline: null,
+    token: 0,
+    accountKey: '',
+  });
+  const deleteTokenCounter = useRef(0);
+  const deleteInFlightRef = useRef(false);
+  const consumedTokensRef = useRef<Set<number>>(new Set());
   const [roleTitle, setRoleTitle] = useState<string>('New to pharmacy');
   const [explorerProfileId, setExplorerProfileId] = useState<number | null>(null);
   const [pitchSkills, setPitchSkills] = useState<string[]>([]);
@@ -405,9 +468,39 @@ export default function TalentBoard({
     availabilitySlots: [],
   });
 
+  const [pitchDefaultsStatus, setPitchDefaultsStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const pitchDefaultsReady = useRef<string | null>(null);
+  const [slotDraftDirty, setSlotDraftDirty] = useState(false);
+  const pitchGuard = useUnsavedChangesGuard({ pitchForm, slotDraftDirty }, {
+    enabled: pitchOpen && pitchDefaultsStatus === 'ready',
+    saving: pitchSaving || pitchDeleting,
+  });
+  const markPitchCleanRef = useRef(pitchGuard.markClean);
+  markPitchCleanRef.current = pitchGuard.markClean;
+  useEffect(() => {
+    if (pitchOpen && pitchDefaultsStatus === 'ready') markPitchCleanRef.current();
+  }, [pitchOpen, pitchDefaultsStatus]);
+
   const isExplorer = user?.role === 'EXPLORER';
   const isPharmacist = user?.role === 'PHARMACIST';
   const isOtherStaff = user?.role === 'OTHER_STAFF';
+
+  useEffect(() => {
+    activeEditorPostIdRef.current = existingPostId;
+    activeDeleteTokenRef.current = null;
+  }, [existingPostId]);
+
+  useEffect(() => {
+    activeDeleteTokenRef.current = null;
+    setDeleteConfirmState({
+      open: false,
+      postId: null,
+      referenceCode: null,
+      headline: null,
+      token: 0,
+      accountKey: '',
+    });
+  }, [user?.id, normalizedRole]);
 
   const resetPitchForm = useCallback(() => {
     setPitchForm({
@@ -428,80 +521,134 @@ export default function TalentBoard({
       availabilitySlots: [],
     });
     setExistingPostId(null);
+    setExistingReferenceCode(null);
+    activeEditorPostIdRef.current = null;
+    activeDeleteTokenRef.current = null;
     setExplorerProfileId(null);
     setRoleTitle('New to pharmacy');
     setPitchSkills([]);
+    setDeleteConfirmState({
+      open: false,
+      postId: null,
+      referenceCode: null,
+      headline: null,
+      token: 0,
+      accountKey: '',
+    });
   }, []);
 
+  useEffect(() => {
+    setPitchSaving(false);
+    setPitchError(null);
+    pitchDefaultsReady.current = null;
+  }, [pitchAccount]);
+
   const loadPitchDefaults = useCallback(async () => {
-    if (!user) return;
+    if (!user || deleteInFlightRef.current || saveInFlightRef.current) return;
+    const currentGeneration = ++pitchLoadGeneration.current;
+    const currentUserId = user.id;
+    const currentRole = normalizedRole;
+    const isCurrent = () =>
+      pitchLoadGeneration.current === currentGeneration &&
+      activeUserRef.current.id === currentUserId &&
+      activeUserRef.current.role === currentRole;
+
+    pitchDefaultsReady.current = null;
+    setPitchDefaultsStatus('loading');
     setPitchError(null);
     resetPitchForm();
+    let onboarding: any;
     let onboardingSkills: string[] = [];
     let inheritedAvailabilitySlots: PitchFormState['availabilitySlots'] = [];
     try {
       inheritedAvailabilitySlots = mapAvailabilityToPitchSlots(await fetchUserAvailabilityService().catch(() => []));
+      if (!isCurrent()) return;
+
       if (isExplorer) {
-        const onboarding: any = await getOnboarding('explorer');
+        onboarding = await getOnboarding('explorer');
+        if (!isCurrent()) return;
         setRoleTitle((onboarding?.role_type || 'New to pharmacy').replace('_', ' '));
         setExplorerProfileId(onboarding?.id ?? null);
       } else if (isPharmacist) {
-        const onboarding: any = await getOnboarding('pharmacist');
+        onboarding = await getOnboarding('pharmacist');
+        if (!isCurrent()) return;
         setRoleTitle('Pharmacist');
         onboardingSkills = Array.isArray(onboarding?.skills) ? onboarding.skills : [];
       } else if (isOtherStaff) {
-        const onboarding: any = await getOnboarding('other_staff');
+        onboarding = await getOnboarding('other_staff');
+        if (!isCurrent()) return;
         setRoleTitle((onboarding?.role_type || 'Pharmacy team').replace('_', ' '));
         onboardingSkills = Array.isArray(onboarding?.skills) ? onboarding.skills : [];
-        }
-        const mine = await getExplorerPostForEditing();
-        if (mine) {
-          const minePostKind =
-            mine.postKind ||
-            (mine.availabilityMode === 'FULL_TIME_NOTICE' ? 'FULL_TIME_APPLICATION' : 'AVAILABILITY');
-          setExistingPostId(mine.id);
-          setPitchForm((prev) => ({
-            ...prev,
-            headline: mine.headline || prev.headline,
-            body: mine.body || prev.body,
-            workTypes: Array.isArray(mine.workTypes) ? mine.workTypes : prev.workTypes,
-            postKind: minePostKind,
-            suburb: mine.locationSuburb || prev.suburb,
-            state: mine.locationState || prev.state,
-            postcode: mine.locationPostcode || prev.postcode,
-            openToTravel: mine.openToTravel != null ? Boolean(mine.openToTravel) : prev.openToTravel,
-            coverageRadiusKm: mine.coverageRadiusKm != null ? Number(mine.coverageRadiusKm) : prev.coverageRadiusKm,
-            availabilitySlots:
-              minePostKind === 'FULL_TIME_APPLICATION'
-                ? []
-                : Array.isArray(mine.availabilityDays) && mine.availabilityDays.length > 0
-                  ? mine.availabilityDays.map((entry: any) => {
-                      if (typeof entry === 'string') {
-                        return { date: entry, startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' };
-                      }
-                      return {
-                        date: String(entry?.date || ''),
-                        startTime: entry?.start_time || entry?.startTime || '09:00',
-                        endTime: entry?.end_time || entry?.endTime || '17:00',
-                        isAllDay: Boolean(entry?.is_all_day ?? entry?.isAllDay),
-                        notes: entry?.notes || '',
-                      };
-                    }).filter((slot: any) => slot.date >= todayIso())
-                  : (prev.availabilitySlots.length ? prev.availabilitySlots : inheritedAvailabilitySlots),
-          }));
-        } else if (inheritedAvailabilitySlots.length > 0) {
-          setPitchForm((prev) => ({
-            ...prev,
-            postKind: 'AVAILABILITY',
-            availabilitySlots: inheritedAvailabilitySlots,
-          }));
-        }
-        if (mine && Array.isArray(mine.skills) && mine.skills.length > 0) setPitchSkills(mine.skills);
-        else if (onboardingSkills.length > 0) setPitchSkills(onboardingSkills);
+      }
+      if (!onboarding) throw new Error('Failed to load your profile.');
+      setPitchForm((prev) => ({
+        ...prev,
+        streetAddress: onboarding.street_address ?? '',
+        suburb: onboarding.suburb ?? '',
+        state: onboarding.state ?? '',
+        postcode: onboarding.postcode ?? '',
+        openToTravel: Boolean(onboarding.open_to_travel),
+        travelStates: Array.isArray(onboarding.travel_states) ? onboarding.travel_states : [],
+        coverageRadiusKm: onboarding.coverage_radius_km != null ? Number(onboarding.coverage_radius_km) : 30,
+        latitude: onboarding.latitude != null ? Number(onboarding.latitude) : null,
+        longitude: onboarding.longitude != null ? Number(onboarding.longitude) : null,
+        googlePlaceId: onboarding.google_place_id ?? '',
+      }));
+      const mine = await getExplorerPostForEditing();
+      if (!isCurrent()) return;
+      if (mine) {
+        const minePostKind =
+          mine.postKind ||
+          (mine.availabilityMode === 'FULL_TIME_NOTICE' ? 'FULL_TIME_APPLICATION' : 'AVAILABILITY');
+        setExistingPostId(mine.id);
+        activeEditorPostIdRef.current = mine.id;
+        setExistingReferenceCode(mine.referenceCode || (mine.id ? `REF-${mine.id}` : null));
+        setPitchForm((prev) => ({
+          ...prev,
+          headline: mine.headline || prev.headline,
+          body: mine.body || prev.body,
+          workTypes: Array.isArray(mine.workTypes) ? mine.workTypes : prev.workTypes,
+          postKind: minePostKind,
+          suburb: mine.locationSuburb || prev.suburb,
+          state: mine.locationState || prev.state,
+          postcode: mine.locationPostcode || prev.postcode,
+          openToTravel: mine.openToTravel != null ? Boolean(mine.openToTravel) : prev.openToTravel,
+          coverageRadiusKm: mine.coverageRadiusKm != null ? Number(mine.coverageRadiusKm) : prev.coverageRadiusKm,
+          availabilitySlots:
+            minePostKind === 'FULL_TIME_APPLICATION'
+              ? []
+              : Array.isArray(mine.availabilityDays) && mine.availabilityDays.length > 0
+                ? mine.availabilityDays.map((entry: any) => {
+                    if (typeof entry === 'string') {
+                      return { date: entry, startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' };
+                    }
+                    return {
+                      date: String(entry?.date || ''),
+                      startTime: entry?.start_time || entry?.startTime || '09:00',
+                      endTime: entry?.end_time || entry?.endTime || '17:00',
+                      isAllDay: Boolean(entry?.is_all_day ?? entry?.isAllDay),
+                      notes: entry?.notes || '',
+                    };
+                  }).filter((slot: any) => slot.date >= todayIso())
+                : (prev.availabilitySlots.length ? prev.availabilitySlots : inheritedAvailabilitySlots),
+        }));
+      } else if (inheritedAvailabilitySlots.length > 0) {
+        setPitchForm((prev) => ({
+          ...prev,
+          postKind: 'AVAILABILITY',
+          availabilitySlots: inheritedAvailabilitySlots,
+        }));
+      }
+      if (mine && Array.isArray(mine.skills) && mine.skills.length > 0) setPitchSkills(mine.skills);
+      else if (onboardingSkills.length > 0) setPitchSkills(onboardingSkills);
+      pitchDefaultsReady.current = `${currentUserId}:${currentRole}`;
+      setPitchDefaultsStatus('ready');
     } catch (err: any) {
+      if (!isCurrent()) return;
+      setPitchDefaultsStatus('error');
       setPitchError(err?.message || 'Failed to load your profile.');
     }
-  }, [isExplorer, isOtherStaff, isPharmacist, resetPitchForm, user]);
+  }, [isExplorer, isOtherStaff, isPharmacist, normalizedRole, resetPitchForm, user?.id]);
 
   useEffect(() => {
     if (pitchOpen) void loadPitchDefaults();
@@ -524,21 +671,55 @@ export default function TalentBoard({
   }, [isOtherStaff, isPharmacist, pitchForm]);
 
   const handlePitchSave = async () => {
+    if (saveInFlightRef.current || deleteInFlightRef.current || activeDeleteTokenRef.current !== null || deleteConfirmState.open) {
+      return;
+    }
+    if (!isMountedRef.current || !pendingStore || (!existingPostId && !pendingReady) || pitchDefaultsReady.current !== `${user?.id}:${normalizedRole}`) return;
+
+    saveInFlightRef.current = true;
+    const currentSaveGen = ++saveGeneration.current;
+    const currentUserId = user?.id;
+    const currentRole = normalizedRole;
+    const isCurrentSave = () =>
+      isMountedRef.current &&
+      saveGeneration.current === currentSaveGen &&
+      activeUserRef.current.id === currentUserId &&
+      activeUserRef.current.role === currentRole;
+
     setPitchSaving(true);
     setPitchError(null);
     try {
+      let savedIntent: PendingPitch | null = null;
+      if (!existingPostId) {
+        try { savedIntent = await pendingStore.read(); }
+        catch {
+          if (isCurrentSave()) {
+            setPendingPitch(null);
+            setPendingReady(false);
+            setPendingError('Your saved pitch could not be read. Review your pitches to recover.');
+            setPitchOpen(false);
+          }
+          return;
+        }
+      }
+      if (savedIntent) {
+        if (isCurrentSave()) { setPendingPitch(savedIntent); setPitchError('Finish the saved pitch from the Talent Board before starting another.'); }
+        return;
+      }
+      if (!isCurrentSave()) return;
       if (pitchForm.openToTravel && (pitchForm.travelStates || []).length === 0) {
+        if (!isCurrentSave()) return;
         setPitchError('Select at least one travel state.');
-        setPitchSaving(false);
         return;
       }
       const isFullTimeApplication = pitchForm.postKind === 'FULL_TIME_APPLICATION';
       if (isExplorer && isFullTimeApplication && !pitchForm.headline.trim() && !pitchForm.body.trim()) {
+        if (!isCurrentSave()) return;
         setPitchError('Please add a headline or some text.');
-        setPitchSaving(false);
         return;
       }
       await updateOnboardingLocationPrefs();
+      if (!isCurrentSave()) return;
       const normalizedWorkTypes = isFullTimeApplication
         ? Array.from(new Set([...(pitchForm.workTypes || []), 'FULL_TIME']))
         : pitchForm.workTypes;
@@ -557,6 +738,7 @@ export default function TalentBoard({
             startTime: entry.startTime || entry.start_time || null,
             endTime: entry.endTime || entry.end_time || null,
             isAllDay: Boolean(entry.isAllDay ?? entry.is_all_day),
+            notes: entry.notes || '',
           }));
       const payload: Record<string, any> = {
         headline: normalizedHeadline,
@@ -577,12 +759,34 @@ export default function TalentBoard({
       };
       if (explorerProfileId) payload.explorer_profile = explorerProfileId;
       if (existingPostId) await updateExplorerPost(existingPostId, payload);
-      else await createExplorerPost(payload);
-      await reload();
+      else {
+        const intent = await pendingStore.acquire(payload, normalizedRole);
+        if (!isCurrentSave()) return;
+        setPendingPitch(intent);
+        await submitPendingPitch(pendingStore, intent, isCurrentSave, pitchAbortRef.current.signal);
+        if (!isCurrentSave()) return;
+        await pendingStore.resolve(intent.key);
+        if (!isCurrentSave()) return;
+        setPendingPitch(null);
+      }
+      if (!isCurrentSave()) return;
+      try {
+        await reload();
+      } catch {}
+      if (!isCurrentSave()) return;
+      pitchDefaultsReady.current = null;
       setPitchOpen(false);
     } catch (err: any) {
-      const detail = err?.response?.data || err?.data || err;
-      if (detail && typeof detail === 'object') {
+      if (!isCurrentSave()) return;
+      if (pendingStore) {
+        try { const intent = await pendingStore.read(); if (isCurrentSave()) setPendingPitch(intent); }
+        catch { if (isCurrentSave()) { setPendingPitch(null); setPendingReady(false); setPendingError('Your saved pitch could not be read. Review your pitches to recover.'); } }
+      }
+      if (!isCurrentSave()) return;
+      const detail = err?.payload || err?.response?.data || err?.data || err;
+      if (!existingPostId && err instanceof Error && !(err as any).payload) {
+        setPitchError(err.message);
+      } else if (detail && typeof detail === 'object') {
         const fieldMessages = Object.entries(detail)
           .map(([field, value]) => `${field}: ${Array.isArray(value) ? value.join(', ') : String(value)}`)
           .join(' ');
@@ -591,9 +795,211 @@ export default function TalentBoard({
         setPitchError(err?.message || 'Failed to save pitch.');
       }
     } finally {
-      setPitchSaving(false);
+      if (saveGeneration.current === currentSaveGen) {
+        saveInFlightRef.current = false;
+        if (isMountedRef.current && activeUserRef.current.id === currentUserId) {
+          setPitchSaving(false);
+        }
+      }
     }
   };
+
+  const finishPendingPitch = async () => {
+    if (!pendingStore || !pendingPitch || saveInFlightRef.current) return;
+    const accountId = user?.id;
+    const accountRole = normalizedRole;
+    const generation = ++saveGeneration.current;
+    const isCurrent = () => isMountedRef.current && saveGeneration.current === generation && activeUserRef.current.id === accountId && activeUserRef.current.role === accountRole;
+    saveInFlightRef.current = true;
+    setPitchSaving(true);
+    setPendingError(null);
+    try {
+      if (!pendingPitch.terminalCode && !pendingPitch.rejected) await submitPendingPitch(pendingStore, pendingPitch, isCurrent, pitchAbortRef.current.signal);
+      if (!isCurrent()) return;
+      await pendingStore.resolve(pendingPitch.key);
+      if (!isCurrent()) return;
+      setPendingPitch(null);
+      try { await reload(); } catch {}
+    } catch (err: any) {
+      if (!isCurrent()) return;
+      try {
+        const intent = await pendingStore.read();
+        if (isCurrent()) { setPendingPitch(intent); setPendingError(err?.message || 'Unable to finish your pitch. Please try again.'); }
+      } catch {
+        if (isCurrent()) { setPendingPitch(null); setPendingReady(false); setPendingError('Your saved pitch could not be read. Review your pitches to recover.'); }
+      }
+    } finally {
+      if (saveGeneration.current === generation) {
+        saveInFlightRef.current = false;
+        if (isCurrent()) setPitchSaving(false);
+      }
+    }
+  };
+
+  const reviewCorruptPitch = async () => {
+    if (!pendingStore || saveInFlightRef.current) return;
+    const account = pitchAccount;
+    const generation = ++saveGeneration.current;
+    const isCurrent = () => isMountedRef.current && saveGeneration.current === generation && pitchAccountRef.current === account;
+    saveInFlightRef.current = true;
+    setPitchSaving(true);
+    try {
+      const mine = await getExplorerPostForEditing();
+      if (!isCurrent()) return;
+      Alert.alert('Review my pitches', mine
+        ? 'A saved pitch was found. Confirm you have reviewed your pitches and want to recover.'
+        : 'No saved pitch was found. Confirm you have reviewed your pitches and want to start a new posting intention.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Confirm', onPress: () => { void (async () => {
+          if (!isCurrent()) return;
+          try {
+            await pendingStore.recoverCorruptAfterReview();
+            if (!isCurrent()) return;
+            try {
+              const intent = await pendingStore.read();
+              if (isCurrent()) { setPendingPitch(intent); setPendingReady(true); setPendingError(null); }
+            } catch { if (isCurrent()) { setPendingPitch(null); setPendingReady(false); setPendingError('Your saved pitch could not be read. Review your pitches to recover.'); } }
+          } catch (err: any) { if (isCurrent()) setPendingError(err?.message || 'Unable to recover your saved pitch.'); }
+        })(); } },
+      ]);
+    } catch (err: any) {
+      if (isCurrent()) setPendingError(err?.message || 'Unable to review your pitches.');
+    } finally {
+      if (saveGeneration.current === generation) {
+        saveInFlightRef.current = false;
+        if (isCurrent()) setPitchSaving(false);
+      }
+    }
+  };
+
+  const handleRequestDelete = useCallback(() => {
+    if (saveInFlightRef.current || pitchSaving || !existingPostId || pitchDeleting || deleteInFlightRef.current || deleteConfirmState.open) return;
+    const token = ++deleteTokenCounter.current;
+    activeDeleteTokenRef.current = token;
+    const liveUser = activeUserRef.current;
+    const currentAccountKey = `${liveUser.id ?? 'anon'}:${liveUser.role ?? ''}`;
+    const headline = pitchForm.headline?.trim() || `${roleTitle || 'Talent'} availability`;
+    const reference = existingReferenceCode || (existingPostId ? `REF-${existingPostId}` : '');
+    setPitchError(null);
+    setDeleteConfirmState({
+      open: true,
+      postId: existingPostId,
+      referenceCode: reference,
+      headline,
+      token,
+      accountKey: currentAccountKey,
+    });
+  }, [deleteConfirmState.open, existingPostId, existingReferenceCode, pitchDeleting, pitchForm.headline, pitchSaving, roleTitle]);
+
+  const handleCancelDelete = useCallback(() => {
+    if (pitchDeleting || deleteInFlightRef.current) return;
+    activeDeleteTokenRef.current = null;
+    setDeleteConfirmState((prev) => ({ ...prev, open: false }));
+  }, [pitchDeleting]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    const { postId, token, accountKey } = deleteConfirmState;
+    const liveUser = activeUserRef.current;
+    const liveAccountKey = `${liveUser?.id ?? 'anon'}:${liveUser?.role ?? ''}`;
+
+    // BEFORE dispatch:
+    // 1. Synchronous mutex guard
+    if (deleteInFlightRef.current || saveInFlightRef.current) return;
+    // 2. Active token guard: token must match activeDeleteTokenRef.current and not be consumed
+    if (!token || token !== activeDeleteTokenRef.current || consumedTokensRef.current.has(token)) return;
+    // 3. Post identity guard: postId must match activeEditorPostIdRef.current (live ref, not stale closure)
+    if (!postId || postId !== activeEditorPostIdRef.current) return;
+    // 4. Live identity guard: accountKey must match liveAccountKey and user must exist
+    if (!liveUser?.id || accountKey !== liveAccountKey) return;
+    // 5. Unmount guard
+    if (!isMountedRef.current) return;
+
+    // Synchronously consume token, invalidate active token ref, acquire mutex
+    activeDeleteTokenRef.current = null;
+    consumedTokensRef.current.add(token);
+    deleteInFlightRef.current = true;
+    const currentOpId = ++deleteOperationIdRef.current;
+    setPitchDeleting(true);
+
+    try {
+      await deleteExplorerPost(postId);
+      // AFTER dispatch:
+      if (!isMountedRef.current || currentOpId !== deleteOperationIdRef.current) return;
+      const postUser = activeUserRef.current;
+      if (!postUser?.id || accountKey !== `${postUser.id}:${postUser.role}`) return;
+
+      // Isolate feed reload error so background feed failure does not turn committed delete into an error
+      try {
+        await reload();
+      } catch {}
+
+      // AFTER await reload: recheck account and generation before closing/messaging
+      if (!isMountedRef.current || currentOpId !== deleteOperationIdRef.current) return;
+      const postReloadUser = activeUserRef.current;
+      if (!postReloadUser?.id || accountKey !== `${postReloadUser.id}:${postReloadUser.role}`) return;
+
+      activeEditorPostIdRef.current = null;
+      setDeleteConfirmState({
+        open: false,
+        postId: null,
+        referenceCode: null,
+        headline: null,
+        token: 0,
+        accountKey: '',
+      });
+      resetPitchForm();
+      setPitchOpen(false);
+    } catch (err: any) {
+      if (!isMountedRef.current || currentOpId !== deleteOperationIdRef.current) return;
+      const errUser = activeUserRef.current;
+      if (!errUser?.id || accountKey !== `${errUser.id}:${errUser.role}`) return;
+
+      try {
+        await reload();
+      } catch {}
+
+      // Recheck account & generation after error reload
+      if (!isMountedRef.current || currentOpId !== deleteOperationIdRef.current) return;
+      const postReloadErrUser = activeUserRef.current;
+      if (!postReloadErrUser?.id || accountKey !== `${postReloadErrUser.id}:${postReloadErrUser.role}`) return;
+
+      // Reconcile EDITOR via authoritative getExplorerPostForEditing
+      let mine: any = undefined;
+      try {
+        mine = await getExplorerPostForEditing();
+      } catch {
+        mine = undefined;
+      }
+
+      if (!isMountedRef.current || currentOpId !== deleteOperationIdRef.current) return;
+      const postReconcileUser = activeUserRef.current;
+      if (!postReconcileUser?.id || accountKey !== `${postReconcileUser.id}:${postReconcileUser.role}`) return;
+
+      setDeleteConfirmState((prev) => ({ ...prev, open: false }));
+
+      if (mine === null || (mine !== undefined && mine.id !== postId)) {
+        // The server actually committed the delete or post no longer belongs to worker.
+        // Clean up editor state and close so stale delete button or form is not retained.
+        activeEditorPostIdRef.current = null;
+        resetPitchForm();
+        setPitchOpen(false);
+      } else {
+        // Post still exists on server, or getter threw an error.
+        // Keep clear error and avoid blind resubmit.
+        const detail = err?.response?.data || err?.data || err;
+        const msg = typeof detail === 'object' && detail?.detail ? detail.detail : err?.message || 'Failed to delete pitch.';
+        setPitchError(msg);
+      }
+    } finally {
+      // finally can't release newer operation!
+      if (currentOpId === deleteOperationIdRef.current) {
+        deleteInFlightRef.current = false;
+        if (isMountedRef.current) {
+          setPitchDeleting(false);
+        }
+      }
+    }
+  }, [deleteConfirmState, reload, resetPitchForm]);
 
   const showPitchButton = !publicMode && !hidePitchButton && canPitch;
   const requestedPitchOpened = useRef(false);
@@ -601,13 +1007,27 @@ export default function TalentBoard({
     if (!openPitchOnMount) requestedPitchOpened.current = false;
   }, [openPitchOnMount]);
 
+  const tryOpenRequestedPitch = useCallback(() => {
+    // A deep-link is a one-time create intent, not a request to re-open the dialog on every tab focus.
+    if (!openPitchOnMount || publicMode || !canPitch || requestedPitchOpened.current) return;
+    requestedPitchOpened.current = true;
+    setPitchOpen(true);
+  }, [canPitch, openPitchOnMount, publicMode]);
+
+  useEffect(() => {
+    tryOpenRequestedPitch();
+  }, [tryOpenRequestedPitch]);
+
   useFocusEffect(
     useCallback(() => {
-      // A deep-link is a one-time create intent, not a request to re-open the dialog on every tab focus.
-      if (!openPitchOnMount || publicMode || !canPitch || requestedPitchOpened.current) return;
-      requestedPitchOpened.current = true;
-      setPitchOpen(true);
-    }, [canPitch, openPitchOnMount, publicMode])
+      void retryEligibility();
+    }, [retryEligibility])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      tryOpenRequestedPitch();
+    }, [tryOpenRequestedPitch])
   );
 
   return (
@@ -629,10 +1049,31 @@ export default function TalentBoard({
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await reload(); setRefreshing(false); }} tintColor="#6366F1" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); try { await Promise.all([reload(), retryEligibility()]); } finally { setRefreshing(false); } }} tintColor="#6366F1" />}
       >
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        {isTalentStaff && staffPublicAccess === false ? (
+        {pendingPitch || pendingError ? (
+          <View style={styles.emptyBox}>
+            <Text variant="titleMedium" style={{ fontWeight: '700' }}>Saved pitch needs attention</Text>
+            <Text style={styles.subtitle} accessibilityLiveRegion="polite">
+              {pendingError || (pendingPitch?.terminalCode === 'PITCH_DELETED' ? 'This pitch was deleted.' : pendingPitch?.terminalCode === 'IDEMPOTENCY_REPLAY_EXPIRED' ? 'This pitch retry has expired. Review your saved pitches before starting again.' : pendingPitch?.terminalCode ? 'This save key was used for a different pitch. Review your saved pitches before starting again.' : pendingPitch?.rejected ? 'The pitch was rejected. Review your saved pitches before starting again.' : 'A pitch save is waiting to finish. Retry to send the saved pitch.')}
+            </Text>
+            {!pendingPitch && pendingError ? <Button mode="outlined" disabled={pitchSaving} onPress={() => void reviewCorruptPitch()}>Review my pitches</Button> : null}
+            {pendingPitch ? <Button mode="outlined" disabled={pitchSaving} onPress={() => void finishPendingPitch()}>{pendingPitch.terminalCode || pendingPitch.rejected ? 'I have reviewed my pitches' : 'Finish saving pitch'}</Button> : null}
+          </View>
+        ) : null}
+        {isTalentStaff && eligibilityStatus === 'error' ? (
+          <View style={styles.emptyBox}>
+            <Text variant="titleMedium" style={{ fontWeight: '700' }}>Unable to verify publishing eligibility</Text>
+            <Text style={styles.subtitle}>
+              {eligibilityError || 'Could not verify your public availability eligibility due to a network issue.'}
+            </Text>
+            <Button mode="outlined" onPress={retryEligibility}>
+              Retry eligibility check
+            </Button>
+          </View>
+        ) : null}
+        {isTalentStaff && eligibilityStatus === 'ineligible' && staffPublicAccess === false ? (
           <View style={styles.emptyBox}>
             <Text variant="titleMedium" style={{ fontWeight: '700' }}>Public Talent profile verification required</Text>
             <Text style={styles.subtitle}>
@@ -690,23 +1131,37 @@ export default function TalentBoard({
           <Button mode="outlined" disabled={page >= pageCount} onPress={() => setPage((p) => Math.min(pageCount, p + 1))}>Next</Button>
         </View>
       </ScrollView>
-      {showPitchButton ? <TouchableOpacity style={styles.fab} onPress={() => setPitchOpen(true)}><IconButton icon="plus" iconColor="#FFFFFF" style={{ margin: 0 }} /></TouchableOpacity> : null}
+      {showPitchButton ? <TouchableOpacity style={styles.fab} onPress={() => { if (!pitchDeleting && !deleteConfirmState.open) setPitchOpen(true); }}><IconButton icon="plus" iconColor="#FFFFFF" style={{ margin: 0 }} /></TouchableOpacity> : null}
       <PitchDialog
         open={pitchOpen}
-        onClose={() => setPitchOpen(false)}
-        onSave={handlePitchSave}
-        onDelete={async () => {
-          if (!existingPostId) return;
-          await deleteExplorerPost(existingPostId);
-          await reload();
-          setPitchOpen(false);
+        onClose={() => {
+          if (saveInFlightRef.current || deleteInFlightRef.current || pitchSaving || pitchDeleting || deleteConfirmState.open) return;
+          pitchGuard.confirmDiscard(() => {
+            pitchDefaultsReady.current = null;
+            pitchLoadGeneration.current += 1;
+            setPitchOpen(false);
+          });
         }}
+        onSave={handlePitchSave}
         isExplorer={isExplorer}
         existingPostId={existingPostId}
+        existingReferenceCode={existingReferenceCode}
         pitchForm={pitchForm}
-        setPitchForm={setPitchForm}
+        setPitchForm={(action) => { if (!saveInFlightRef.current) setPitchForm(action); }}
+        isSaveInFlight={() => saveInFlightRef.current}
+        onSlotDraftDirtyChange={setSlotDraftDirty}
         pitchError={pitchError}
         pitchSaving={pitchSaving}
+        defaultsStatus={pitchDefaultsStatus}
+        onRetryDefaults={loadPitchDefaults}
+        deleteConfirmOpen={deleteConfirmState.open}
+        deleteBusy={pitchDeleting}
+        capturedPostId={deleteConfirmState.postId}
+        capturedReferenceCode={deleteConfirmState.referenceCode}
+        capturedHeadline={deleteConfirmState.headline}
+        onRequestDelete={handleRequestDelete}
+        onConfirmDelete={handleConfirmDelete}
+        onCancelDelete={handleCancelDelete}
       />
     </SafeAreaView>
   );
@@ -725,3 +1180,10 @@ const styles = StyleSheet.create({
   paginationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   fab: { position: 'absolute', right: 20, bottom: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: '#6366F1', justifyContent: 'center', alignItems: 'center', elevation: 6 },
 });
+
+export default function TalentBoard(props: TalentBoardProps) {
+  const { user } = useAuth();
+  const normalizedRole = String(user?.role || '').trim().toUpperCase().replace(/\s+/g, '_');
+  const accountKey = `${user?.id ?? 'anon'}:${normalizedRole}`;
+  return <TalentBoardInner key={accountKey} {...props} />;
+}

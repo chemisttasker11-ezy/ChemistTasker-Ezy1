@@ -7,7 +7,7 @@ const source=readFileSync(new URL('./nextShiftModel.ts',import.meta.url),'utf8')
 const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const scope={exports:{},Date,Intl,Set,Number,String,URLSearchParams,Object,encodeURIComponent};
 runInNewContext(js,scope);
-const {sanitizeConfirmedShifts,upcomingShifts,calendarEditorUrl,directionsUrl}=scope.exports;
+const {sanitizeConfirmedShifts,upcomingShifts,calendarEditorUrl,directionsUrl,offlineShiftKey}=scope.exports;
 const sample={id:5,roleNeeded:'PHARMACIST',pharmacyDetail:{name:'Test pharmacy',streetAddress:'10 Example St',suburb:'Brisbane',state:'QLD'},assignedOccurrences:[{slotId:9,date:'2027-01-08',startTime:'09:00:00',endTime:'17:00:00',timezone:'Australia/Brisbane'},{slotId:10,date:'2027-01-10',startTime:'09:00',endTime:'17:00',timezone:'Australia/Brisbane'}],hourlyRate:'999.99',lineItems:[{bankAccount:'PRIVATE'}]};
 test('worker offline projection is local-time aware and excludes payment details',()=>{
  const rows=sanitizeConfirmedShifts([sample],123);
@@ -53,4 +53,16 @@ test('explicit pharmacy time zone overrides state for regional daylight saving',
  const rows=sanitizeConfirmedShifts([broken],7);
  assert.equal(rows.length,1);
  assert.equal(rows[0].start,'2027-01-07T22:30:00.000Z');
+});
+
+test('distinct occurrence keys avoid collision for repeated slot assignments',()=>{
+ const recurring={...sample,assignedOccurrences:[
+  {slotId:55,date:'2027-01-08',startTime:'09:00',endTime:'17:00',timezone:'Australia/Brisbane'},
+  {slotId:55,date:'2027-01-10',startTime:'10:00',endTime:'18:00',timezone:'Australia/Brisbane'},
+ ]};
+ const rows=sanitizeConfirmedShifts([recurring],7);
+ const keys=rows.map(offlineShiftKey);
+ assert.equal(new Set(keys).size,2);
+ assert.equal(keys[0],'5:55:2027-01-08T09:00:00');
+ assert.equal(keys[1],'5:55:2027-01-10T10:00:00');
 });

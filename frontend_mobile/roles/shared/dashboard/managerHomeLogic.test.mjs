@@ -21,6 +21,7 @@ function loadTs(path, imports) {
   vm.runInNewContext(outputText, {
     exports: result,
     require: (name) => {
+      if (name === '@/components/ui/BrandActivityIndicator') return { BrandActivityIndicator: 'ActivityIndicator' };
       assert.ok(name in imports, `Unexpected import: ${name}`);
       return imports[name];
     },
@@ -346,9 +347,10 @@ test('current initial defaults and 403 fallbacks still update the scope', async 
     const request = h.render().fetchDashboard();
     h.pending[0].reject(forbidden);
     await assert.rejects(request, (error) => error === forbidden);
-    assert.equal(h.workspace.workspace, pharmacies.length ? 'internal' : 'platform');
-    assert.equal(h.workspace.selectedPharmacyId, pharmacies.length ? 2 : null);
-    assert.equal(h.workspace.selectedPharmacyName, pharmacies.length ? 'B' : null);
+    assert.equal(h.workspace.workspace, 'internal');
+    assert.equal(h.workspace.selectedPharmacyId, 1);
+    assert.equal(h.workspace.selectedPharmacyName, 'A');
+    assert.deepEqual(h.writes, []);
   }
 });
 
@@ -377,8 +379,11 @@ test('all backend dashboard activity link families reach mobile routes with quer
       assert.equal(activityRoute({ action_url: `${base}/dashboard/pharmacy-hub${query}` }, persona), `/${persona}/hub${query}`);
     }
     if (persona === 'admin') continue;
-    for (const suffix of ['/shifts/12', '/invoice/12', '', '/']) {
+    for (const suffix of ['/shifts/12', '/invoice/12']) {
       assert.equal(activityRoute({ actionUrl: `/dashboard/${persona}${suffix}${query}` }, persona), `/${persona}${suffix}${query}`);
+    }
+    for (const suffix of ['', '/']) {
+      assert.equal(activityRoute({ actionUrl: `/dashboard/${persona}${suffix}${query}` }, persona), `/${persona}/dashboard${query}`);
     }
   }
   for (const suffix of ['/shifts/12', '/invoice/12', '']) {

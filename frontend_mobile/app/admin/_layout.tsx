@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { usePathname, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Text } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import {
   ArrowLeftRight,
   CalendarCheck,
@@ -23,6 +23,7 @@ import { AdminWorkspaceProvider, useAdminWorkspace } from '@/context/AdminWorksp
 import { colors } from '@/constants/tokens';
 import { useUnsavedChangesRegistry } from '@/roles/shared/forms/UnsavedChangesRegistryProvider';
 import { usePersonaSwitch } from '@/roles/shared/dashboard/dashboardScope';
+import { BrandLoader } from '@/components/ui';
 import { type MoreGroup, type MoreItem, PersonaShell, type ShellTab } from '@/components/shell';
 
 function profileRouteForRole(role?: string | null) {
@@ -162,7 +163,7 @@ function AdminLayoutInner() {
   );
 
   if (isLoading || adminWorkspaceLoading) {
-    return <View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /><Text>Restoring admin workspace…</Text></View>;
+    return <View style={styles.loading}><BrandLoader size={56} accessibilityLabel="Restoring admin workspace" /></View>;
   }
 
   return (

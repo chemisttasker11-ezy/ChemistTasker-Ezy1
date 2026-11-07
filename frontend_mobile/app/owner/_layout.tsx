@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
+import { View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
@@ -35,6 +36,7 @@ import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
 import { useAdminCan } from '@/context/AdminWorkspaceContext';
 import { useGuardedNavigation, useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
+import { BrandLoader } from '@/components/ui';
 import { type MoreGroup, type MoreItem, PersonaShell, type ShellTab } from '@/components/shell';
 
 const titles: Record<string, string> = {
@@ -281,6 +283,14 @@ export default function OwnerLayout() {
     ],
     [replaceWithGuard]
   );
+
+  if (isLoading || !user || user.role !== 'OWNER') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <BrandLoader size={44} accessibilityLabel="Loading workspace" />
+      </View>
+    );
+  }
 
   return (
     <PersonaShell

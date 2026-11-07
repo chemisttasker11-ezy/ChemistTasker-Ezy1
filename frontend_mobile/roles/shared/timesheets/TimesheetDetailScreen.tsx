@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Button, Card, Chip, Switch, Text, TextInput } from 'react-native-paper';
+import { Button, Card, Chip, Switch, Text, TextInput } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { type WorkforceTimesheetDetail, type WorkforceTimesheetCheck, type WorkforceTimesheetDay, workforce } from '@chemisttasker/shared-core';
 import { colors, font, radius, space, touch } from '@/constants/tokens';
 import { ContentState } from '@/components/ui/ContentState';

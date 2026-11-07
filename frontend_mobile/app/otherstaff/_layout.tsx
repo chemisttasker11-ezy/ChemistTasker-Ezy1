@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'expo-router';
 import { useGuardedNavigation, useUnsavedChangesRegistry } from '../../roles/shared/forms/UnsavedChangesRegistryProvider';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '../../context/AuthContext';
 import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
@@ -9,6 +9,7 @@ import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
 import { useAdminCan } from '@/context/AdminWorkspaceContext';
 import { colors } from '@/constants/tokens';
+import { BrandLoader } from '@/components/ui';
 import { PersonaShell, useWorkerShell } from '@/components/shell';
 
 const titles: Record<string, string> = {
@@ -150,7 +151,7 @@ export default function OtherStaffTabs() {
   if (isLoading || !user || user.role !== 'OTHER_STAFF') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <BrandLoader size={44} accessibilityLabel="Loading workspace" />
       </View>
     );
   }

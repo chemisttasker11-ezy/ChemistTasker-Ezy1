@@ -1,13 +1,53 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
+import { Button, Card, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
+import { RootPageHeader } from '@/components/RootPageHeader';
 import { fetchMyConfirmedShifts } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { colors, radius, space } from '@/constants/tokens';
-import { calendarEditorUrl, directionsUrl, sanitizeConfirmedShifts, upcomingShifts, type OfflineShift } from '@/features/nextShift/nextShiftModel';
+import { calendarEditorUrl, directionsUrl, offlineShiftKey, sanitizeConfirmedShifts, upcomingShifts, type OfflineShift } from '@/features/nextShift/nextShiftModel';
 import { readConfirmedShiftSnapshot, saveConfirmedShiftSnapshot } from '@/features/nextShift/offlineConfirmedShifts';
+
+export async function loadNextShiftsSequence({
+ userId,
+ isCurrent,
+ onCached,
+ onLive,
+ onError,
+ fetchLive = fetchMyConfirmedShifts,
+ readSnapshot = readConfirmedShiftSnapshot,
+ saveSnapshot = saveConfirmedShiftSnapshot,
+}: {
+ userId: number;
+ isCurrent: () => boolean;
+ onCached: (snapshot: { rows: OfflineShift[]; savedAt: string }) => void;
+ onLive: (rows: OfflineShift[]) => void;
+ onError: (msg: string) => void;
+ fetchLive?: () => Promise<any[]>;
+ readSnapshot?: (id: number) => Promise<{ rows: OfflineShift[]; savedAt: string } | null>;
+ saveSnapshot?: (id: number, shifts: any[]) => Promise<unknown>;
+}): Promise<void> {
+ try {
+  const saved = await readSnapshot(userId).catch(() => null);
+  if (!isCurrent()) return;
+  if (saved) onCached(saved);
+  const current = await fetchLive();
+  if (!isCurrent()) return;
+  if (current.some((shift) => !Array.isArray(shift.assignedOccurrences))) {
+   onError('Confirmed shift dates cannot be verified until the service is updated. Please use your main shift page.');
+   return;
+  }
+  const liveRows = sanitizeConfirmedShifts(current, userId);
+  onLive(liveRows);
+  void saveSnapshot(userId, current).catch(() => undefined);
+ } catch {
+  if (isCurrent()) {
+   onError('Live shifts could not be verified. Saved details may have changed or been cancelled.');
+  }
+ }
+}
 
 export default function NextShiftScreen() {
  const { user } = useAuth();
@@ -16,7 +56,6 @@ export default function NextShiftScreen() {
 }
 
 function ScopedNextShifts({userId}:{userId?:number}) {
- const router=useRouter();
  const generation=useRef(0);
  const [rows,setRows]=useState<OfflineShift[]>([]);
  const [cachedAt,setCachedAt]=useState('');
@@ -29,21 +68,13 @@ function ScopedNextShifts({userId}:{userId?:number}) {
   if(userId==null){setRows([]);setLoading(false);return;}
   setLoading(true);setMessage('');
   try{
-   const saved=await readConfirmedShiftSnapshot(userId);
-   if(gen!==generation.current)return;
-   if(saved){setRows(saved.rows);setCachedAt(saved.savedAt);setOffline(true);}
-   const current=await fetchMyConfirmedShifts();
-   if(gen!==generation.current)return;
-   if(current.some(shift=>!Array.isArray(shift.assignedOccurrences))) {
-    setMessage('Confirmed shift dates cannot be verified until the service is updated. Please use your main shift page.');
-    return;
-   }
-   const liveRows=sanitizeConfirmedShifts(current,userId);
-   setRows(liveRows);setCachedAt(new Date().toISOString());setOffline(false);
-   // Cache failure must not hide valid freshly fetched shifts.
-   void saveConfirmedShiftSnapshot(userId,current).catch(()=>undefined);
-  }catch{
-   if(gen===generation.current)setMessage('Live shifts could not be verified. Saved details may have changed or been cancelled.');
+   await loadNextShiftsSequence({
+    userId,
+    isCurrent:()=>gen===generation.current,
+    onCached:(saved)=>{setRows(saved.rows);setCachedAt(saved.savedAt);setOffline(true);},
+    onLive:(liveRows)=>{setRows(liveRows);setCachedAt(new Date().toISOString());setOffline(false);},
+    onError:(msg)=>setMessage(msg),
+   });
   }finally{
    if(gen===generation.current)setLoading(false);
   }
@@ -68,9 +99,9 @@ function ScopedNextShifts({userId}:{userId?:number}) {
   return formatDate(row.wallStart)+' · '+formatTime(row.wallStart)+'–'+
    (dayEnd!==dayStart ? formatDate(row.wallEnd)+' ' : '')+formatTime(row.wallEnd);
  };
- return <SafeAreaView edges={['top','left','right','bottom']} style={styles.page}>
+ return <SafeAreaView edges={['left','right','bottom']} style={styles.page}>
+  <RootPageHeader title="My next shifts" />
   <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={loading} onRefresh={()=>void load()}/>}>
-   <Button mode="text" icon="arrow-left" onPress={()=>router.back()}>Back</Button>
    <Text variant="headlineMedium" style={styles.title}>My next shifts</Text>
    <Text style={styles.muted}>Confirmed dates only. Refresh against ChemistTasker before travelling.</Text>
    {cachedAt?<Text accessibilityRole="alert" style={offline?styles.warning:styles.muted}>
@@ -82,7 +113,7 @@ function ScopedNextShifts({userId}:{userId?:number}) {
      <Text variant="titleMedium">No upcoming confirmed shifts</Text>
      <Text style={styles.muted}>Shifts will appear here once confirmed.</Text>
    </Card.Content></Card>:null}
-   {upcoming.map((row,index)=><Card key={row.shiftId+'-'+row.slotId} mode="outlined" style={styles.card}>
+   {upcoming.map((row,index)=><Card key={offlineShiftKey(row)} mode="outlined" style={styles.card}>
      <Card.Content style={styles.group}>
       {index===0?<Text style={styles.marker}>NEXT SHIFT</Text>:null}
       <Text variant="titleMedium" style={styles.title}>{row.pharmacy} · {row.role}</Text>

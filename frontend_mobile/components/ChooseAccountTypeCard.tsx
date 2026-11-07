@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -10,7 +11,7 @@ import { colors, font, radius, space, touch, type } from '@/constants/tokens';
 
 // A pharmacy-manager account may remain a permanent admin-only identity.
 const ACCOUNT_TYPES = [
-  { role: 'PHARMACIST', staffRole: 'PHARMACIST', label: 'Pharmacist', onboardingPath: '/pharmacist/onboarding' },
+  { role: 'PHARMACIST', staffRole: 'PHARMACIST', label: 'Pharmacist', onboardingPath: '/pharmacist/profile-basic-info' },
   { role: 'OTHER_STAFF', staffRole: 'INTERN', label: 'Intern pharmacist', onboardingPath: '/otherstaff/profile-basic-info' },
   { role: 'OTHER_STAFF', staffRole: 'TECHNICIAN', label: 'Dispensary technician', onboardingPath: '/otherstaff/profile-basic-info' },
   { role: 'OTHER_STAFF', staffRole: 'ASSISTANT', label: 'Pharmacy assistant', onboardingPath: '/otherstaff/profile-basic-info' },

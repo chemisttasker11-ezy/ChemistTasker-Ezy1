@@ -21,7 +21,7 @@ from .models import (ListingEscalationStep, MarketplaceAuditEvent, MarketplaceCa
                      MarketplaceCatalogueProduct, MarketplaceExchangeParticipant, MarketplaceImage, MarketplaceInternalTransfer, MarketplaceListing, MarketplaceMessage,
                      MarketplaceReport, MarketplaceRequestReceipt, MarketplaceSavedListing, MarketplaceTermsAcceptance)
 from .policy import CURRENT_TERMS_VERSION, evaluate_marketplace_access, owns_pharmacy
-from .serializers import ExchangeSerializer, ListingWriteSerializer, MessageSerializer, PublicCategorySerializer, PublicListingSerializer
+from .serializers import ExchangeSerializer, ListingWriteSerializer, MessageSerializer, PublicCategorySerializer, PublicListingSerializer, repair_blank_listing_slug
 from .services import accept_exchange, assert_listing_manager, buyer_can_contact, request_receipt
 
 
@@ -89,7 +89,7 @@ class Listings(APIView):
                 return Response(existing.outcome)
         serializer = ListingWriteSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        listing = serializer.save(creator=request.user, pharmacy=pharmacy)
+        listing = serializer.save(creator=request.user, pharmacy=pharmacy, slug=data["slug"])
         MarketplaceAuditEvent.objects.create(actor=request.user, acting_pharmacy=pharmacy, action="LISTING_CREATED", target_type="listing", target_id=str(listing.id))
         outcome = dict(ListingWriteSerializer(listing).data)
         if request_id:
@@ -180,6 +180,7 @@ class ListingAction(APIView):
         if expected != listing.version:
             return Response({"code": "STALE_VERSION"}, status=409)
         if action == "submit" and listing.publication_status in ("DRAFT", "REJECTED"):
+            repair_blank_listing_slug(listing)
             listing.full_clean()
             listing.publication_status = "PENDING_REVIEW" if listing.category.requires_review else "PUBLISHED"
             if listing.publication_status == "PUBLISHED":

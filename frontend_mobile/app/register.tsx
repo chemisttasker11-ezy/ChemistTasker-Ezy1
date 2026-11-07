@@ -1,12 +1,12 @@
 import React, { type ReactElement, useMemo, useRef, useState } from 'react';
+import { GuardedModal as Modal } from '@/components/security/GuardedModal';
 import {
-  ActivityIndicator,
   View,
   StyleSheet,
   Text,
   type TextInputInstance,
-  Modal,
 } from 'react-native';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import {
   Calendar,
   Check,
@@ -23,7 +23,7 @@ import {
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
-import { DatePickerModal } from 'react-native-paper-dates';
+import { GuardedDatePickerModal as DatePickerModal } from '@/components/security/GuardedModal';
 import { NEWCOMER_MINIMUM_AGE, NEWCOMER_TYPES, ageFromBirthDate } from '@chemisttasker/shared-core';
 import { useAuth } from '../context/AuthContext';
 import { openWebPage } from '@/features/explore/webLinks';

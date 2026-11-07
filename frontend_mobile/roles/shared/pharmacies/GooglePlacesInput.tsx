@@ -26,12 +26,14 @@ interface GooglePlacesInputProps {
         longitude?: number;
     }) => void;
     error?: string;
+    onChangeText?: (text: string) => void;
 }
 
 export default function GooglePlacesInput({
     label,
     value,
     onPlaceSelected,
+    onChangeText,
     error,
 }: GooglePlacesInputProps) {
     const [focused, setFocused] = useState(false);
@@ -39,10 +41,10 @@ export default function GooglePlacesInput({
     const isWeb = Platform.OS === 'web';
 
     React.useEffect(() => {
-        if (value && ref.current) {
+        if ((value || onChangeText) && ref.current && ref.current.getAddressText?.() !== value) {
             ref.current.setAddressText(value);
         }
-    }, [value]);
+    }, [value, onChangeText]);
 
     // Get API key from environment
     const apiKey = Platform.select({
@@ -60,7 +62,8 @@ export default function GooglePlacesInput({
                     value={value}
                     mode="outlined"
                     style={styles.input}
-                    editable={false}
+                    editable={Boolean(onChangeText)}
+                    onChangeText={onChangeText}
                 />
                 <HelperText type="error" visible>
                     Google Places API key not configured
@@ -150,6 +153,7 @@ export default function GooglePlacesInput({
                     description: styles.description,
                 }}
                 textInputProps={{
+                    onChangeText,
                     onFocus: () => setFocused(true),
                     onBlur: () => setFocused(false),
                     placeholderTextColor: surfaceTokens.textMuted,

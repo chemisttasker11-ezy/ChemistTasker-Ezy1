@@ -8,6 +8,8 @@ import { getOnboardingDetail, updateOnboardingForm, searchRoleSkillGroups, norma
 import { SkillEvidenceIcon } from '../../shared/skills/VerificationBadges';
 import { pickSingleDocument, roleKey, toRNFile } from './shared';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
+import { BrandLoader } from '@/components/ui';
+import { SegmentTabs, tabPanelProps } from '@/components/ui/SegmentTabs';
 
 type CertRow = { skill_code: string; path?: string; url?: string | null; uploaded_at?: string | null };
 type ApiData = { skills?: string[]; skill_certificates?: CertRow[]; role_type?: string | null };
@@ -119,7 +121,7 @@ export default function OtherStaffSkillsScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.loader}>
-          <Text>Loading skills...</Text>
+          <BrandLoader size={44} accessibilityLabel="Loading skills…" />
         </View>
       </SafeAreaView>
     );
@@ -133,13 +135,17 @@ export default function OtherStaffSkillsScreen() {
 
         <Searchbar placeholder="Search skills or software" value={query} onChangeText={setQuery} accessibilityLabel="Search skills or software" />
         <Text style={styles.help}>{selected.filter(code => (skillIndex.get(code) as any)?.group !== SOFTWARE_GROUP).length} skills selected. There is no minimum.</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-          {groups.map(group => <Chip key={group.key} selected={activeTab === group.key}
-            accessibilityRole="tab" accessibilityState={{ selected: activeTab === group.key }}
-            onPress={() => setTab(group.key)}>{group.label}</Chip>)}
-        </ScrollView>
+        {groups.length > 0 && activeTab ? <SegmentTabs
+          tabs={groups.map(group => ({ value: group.key, label: group.label }))}
+          value={activeTab}
+          onChange={setTab}
+          label="Skill categories"
+          idPrefix="otherstaff-skill-categories"
+          mobileWrap
+        /> : null}
         {currentRole && currentItems.length === 0 && software.length === 0 ? <Text accessibilityRole="alert">Nothing matches. Try a shorter word, such as Webster or Fred.</Text> : null}
 
+        <View {...(activeTab ? tabPanelProps("otherstaff-skill-categories", activeTab) : {})}>
         {currentItems.map((item: any) => {
           const checked = selected.includes(item.code);
           const required = requiresCert(item.code);
@@ -173,7 +179,7 @@ export default function OtherStaffSkillsScreen() {
             </View>
           );
         })}
-
+        </View>
 
         {!currentRole ? <HelperText type="info">Choose your role under Role & qualifications first.</HelperText> : null}
         <SoftwarePicker role={currentRole} items={software} selected={selected} disabled={saving} onToggle={toggle} />

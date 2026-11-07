@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react-native';
 import { attendance, getOrganizationMembership, workforce } from '@chemisttasker/shared-core';
 import {
   BrandBanner,
+  BrandLoader,
   CountBadge,
   IconTile,
   InitialsAvatar,
@@ -79,7 +80,24 @@ export function HomeScroll({
 
 /** The one next action at the top of Home, on the brand gradient. A skeleton of the same size while loading. */
 export function NextStepCard({ step, loading }: { step: NextStep | null; loading: boolean }) {
-  if (loading && !step) return <Skeleton width="100%" height={176} borderRadius={radius.banner} />;
+  if (loading && !step) {
+    return (
+      <View
+        style={{
+          width: '100%',
+          height: 176,
+          borderRadius: radius.banner,
+          backgroundColor: colors.surfaceBg,
+          borderWidth: 1,
+          borderColor: colors.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <BrandLoader size={44} accessibilityLabel="Loading next action…" />
+      </View>
+    );
+  }
   if (!step) return null;
   return (
     <BrandBanner
@@ -182,19 +200,23 @@ export function Rows({ children }: { children: ReactNode }) {
   );
 }
 
-/** Skeleton rows shaped like PersonRow while a block loads. */
+/** Shared BrandLoader replacing skeleton rows while a block loads. */
 export function BlockLoading({ rows = 2, dense = false }: { rows?: number; dense?: boolean }) {
   return (
-    <View accessible accessibilityRole="progressbar" accessibilityLabel="Loading" style={styles.rows}>
-      {Array.from({ length: rows }, (_, index) => (
-        <View key={index} style={[styles.row, dense ? styles.denseRow : null]}>
-          <Skeleton width={40} height={40} borderRadius={radius.pill} />
-          <View style={styles.copy}>
-            <Skeleton width={index ? '55%' : '40%'} height={15} />
-            <Skeleton width="70%" height={12} style={styles.skeletonLine} />
-          </View>
-        </View>
-      ))}
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading"
+      style={[
+        styles.rows,
+        {
+          minHeight: dense ? 48 : Math.max(rows * 44, 48),
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+      ]}
+    >
+      <BrandLoader size={dense ? 24 : 32} accessibilityLabel="Loading" />
     </View>
   );
 }

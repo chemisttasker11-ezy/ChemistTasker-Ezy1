@@ -1,13 +1,13 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import {
-  ActivityIndicator,
   Button,
   Card,
   Checkbox,
   Divider,
   Text,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import {
   Store,
   Share2,

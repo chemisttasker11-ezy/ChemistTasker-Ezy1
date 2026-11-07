@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, FAB, Menu, Modal, Portal, Snackbar, Text, TextInput, useTheme } from 'react-native-paper';
+import { Button, FAB, Menu, Modal, Portal, Snackbar, Text, TextInput, useTheme } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import ChatSidebar from './ChatSidebar';

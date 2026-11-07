@@ -1,4 +1,4 @@
-import { getPharmacyHoursForDate } from '@chemisttasker/shared-core';
+import { getPharmacyHoursForDate, isValidShiftPostingTimeRange } from '@chemisttasker/shared-core';
 export const ROLE_OPTIONS = ['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT'];
 export const EMPLOYMENT_TYPES = ['LOCUM', 'PART_TIME', 'FULL_TIME'];
 export const PRIMARY = '#4F46E5';
@@ -284,12 +284,39 @@ export const toPositiveInt = (value: unknown): number | null => {
 };
 
 /** Strict calendar dates: Date.UTC is used only to validate components, never to display a date. */
-const isValidIsoDay = (value: string): boolean => {
+export const isValidIsoDay = (value: string): boolean => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
     const [year, month, day] = value.split('-').map(Number);
     const parsed = new Date(Date.UTC(year, month - 1, day));
     return parsed.getUTCFullYear() === year && parsed.getUTCMonth() + 1 === month && parsed.getUTCDate() === day;
 };
+
+export const validClock = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
+
+export function validateSlotEntry(entry: Partial<SlotEntry>): string | null {
+    if (!entry.startTime || !entry.endTime || !validClock.test(entry.startTime) || !validClock.test(entry.endTime)) {
+        return 'Set a start and finish time.';
+    }
+    if (!isValidShiftPostingTimeRange(entry.startTime, entry.endTime)) {
+        return 'The start and finish times cannot be the same.';
+    }
+    if (!entry.date || !isValidIsoDay(entry.date)) {
+        return 'Pick a date first.';
+    }
+    if (entry.isRecurring && (!entry.recurringEndDate || !isValidIsoDay(entry.recurringEndDate) || !entry.recurringDays?.length)) {
+        return 'Pick the weekdays and the date it repeats until.';
+    }
+    return null;
+}
+
+export function validateSlotEntries(entries: SlotEntry[]): string | null {
+    if (!entries.length) return 'Select at least one date from the calendar.';
+    for (const entry of entries) {
+        const error = validateSlotEntry(entry);
+        if (error) return error;
+    }
+    return null;
+}
 
 export function parsePostShiftSearchParams(
     params?: PostShiftRawParams | null,

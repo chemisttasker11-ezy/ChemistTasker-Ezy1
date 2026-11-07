@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, Surface, Text } from 'react-native-paper';
+import { Button, Surface, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { startDirectMessageByMembership, type MembershipDTO } from '@chemisttasker/shared-core';
 import { fetchMembershipsForPharmacy } from '@/roles/shared/pharmacies/membershipApi';
 import { useWorkspace } from '@/context/WorkspaceContext';

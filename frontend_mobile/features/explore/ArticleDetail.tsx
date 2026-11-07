@@ -1,14 +1,30 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Linking, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Button, Card, Text, TextInput } from 'react-native-paper';
+import { Button, Card, Text, TextInput } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { PublicArticleComment, PublicArticleDetail as Article } from '@chemisttasker/shared-core';
 import { chemistTaskerApi } from '@/config/api';
 import { useAuth } from '@/context/AuthContext';
-import { colors, radius, space, touch } from '@/constants/tokens';
+import { colors, radius, space } from '@/constants/tokens';
 import { RichContent } from './RichContent';
 import { publicWebUrl, safePublicUrl } from './webLinks';
+import {
+  type ActionScope,
+  applyServerReplyPage,
+  beginOperation,
+  createTokenLock,
+  type DiscussionReplyMap,
+  handlePageFailure,
+  incrementReplyCount,
+  insertPostedReply,
+  isScopeCurrent,
+  markCommentDeleted,
+  mergeItems,
+  updateCommentReactions,
+  updateReplyThread,
+} from './discussionModel';
 
 const displayDate = (value: string) => {
   try { return new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Brisbane', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value)); }
@@ -16,31 +32,40 @@ const displayDate = (value: string) => {
 };
 
 export function ArticleDetail({ slug }: { slug: string }) {
-  const router = useRouter();
   const { user } = useAuth();
   const accountKey = String(user?.id ?? 'anonymous');
+  return <ArticleDetailView key={`${accountKey}:${slug}`} slug={slug} accountKey={accountKey} />;
+}
+
+function ArticleDetailView({ slug, accountKey }: { slug: string; accountKey: string }) {
+  const router = useRouter();
+  const { user } = useAuth();
   const generation = useRef(0);
-  const submitting = useRef(false);
-  const pagingRef = useRef(false);
+  const writeLock = useRef(createTokenLock());
+  const latestScopeRef = useRef<ActionScope>({ accountKey, routeKey: slug, generation: 0 });
+
   const [article, setArticle] = useState<Article | null>(null);
   const [comments, setComments] = useState<PublicArticleComment[]>([]);
+  const [replyThreads, setReplyThreads] = useState<DiscussionReplyMap<PublicArticleComment>>({});
   const [loading, setLoading] = useState(true);
   const [commentsLoading, setCommentsLoading] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [internalBusy, setBusy] = useState(false);
+  const [paging, setPaging] = useState(false);
+  const busy = internalBusy || paging || Object.values(replyThreads).some(t => Boolean(t?.loading || t?.paging));
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [message, setMessage] = useState('');
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [page, setPage] = useState<number | null>(null);
-  const [paging, setPaging] = useState(false);
   const [reportId, setReportId] = useState<number | null>(null);
   const [reason, setReason] = useState('');
 
   const load = useCallback(async () => {
     const ticket = ++generation.current;
-    setLoading(true); setError(''); setActionError('');
-    pagingRef.current = false;
-    setArticle(null); setComments([]); setPage(null); setPaging(false); setReplyTo(null); setReportId(null); setReason('');
+    latestScopeRef.current.generation = ticket;
+    setLoading(true); setError(''); setActionError(''); setBusy(false);
+    writeLock.current.forceRelease();
+    setArticle(null); setComments([]); setReplyThreads({}); setPage(null); setPaging(false); setReplyTo(null); setReportId(null); setReason('');
     try {
       const result = await chemistTaskerApi.publicContent.getArticle(slug);
       if (ticket !== generation.current) return;
@@ -56,100 +81,288 @@ export function ArticleDetail({ slug }: { slug: string }) {
     } finally {
       if (ticket === generation.current) { setLoading(false); setCommentsLoading(false); }
     }
-  }, [slug, accountKey]);
+  }, [slug]);
 
   useEffect(() => {
     let active = true;
+    const activity = writeLock.current;
     // Defer initial load until after effects subscribe; stale generations cannot overwrite state.
     void Promise.resolve().then(() => { if (active) void load(); });
-    return () => { active = false; generation.current += 1; pagingRef.current = false; };
+    return () => {
+      active = false;
+      generation.current += 1;
+      latestScopeRef.current.generation = generation.current;
+      activity.forceRelease();
+    };
   }, [load]);
 
   const requiresSignIn = () => {
     router.push({ pathname: '/login', params: { returnTo: '/explore/article/' + encodeURIComponent(slug) } } as any);
   };
+
   const sendComment = async () => {
-    if (!article?.comments_open || !user || !message.trim() || submitting.current) return;
-    const ticket = generation.current;
-    submitting.current = true; setBusy(true); setActionError('');
+    if (!article?.comments_open || !user || !message.trim()) return;
+    const op = beginOperation(writeLock.current, latestScopeRef.current);
+    if (!op) return;
+    const { ticket, snapshot } = op;
+    setBusy(true); setActionError('');
+    const targetParent = replyTo;
     try {
-      await chemistTaskerApi.publicContent.createArticleComment(slug, { body: message.trim(), ...(replyTo === null ? {} : { parent: replyTo }) });
-      if (ticket !== generation.current) return;
-      setMessage(''); setReplyTo(null);
-      const response = await chemistTaskerApi.publicContent.listArticleComments(slug);
-      if (ticket === generation.current) { setComments(response.results || []); setPage(response.next ? 2 : null); }
+      const created = await chemistTaskerApi.publicContent.createArticleComment(slug, {
+        body: message.trim(),
+        ...(targetParent === null ? {} : { parent: targetParent }),
+      });
+      if (!isScopeCurrent(latestScopeRef.current, snapshot)) return;
+      setMessage('');
+      setReplyTo(null);
+      if (targetParent !== null) {
+        setReplyThreads(threads => insertPostedReply(threads, targetParent, created));
+        setComments(old => incrementReplyCount(old, targetParent));
+      } else {
+        setComments(old => mergeItems([created], old));
+      }
     } catch (failure: any) {
-      if (ticket === generation.current) setActionError(failure?.message || 'Comment could not be published. Retry safely.');
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setActionError(failure?.message || 'Comment could not be published. Retry safely.');
+      }
     } finally {
-      submitting.current = false;
-      if (ticket === generation.current) setBusy(false);
+      writeLock.current.release(ticket);
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setBusy(false);
+      }
     }
   };
-  const deleteComment = async (comment: PublicArticleComment) => {
-    if (!user || !comment.can_delete || busy) return;
-    const ticket = generation.current;
+
+  const deleteComment = async (comment: PublicArticleComment, rootId?: number) => {
+    if (!user || !comment.can_delete || comment.deleted) return;
+    const op = beginOperation(writeLock.current, latestScopeRef.current);
+    if (!op) return;
+    const { ticket, snapshot } = op;
     setBusy(true); setActionError('');
     try {
       await chemistTaskerApi.publicContent.deleteArticleComment(comment.id);
-      const response = await chemistTaskerApi.publicContent.listArticleComments(slug);
-      if (ticket === generation.current) { setComments(response.results || []); setPage(response.next ? 2 : null); }
+      if (!isScopeCurrent(latestScopeRef.current, snapshot)) return;
+      if (rootId) {
+        setReplyThreads(threads => updateReplyThread(threads, rootId, cur => ({
+          ...cur,
+          items: markCommentDeleted(cur.items, comment.id),
+        })));
+      } else {
+        setComments(old => markCommentDeleted(old, comment.id));
+      }
     } catch (failure: any) {
-      if (ticket === generation.current) setActionError(failure?.message || 'Unable to delete this comment.');
-    } finally { if (ticket === generation.current) setBusy(false); }
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setActionError(failure?.message || 'Unable to delete this comment.');
+      }
+    } finally {
+      writeLock.current.release(ticket);
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setBusy(false);
+      }
+    }
   };
+
   const loadMoreComments = async () => {
-    if (page === null || pagingRef.current) return;
-    const ticket = generation.current;
-    pagingRef.current = true;
+    if (page === null) return;
+    const op = beginOperation(writeLock.current, latestScopeRef.current);
+    if (!op) return;
+    const { ticket, snapshot } = op;
     setPaging(true); setActionError('');
     try {
       const response = await chemistTaskerApi.publicContent.listArticleComments(slug, { page });
-      if (ticket !== generation.current) return;
-      setComments(old => {
-        const merged = new Map(old.map(comment => [comment.id, comment]));
-        for (const comment of response.results || []) merged.set(comment.id, comment);
-        return [...merged.values()];
-      });
+      if (!isScopeCurrent(latestScopeRef.current, snapshot)) return;
+      setComments(old => mergeItems(old, response.results || []));
       setPage(response.next ? page + 1 : null);
     } catch (failure: any) {
-      if (ticket === generation.current) setActionError(failure?.message || 'Older comments could not load.');
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setComments(old => handlePageFailure(old, failure).items);
+        setActionError(failure?.message || 'Older comments could not load.');
+      }
     } finally {
-      if (ticket === generation.current) {
-        pagingRef.current = false;
+      writeLock.current.release(ticket);
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
         setPaging(false);
       }
     }
   };
+
+  const toggleReplies = async (rootComment: PublicArticleComment) => {
+    const rootId = rootComment.id;
+    const current = replyThreads[rootId];
+    if (current?.serverLoaded && current.expanded) {
+      setReplyThreads(threads => updateReplyThread(threads, rootId, prev => ({ ...prev, expanded: false })));
+      return;
+    }
+    if (current?.serverLoaded && !current.expanded) {
+      setReplyThreads(threads => updateReplyThread(threads, rootId, prev => ({ ...prev, expanded: true, error: '' })));
+      return;
+    }
+    const op = beginOperation(writeLock.current, latestScopeRef.current);
+    if (!op) return;
+    const { ticket, snapshot } = op;
+    setReplyThreads(threads => updateReplyThread(threads, rootId, prev => ({ ...prev, loading: true, error: '', expanded: true })));
+    try {
+      const response = await chemistTaskerApi.publicContent.listArticleComments(slug, { parent: rootId, page: 1 });
+      if (!isScopeCurrent(latestScopeRef.current, snapshot)) return;
+      setReplyThreads(threads => updateReplyThread(threads, rootId, prev =>
+        applyServerReplyPage(prev, 1, response.results || [], response.next)
+      ));
+    } catch (failure: any) {
+      if (!isScopeCurrent(latestScopeRef.current, snapshot)) return;
+      setReplyThreads(threads => updateReplyThread(threads, rootId, prev => ({
+        ...prev,
+        loading: false,
+        error: failure?.message || 'Replies could not load. Retry.',
+      })));
+    } finally {
+      writeLock.current.release(ticket);
+    }
+  };
+
+  const loadMoreReplies = async (rootId: number) => {
+    const current = replyThreads[rootId];
+    if (!current || current.nextPage === null) return;
+    const nextPage = current.nextPage;
+    const op = beginOperation(writeLock.current, latestScopeRef.current);
+    if (!op) return;
+    const { ticket, snapshot } = op;
+    setReplyThreads(threads => updateReplyThread(threads, rootId, prev => ({ ...prev, paging: true, error: '' })));
+    try {
+      const response = await chemistTaskerApi.publicContent.listArticleComments(slug, { parent: rootId, page: nextPage });
+      if (!isScopeCurrent(latestScopeRef.current, snapshot)) return;
+      setReplyThreads(threads => updateReplyThread(threads, rootId, prev =>
+        applyServerReplyPage(prev, nextPage, response.results || [], response.next)
+      ));
+    } catch (failure: any) {
+      if (!isScopeCurrent(latestScopeRef.current, snapshot)) return;
+      setReplyThreads(threads => updateReplyThread(threads, rootId, prev => ({
+        ...prev,
+        paging: false,
+        items: handlePageFailure(prev.items, failure).items,
+        error: failure?.message || 'More replies could not load.',
+      })));
+    } finally {
+      writeLock.current.release(ticket);
+    }
+  };
+
+  const reactComment = async (comment: PublicArticleComment, kind: 'like' | 'insightful' | 'support', rootId?: number) => {
+    if (!user) return requiresSignIn();
+    if (comment.deleted) return;
+    const op = beginOperation(writeLock.current, latestScopeRef.current);
+    if (!op) return;
+    const { ticket, snapshot } = op;
+    setBusy(true); setActionError('');
+    try {
+      const summary = comment.reactions?.mine === kind
+        ? await chemistTaskerApi.publicContent.removeArticleCommentReaction(comment.id)
+        : await chemistTaskerApi.publicContent.reactToArticleComment(comment.id, { kind });
+      if (!isScopeCurrent(latestScopeRef.current, snapshot)) return;
+      if (rootId) {
+        setReplyThreads(threads => updateReplyThread(threads, rootId, cur => ({
+          ...cur,
+          items: updateCommentReactions(cur.items, comment.id, summary),
+        })));
+      } else {
+        setComments(old => updateCommentReactions(old, comment.id, summary));
+      }
+    } catch (failure: any) {
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setActionError(failure?.message || 'Could not update reaction.');
+      }
+    } finally {
+      writeLock.current.release(ticket);
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setBusy(false);
+      }
+    }
+  };
+
   const reportComment = async () => {
-    if (!user || reportId === null || !reason.trim() || busy) return;
-    const ticket = generation.current;
+    if (!user || reportId === null || !reason.trim()) return;
+    const op = beginOperation(writeLock.current, latestScopeRef.current);
+    if (!op) return;
+    const { ticket, snapshot } = op;
     setBusy(true); setActionError('');
     try {
       await chemistTaskerApi.publicContent.reportArticleComment(reportId, { reason: reason.trim() });
-      if (ticket === generation.current) { setReportId(null); setReason(''); }
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setReportId(null);
+        setReason('');
+      }
     } catch (failure: any) {
-      if (ticket === generation.current) setActionError(failure?.message || 'Could not report comment.');
-    } finally { if (ticket === generation.current) setBusy(false); }
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setActionError(failure?.message || 'Could not report comment.');
+      }
+    } finally {
+      writeLock.current.release(ticket);
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setBusy(false);
+      }
+    }
   };
+
   const react = async (kind: 'like' | 'insightful' | 'support') => {
     if (!user) return requiresSignIn();
-    if (!article || busy) return;
-    const ticket = generation.current;
+    if (!article) return;
+    const op = beginOperation(writeLock.current, latestScopeRef.current);
+    if (!op) return;
+    const { ticket, snapshot } = op;
     setBusy(true); setActionError('');
     try {
       const summary = article.reactions.mine === kind
         ? await chemistTaskerApi.publicContent.removeArticleReaction(slug)
         : await chemistTaskerApi.publicContent.reactToArticle(slug, { kind });
-      if (ticket === generation.current) setArticle(old => old ? { ...old, reactions: summary } : null);
+      if (!isScopeCurrent(latestScopeRef.current, snapshot)) return;
+      setArticle(old => old ? { ...old, reactions: summary } : null);
     } catch (failure: any) {
-      if (ticket === generation.current) setActionError(failure?.message || 'Could not update reaction.');
-    } finally { if (ticket === generation.current) setBusy(false); }
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setActionError(failure?.message || 'Could not update reaction.');
+      }
+    } finally {
+      writeLock.current.release(ticket);
+      if (isScopeCurrent(latestScopeRef.current, snapshot)) {
+        setBusy(false);
+      }
+    }
   };
 
   const share = async () => {
     if (!article) return;
     try { await Share.share({ message: publicWebUrl('/' + article.kind + '/' + encodeURIComponent(article.slug)) }); }
     catch { setActionError('Sharing is unavailable on this device.'); }
+  };
+
+  const reactionChoices = [
+    { kind: 'like' as const, label: 'Helpful' },
+    { kind: 'insightful' as const, label: 'Insightful' },
+    { kind: 'support' as const, label: 'Support' },
+  ];
+
+  const renderCommentReactions = (comment: PublicArticleComment, rootId?: number) => {
+    if (comment.deleted) return null;
+    return (
+      <View style={styles.commentReactions} accessibilityRole="toolbar" accessibilityLabel="Comment reactions">
+        {reactionChoices.map(({ kind, label }) => {
+          const count = comment.reactions?.counts?.[kind] || 0;
+          const selected = comment.reactions?.mine === kind;
+          return (
+            <Button
+              key={kind}
+              mode={selected ? 'contained-tonal' : 'outlined'}
+              compact
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel={`${label}: ${count} reactions${selected ? ', selected' : ''}`}
+              accessibilityState={{ selected }}
+              onPress={() => void reactComment(comment, kind, rootId)}
+            >
+              {label} · {count}
+            </Button>
+          );
+        })}
+      </View>
+    );
   };
 
   return <SafeAreaView style={styles.page} edges={['top','left','right','bottom']}>
@@ -171,15 +384,42 @@ export function ArticleDetail({ slug }: { slug: string }) {
           </View>
           <Card mode="outlined" style={styles.card}><Card.Content style={styles.comments}>
             <Text variant="titleLarge" style={styles.title}>Discussion</Text>
-            {commentsLoading ? <ActivityIndicator /> : comments.length === 0 ? <Text style={styles.subtitle}>No comments yet.</Text> : comments.map(row => <View key={row.id} style={styles.comment}>
-              <Text variant="titleSmall">{row.author_name}</Text>
-              <Text style={styles.subtitle}>{row.deleted ? 'Comment removed' : row.body}</Text>
-              <Text style={styles.meta}>{displayDate(row.created_at)}</Text>
-              {row.can_delete && user && !row.deleted ? <Button mode="text" disabled={busy} onPress={() => void deleteComment(row)}>Delete my comment</Button> : null}
-              {!row.deleted && article.comments_open ? <Button mode="text" onPress={() => user ? setReplyTo(row.parent || row.id) : requiresSignIn()}>Reply</Button> : null}
-              {!row.deleted && user ? <Button mode="text" disabled={busy} onPress={() => { setReportId(row.id); setReason(''); }}>Report comment</Button> : null}
-            </View>)}
-            {page !== null ? <Button mode="outlined" disabled={paging} loading={paging} onPress={() => void loadMoreComments()}>Load more comments</Button> : null}
+            {commentsLoading ? <ActivityIndicator /> : comments.length === 0 ? <Text style={styles.subtitle}>No comments yet.</Text> : comments.map(row => {
+              const thread = replyThreads[row.id];
+              return (
+                <View key={row.id} style={styles.comment}>
+                  <Text variant="titleSmall">{row.author_name}</Text>
+                  <Text style={styles.subtitle}>{row.deleted ? 'Comment removed' : row.body}</Text>
+                  <Text style={styles.meta}>{displayDate(row.created_at)}</Text>
+                  {renderCommentReactions(row)}
+                  <View style={styles.commentActions}>
+                    {row.can_delete && user && !row.deleted ? <Button mode="text" disabled={busy} onPress={() => void deleteComment(row)}>Delete my comment</Button> : null}
+                    {!row.deleted && article.comments_open ? <Button mode="text" onPress={() => user ? setReplyTo(row.parent || row.id) : requiresSignIn()}>Reply</Button> : null}
+                    {!row.deleted && user ? <Button mode="text" disabled={busy} onPress={() => { setReportId(row.id); setReason(''); }}>Report comment</Button> : null}
+                    {(row.reply_count > 0 || (thread?.items.length ?? 0) > 0) ? <Button mode="text" compact disabled={busy} icon={thread?.expanded && thread.serverLoaded ? 'chevron-up' : 'chevron-down'} onPress={() => void toggleReplies(row)}>{thread?.expanded ? (!thread.serverLoaded ? 'View all replies' : 'Hide replies') : `View ${row.reply_count} ${row.reply_count === 1 ? 'reply' : 'replies'}`}</Button> : null}
+                  </View>
+                  {thread?.expanded ? <View style={styles.repliesList}>
+                    {thread.loading ? <ActivityIndicator size="small" style={styles.replyStatus} /> : null}
+                    {thread.items.map(reply => (
+                      <View key={reply.id} style={styles.replyItem}>
+                        <Text variant="titleSmall">{reply.author_name}</Text>
+                        <Text style={styles.subtitle}>{reply.deleted ? 'Comment removed' : reply.body}</Text>
+                        <Text style={styles.meta}>{displayDate(reply.created_at)}</Text>
+                        {renderCommentReactions(reply, row.id)}
+                        <View style={styles.commentActions}>
+                          {reply.can_delete && user && !reply.deleted ? <Button mode="text" compact disabled={busy} onPress={() => void deleteComment(reply, row.id)}>Delete my comment</Button> : null}
+                          {!reply.deleted && article.comments_open ? <Button mode="text" compact onPress={() => user ? setReplyTo(row.id) : requiresSignIn()}>Reply</Button> : null}
+                          {!reply.deleted && user ? <Button mode="text" compact disabled={busy} onPress={() => { setReportId(reply.id); setReason(''); }}>Report comment</Button> : null}
+                        </View>
+                      </View>
+                    ))}
+                    {thread.nextPage !== null ? <Button mode="text" compact disabled={thread.paging || busy} loading={thread.paging} onPress={() => void loadMoreReplies(row.id)}>Load more replies</Button> : null}
+                    {thread.error ? <View style={styles.replyError}><Text style={styles.error} accessibilityRole="alert">{thread.error}</Text><Button mode="text" compact disabled={thread.paging || busy} onPress={() => void loadMoreReplies(row.id)}>Retry replies</Button></View> : null}
+                  </View> : null}
+                </View>
+              );
+            })}
+            {page !== null ? <Button mode="outlined" disabled={paging || busy} loading={paging} onPress={() => void loadMoreComments()}>Load more comments</Button> : null}
             {reportId !== null ? <View style={styles.warning}>
               <TextInput mode="outlined" label="Reason for reporting" multiline maxLength={500} value={reason} onChangeText={setReason} disabled={busy} />
               <Button mode="contained" onPress={() => void reportComment()} disabled={busy || !reason.trim()}>Send report</Button>
@@ -208,6 +448,12 @@ const styles = StyleSheet.create({
   comments: { gap: space.md },
   card: { borderColor: colors.border, backgroundColor: colors.surfaceBg, borderRadius: radius.card },
   comment: { gap: space.xs, paddingVertical: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  commentActions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, alignItems: 'center' },
+  commentReactions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, marginVertical: space.xs },
+  repliesList: { paddingLeft: space.md, borderLeftWidth: 2, borderLeftColor: colors.border, marginTop: space.sm, gap: space.sm },
+  replyItem: { gap: space.xs, paddingVertical: space.xs },
+  replyStatus: { marginVertical: space.xs },
+  replyError: { gap: space.xs, paddingVertical: space.xs },
   status: { paddingVertical: space['2xl'], alignItems: 'center', gap: space.md },
   warning: { gap: space.sm },
   error: { color: colors.status.red.fg },

@@ -5,6 +5,7 @@ import { Button, Chip, HelperText, Switch, Text, TextInput } from 'react-native-
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import { roleKey } from './shared';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
+import { BrandLoader } from '@/components/ui';
 
 type ApiData = {
   payment_preference?: 'ABN' | 'TFN' | string;
@@ -38,7 +39,7 @@ export default function PharmacistPaymentScreen() {
   const [abnInput, setAbnInput] = useState('');
   const [showSuperABN, setShowSuperABN] = useState(false);
   const unsaved = useUnsavedChangesGuard(
-    { data, tfnInput, abnInput, showSuperABN },
+    { data, tfnInput, abnInput },
     { enabled: !loading, onSave: () => (isTFN ? saveTFNAndSuper() : saveABN()), saving: saving || checkingABN }
   );
 
@@ -63,7 +64,6 @@ export default function PharmacistPaymentScreen() {
           },
           tfnInput: '',
           abnInput: res?.abn || '',
-          showSuperABN: nextShowSuperABN,
         });
       } catch (err: any) {
         if (!mounted) return;
@@ -103,7 +103,7 @@ export default function PharmacistPaymentScreen() {
       const res: ApiData = (await updateOnboardingForm(roleKey, fd as any)) as any;
       setData(res || {});
       setTfnInput('');
-      unsaved.markClean({ data: res || {}, tfnInput: '', abnInput, showSuperABN });
+      unsaved.markClean({ data: res || {}, tfnInput: '', abnInput });
       Alert.alert('Saved', 'TFN & Super saved.');
     } catch (err: any) {
       const resp = err?.response?.data;
@@ -131,7 +131,7 @@ export default function PharmacistPaymentScreen() {
       if (data.super_member_number != null) fd.append('super_member_number', String(data.super_member_number));
       const res: ApiData = (await updateOnboardingForm(roleKey, fd as any)) as any;
       setData(res || {});
-      unsaved.markClean({ data: res || {}, tfnInput, abnInput, showSuperABN });
+      unsaved.markClean({ data: res || {}, tfnInput, abnInput });
       Alert.alert('Saved', 'ABN payment details saved.');
     } catch (err: any) {
       const resp = err?.response?.data;
@@ -157,7 +157,7 @@ export default function PharmacistPaymentScreen() {
       fd.append('submitted_for_verification', 'true');
       const res: ApiData = (await updateOnboardingForm(roleKey, fd as any)) as any;
       setData(res || {});
-      unsaved.markClean({ data: res || {}, tfnInput, abnInput, showSuperABN });
+      unsaved.markClean({ data: res || {}, tfnInput, abnInput });
       Alert.alert('ABN', 'ABN check queued.');
     } catch (err: any) {
       const resp = err?.response?.data;
@@ -181,7 +181,7 @@ export default function PharmacistPaymentScreen() {
       fd.append('abn_entity_confirmed', 'true');
       const res: ApiData = (await updateOnboardingForm(roleKey, fd as any)) as any;
       setData(res || {});
-      unsaved.markClean({ data: res || {}, tfnInput, abnInput, showSuperABN });
+      unsaved.markClean({ data: res || {}, tfnInput, abnInput });
       Alert.alert('Saved', 'ABN confirmed.');
     } catch (err: any) {
       const resp = err?.response?.data;
@@ -199,7 +199,7 @@ export default function PharmacistPaymentScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.loader}>
-          <Text>Loading payment...</Text>
+          <BrandLoader size={44} accessibilityLabel="Loading payment…" />
         </View>
       </SafeAreaView>
     );
@@ -273,7 +273,7 @@ export default function PharmacistPaymentScreen() {
 
             <View style={styles.switchRow}>
               <Text>Add super details</Text>
-              <Switch value={showSuperABN} onValueChange={setShowSuperABN} />
+              <Switch accessibilityLabel="Add super details" value={showSuperABN} onValueChange={setShowSuperABN} />
             </View>
             {showSuperABN ? (
               <>

@@ -127,6 +127,24 @@ class ExplorerPost(models.Model):
         return latest_date >= (today or timezone.localdate())
 
 
+class PitchCreateRequest(models.Model):
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    operation = models.CharField(max_length=32, default='talent.pitch.create')
+    key = models.UUIDField()
+    fingerprint = models.CharField(max_length=64)
+    fingerprint_version = models.PositiveSmallIntegerField(default=1)
+    post = models.ForeignKey(ExplorerPost, null=True, on_delete=models.SET_NULL)
+    original_post_id = models.PositiveBigIntegerField(null=True)
+    response_status = models.PositiveSmallIntegerField(default=201)
+    response_body = models.JSONField(null=True)
+    response_headers = models.JSONField(default=dict)
+    created_at = models.DateTimeField(default=timezone.now)
+    replay_expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['author', 'operation', 'key'], name='talent_pitch_request_unique')]
+
+
 class ExplorerPostReaction(models.Model):
     """
     Simple 'like' for now (one per user per post).

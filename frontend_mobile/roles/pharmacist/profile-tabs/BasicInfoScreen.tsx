@@ -5,7 +5,7 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Chip, HelperText, Menu, Text, TextInput } from 'react-native-paper';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
-import { ContentState } from '@/components/ui';
+import { BrandLoader, ContentState } from '@/components/ui';
 import { colors, font, space, touch } from '@/constants/tokens';
 import ProfileBasicActions from '../../shared/profile/ProfileBasicActions';
 import { formatOnboardingErrors } from '../../shared/forms/formatOnboardingErrors';
@@ -167,7 +167,7 @@ export default function PharmacistBasicInfoScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.loader}>
-          <Text>Loading basic info...</Text>
+          <BrandLoader size={44} accessibilityLabel="Loading basic info…" />
         </View>
       </SafeAreaView>
     );
