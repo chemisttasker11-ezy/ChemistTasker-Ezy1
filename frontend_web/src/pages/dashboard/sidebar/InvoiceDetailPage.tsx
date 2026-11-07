@@ -160,8 +160,15 @@ export default function InvoiceDetailPage() {
         if (cancelled) return;
         navigate(`${listBase}?invoice=${id}`, { replace: true });
       })
-      .catch(() => {
-        if (!cancelled) loadLegacy();
+      .catch((managedError: any) => {
+        if (cancelled) return;
+        const status = managedError?.response?.status ?? managedError?.status;
+        if (status === 404) {
+          loadLegacy();
+        } else {
+          setInvoice(null);
+          setLoading(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -170,6 +177,7 @@ export default function InvoiceDetailPage() {
     function loadLegacy() {
     getInvoiceDetail(Number(id))
       .then((data: any) => {
+        if (cancelled) return;
         setInvoice(data);
         setExternal(data.external || false);
         setIssuerFirstName(data.issuer_first_name || '');
@@ -215,13 +223,13 @@ export default function InvoiceDetailPage() {
         );
       })
       .catch(() => {
-        setInvoice(null);
+        if (!cancelled) setInvoice(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
     }
     // location and user only steer the one-time hand-off.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, loadAttempt]);
+  }, [id, loadAttempt, user?.id, isRecipient, location.pathname]);
 
   // --- Totals ---
   const subtotal = lineItems

@@ -22,6 +22,7 @@ import {
   updateInvoice,
 } from '@chemisttasker/shared-core';
 import { shareLegacyInvoicePdf } from './shareLegacyInvoicePdf';
+import { useAuth } from '@/context/AuthContext';
 
 type LineItem = {
   id?: number | string;
@@ -90,6 +91,7 @@ type Props = { basePath?: string };
 export default function InvoiceDetail({ basePath }: Props) {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
+  const { user } = useAuth();
   const segments = useSegments();
   const role = (segments[0] as string) || 'pharmacist';
   const resolvedBase = basePath || `/${role}/invoice`;
@@ -102,6 +104,7 @@ export default function InvoiceDetail({ basePath }: Props) {
   const [sending, setSending] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [snackbar, setSnackbar] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -122,9 +125,16 @@ export default function InvoiceDetail({ basePath }: Props) {
         if (isReceivedMode) await finance.receivedInvoice(numericId);
         else await finance.invoice(numericId);
         if (live) router.replace(`${resolvedBase}?invoice=${numericId}` as any);
-      } catch {
-        // A managed lookup may return 404 for an old-format invoice. Do not
-        // remove the legacy path or interpret that miss as permission to edit.
+      } catch (managedError: any) {
+        if (!live) return;
+        // Only an explicit 404 permits the historical legacy route.
+        const status = managedError?.response?.status ?? managedError?.status;
+        if (status !== 404) {
+          const detail = managedError?.response?.data?.detail;
+          setSnackbar(typeof detail === 'string' && detail.trim() ? detail :
+            managedError?.message || 'The managed finance lookup failed. Try again.');
+          return;
+        }
         try {
           const data = (await getInvoiceDetail(numericId)) as Invoice;
           if (!live) return;
@@ -146,7 +156,7 @@ export default function InvoiceDetail({ basePath }: Props) {
     };
     void openInvoice();
     return () => { live = false; };
-  }, [id, isReceivedMode, resolvedBase, router]);
+  }, [id, isReceivedMode, resolvedBase, router, user?.id, loadAttempt]);
 
   const recalc = useCallback((li: LineItem) => {
     const total =
@@ -319,6 +329,8 @@ export default function InvoiceDetail({ basePath }: Props) {
         </View>
         <View style={styles.errorBox}>
           <Text variant="titleMedium">Unable to load invoice</Text>
+          <Text accessibilityRole="alert">{snackbar || 'The invoice may no longer be available to this account.'}</Text>
+          <Button mode="outlined" onPress={() => setLoadAttempt(previous => previous + 1)}>Try again</Button>
         </View>
       </SafeAreaView>
     );

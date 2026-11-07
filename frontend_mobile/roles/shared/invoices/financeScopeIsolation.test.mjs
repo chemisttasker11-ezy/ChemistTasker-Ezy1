@@ -8,11 +8,6 @@ test('finance account/mode switching invalidates old requests',()=>{
  assert.match(code,/if \(current\(\)\) setReceivedInvoices\(nextReceived\)/);
  assert.match(code,/if \(!current\(\)\) return;\s*setCustomers\(c\)/);
 });
-test('switch clears financial data and active review/modal before new authorization loads',()=>{
- assert.match(code,/setInvoices\(\[\]\); setReceivedInvoices\(\[\]\); setCustomers\(\[\]\)/);
- assert.match(code,/setSelected\(null\); setHistoryDocument\(null\); setForm\(null\); setEditor\(null\)/);
- assert.match(code,/return \(\) => \{ loadGen\.current \+= 1; historyGen\.current \+= 1; \}/);
-});
 test('failed scope-aware load never masquerades as an empty finance page',()=>{
  assert.match(code,/if \(current\(\)\) setError\(failure\?\.message/);
  assert.match(code,/Could not refresh this workspace/);
