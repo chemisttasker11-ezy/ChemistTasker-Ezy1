@@ -15,10 +15,9 @@ async function settled(h) {
   for (let i = 0; i < 5; i++) await h.flush();
 }
 
-test('C same-account double-tap cannot issue duplicate creates, images or review submission', async () => {
+test('R same-account double-tap cannot issue duplicate creates, images or review submission', async () => {
   const h = await ready();
-  h.click('Submit for review');
-  h.click('Submit for review'); // same render, before React can set disabled
+  h.clickSameRender('Submit for review', 2); // same mounted callback, no intermediate render
   await settled(h);
   assert.equal(h.callsOf('create').length, 1, 'synchronous attempt mutex');
   assert.equal(h.callsOf('upload').length, 1);
