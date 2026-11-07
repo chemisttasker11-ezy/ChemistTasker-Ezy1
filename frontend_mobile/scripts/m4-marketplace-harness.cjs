@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const ts = require('typescript');
+const ts = require('../node_modules/typescript');
 const root = path.resolve(__dirname, '../..');
 const jsx = (type, props, key) => ({ type, props: props || {}, key });
 function load(relative, modules, globals = {}) {
@@ -120,9 +120,9 @@ function createMarketplace() {
   const scheduler = createScheduler();
   const env = { user: { id: 1001, role: 'OWNER' }, params: {}, screen: 'review' };
   const storage = new Map(), calls = [], nav = [], fetchQueue = new Map(), responses = new Map();
-  const writeBarriers = [];
+  const writeBarriers = [], readBarriers = [], photoQueue = [];
   const store = {
-    async getItem(key) { return storage.get(key) ?? null; },
+    async getItem(key) { const gate = readBarriers.shift(); if (gate) await gate.promise; return storage.get(key) ?? null; },
     async setItem(key, value) { const gate = writeBarriers.shift(); if (gate) await gate.promise; storage.set(key, value); },
     async removeItem(key) { storage.delete(key); },
   };
@@ -146,6 +146,7 @@ function createMarketplace() {
     return value;
   }
   const api = {
+    lookupCatalogue: async query => { calls.push({ step: 'lookup', owner: env.user?.id, query }); return take('lookup', { results: [] }); },
     getListingOptions: async () => ({
       can_trade_personally: true, can_trade_for_pharmacy: true, blockers: [],
       eligible_pharmacies: [{ id: 11, label: 'Tom A' }],
@@ -204,7 +205,11 @@ function createMarketplace() {
       GuardedDatePickerInput: 'DatePicker', GuardedTimePickerModal: 'TimePicker',
     },
     'expo-router': { useLocalSearchParams: () => env.params, useRouter: () => router },
-    'expo-image-picker': {},
+    'expo-image-picker': { launchImageLibraryAsync: async () => {
+      calls.push({ step: 'photo-picker', owner: env.user?.id });
+      const pending = photoQueue.shift();
+      return pending?.promise ? pending.promise : pending || { canceled: true };
+    } },
     '@/config/api': { chemistTaskerApi: { marketplace: api } },
     '@/context/AuthContext': { useAuth: () => ({ user: env.user }) },
     '@chemisttasker/shared-core': policy,
@@ -240,8 +245,11 @@ function createMarketplace() {
   async function getDraft(scope) { return draftModule.loadMarketplaceDraft(String(scope)); }
   const callsOf = step => calls.filter(call => call.step === step);
   const pauseNextWrite = () => { const gate = deferred(); writeBarriers.push(gate); return gate; };
+  const pauseNextRead = () => { const gate = deferred(); readBarriers.push(gate); return gate; };
+  const queuePhoto = next => photoQueue.push(next);
   return { scheduler, env, storage, calls, nav, queue, queueLocal, pauseNextWrite, api,
-    render, currentNodes, button, click, setDraft, getDraft, callsOf, deferred,
+    render, currentNodes, button, click, setDraft, getDraft, callsOf, deferred, queuePhoto,
+    pauseNextRead, draftModule,
     unmount: scheduler.unmount, flush: scheduler.flush };
 }
 module.exports = { createMarketplace, deferred };
