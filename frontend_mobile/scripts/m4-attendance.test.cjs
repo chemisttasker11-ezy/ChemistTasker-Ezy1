@@ -514,7 +514,8 @@ test('C: unmount invalidates an unresolved attendance timeline before a new scop
   h.env.params = { sessionId: '79' };
   const nodes = await h.render();
   assert.equal(nodes.some(node => node.type === 'DataRow' &&
-    String(node.props.title).includes('9001')), false);
+    Number(node.props.key) === 9001), false,
+    'no stale original event row may appear in the new session');
   assert.deepEqual(h.io.timeline, [78, 79],
     'the new session starts its own timeline and cannot inherit the former request');
   h.engine.unmount();
