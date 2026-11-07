@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.utils.text import slugify
 
 from .models import ListingAudiencePolicy, ListingDeliveryTerms, MarketplaceCategory, MarketplaceExchange, MarketplaceListing, MarketplaceMessage
 from .policy import ROLE_LABELS, resolved_role
@@ -120,6 +121,8 @@ class ListingWriteSerializer(serializers.ModelSerializer):
         validated_data.pop("expected_version", None)
         for name, value in validated_data.items():
             setattr(instance, name, value)
+        if not instance.slug:
+            instance.slug = slugify(instance.title)[:160] or "listing"
         instance.version += 1
         instance.full_clean()
         instance.save()

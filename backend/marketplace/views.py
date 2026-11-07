@@ -89,7 +89,7 @@ class Listings(APIView):
                 return Response(existing.outcome)
         serializer = ListingWriteSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        listing = serializer.save(creator=request.user, pharmacy=pharmacy)
+        listing = serializer.save(creator=request.user, pharmacy=pharmacy, slug=data["slug"])
         MarketplaceAuditEvent.objects.create(actor=request.user, acting_pharmacy=pharmacy, action="LISTING_CREATED", target_type="listing", target_id=str(listing.id))
         outcome = dict(ListingWriteSerializer(listing).data)
         if request_id:

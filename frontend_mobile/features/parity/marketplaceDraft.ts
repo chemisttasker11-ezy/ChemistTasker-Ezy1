@@ -45,4 +45,10 @@ export function patchMarketplaceDraft(
  void operation.finally(()=>{if(writes.get(scope)===operation)writes.delete(scope);}).catch(()=>undefined);
  return operation;
 }
-export async function clearMarketplaceDraft(scope:string){await AsyncStorage.removeItem(key(scope));}
+export function clearMarketplaceDraft(scope:string):Promise<void>{
+ const previous=writes.get(scope)??Promise.resolve();
+ const operation=previous.catch(()=>undefined).then(()=>AsyncStorage.removeItem(key(scope)));
+ writes.set(scope,operation);
+ void operation.finally(()=>{if(writes.get(scope)===operation)writes.delete(scope);}).catch(()=>undefined);
+ return operation;
+}
