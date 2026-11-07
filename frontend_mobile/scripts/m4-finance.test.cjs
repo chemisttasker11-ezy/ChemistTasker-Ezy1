@@ -193,6 +193,51 @@ test('R: old managed result cannot navigate after account changes without changi
   app.unmount();
 });
 
+
+test('C: both unavailable after explicit managed 404 displays failure and never opens editor', async () => {
+  const app = invoiceScreen({ managed: async () => { throw refusal(404); },
+    legacy: async () => { throw new ApiError('Legacy invoice missing', 404, { detail: 'Missing' }); } });
+  const nodes = await app.render();
+  assert.equal(app.calls.filter(call => call[0] === 'legacy').length, 1);
+  assert.ok(nodes.some(n => n.type === 'Text' && /unable to load invoice/i.test(text(n))));
+  assert.ok(button(nodes, 'Try again'), 'missing managed and legacy rows must allow retry');
+  app.unmount();
+});
+
+test('C: received-mode identity is never exchanged for an issued invoice during account changes', async () => {
+  const pending = later();
+  const app = invoiceScreen({ managed: (_id, actor) =>
+    actor === 701 ? pending.promise : Promise.reject(refusal(403)) });
+  app.state.role = 'owner';
+  await app.render();
+  assert.ok(app.calls.some(([type]) => type === 'received'));
+  assert.equal(app.calls.some(([type]) => type === 'managed'), false);
+  app.state.userId = 702;
+  await app.render();
+  pending.resolve({ id: 48, number: 'OLD-RECEIVED' });
+  await app.flush();
+  assert.deepEqual(app.navigated, []);
+  assert.equal(app.calls.some(([type]) => type === 'legacy'), false);
+  app.unmount();
+});
+
+test('C: real 403 refusal preserves a visible retry and no legacy data is displayed', async () => {
+  let attempts = 0;
+  const app = invoiceScreen({ managed: async () => {
+    attempts += 1;
+    if (attempts === 1) throw refusal(403);
+    return { id: 48, number: 'RETRY-48' };
+  } });
+  const nodes = await app.render();
+  assert.ok(button(nodes, 'Try again'));
+  assert.equal(app.calls.some(c => c[0] === 'legacy'), false);
+  button(nodes, 'Try again').props.onPress();
+  await app.render();
+  assert.equal(attempts, 2);
+  assert.deepEqual(app.navigated, ['/pharmacist/invoice?invoice=48']);
+  app.unmount();
+});
+
 const invoice = (id, number) => ({
   id, invoice_id: id, number, version: 1, kind: 'invoice', status: 'sent',
   request_key: 'fixture-' + id, voided: false, balance: '80.00', paid: '30.00',
