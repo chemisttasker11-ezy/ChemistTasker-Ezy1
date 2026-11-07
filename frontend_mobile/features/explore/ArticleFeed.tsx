@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button, Card, Searchbar, Text } from 'react-native-paper';
+import { Button, Card, Chip, Searchbar, Text } from 'react-native-paper';
 import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { PublicArticle, PublicContentKind } from '@chemisttasker/shared-core';
@@ -28,13 +28,17 @@ export default function ArticleFeed({ section }: { section: 'learning' | 'blog' 
   const [rows, setRows] = useState<PublicArticle[]>([]);
   const [query, setQuery] = useState('');
   const [appliedQuery, setAppliedQuery] = useState('');
+  const [selectedTopic, setSelectedTopic] = useState('all');
   const [nextPage, setNextPage] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [moreLoading, setMoreLoading] = useState(false);
   const [error, setError] = useState('');
   const [moreError, setMoreError] = useState('');
   const kind: PublicContentKind | undefined = section === 'learning' ? undefined : section;
-  const topic = section === 'learning' ? 'learning' : undefined;
+  // Learning is deliberately a separate feed query; public topics only apply
+  // to blog/news and must never rewrite the existing learning content policy.
+  const topic = section === 'learning' ? 'learning'
+    : selectedTopic === 'all' ? undefined : selectedTopic;
   const title = section === 'learning' ? 'Learning' : section === 'blog' ? 'Blog' : 'News';
 
   useEffect(() => {
@@ -94,6 +98,14 @@ export default function ArticleFeed({ section }: { section: 'learning' | 'blog' 
       <Text variant="headlineMedium" style={styles.title}>{title}</Text>
       <Text style={styles.muted}>{section === 'learning' ? 'Clinical and professional development articles.' : section === 'blog' ? 'Stories and perspectives from pharmacy.' : 'News and updates from the pharmacy sector.'}</Text>
       <Searchbar placeholder="Search published articles" value={query} onChangeText={setQuery} accessibilityLabel={'Search ' + title} />
+      {section !== 'learning' ? <View style={styles.topics}>
+        {([
+          ['all','All topics'],['practice','Practice'],['career','Career'],
+          ['tga','TGA'],['industry','Industry'],['community','Community'],
+        ] as const).map(([code,label]) =>
+          <Chip key={code} selected={selectedTopic === code} accessibilityLabel={'Topic ' + label}
+            onPress={() => setSelectedTopic(code)}>{label}</Chip>)}
+      </View> : null}
       {loading ? <View style={styles.status}><ActivityIndicator /><Text>Loading published articles…</Text></View> :
        error ? <View style={styles.status}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Button mode="outlined" onPress={() => void load()}>Retry</Button></View> :
        rows.length ? rows.map(item => {
@@ -122,6 +134,7 @@ const styles = StyleSheet.create({
   card: { borderColor: colors.border, backgroundColor: colors.surfaceBg, borderRadius: radius.card, overflow: 'hidden' },
   cover: { height: 170, width: '100%' },
   cardBody: { paddingTop: space.md, gap: space.sm },
+  topics: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   category: { color: colors.primary, letterSpacing: 0.5, fontWeight: '700' },
   action: { color: colors.primary, minHeight: touch.min, textAlignVertical: 'center', fontWeight: '700' },
   status: { paddingVertical: space['2xl'], gap: space.md, alignItems: 'center' },
