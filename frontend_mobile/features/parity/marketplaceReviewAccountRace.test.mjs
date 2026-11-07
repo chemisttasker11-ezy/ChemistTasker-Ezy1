@@ -12,6 +12,14 @@ async function setup(patch = {}) {
   await h.render();
   return h;
 }
+async function waitForCall(h, step) {
+  for (let i = 0; i < 30; i++) {
+    if (h.callsOf(step).length) return;
+    await h.flush();
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.fail('Deferred boundary was not reached: ' + step);
+}
 async function switched(h) {
   h.env.user = { id: 2002, role: 'OWNER' };
   await h.render(); // actual keyed MarketplaceParityContent unmount, effects/cleanup
@@ -22,7 +30,7 @@ test('R account_switch_during_fetch_blocks_upload through actual keyed account w
   const read = deferred();
   h.queueLocal('file:///photo-1', read);
   h.click('Submit for review');
-  await h.flush();
+  await waitForCall(h, 'local-fetch');
   assert.equal(h.callsOf('create').length, 1);
   assert.equal(h.callsOf('local-fetch').length, 1);
   assert.equal(h.callsOf('upload').length, 0);
@@ -46,7 +54,7 @@ test('R account_switch_while_blob_pending_blocks_upload on a retired ReviewStep'
   const read = deferred();
   h.queueLocal('file:///photo-1', { blob: () => read.promise });
   h.click('Submit for review');
-  await h.flush();
+  await waitForCall(h, 'local-fetch');
   assert.equal(h.callsOf('local-fetch').length, 1);
   assert.equal(h.callsOf('upload').length, 0);
   await switched(h);
@@ -64,7 +72,7 @@ test('C late create response after account unmount cannot start audience/upload/
   const created = deferred();
   h.queue('create', created);
   h.click('Submit for review');
-  await h.flush();
+  await waitForCall(h, 'create');
   await switched(h);
   created.resolve({ id: 'a1111111-1111-4111-8111-111111111111', version: 1 });
   await h.flush(); await h.flush();
@@ -80,7 +88,7 @@ test('C late audience response cannot start previous-account image upload', asyn
   const audience = deferred();
   h.queue('audience', audience);
   h.click('Submit for review');
-  await h.flush(); await h.flush();
+  await waitForCall(h, 'audience');
   assert.equal(h.callsOf('audience').length, 1);
   await switched(h);
   audience.resolve({ current_circle: 'OWNED_CHAIN', maximum_circle: 'PLATFORM', version: 2 });
@@ -95,7 +103,7 @@ test('C late update response after account switch leaves personal draft intact',
     created_listing_version: 2 });
   const update = deferred();
   h.queue('update', update);
-  h.click('Submit for review'); await h.flush();
+  h.click('Submit for review'); await waitForCall(h, 'update');
   assert.equal(h.callsOf('update').length, 1);
   await switched(h);
   update.resolve({ version: 3 });
