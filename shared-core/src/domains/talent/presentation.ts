@@ -61,3 +61,67 @@ export function filterTalentCandidates<T extends TalentFilterCandidate>(registry
   });
   return { filtered, roleOptions, stateOptions, roleSkillOptions, softwareOptions };
 }
+
+
+/** Public-feed-only projection: omit all private contact and authenticated profile fields. */
+export interface PublicTalentCandidate extends TalentFilterCandidate {
+  id: number;
+  roleTitle: string;
+  referenceCode: string | null;
+  availabilitySummary: string;
+  ratingAverage: number | null;
+  ratingCount: number | null;
+}
+export function projectPublicTalentCandidate(
+  raw: Record<string, unknown>,
+  registry: SkillsRegistry,
+): PublicTalentCandidate {
+  const take = (...keys: string[]) => {
+    for (const key of keys) if (raw[key] != null) return raw[key];
+    return null;
+  };
+  const string = (...keys: string[]) => String(take(...keys) ?? '').trim();
+  const strings = (...keys: string[]) => {
+    const value = take(...keys);
+    return Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : [];
+  };
+  const roleTitle = string('role_title', 'roleTitle', 'explorer_role_type',
+    'explorerRoleType', 'role_category', 'roleCategory') || 'Pharmacy talent';
+  const referenceCode = string('reference_code', 'referenceCode') || null;
+  const rawDates = take('availability_days', 'availabilityDays');
+  const availableDates = (Array.isArray(rawDates) ? rawDates : [])
+    .map(item => typeof item === 'string' ? item : item && typeof item === 'object'
+      ? String((item as Record<string, unknown>).date ?? '') : '')
+    .filter(value => /^\d{4}-\d{2}-\d{2}$/.test(value));
+  const projected = projectTalentSkills(registry, [
+    ...strings('skills'), ...strings('software'),
+  ]);
+  const workTypes = strings('work_types', 'workTypes');
+  const rawAverage = take('rating_average','ratingAverage');
+  const rawCount = take('rating_count','ratingCount');
+  const valueOrNull = (value: unknown) =>
+    value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
+  const role = roleTitle.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  return {
+    id: Number(take('id')),
+    roleTitle,
+    role,
+    state: string('location_state','locationState'),
+    city: string('location_suburb','locationSuburb','location_state','locationState'),
+    pitch: string('body','short_bio','shortBio','headline'),
+    refId: referenceCode ? (referenceCode.startsWith('REF-') ? referenceCode : 'REF-' + referenceCode) : '',
+    referenceCode,
+    workTypes,
+    clinicalServices: projected.clinicalServices,
+    expandedScope: projected.expandedScope,
+    skills: projected.skills,
+    dispenseSoftware: projected.dispenseSoftware,
+    willingToTravel: Boolean(take('open_to_travel','openToTravel')),
+    isInternshipSeeker: /intern|student/i.test(roleTitle) ||
+      workTypes.some(value => /placement|volunteer/i.test(value)),
+    availableDates,
+    availabilitySummary: string('availability_summary','availabilitySummary'),
+    ratingAverage: valueOrNull(rawAverage),
+    ratingCount: valueOrNull(rawCount),
+  };
+}
