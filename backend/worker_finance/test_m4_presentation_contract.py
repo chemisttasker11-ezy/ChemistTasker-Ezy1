@@ -39,6 +39,17 @@ class FinancePresentationContractTests(TestCase):
             business_use_percent='80.00', tax_code='GST',
         )
 
+    def test_r_unmanaged_invoice_is_hidden_from_managed_detail(self):
+        legacy = Invoice.objects.create(user=self.worker, request_key=None, calculation={})
+        response = client_for(self.worker).get(ROOT + f'invoices/{legacy.pk}/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_c_unmanaged_invoice_remains_accessible_through_legacy_detail(self):
+        legacy = Invoice.objects.create(user=self.worker, request_key=None, calculation={})
+        response = client_for(self.worker).get(f'/api/v1/invoices/{legacy.pk}/')
+        self.assertEqual(response.status_code, 200, getattr(response, 'data', None))
+        self.assertEqual(response.data['id'], legacy.pk)
+
     def test_managed_invoice_detail_is_owner_or_recipient_scoped(self):
         own = client_for(self.worker).get(ROOT + f'invoices/{self.invoice.pk}/')
         self.assertEqual(own.status_code, 200, own.data)

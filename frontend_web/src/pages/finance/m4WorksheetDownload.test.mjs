@@ -46,7 +46,9 @@ function nodes(tree, result = []) {
   }
   return result;
 }
-test('R: actual web worksheet button emits byte-identical native/shared CSV and revokes its browser URL', async () => {
+async function worksheetUi(raceField) {
+  let resolvePending; let calls = 0;
+  const pending = new Promise(resolve => { resolvePending = resolve; });
   const created = [], revoked = [], clicks = [], removed = [], timers = [];
   const fakeURL = { createObjectURL(blob) { created.push(blob); return 'blob:worksheet'; },
     revokeObjectURL(url) { revoked.push(url); } };
@@ -88,7 +90,7 @@ test('R: actual web worksheet button emits byte-identical native/shared CSV and 
     react, '@mui/material': mui,
     'lucide-react': new Proxy({}, { get: (_target, name) => String(name) }),
     '@chemisttasker/shared-core': {
-      finance: { worksheet: async () => worksheet },
+      finance: { worksheet: async () => raceField && ++calls === 1 ? pending : worksheet },
       financeStatus: row => row.status,
       invoiceCsvRows: csv.invoiceCsvRows, expenseCsvRows: csv.expenseCsvRows, worksheetCsvRows: csv.worksheetCsvRows,
     },
@@ -127,6 +129,15 @@ test('R: actual web worksheet button emits byte-identical native/shared CSV and 
   const control = (label) => render().find(node => node.type === 'Button'
     && nodes(node.props.children).length === 0
     && String(node.props.children) === label);
+  if (raceField) {
+    control('Calculate').props.onClick();
+    const labels = { start: 'Period start', end: 'Period end', basis: 'GST basis' };
+    render().find(n => n.type === 'TextField' && n.props.label === labels[raceField])
+      .props.onChange({ target: { value: raceField === 'basis' ? 'accrual' : '2026-10-01' } });
+    resolvePending(worksheet);
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    assert.equal(!!control('Download worksheet (CSV)'), false, raceField);
+  }
   const calculate = control('Calculate');
   assert.ok(calculate, 'real Calculate button must be rendered');
   calculate.props.onClick();
@@ -144,4 +155,8 @@ test('R: actual web worksheet button emits byte-identical native/shared CSV and 
   assert.equal(timers[0][1], 1000);
   timers[0][0]();
   assert.deepEqual(revoked, ['blob:worksheet']);
-});
+}
+test('C: actual web worksheet download matches shared CSV and revokes its URL', async () => worksheetUi());
+for (const field of ['start', 'end', 'basis']) {
+  test(`R: web rejects worksheet after ${field} changes and recalculates`, async () => worksheetUi(field));
+}

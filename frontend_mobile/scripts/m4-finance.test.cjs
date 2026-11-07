@@ -259,8 +259,8 @@ const customer = () => ({
     abn_status: 'Cancelled', abn_gst_registered: false },
 });
 
-function financeWorkspace() {
-  const h = createHooks(), state = { userId: 701, invoice: undefined }, shares = [], files = [], calls = [];
+function financeWorkspace(config = {}) {
+  const h = createHooks(), state = { userId: 701, invoice: undefined, receivedMode: false }, shares = [], files = [], calls = [];
   let list = [invoice(1, 'INV-1'), invoice(51, 'INV-51')];
   const realCsv = fs.existsSync(path.join(repo, 'shared-core/src/domains/finance/csv.ts'))
     ? compile('shared-core/src/domains/finance/csv.ts', {}) : new Proxy({}, {
@@ -270,7 +270,7 @@ function financeWorkspace() {
     constructor(_cache, filename) { this.name = filename; this.uri = 'file:///cache/' + filename;
       this.deleted = false; files.push(this); }
     create() {}
-    async write(value) { this.bytes = typeof value === 'string'
+    async write(value) { if (config.write) await config.write(); this.bytes = typeof value === 'string'
       ? new TextEncoder().encode(value) : value; }
     delete() { this.deleted = true; }
   }
@@ -316,17 +316,17 @@ function financeWorkspace() {
       finance, financeStatus: row => row.status === 'sent' ? 'Sent' : row.status,
       financeToday: () => '2026-11-07', ...realCsv,
     },
-    './FinanceInvoiceEditor': { default: 'FinanceInvoiceEditor' },
+    './FinanceInvoiceEditor': { __esModule: true, default: 'FinanceInvoiceEditor' },
     './receivedInvoicePolicy': { receivedInvoiceActions: () => ({
       approve: false, revise: false, paid: false }) },
-    '@/features/parity/nativeFileBytes': { nativeFileBytes: async blob => new Uint8Array(await blob.arrayBuffer()) },
+    '@/features/parity/nativeFileBytes': { nativeFileBytes: config.bytes || (async blob => new Uint8Array(await blob.arrayBuffer())) },
     '@/constants/tokens': palette,
     '@/context/AuthContext': { useAuth: () => ({ user: { id: state.userId } }) },
     '@/components/ui/SegmentTabs': { SegmentTabs: 'SegmentTabs', tabPanelProps: () => ({}) },
     '@/components/ui/ResponsiveSegmentedButtons': {
       ResponsiveSegmentedButtons: 'ResponsiveSegmentedButtons' },
   });
-  const render = () => h.settled(module.default, {});
+  const render = () => h.settled(module.default, { receivedMode: state.receivedMode });
   return { h, state, files, shares, calls, finance, sharing, get list() { return list; },
     set list(value) { list = value; }, render };
 }
@@ -350,6 +350,73 @@ const click = async (app, label) => {
   assert.equal(action.props.disabled === true, false, label + ' must be enabled');
   await action.props.onPress(); await app.h.flush();
 };
+
+test('account and mode switches clear finance and review while ignoring old loads and history', async () => {
+  for (const change of ['account', 'mode']) {
+    const app = financeWorkspace(), oldLoad = later(), newLoad = later(), history = later();
+    const original = invoice(1, 'OLD-INVOICE');
+    original.revisions = [{ version: 2, invoice_status: 'sent', calculation: original.calculation }];
+    app.list = [original];
+    let nodes = await app.render();
+    assert.ok(nodes.some(n => text(n) === 'OLD-INVOICE'));
+    await click(app, 'View invoice');
+    nodes = await app.render();
+    assert.ok(nodes.some(n => n.type === 'Modal' && n.props.visible));
+    app.finance.invoiceRevision = () => history.promise;
+    button(nodes, 'View').props.onPress();
+    await app.h.flush();
+    app.finance.invoices = () => oldLoad.promise;
+    nodes = await app.render();
+    const refresh = nodes.find(n => n.type === 'ScrollView' && n.props.refreshControl);
+    assert.ok(refresh, 'refresh starts a second old-scope load');
+    refresh.props.refreshControl.props.onRefresh();
+    await app.h.flush();
+    app.finance.invoices = () => newLoad.promise;
+    app.finance.receivedInvoices = () => newLoad.promise;
+    if (change === 'account') app.state.userId = 702;
+    else app.state.receivedMode = true;
+    nodes = await app.render();
+    assert.ok(nodes.some(n => n.type === 'Spinner' && n.props.accessibilityLabel === 'Loading finance records'));
+    assert.ok(nodes.filter(n => n.type === 'Modal').every(n => !n.props.visible));
+    assert.ok(!nodes.some(n => text(n).includes('OLD-INVOICE')));
+    newLoad.resolve([invoice(4, 'NEW-INVOICE')]);
+    nodes = await app.render();
+    if (change === 'mode') nodes = await navigateTab(app, 'Received');
+    assert.ok(nodes.some(n => text(n) === 'NEW-INVOICE'));
+    oldLoad.resolve([invoice(3, 'STALE-LOAD')]);
+    history.resolve({ ...invoice(1, 'STALE-HISTORY'), version: 2 });
+    await app.h.flush();
+    nodes = await app.render();
+    assert.ok(nodes.some(n => text(n) === 'NEW-INVOICE'));
+    assert.ok(nodes.filter(n => n.type === 'Modal').every(n => !n.props.visible));
+    assert.ok(!nodes.some(n => /OLD-INVOICE|STALE-LOAD|STALE-HISTORY/.test(text(n))));
+    app.h.unmount();
+  }
+});
+
+test('account switch closes finance forms and invoice editor while authorization loads', async () => {
+  for (const view of ['form', 'editor']) {
+    const app = financeWorkspace(), next = later();
+    if (view === 'form') {
+      await navigateTab(app, 'Customers');
+      await click(app, 'Create customer');
+      assert.ok((await app.render()).some(n => n.type === 'Modal' && n.props.visible));
+    } else {
+      const nodes = await app.render();
+      nodes.find(n => n.type === 'IconButton' && n.props.accessibilityLabel === 'Create invoice').props.onPress();
+      assert.ok((await app.render()).some(n => n.type === 'FinanceInvoiceEditor'));
+    }
+    app.finance.invoices = () => next.promise;
+    app.state.userId = 702;
+    const nodes = await app.render();
+    assert.ok(nodes.some(n => n.type === 'Spinner' && n.props.accessibilityLabel === 'Loading finance records'));
+    assert.ok(nodes.filter(n => n.type === 'Modal').every(n => !n.props.visible));
+    assert.ok(!nodes.some(n => n.type === 'FinanceInvoiceEditor'));
+    next.resolve([]);
+    await app.render();
+    app.h.unmount();
+  }
+});
 
 test('R: native finance provides CSV exports for filtered issued invoices and all-page expenses', async () => {
   const app = financeWorkspace();
@@ -523,7 +590,7 @@ test('C: account switch while sharing availability is pending discards old expor
 });
 
 
-test('C: parity BAS summary displays excluded legacy count and warnings', async () => {
+async function parityBas(worksheetCall) {
   const engine = createHooks();
   const state = { id: '14', status: 503 }, existing = customer(), calls = [];
   const widgets = Object.fromEntries([
@@ -542,7 +609,7 @@ test('C: parity BAS summary displays excluded legacy count and warnings', async 
     './nativeFileBytes': { nativeFileBytes: async () => new Uint8Array() },
     '@chemisttasker/shared-core': {
       finance: { customers: async () => [existing],
-        worksheet: async () => ({ G1: '1', '1A': '2', '1B': '3', estimated_gst_net: '4', excluded_legacy_invoice_count: 7, warnings: ['Review'] }),
+        worksheet: worksheetCall || (async () => ({ G1: '1', '1A': '2', '1B': '3', estimated_gst_net: '4', excluded_legacy_invoice_count: 7, warnings: ['Review'] })),
         saveCustomer: async data => ({ ...existing, ...data }) },
       financeStatus: row => row.status, financeToday: () => '2026-11-07',
     },
@@ -553,6 +620,11 @@ test('C: parity BAS summary displays excluded legacy count and warnings', async 
       replaceUnderscore: value => String(value), toNumber: value => Number(value || 0) },
   });
   const render = () => engine.settled(module.FinanceParityScreen, { screen: 'bas' });
+  return { engine, render };
+}
+
+test('C: parity BAS summary displays excluded legacy count and warnings', async () => {
+  const { engine, render } = await parityBas();
   let nodes = await render();
   button(nodes, 'Calculate worksheet').props.onPress();
   await engine.flush();
@@ -582,5 +654,62 @@ test('C: customer ABN 422, 503 and 429 leave the workspace usable for retry', as
     assert.equal(attempts, 2);
     nodes = await app.render();
     assert.ok(nodes.some(n => n.type === 'Text' && text(n).includes('ACME Group')));
+  }
+});
+
+
+for (const boundary of ['availability', 'bytes', 'write']) {
+  test(`R: unmounted CSV export stops at ${boundary}`, async () => {
+    const pending = later();
+    const config = boundary === 'bytes' ? { bytes: () => pending.promise } :
+      boundary === 'write' ? { write: () => pending.promise } : {};
+    const app = financeWorkspace(config);
+    if (boundary === 'availability') app.sharing.isAvailableAsync = () => pending.promise;
+    const action = button(await app.render(), 'Export invoices CSV');
+    const task = action.props.onPress();
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    app.h.unmount();
+    pending.resolve(boundary === 'availability' ? true : new Uint8Array([1]));
+    await task;
+    for (let i = 0; i < 10; i++) await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(app.files.filter(file => file.bytes && !file.deleted).length, 0, boundary);
+    assert.equal(app.shares.length, 0, boundary);
+    if (boundary === 'write') assert.ok(app.files[0].deleted, 'in-flight write is removed');
+  });
+}
+
+test('R: workspace discards a worksheet calculated for an edited period or basis', async () => {
+  for (const field of ['start', 'end', 'basis']) {
+    const app = financeWorkspace(), pending = later();
+    let calls = 0;
+    app.finance.worksheet = async (...args) => { calls++; return calls === 1 ? pending.promise :
+      { start: args[0], end: args[1], basis: args[2], G1:'1', '1A':'2', '1B':'3', estimated_gst_net:'4', warnings:[], excluded_legacy_invoice_count:0 }; };
+    let nodes = await navigateTab(app, 'GST / BAS');
+    button(nodes, 'Calculate worksheet').props.onPress();
+    nodes = await app.render();
+    if (field === 'basis') nodes.find(n => n.type === 'Chip' && text(n) === 'Accrual').props.onPress();
+    else nodes.find(n => n.type === 'TextInput' && n.props.label.startsWith(field === 'start' ? 'Start' : 'End')).props.onChangeText('2026-10-01');
+    await app.render();
+    pending.resolve({ G1:'999', '1A':'2', '1B':'3', estimated_gst_net:'4', warnings:[], excluded_legacy_invoice_count:0 });
+    await app.h.flush(); nodes = await app.render();
+    assert.equal(!!button(nodes, 'Export draft worksheet CSV'), false, field);
+    await click(app, 'Calculate worksheet');
+    assert.ok(button(await app.render(), 'Export draft worksheet CSV'), field);
+  }
+});
+
+test('R: parity BAS rejects results for edited period and basis and can recalculate', async () => {
+  for (const field of ['start', 'end', 'basis']) {
+    const pending = later(); let calls = 0;
+    const result = { G1:'1', '1A':'2', '1B':'3', estimated_gst_net:'4', warnings:[], excluded_legacy_invoice_count:0 };
+    const app = await parityBas(async () => ++calls === 1 ? pending.promise : result);
+    let nodes = await app.render(); button(nodes, 'Calculate worksheet').props.onPress();
+    nodes = await app.render();
+    if (field === 'basis') nodes.find(n => n.type === 'ChoiceChips').props.onChange('accrual');
+    else nodes.find(n => n.type === 'Field' && n.props.label.startsWith(field === 'start' ? 'Start' : 'End')).props.onChangeText('2026-10-01');
+    await app.render(); pending.resolve(result); await app.engine.flush(); nodes = await app.render();
+    assert.equal(nodes.some(n => n.type === 'MetricGrid'), false, field);
+    button(nodes, 'Calculate worksheet').props.onPress(); await app.engine.flush();
+    assert.ok((await app.render()).some(n => n.type === 'MetricGrid'), field);
   }
 });
