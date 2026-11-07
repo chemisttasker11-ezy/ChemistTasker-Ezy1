@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
     Button,
     Card,
@@ -17,6 +18,9 @@ import {
 import { ContentState } from '@/components/ui';
 import { colors, radius, space } from '@/constants/tokens';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
+import { useAuth } from '@/context/AuthContext';
+import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { startDirectChat } from '../chat/hooks';
 import { useShiftSurface } from './useShiftSurface';
 import { WorkerProfileDialog } from './WorkerProfileDialog';
 import { filterDeferredPayrollOffers, type DeferredPayrollOffer } from './confirmedPayroll';
@@ -46,6 +50,10 @@ export default function ConfirmedShiftsView() {
 
 function ScopedConfirmedShifts({ surface }: { surface: ReturnType<typeof useShiftSurface> }) {
     const scopedPharmacyId = surface.scopedPharmacyId;
+    const router = useRouter();
+    const { user } = useAuth();
+    const chatGenRef = useRef(0);
+    const pendingChatsRef = useRef<Set<number>>(new Set());
 
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [loading, setLoading] = useState(true);
@@ -147,8 +155,35 @@ function ScopedConfirmedShifts({ surface }: { surface: ReturnType<typeof useShif
             loadGenRef.current++;
             payrollGenRef.current++;
             profileGenRef.current++;
+            chatGenRef.current++;
+            pendingChatsRef.current.clear();
         };
     }, []);
+
+    const messageAssigned = async (userId: number) => {
+        // Synchronous lock: two presses from the same render initiate one DM only.
+        if (pendingChatsRef.current.has(userId)) return;
+        pendingChatsRef.current.add(userId);
+        const gen = chatGenRef.current;
+        const scope = surface.scopeKey;
+        try {
+            const room: any = await startDirectChat({ userId });
+            if (chatGenRef.current !== gen || scope !== surface.scopeKey) return;
+            const roomId = room?.id ?? room?.room_id;
+            if (roomId != null) {
+                router.push({
+                    pathname: getMessageDetailRoute(user?.role, roomId, surface.persona) as any,
+                    params: { id: String(roomId) },
+                });
+            }
+        } catch (err: any) {
+            if (chatGenRef.current === gen && scope === surface.scopeKey) {
+                setSnackbar(err?.message || 'Could not start message');
+            }
+        } finally {
+            if (chatGenRef.current === gen) pendingChatsRef.current.delete(userId);
+        }
+    };
 
     const openProfile = async (shiftId: number, slotId: number | null, userId: number) => {
         const gen = ++profileGenRef.current;
@@ -252,6 +287,7 @@ function ScopedConfirmedShifts({ surface }: { surface: ReturnType<typeof useShif
                 emptyText="No confirmed shifts available."
                 mode="confirmed"
                 onViewAssigned={openProfile}
+                onMessageAssigned={(id) => void messageAssigned(id)}
             />
 
             <WorkerProfileDialog
