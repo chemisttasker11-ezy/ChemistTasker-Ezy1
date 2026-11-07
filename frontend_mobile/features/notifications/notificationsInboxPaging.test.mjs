@@ -20,7 +20,7 @@ test('real inbox renders subsequent pages without duplicate items and never post
   await h.focus();
   h.waitFor(2, page([note(20), note(21)]));
   const nodes = await h.loadOlder();
-  assert.deepEqual(h.rows(nodes).map(row => row.id),
+  assert.deepEqual(Array.from(h.rows(nodes), row => row.id),
     Array.from({ length: 21 }, (_, index) => index + 1));
   assert.equal(h.calls.filter(c => c[0] === 'POST').length, 0);
   h.unmount();
@@ -32,7 +32,7 @@ test('first-page failure displays retry, retains rows and never masquerades as a
   await h.focus();
   h.waitFor(1, Error('Refresh offline'));
   let nodes = await h.refresh();
-  assert.deepEqual(h.rows(nodes).map(row => row.id), [1, 2]);
+  assert.deepEqual(Array.from(h.rows(nodes), row => row.id), [1, 2]);
   assert.match(h.readError(nodes), /Refresh offline/);
   assert.equal(h.rows(nodes).length, 2);
   h.unmount();
@@ -44,7 +44,7 @@ test('malformed page two fails visibly but leaves good page one intact', async (
   await h.focus();
   h.waitFor(2, { error: 'malformed response' });
   const nodes = await h.loadOlder();
-  assert.deepEqual(h.rows(nodes).map(n => n.id), [1]);
+  assert.deepEqual(Array.from(h.rows(nodes), n => n.id), [1]);
   assert.match(h.readError(nodes), /Unexpected notifications response/i);
   h.unmount();
 });

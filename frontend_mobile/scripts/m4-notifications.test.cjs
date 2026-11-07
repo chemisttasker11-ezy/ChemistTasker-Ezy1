@@ -28,7 +28,7 @@ test('R same_account_refocus_failure_keeps_rows and retry obtains updated same-a
   assert.equal(h.rows(nodes)[0].id, 1);
   h.waitFor(1, page(twenty(100), null));
   nodes = await h.refresh();
-  assert.deepEqual(h.rows(nodes).map(row => row.id), twenty(100).map(row => row.id));
+  assert.deepEqual(Array.from(h.rows(nodes), row => row.id), twenty(100).map(row => row.id));
   assert.equal(h.readError(nodes).includes('Network unavailable'), false);
   h.unmount();
 });
@@ -44,18 +44,18 @@ test('C account_change_clears_before_network and old page1 completion cannot cro
   h.waitFor(1, nextRequest);
   h.scope.user = { id: 2002, role: 'EXPLORER' };
   let nodes = await h.settle();
-  assert.deepEqual(h.rows(nodes), [], 'new account must never show previous account rows');
+  assert.deepEqual(Array.from(h.rows(nodes)), [], 'new account must never show previous account rows');
   previousRequest.resolve(page(twenty(50)));
   await h.flush();
   nodes = await h.settle();
-  assert.deepEqual(h.rows(nodes), [], 'stale page must not restore old data');
+  assert.deepEqual(Array.from(h.rows(nodes)), [], 'stale page must not restore old data');
   nextRequest.resolve(page([notice(8001)]));
   await h.flush();
   nodes = await h.settle();
-  assert.deepEqual(h.rows(nodes).map(row => row.id), [8001]);
+  assert.deepEqual(Array.from(h.rows(nodes), row => row.id), [8001]);
   h.scope.user = null;
   nodes = await h.settle();
-  assert.deepEqual(h.rows(nodes), [], 'signout clears all private list rows');
+  assert.deepEqual(Array.from(h.rows(nodes)), [], 'signout clears all private list rows');
   const networkCount = h.calls.filter(([method]) => method === 'GET').length;
   await h.settle();
   assert.equal(h.calls.filter(([method]) => method === 'GET').length, networkCount,
@@ -81,7 +81,7 @@ for (const outcome of ['resolve', 'reject']) {
     else late.reject(Error('Stale receipt refused'));
     await h.flush();
     nodes = await h.settle();
-    assert.deepEqual(h.rows(nodes).map(row => row.id), [7001]);
+    assert.deepEqual(Array.from(h.rows(nodes), row => row.id), [7001]);
     assert.equal(h.events.length, 0, 'a previous-account receipt must not emit a badge update');
     assert.equal(h.readError(nodes).includes('Stale receipt refused'), false);
     h.unmount();
@@ -120,8 +120,8 @@ test('C full page2 de-duplication, failed page2 retry and retained read receipt'
   h.waitFor(2, page([notice(20), notice(21)]));
   nodes = await h.loadOlder();
   assert.equal(h.rows(nodes).length, 21);
-  assert.equal(new Set(h.rows(nodes).map(row => row.id)).size, 21);
-  assert.deepEqual(h.rows(nodes).slice(-2).map(row => row.id), [20, 21]);
+  assert.equal(new Set(Array.from(h.rows(nodes), row => row.id)).size, 21);
+  assert.deepEqual(Array.from(h.rows(nodes)).slice(-2).map(row => row.id), [20, 21]);
   const olderCalls = h.calls.filter(([method, pageNum]) => method === 'GET' && pageNum === 2);
   assert.equal(olderCalls.length, 2);
   h.unmount();
@@ -146,7 +146,7 @@ test('C stale pagination and refresh-finally do not clear a newer account loadin
   newFirstPage.resolve(page([notice(3001)]));
   await h.flush();
   nodes = await h.settle();
-  assert.deepEqual(h.rows(nodes).map(row => row.id), [3001]);
+  assert.deepEqual(Array.from(h.rows(nodes), row => row.id), [3001]);
   h.unmount();
 });
 

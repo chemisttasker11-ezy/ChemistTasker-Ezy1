@@ -60,6 +60,7 @@ describe('M4-03 real notifications transport contracts', () => {
     const a = getNotifications(1);
     userToken = 'zoe-token';
     const b = getNotifications(2);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const [, first] = fetchMock.mock.calls[0];
     const [, second] = fetchMock.mock.calls[1];
     expect(first.headers.Authorization).toContain('omar-token');

@@ -79,3 +79,22 @@ test('C: read event reloads current account only and unmount removes event liste
   app.engine.unmount();
   assert.ok(app.listeners.every(l => !l.active), 'event listeners must be removed on cleanup');
 });
+
+test('R: merely navigating to inbox cannot clear a badge before a successful read receipt', async () => {
+  const app = shellHarness();
+  app.responses.push({ results: [{ id: 44, read_at: null }, { id: 45, read_at: null }] });
+  let nodes = await app.render();
+  assert.equal(app.count(nodes), 2);
+  // The inbox may be offline and emit no receipt; opening it is not a read.
+  app.scope.pathname = '/pharmacist/notifications';
+  nodes = await app.render();
+  assert.equal(app.count(nodes), 2, 'navigation alone is not a successful receipt');
+  // A current successful receipt emits the production event; the shell reloads.
+  app.responses.push({ results: [{ id: 44, read_at: '2026-11-07T03:00:00Z' },
+    { id: 45, read_at: '2026-11-07T03:00:00Z' }] });
+  app.fire('ct-notifications-read');
+  await app.engine.flush();
+  nodes = await app.render();
+  assert.equal(app.count(nodes), 0, 'confirmed read receipt refreshes the current badge');
+  app.engine.unmount();
+});

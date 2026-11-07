@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const ts = require('typescript');
+const ts = require('../node_modules/typescript');
 const root = path.resolve(__dirname, '..');
 const jsx = (type, props, key) => ({ type, props: props || {}, key });
 
@@ -268,8 +268,12 @@ function createInbox() {
     control.props.onEndReached(); await engine.flush();
     return settle();
   }
-  const readError = nodes => nodes.filter(n => n.type === 'Text' &&
-    /could not|failed|retry|read status/i.test(text(n))).map(text).join(' ');
+  // Assert the actual rendered header and footer, not hidden error state.
+  const readError = nodes => {
+    const list = nodes.find(n => n.type === 'FlatList');
+    return [list?.props?.ListHeaderComponent, list?.props?.ListFooterComponent]
+      .map(text).join(' ');
+  };
   return { scope, calls, events, routes, waitFor, waitForMark, rows, list,
     settle, focus, refocus, blur: engine.blur, flush: engine.flush,
     press, refresh, loadOlder, readError, text, engine, deferred, unmount: engine.unmount };
