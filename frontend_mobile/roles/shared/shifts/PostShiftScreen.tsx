@@ -1123,8 +1123,7 @@ export default function PostShiftScreen() {
             setError('That date has passed. Pick today or later.');
             return false;
         }
-        if (past.length || late.length) setToast('Past dates were left out.');
-        return addSlotEntries(
+        const added = addSlotEntries(
             valid.map((date) => ({
                 date,
                 ...(selectedDateTimes[date] || { startTime: slotStart, endTime: slotEnd }),
@@ -1134,6 +1133,8 @@ export default function PostShiftScreen() {
             })),
             { clearAllSelected: true }
         );
+        if (added && (past.length || late.length)) setToast('Past dates were left out.');
+        return added;
     };
 
     const removeSlot = (index: number) => setSlots((prev) => prev.filter((_, i) => i !== index));
