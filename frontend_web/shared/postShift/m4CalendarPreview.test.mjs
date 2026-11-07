@@ -355,12 +355,12 @@ for (const persona of ['owner','admin']) {
     nodes = await host.settle();
     let dateStep = nodes.find(n => n.type === 'PostShiftTimetableStep');
     assert.ok(dateStep, 'actual timetable props must be rendered');
-    dateStep.props.setSlots([slot('2027-07-10')]);
+    dateStep.props.setSlots([slot('2027-01-10')]);
     nodes = await host.settle();
     dateStep = nodes.find(n => n.type === 'PostShiftTimetableStep');
     assert.equal(dateStep.props.calendarEvents.length, 1);
     assert.deepEqual(local(dateStep.props.calendarEvents[0]), {
-      start:'2027-07-10T22:00', end:'2027-07-11T06:00',
+      start:'2027-01-10T22:00', end:'2027-01-11T06:00',
     });
     // Change callbacks and time-context search without replacing the mounted form.
     host.changeCallback(() => host.completed.push('new callback'));
@@ -374,7 +374,7 @@ for (const persona of ['owner','admin']) {
     assert.equal(host.submitted.length, 1);
     assert.deepEqual(JSON.parse(JSON.stringify(host.submitted[0].slots.map(s =>
       [s.date,s.start_time,s.end_time]))),
-      [['2027-07-10','22:00','06:00']]);
+      [['2027-01-10','22:00','06:00']]);
     assert.equal(host.submitted[0].pharmacy, 4);
     if(persona === 'owner') assert.deepEqual(host.completed, ['new callback']);
   });
