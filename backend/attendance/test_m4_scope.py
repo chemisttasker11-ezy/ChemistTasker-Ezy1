@@ -145,3 +145,72 @@ class M4AttendanceScopeContracts(TestCase):
         review.refresh_from_db()
         self.assertEqual(review.status, ProvisionalAttendance.Status.PENDING)
         self.assertFalse(AttendanceCorrection.objects.filter(original_event=event).exists())
+
+
+    def test_C_all_authorized_managers_approve_and_reject_real_attendance(self):
+        """#8: successful service writes for owner, org admin, region, roster delegate."""
+        for action in ("approve", "reject"):
+            for manager in self.allowed:
+                with self.subTest(action=action, manager=manager.email):
+                    session, event, review = self.review()
+                    original = event.occurred_at
+                    reason = "M4 verified attendance before closing"
+                    response = client_for(manager).post(
+                        BASE + action + "/",
+                        {"provisional_id": review.pk, "reason": reason},
+                        format="json",
+                    )
+                    self.assertEqual(response.status_code, 200, response.data)
+                    review.refresh_from_db()
+                    session.refresh_from_db()
+                    event.refresh_from_db()
+                    self.assertEqual(event.occurred_at, original, "raw scan evidence is immutable")
+                    self.assertEqual(review.decided_by_id, manager.pk)
+                    self.assertEqual(review.decision_reason, reason)
+                    if action == "approve":
+                        self.assertEqual(response.data["status"], "APPROVED")
+                        self.assertEqual(review.status, ProvisionalAttendance.Status.APPROVED)
+                        self.assertIsNotNone(session.assignment_id)
+                        self.assertFalse(session.is_provisional)
+                        self.assertEqual(review.backfill_assignment_id, session.assignment_id)
+                        self.assertEqual(response.data["assignment_id"], session.assignment_id)
+                        self.assertTrue(ShiftSlotAssignment.objects.filter(
+                            pk=session.assignment_id, user=self.worker, shift__pharmacy=self.site_a,
+                        ).exists())
+                        self.assertEqual(response.data["shift_id"], review.backfill_shift_id)
+                        # Repeat approval must be idempotent, not backfill twice.
+                        repeat = client_for(manager).post(
+                            BASE + "approve/",
+                            {"provisional_id": review.pk, "reason": reason},
+                            format="json",
+                        )
+                        self.assertEqual(repeat.status_code, 200, repeat.data)
+                        self.assertEqual(repeat.data["assignment_id"], session.assignment_id)
+                    else:
+                        self.assertEqual(response.data["status"], "REJECTED")
+                        self.assertEqual(review.status, ProvisionalAttendance.Status.REJECTED)
+                        self.assertIsNone(session.assignment_id)
+                        self.assertTrue(session.is_provisional)
+                        self.assertEqual(response.data["reason"], reason)
+
+    def test_C_staff_only_pharmacy_delegate_is_unrepresentable_in_real_capability_matrix(self):
+        """No synthetic STAFF-only pharmacy assignment: backend role levels do not grant it."""
+        from access_control.pharmacy_roles import PharmacyAdminPolicy
+        from users.org_roles import ROLE_DEFINITIONS, OrgCapability
+
+        for level, capabilities in PharmacyAdminPolicy.CAPABILITY_MATRIX.items():
+            with self.subTest(level=level):
+                self.assertFalse(
+                    PharmacyAdminPolicy.CAPABILITY_MANAGE_STAFF in capabilities
+                    and PharmacyAdminPolicy.CAPABILITY_MANAGE_ROSTER not in capabilities
+                )
+        for role, definition in ROLE_DEFINITIONS.items():
+            for level in definition.allowed_admin_levels:
+                capabilities = definition.consolidated_capabilities(level)
+                with self.subTest(role=role, level=level):
+                    self.assertFalse(
+                        OrgCapability.MANAGE_STAFF in capabilities
+                        and OrgCapability.MANAGE_ROSTER not in capabilities
+                    )
+        # A communication-only pharmacy delegate is valid and remains denied
+        # by the existing full HTTP negative matrix above.
