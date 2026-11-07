@@ -25,30 +25,40 @@ export function useShellChrome(notificationsRoute: string, navigate: (route: str
     setPhotoUrl((user as any)?.profile_photo || (user as any)?.profile_photo_url || (user as any)?.profilePhoto || null);
   }, [user, isLoading]);
 
-  // Only the newest request may set the badge: an older response would restore a count from before a mark-read.
+  // The badge is private to the signed-in account. Generation protects
+  // overlapping refreshes; account identity protects the authentication switch.
+  const accountKey = String(user?.id ?? 'signed-out');
+  const scopeRef = useRef(accountKey);
+  const [badgeAccount, setBadgeAccount] = useState(accountKey);
   const generation = useRef(0);
   const loadUnread = useCallback(async () => {
+    if (user?.id == null || scopeRef.current !== accountKey) return;
     const id = ++generation.current;
     try {
       const res: any = await getNotifications();
-      if (id !== generation.current) return;
-      if (typeof res?.unread_count === 'number') {
-        setUnreadCount(res.unread_count);
-        return;
-      }
-      if (typeof res?.unreadCount === 'number') {
-        setUnreadCount(res.unreadCount);
-        return;
-      }
-      setUnreadCount(listOf(res).filter((n: any) => !(n.read_at || n.readAt)).length);
+      if (id !== generation.current || scopeRef.current !== accountKey) return;
+      const count = typeof res?.unread_count === 'number'
+        ? res.unread_count
+        : typeof res?.unreadCount === 'number'
+          ? res.unreadCount
+          : listOf(res).filter((n: any) => !(n.read_at || n.readAt)).length;
+      setUnreadCount(count);
+      setBadgeAccount(accountKey);
     } catch {
-      // best-effort badge; ignore errors
+      // best-effort badge; a failed reload never imports another account's count.
     }
-  }, []);
+  }, [accountKey, user?.id]);
 
   useEffect(() => {
-    void loadUnread();
-  }, [loadUnread]);
+    // Any outstanding request from the previous account must be invalidated
+    // even when its HTTP response arrives after the new account has rendered.
+    scopeRef.current = accountKey;
+    generation.current += 1;
+    setUnreadCount(0);
+    setBadgeAccount(accountKey);
+    if (user?.id != null) void loadUnread();
+    return () => { generation.current += 1; };
+  }, [accountKey, loadUnread, user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -86,5 +96,5 @@ export function useShellChrome(notificationsRoute: string, navigate: (route: str
 
   const openNotifications = useCallback(() => navigate(notificationsRoute), [navigate, notificationsRoute]);
 
-  return { unreadCount, photoUrl, openNotifications };
+  return { unreadCount: badgeAccount === accountKey ? unreadCount : 0, photoUrl, openNotifications };
 }
