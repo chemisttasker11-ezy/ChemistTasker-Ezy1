@@ -1447,7 +1447,14 @@ export default function PostShiftScreen() {
                     />
                 );
             case 'review':
-                return <NativeShiftBoardPreview shift={buildShiftPostingPreview(postingDraft(), selectedPharmacy) as any} />;
+                return (
+                    <View style={{ gap: space.sm }}>
+                        <Text style={styles.helper} accessibilityRole="text">
+                            This is how your shift appears on the job board. Go back to change anything.
+                        </Text>
+                        <NativeShiftBoardPreview shift={buildShiftPostingPreview(postingDraft(), selectedPharmacy) as any} />
+                    </View>
+                );
             default: return null;
         }
     };
