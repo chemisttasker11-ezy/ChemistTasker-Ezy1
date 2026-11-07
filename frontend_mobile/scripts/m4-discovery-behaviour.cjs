@@ -6,6 +6,8 @@ const vm = require('node:vm');
 const ts = require('../node_modules/typescript');
 const root = path.resolve(__dirname, '..');
 const jsx = (type, props, key) => ({type, props: props || {}, key});
+const Card=props=>jsx('Card',props);
+Card.Content=props=>jsx('CardContent',props);
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((yes,no) => {resolve=yes; reject=no;});
@@ -82,7 +84,7 @@ function talentHarness(reference='', role=null) {
   const module=load('app/explore/talent-board.tsx', {
     react:ui.react,'react/jsx-runtime':{jsx,jsxs:jsx},
     'react-native':{ScrollView:'ScrollView',StyleSheet:{create:x=>x},View:'View'},
-    'react-native-paper':{Button:'Button',Card:{Content:'CardContent'},Chip:'Chip',Text:'Text',TextInput:'TextInput'},
+    'react-native-paper':{Button:'Button',Card,Chip:'Chip',Text:'Text',TextInput:'TextInput'},
     'expo-router':{useRouter:()=>({push:r=>routes.push(r),replace:r=>routes.push(r),
       canGoBack:()=>false,back(){}}), useLocalSearchParams:()=>({reference_code:session.reference})},
     '@/components/ui/BrandActivityIndicator':{BrandActivityIndicator:'Spinner'},
@@ -104,7 +106,7 @@ function articleHarness(section='blog') {
   const module=load('features/explore/ArticleFeed.tsx', {
     react:ui.react,'react/jsx-runtime':{jsx,jsxs:jsx},
     'react-native':{ScrollView:'ScrollView',Image:'Image',StyleSheet:{create:x=>x},View:'View'},
-    'react-native-paper':{Button:'Button',Card:{Content:'CardContent'},Chip:'Chip',Text:'Text',Searchbar:'Searchbar'},
+    'react-native-paper':{Button:'Button',Card,Chip:'Chip',Text:'Text',Searchbar:'Searchbar'},
     'expo-router':{useRouter:()=>({push:x=>routes.push(x),replace:x=>routes.push(x),back(){},canGoBack:()=>false})},
     '@/components/ui/BrandActivityIndicator':{BrandActivityIndicator:'Spinner'},
     'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
