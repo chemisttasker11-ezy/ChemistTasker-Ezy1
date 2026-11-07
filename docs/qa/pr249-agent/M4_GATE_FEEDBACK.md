@@ -36,6 +36,14 @@ Exact working diff for M4-05: M4-05_HARNESS_FIX.patch (same folder).
     the delivery; never change an assertion after the fix.
 14. A C (control) test must pass on base. Check fixtures against the code path the service really reads (e.g. the
     pharmacy time zone, not only the period's).
+15. Error-path tests must throw the REAL shared-core error: `ApiError` with `.status` (shared-core/src/transport/errors.ts:6),
+    not a made-up `{ response: { status } }` object.
+16. `new TextDecoder()` drops a leading BOM: decode with `new TextDecoder('utf-8', { ignoreBOM: true })` to assert it.
+17. `onPress={() => void fn()}` cannot be awaited: flush macrotasks (`await new Promise(r => setTimeout(r, 0))`, repeated
+    until the mock settles) or call an awaitable path before asserting side effects such as temp-file deletion.
+18. Text matchers: rendered text may be split across nodes ("Invoice #" + "48"); match with a regex such as
+    `/invoice #\s*48/i`. Find titles where the page really renders them (e.g. PageHeader props, not Typography).
+19. Backend fixtures must satisfy model/service validation (e.g. an Expense with gst_amount needs tax_code='GST').
 
 ## Appendix E (J5 conversions)
 Section E of M4_JOB_PACK.md is only a heading (no assignment table). Ignore it for now: J5 conversions are NOT part of
@@ -95,3 +103,35 @@ To do on agent/m4-03 (tests-only commit(s) first, then fix commits):
    token-scope assertion.
 5. Keep: server list/detail/preferences scoped to request.user (backend/notifications/views.py:32) and mark-read
    queryset scope (services.py:166): no backend change needed.
+
+## M4-02 verdict: FIX FIRST (Claude B, head 2dc238fb; production fix looks right, test proof broken)
+All 8 mobile tests crash at m4-finance.test.cjs:60 (`this.useMemo`, rule 2). With harness-only scratch fixes: mobile
+managed-source, race, ABN and BAS export are red at base and green at head. PG worker_finance+invoicing: Ran 182, 1 error
+(new test fixture). shared-core 481/483 (2 timeouts pass alone), tsc 0, lint 0 errors.
+To do on agent/m4-02 (tests-only commit(s) first, then fix commits):
+1. PRODUCTION GAP frontend_web/src/pages/finance/FinanceWorkspace.tsx:333 still builds the worksheet CSV inline with
+   different labels; call shared-core `worksheetCsvRows(worksheet)` there, and make the first row in
+   shared-core/src/domains/finance/csv.ts:48 'DRAFT ONLY' (web's existing label) so web and native files match. Test it.
+2. Mobile harness m4-finance.test.cjs: :60 `react.useMemo` (rule 2); :305 TextDecoder ignoreBOM (rule 16); :344 await the
+   export / flush macrotasks (rule 17); :171 match /invoice #\s*48/i (rule 18).
+3. Web harness m4Finance.test.mjs: :80-81 add `__esModule: true` to the mocks (rule 1); :154 look for the title in the
+   PageHeader props (rule 18).
+4. backend/worker_finance/test_m4_presentation_contract.py:38 add tax_code='GST' (rule 19).
+5. Refusal tests: add cases with real `ApiError` instances for 404 and 403 (rule 15).
+6. Missing matrix tests (M4_JOB_PACK M4-02 numbering): #1 both lookups fail; #2 received-mode race; #3 422/503/429 keep the
+   entered fields and allow retry; #4 exact header, current filter, no received rows; #6 parity BAS screen shows the excluded
+   count; #7 share unavailable, double tap gives one share, account switch mid-export; #8 no-store headers, ABR field
+   allow-list, concurrent ABN change -> 400, scoped manager vs Nadia; #9 web UI click -> download and object-URL revocation.
+
+## M4-08 verdict: FIX FIRST (Codex A, head 7bd803a0; production fix correct, coverage incomplete)
+Red at base proven: m4CalendarPreview.test.mjs:96 (overnight end), :114 (recurrence), :137 (year rollover). Head: focused
+4/4, web tsc 0, mobile 733/733. PG talent 84/84 OK on base and head (controls). Harness commit 7bd803a0 is a pure repair.
+To do on agent/m4-08 (tests-only commit(s) first; no production change expected unless a new test finds one):
+1. m4CalendarPreview.test.mjs:145 replaces the form with a string: mount the REAL owner and admin PostShiftForm flows and
+   assert the displayed calendar events, the submission payload (slots unchanged, overnight end not shifted in the
+   payload), and state across callback/time-context changes.
+2. :120 edits an unrelated daytime slot directly: exercise selecting a recurring calendar event and verify its source
+   mapping and the saved dates.
+3. Split the combined rollover test: the year/month/leap rollover assertions are R (they fail at base), so label them R and
+   keep the C controls in their own test so they execute on base. Isolate time-zone cases (rule 7: TZ set before load,
+   one process per zone if needed).
