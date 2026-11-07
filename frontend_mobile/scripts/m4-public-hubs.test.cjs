@@ -10,7 +10,7 @@ const source = fs.readFileSync(path.resolve(__dirname, '../app/explore/hubs/[hub
 const output = ts.transpileModule(source, { fileName:'[hub].tsx',
   compilerOptions:{ module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,
     jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true } }).outputText;
-const element = (type,props) => ({type,props:props||{}});
+const element = (type,props,key) => ({type,props:{...(props||{}),...(key===undefined?{}:{key})}});
 function find(node, predicate, found=[]) {
   if(Array.isArray(node)) node.forEach(n=>find(n,predicate,found));
   else if(node && typeof node==='object') {
