@@ -44,6 +44,13 @@ Exact working diff for M4-05: M4-05_HARNESS_FIX.patch (same folder).
 18. Text matchers: rendered text may be split across nodes ("Invoice #" + "48"); match with a regex such as
     `/invoice #\s*48/i`. Find titles where the page really renders them (e.g. PageHeader props, not Typography).
 19. Backend fixtures must satisfy model/service validation (e.g. an Expense with gst_amount needs tax_code='GST').
+20. Python must parse: a generator expression passed with other arguments needs its own parentheses
+    (`set((row['id'] for row in rows))`, never `f(x for x in y, z)`); never name a test helper `self.client` (Django's
+    TestCase assigns it). Check every .py file with `python -m py_compile` mentally before committing.
+21. Race tests: wait for the exact deferred boundary you claim (resolve the pending fetch/blob AFTER the account switch),
+    never assert before it; a double-tap test presses twice from the SAME render (no re-render between presses).
+22. Effect-based redirects still mount the screen once: a guard that must stop a forbidden API call has to be
+    synchronous (decide before mounting the loader), and its test must count API calls during the redirect.
 
 ## Appendix E (J5 conversions)
 Section E of M4_JOB_PACK.md is only a heading (no assignment table). Ignore it for now: J5 conversions are NOT part of
@@ -135,3 +142,37 @@ To do on agent/m4-08 (tests-only commit(s) first; no production change expected 
 3. Split the combined rollover test: the year/month/leap rollover assertions are R (they fail at base), so label them R and
    keep the C controls in their own test so they execute on base. Isolate time-zone cases (rule 7: TZ set before load,
    one process per zone if needed).
+
+## M4-05 senior verdict (Codex B, head 765eae7c): FIX FIRST (Claude B re-gate had APPROVED; red/green proof is valid)
+To do on agent/m4-05 (tests-only commit first, then fix):
+1. P2 frontend_mobile/app/next-shifts.tsx:53 mounts the loader for any authenticated user; the root guard redirects in an
+   effect while the Stack stays mounted, so an Explorer still triggers one fetchMyConfirmedShifts call (rule 22). Fix:
+   synchronously check worker eligibility (the same shared-core policy shiftSurface uses) before mounting
+   ScopedNextShifts; R test: Explorer deep link to /next-shifts makes ZERO personal calls; C: PHARMACIST and OTHER_STAFF
+   still load it.
+2. P2 frontend_web m4Explorer.test.mjs:199 tests ProtectedRoute with a fabricated AllowedBoard and re-creates
+   canAccessRoute at :214 (rule 11). Exercise the REAL Next public -> dashboard handoff/navigation adapter and the
+   dashboard destination with production permission logic: hydration wait, no loop, zero personal calls.
+3. P3 frontend_web/src/main.tsx:25 redirect drops #fragment: append location.hash (test it).
+
+## M4-04 verdict: FIX FIRST (Codex A, head b4147156)
+Valid red->green: keyed fetch/blob unmount (m4-marketplace-review.test.cjs:29,:45) and partial image retry
+(marketplaceReviewSubmission.test.mjs:77). Gates: mobile 743/746 (3 failing tests fail on base too), shared-core 485/485,
+Next 4/4, lint 0 errors. PostgreSQL: backend/marketplace/test_m4_submission.py does NOT import (SyntaxError at :146).
+To do on agent/m4-04 (tests-only commit(s) first, then fix commits):
+1. backend test_m4_submission.py:146 SyntaxError (generator argument, rule 20) and :62 helper named self.client shadowed by
+   Django (rename it and its callers). Every test in the file must then run on PostgreSQL.
+2. marketplaceReviewAccountRace.test.mjs:27,:50 assert before the deferred boundary (0 !== 1, fail on head too): resolve
+   the pending fetch/blob after the account switch, then assert no upload (rule 21).
+3. Controls that fail on base (marketplaceReviewAccountRace.test.mjs:71,:88; m4-marketplace-review.test.cjs:59,:82,:107)
+   are really R tests: label them R and state the base defect, or fix them so they pass on base (rule 14).
+4. Double tap (marketplaceReviewSubmission.test.mjs:21) fails on base and head: press twice from the same render (rule 21).
+5. m4-marketplace-harness.cjs:7 resolve typescript repo-relative (rule 6).
+6. Complete matrix #3-#9 of the M4-04 pack section: real seller/persona and blocked-eligibility cases, feature-off, image
+   retry, error visibility and validation.
+7. GAP frontend_mobile/features/parity/marketplace.tsx:188 (catalogue lookup) and :219 (photo picker) can finish after
+   unmount and start a draft write; marketplaceDraft.ts:31 awaits a read before writing. Invalidate the step and check the
+   scope before every patch; guard or serialize the draft completion. R tests first.
+8. GAP frontend_web/landing_next/features/marketplace/add-item-wizard.tsx:189 Next create -> audience -> uploads -> submit
+   has no account/unmount guard and no create receipt key (client_request_id); failed uploads are swallowed at :232.
+   Capture scope, guard each boundary, keep the key and progress for retries, surface upload failures. R tests first.
