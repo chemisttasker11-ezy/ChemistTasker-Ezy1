@@ -20,6 +20,7 @@ const rolePath: Record<string, string> = {
   TECHNICIAN: 'Dispensary workflow and workplace development',
   ASSISTANT: 'Customer service and workplace development',
   EXPLORER: 'Career discovery and pharmacy pathways',
+  CAREER_SWITCHER: 'Career transition and pharmacy pathways',
 };
 
 function getNextPage(next: string | null): number | null {
