@@ -225,6 +225,18 @@ class M4MarketplaceSubmissionContracts(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertTrue(MarketplaceListing.objects.get(pk=made.data['id']).slug)
 
+    def test_R_owner_can_submit_legacy_blank_slug_draft(self):
+        made = self.create_listing()
+        MarketplaceListing.objects.filter(pk=made.data['id']).update(slug='')
+        response = self.api_client(self.tom).post(
+            API + f"listings/{made.data['id']}/submit/",
+            {'expected_version': made.data['version']}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        listing = MarketplaceListing.objects.get(pk=made.data['id'])
+        self.assertEqual(listing.creator, self.tom)
+        self.assertTrue(listing.slug)
+        self.assertEqual(listing.publication_status, 'PENDING_REVIEW')
+
     def test_C_personal_sellers_and_delegated_admins(self):
         self.personal.field_schema = {'allowed_seller_roles': [
             'OWNER', 'PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'EXPLORER']}

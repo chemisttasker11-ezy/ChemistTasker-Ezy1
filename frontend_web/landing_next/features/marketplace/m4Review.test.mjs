@@ -13,7 +13,7 @@ const text = node => typeof node === 'string' || typeof node === 'number' ? Stri
 function nextWizard(options = {}) {
   const state = { session: 'authenticated', role: 'PHARMACIST', id: 101 };
   const calls = [], routes = [], slots = [], effects = [];
-  let cursor = 0;
+  let cursor = 0, uuid = 0;
   const equal = (a, b) => !!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
   const react = {
     useState(initial) {
@@ -81,7 +81,7 @@ function nextWizard(options = {}) {
     },
     updateAudience: async (id, body) => {
       calls.push({ method: 'audience', id, body });
-      return { version: 2 };
+      return { version: body.expected_version + 1 };
     },
     uploadImage: async (id, body) => {
       calls.push({ method: 'upload', id, body });
@@ -107,7 +107,7 @@ function nextWizard(options = {}) {
   const module = { exports: {} };
   vm.runInNewContext(compiled, {
     module, exports: module.exports, URL, FormData, Blob, console,
-    crypto: { randomUUID: () => '5b3f8a60-bccb-4b66-988b-e8c36445b841' },
+    crypto: { randomUUID: () => `5b3f8a60-bccb-4b66-988b-${String(++uuid).padStart(12, '0')}` },
     require(id) {
       if (!(id in modules)) throw Error('Unknown Next wizard import ' + id);
       return modules[id];
@@ -150,8 +150,8 @@ function nextWizard(options = {}) {
     input.props.onChange({ target: { value } });
     await flush();
   }
-  async function toFinal(withPhoto = false) {
-    await click('Personal item');
+  async function toFinal(withPhoto = false, pharmacy = false) {
+    await click(pharmacy ? 'Pharmacy-owned item' : 'Personal item');
     await click('Free');
     await click('Continue to Category');
     await click('Professional books');
@@ -176,6 +176,55 @@ function nextWizard(options = {}) {
   function unmount() { for (const slot of slots) slot?.cleanup?.(); }
   return { state, calls, routes, access, api, stable, click, fill, toFinal, unmount };
 }
+
+test('R: Add another item creates a second listing with a new receipt', async () => {
+  const app = nextWizard();
+  await app.toFinal();
+  await app.click('Save as private draft');
+  await app.click('Add another item');
+  await app.toFinal();
+  await app.click('Save as private draft');
+  assert.deepEqual(app.calls.map(c => c.method), ['create', 'create']);
+  assert.notEqual(app.calls[0].body.client_request_id, app.calls[1].body.client_request_id);
+});
+
+test('C: upload retry retains the same listing receipt and progress', async () => {
+  let attempt = 0;
+  const app = nextWizard({ upload: async () => { if (++attempt === 1) throw Error('Retry'); } });
+  await app.toFinal(true);
+  await app.click('Save as private draft');
+  await app.click('Save as private draft');
+  assert.deepEqual(app.calls.map(c => c.method), ['create', 'upload', 'update', 'upload']);
+  assert.equal(app.calls[2].id, app.calls[1].id);
+  assert.equal(app.calls[2].body.client_request_id, app.calls[0].body.client_request_id);
+});
+
+test('R: changed pharmacy audience is reapplied after an upload failure', async () => {
+  let attempt = 0;
+  const category = { id: 7, slug: 'fixtures', name: 'Professional books', description: 'Fixtures',
+    context: 'PHARMACY', maximum_buyer_roles: ['OWNER'], permitted_modes: ['FREE'] };
+  const app = nextWizard({ access: { can_trade_for_pharmacy: true,
+    eligible_pharmacies: [{ id: 1, label: 'My pharmacy' }], pharmacy_categories: [category] },
+    upload: async () => { if (++attempt === 1) throw Error('Retry'); } });
+  await app.toFinal(true, true);
+  await app.click('Submit for review');
+  await app.click('Back');
+  await app.click('Back');
+  await app.click('Back');
+  const select = (await app.stable()).find(n => n.type === 'select' && n.props.value === 'PLATFORM');
+  assert.ok(select, 'Maximum audience ceiling control');
+  select.props.onChange({ target: { value: 'OWNED_CHAIN' } });
+  await app.click('Continue to Delivery');
+  await app.click('Review Listing');
+  await app.click('Proceed to Submit');
+  await app.click('Submit for review');
+  const audiences = app.calls.filter(c => c.method === 'audience');
+  assert.equal(audiences.length, 2);
+  assert.equal(audiences[0].body.maximum_circle, 'PLATFORM');
+  assert.equal(audiences[1].body.maximum_circle, 'OWNED_CHAIN');
+  assert.equal(audiences[1].body.expected_version, 3);
+  assert.equal(app.calls.find(c => c.method === 'submit').version, 4);
+});
 
 test('C: anonymous Next marketplace new route does not create/submit; links back to authentication', async () => {
   const app = nextWizard();
