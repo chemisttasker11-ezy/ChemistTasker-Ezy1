@@ -314,7 +314,8 @@ export function validateSlotEntries(entries: SlotEntry[]): string | null {
     for (const entry of entries) {
         const error = validateSlotEntry(entry);
         if (error) return error;
-        if (!splitPostableDates([entry.date], new Date()).valid.length) {
+        if (!splitPostableDates([entry.date], new Date()).valid.length ||
+            (entry.isRecurring && !splitPostableDates([entry.recurringEndDate], new Date()).valid.length)) {
             return 'That date has passed. Pick today or later.';
         }
     }
