@@ -125,3 +125,34 @@ export function projectPublicTalentCandidate(
     ratingCount: valueOrNull(rawCount),
   };
 }
+
+
+/**
+ * Common public-board wire aliases. Keep the same presentation contract in
+ * Vite and the migrated Next copy; server visibility remains authoritative.
+ */
+export function normalizePublicTalentPost(post: Record<string, any>): Record<string, any> {
+  return {
+    ...post,
+    authorUserId: post.author_user_id ?? post.authorUserId ?? null,
+    roleTitle: post.role_title ?? post.roleTitle ?? null,
+    roleCategory: post.role_category ?? post.roleCategory ?? null,
+    workTypes: post.work_types ?? post.workTypes ?? null,
+    postKind: post.post_kind ?? post.postKind ?? null,
+    coverageRadiusKm: post.coverage_radius_km ?? post.coverageRadiusKm ?? null,
+    openToTravel: post.open_to_travel ?? post.openToTravel ?? null,
+    availabilityMode: post.availability_mode ?? post.availabilityMode ?? null,
+    availabilitySummary: post.availability_summary ?? post.availabilitySummary ?? null,
+    availabilityDays: post.availability_days ?? post.availabilityDays ?? null,
+    availabilityNotice: post.availability_notice ?? post.availabilityNotice ?? null,
+    locationState: post.location_state ?? post.locationState ?? null,
+    locationSuburb: post.location_suburb ?? post.locationSuburb ?? null,
+    locationPostcode: post.location_postcode ?? post.locationPostcode ?? null,
+    referenceCode: post.reference_code ?? post.referenceCode ?? null,
+    explorerRoleType: post.explorer_role_type ?? post.explorerRoleType ?? null,
+    explorerUserId: post.explorer_user_id ?? post.explorerUserId ?? null,
+    explorerProfileId: post.explorer_profile ?? post.explorerProfile ?? null,
+    ratingAverage: post.rating_average ?? post.ratingAverage ?? null,
+    ratingCount: post.rating_count ?? post.ratingCount ?? null,
+  };
+}

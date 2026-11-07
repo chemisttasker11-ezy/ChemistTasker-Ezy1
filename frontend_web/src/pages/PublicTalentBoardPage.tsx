@@ -11,7 +11,7 @@ import {
 import AuthLayout from "../layouts/AuthLayout";
 import PublicLogoTopBar from "../components/PublicLogoTopBar";
 import TalentBoard from "./dashboard/sidebar/TalentBoard";
-import { getPublicTalentFeed } from "@chemisttasker/shared-core";
+import { getPublicTalentFeed, normalizePublicTalentPost } from "@chemisttasker/shared-core";
 import { loadAllTalentPages } from "./dashboard/sidebar/TalentBoard/hooks/loadAllTalentPages";
 import { setCanonical, setPageMeta, setSocialMeta } from "../utils/seo";
 
@@ -46,29 +46,7 @@ export default function PublicTalentBoardPage() {
     try {
       const res: any = await loadAllTalentPages((page) => getPublicTalentFeed({ page, page_size: 200 }));
       const list = Array.isArray(res) ? res : Array.isArray(res?.results) ? res.results : [];
-      const mapped = list.map((post: any) => ({
-        ...post,
-        authorUserId: post.author_user_id ?? post.authorUserId ?? null,
-        roleTitle: post.role_title ?? post.roleTitle ?? null,
-        roleCategory: post.role_category ?? post.roleCategory ?? null,
-        workTypes: post.work_types ?? post.workTypes ?? null,
-        postKind: post.post_kind ?? post.postKind ?? null,
-        coverageRadiusKm: post.coverage_radius_km ?? post.coverageRadiusKm ?? null,
-        openToTravel: post.open_to_travel ?? post.openToTravel ?? null,
-        availabilityMode: post.availability_mode ?? post.availabilityMode ?? null,
-        availabilitySummary: post.availability_summary ?? post.availabilitySummary ?? null,
-        availabilityDays: post.availability_days ?? post.availabilityDays ?? null,
-        availabilityNotice: post.availability_notice ?? post.availabilityNotice ?? null,
-        locationState: post.location_state ?? post.locationState ?? null,
-        locationSuburb: post.location_suburb ?? post.locationSuburb ?? null,
-        locationPostcode: post.location_postcode ?? post.locationPostcode ?? null,
-        referenceCode: post.reference_code ?? post.referenceCode ?? null,
-        explorerRoleType: post.explorer_role_type ?? post.explorerRoleType ?? null,
-        explorerUserId: post.explorer_user_id ?? post.explorerUserId ?? null,
-        explorerProfileId: post.explorer_profile ?? post.explorerProfile ?? null,
-        ratingAverage: post.rating_average ?? post.ratingAverage ?? null,
-        ratingCount: post.rating_count ?? post.ratingCount ?? null,
-      }));
+      const mapped = list.map(normalizePublicTalentPost);
       // A shared QR reference opens only the matching published, public talent listing.
       const requestedRef = new URLSearchParams(window.location.search).get('reference_code');
       setPosts(requestedRef ? mapped.filter((post: any) => post.referenceCode === requestedRef) : mapped);
