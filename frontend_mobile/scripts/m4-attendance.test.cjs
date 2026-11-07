@@ -330,6 +330,9 @@ test('R: live pharmacy switch while A timeline is pending cannot load or reveal 
   const h = screenHarness();
   approvedReview(h);
   h.env.screen = 'review-detail';
+  // Use sessionId alone: selecting pending id during the first fetch would
+  // legitimately issue a second effect request on the next render.
+  h.env.params = { sessionId: '78' };
   const old = deferred();
   h.io.timelineReplies.push(old);
   await h.render();
