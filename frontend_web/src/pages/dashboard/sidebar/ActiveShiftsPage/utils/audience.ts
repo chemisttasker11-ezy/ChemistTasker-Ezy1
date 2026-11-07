@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { Building2, Heart, Network, Sparkles, Store } from 'lucide-react';
-import { SHIFT_AUDIENCE_LEVELS, type EscalationLevelKey } from '@chemisttasker/shared-core';
+import { SHIFT_AUDIENCE_LEVELS, type EscalationLevelKey, type ShiftAudienceKey } from '@chemisttasker/shared-core';
 
 export type AudienceScope = 'internal' | 'platform';
 
@@ -15,7 +15,7 @@ export type AudienceLevel = {
 };
 
 /** Escalation order: the shift is offered to each audience in turn, internal first. */
-const ICONS: Record<EscalationLevelKey, LucideIcon> = {
+const ICONS: Record<ShiftAudienceKey, LucideIcon> = {
     FULL_PART_TIME: Building2,
     LOCUM_CASUAL: Heart,
     OWNER_CHAIN: Store,
