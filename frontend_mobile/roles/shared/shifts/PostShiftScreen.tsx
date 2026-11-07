@@ -167,6 +167,9 @@ export default function PostShiftScreen() {
     }, []);
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
+    // The route change waits for visible native success feedback. This ref is
+    // read only inside event handlers, never during React rendering.
+    const postSuccessDestinationRef = React.useRef<string | null>(null);
     const [pharmacyMenuVisible, setPharmacyMenuVisible] = useState(false);
     const [activeStep, setActiveStep] = useState<StepKey>('details');
     const [calendarMonthAnchor, setCalendarMonthAnchor] = useState<Date>(new Date());
@@ -1233,7 +1236,7 @@ export default function PostShiftScreen() {
     const handleSubmit = async () => {
         // State alone cannot prevent two taps before React renders the loading flag.
         // A second create POST may publish a duplicate shift, so lock synchronously.
-        if (postingBusyRef.current || !hasAccess || hydrating) return;
+        if (postingBusyRef.current || postSuccessDestinationRef.current || !hasAccess || hydrating) return;
         setError('');
         const draft = postingDraft();
         const validation = validateShiftPostingDraft(draft);
@@ -1261,7 +1264,10 @@ export default function PostShiftScreen() {
                 touchedRef.current = false;
             }
             unsaved.markClean();
-            if (surface.persona) router.replace(shiftRoute(surface.persona, { section: 'active' }) as any);
+            postSuccessDestinationRef.current = surface.persona
+                ? shiftRoute(surface.persona, { section: 'active' })
+                : null;
+            // Do not replace here: it unmounts the Snackbar before it is visible.
         } catch (e: any) {
             if (stillCurrent()) {
                 setError(e instanceof ApiError ? e.message : (e?.response?.data?.detail || 'Unable to save shift'));
@@ -1271,6 +1277,14 @@ export default function PostShiftScreen() {
             if (stillCurrent()) setLoading(false);
         }
     };
+
+    const dismissToast = () => {
+        const destination = postSuccessDestinationRef.current;
+        postSuccessDestinationRef.current = null;
+        setToast('');
+        if (destination) router.replace(destination as any);
+    };
+    const showingPostSuccess = toast === 'Shift posted successfully!' || toast === 'Shift updated successfully!';
 
     const chipStyle = (selected: boolean) => [styles.chip, selected ? styles.chipSelected : styles.chipUnselected];
     const chipTextStyle = (selected: boolean) => (selected ? styles.chipTextSelected : styles.chipText);
@@ -1545,7 +1559,7 @@ export default function PostShiftScreen() {
                         <Button
                             mode="contained"
                             onPress={handleSubmit}
-                            disabled={!canSubmit || loading}
+                            disabled={!canSubmit || loading || showingPostSuccess}
                             loading={loading}
                             style={[styles.primaryBtn, styles.navBtnPrimary]}
                             contentStyle={styles.navBtnContent}
@@ -1557,7 +1571,12 @@ export default function PostShiftScreen() {
                 </View>
             </ScrollView>
 
-            <Snackbar visible={!!toast} onDismiss={() => setToast('')} duration={2500}>
+            <Snackbar
+                visible={!!toast}
+                onDismiss={dismissToast}
+                action={showingPostSuccess ? { label: 'View shifts', onPress: dismissToast } : undefined}
+                duration={2500}
+            >
                 {toast}
             </Snackbar>
 
