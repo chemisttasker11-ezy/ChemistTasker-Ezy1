@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { finance, financeStatus, financeToday, type FinanceCustomer, type FinanceCustomerInput, type FinanceItem, type FinanceItemInput, type FinanceInvoice, type FinanceExpense, type FinanceExpenseInput, type FinanceWorksheet } from '@chemisttasker/shared-core';
+import { finance, financeStatus, financeToday, renderFinanceCsv, invoiceCsvRows, expenseCsvRows, worksheetCsvRows, type FinanceCustomer, type FinanceCustomerInput, type FinanceItem, type FinanceItemInput, type FinanceInvoice, type FinanceExpense, type FinanceExpenseInput, type FinanceWorksheet } from '@chemisttasker/shared-core';
 import FinanceInvoiceEditor from './FinanceInvoiceEditor';
 import { receivedInvoiceActions } from './receivedInvoicePolicy';
 import { nativeFileBytes } from '@/features/parity/nativeFileBytes';
@@ -42,6 +42,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const [customers, setCustomers] = useState<FinanceCustomer[]>([]); const [items, setItems] = useState<FinanceItem[]>([]);
   const [invoices, setInvoices] = useState<FinanceInvoice[]>([]); const [receivedInvoices, setReceivedInvoices] = useState<FinanceInvoice[]>([]); const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const running = useRef(false); const [error, setError] = useState('');
+  const [csvBusy, setCsvBusy] = useState(false); const csvPending = useRef(false); const csvGeneration = useRef(0);
   const [editor, setEditor] = useState<{ invoice?: FinanceInvoice; key: string } | null>(null);
   const [form, setForm] = useState<Form | null>(null); const [formError, setFormError] = useState('');
   const [selected, setSelected] = useState<FinanceInvoice | null>(null);
@@ -83,6 +84,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     // refreshing the new authorized scope.
     setInvoices([]); setReceivedInvoices([]); setCustomers([]); setItems([]); setExpenses([]);
     historyGen.current += 1;
+    csvGeneration.current += 1; csvPending.current = false; setCsvBusy(false);
     handledLink.current = '';
     setSelected(null); setHistoryDocument(null); setForm(null); setEditor(null);
     setHistoryLoading(false); setHistoryError(''); setWorksheet(null);
@@ -168,6 +170,44 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       try { file.delete(); } catch { /* best-effort cleanup */ }
     }
   };
+  const shareCsv = async (name: string, rows: (string | number)[][]) => {
+    if (csvPending.current || !user?.id || loading) return;
+    const capturedScope = ownerScope;
+    const request = ++csvGeneration.current;
+    const current = () => scopeRef.current === capturedScope && csvGeneration.current === request;
+    csvPending.current = true;
+    setCsvBusy(true);
+    setError('');
+    let temporary: File | null = null;
+    try {
+      if (!(await Sharing.isAvailableAsync())) throw new Error('CSV sharing is unavailable on this device.');
+      if (!current()) return;
+      // A CSV is plain text, not an invoice PDF or a bearer-token link.
+      const bytes = await nativeFileBytes(new Blob([renderFinanceCsv(rows)],
+        { type: 'text/csv;charset=utf-8' }));
+      if (!current()) return;
+      const safeName = name.replace(/[^a-zA-Z0-9_.-]/g, '_').slice(0, 80);
+      temporary = new File(Paths.cache, 'finance-' + String(user.id) + '-' + request + '-' + safeName);
+      temporary.create({ overwrite: true });
+      await temporary.write(bytes);
+      if (!current()) return;
+      await Sharing.shareAsync(temporary.uri, {
+        dialogTitle: 'Export ' + name,
+        mimeType: 'text/csv',
+        UTI: 'public.comma-separated-values-text',
+      });
+    } catch (failure: any) {
+      if (current()) setError(failure?.message || 'CSV export failed. Retry the export.');
+    } finally {
+      if (temporary) {
+        try { temporary.delete(); } catch { /* best-effort local-only cleanup */ }
+      }
+      if (current()) {
+        csvPending.current = false;
+        setCsvBusy(false);
+      }
+    }
+  };
   const afterSave = async () => {
     const savedScope = ownerScope;
     try { await load(); }
@@ -175,6 +215,9 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   };
   const ask = (title: string, message: string, action: () => Promise<unknown>) => Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Confirm', onPress: () => void run(action) }]);
   const matches = (...values: string[]) => values.join(' ').toLowerCase().includes(search.toLowerCase());
+  const visibleIssued = invoices.filter(i =>
+    (status === 'All' || financeStatus(i) === status) &&
+    matches(i.number, i.payload.customer?.name || '', i.payload.reference));
   const panel = { padding: space.lg, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceBg, marginBottom: space.md };
   const customerForm = (initial?: FinanceCustomer) => {
     const value: FinanceCustomerInput = initial || { name: '', legal_name: '', abn: '', contact_name: '', email: '', phone: '', address: '', payment_terms_days: 14, notes: '', active: true };
@@ -229,9 +272,13 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
       {loading ? <ActivityIndicator accessibilityLabel="Loading finance records" /> : <>
       {tab !== 'GST / BAS' && <Searchbar placeholder={`Search ${tab.toLowerCase()}`} value={search} onChangeText={setSearch} style={{ borderRadius: radius.control, marginBottom: space.lg, backgroundColor: colors.surfaceBg }} />}
       {tab === 'Invoices' && <>
+        <Button mode="outlined" icon="file-delimited" disabled={csvBusy || loading} loading={csvBusy}
+          onPress={() => void shareCsv('workspace-invoices.csv', invoiceCsvRows(visibleIssued))}>
+          Export invoices CSV
+        </Button>
         <View style={{ flexDirection: 'row', gap: 24, marginBottom: 20 }}><View><Text variant="labelMedium">Balance due</Text><Text variant="titleLarge">{money(invoices.filter(i => !i.voided && i.kind === 'invoice').reduce((sum, i) => sum + Number(i.balance), 0))}</Text></View><View><Text variant="labelMedium">Saved</Text><Text variant="titleLarge">{invoices.filter(i => financeStatus(i) === 'Saved').length}</Text></View></View>
         <ResponsiveSegmentedButtons value={status} onValueChange={setStatus} buttons={['All', 'Saved', 'Sent', 'Approved for payment', 'Revision requested', 'Overdue', 'Part paid', 'Paid'].map(value => ({ value, label: value }))} />
-        {invoices.filter(i => (status === 'All' || financeStatus(i) === status) && matches(i.number, i.payload.customer?.name || '', i.payload.reference)).map(i => <Surface key={i.id} elevation={0} style={panel}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleMedium">{i.number}</Text><Text>{i.payload.customer?.name}</Text></View><Chip compact>{financeStatus(i)}</Chip></View><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 16 }}><Text variant="bodySmall">Due {i.payload.due_date}</Text><Text variant="titleMedium">{money(i.balance)}</Text></View><Button mode="outlined" onPress={() => { setHistoryDocument(null); setHistoryError(''); setSelected(i); }}>View invoice</Button></Surface>)}
+        {visibleIssued.map(i => <Surface key={i.id} elevation={0} style={panel}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text variant="titleMedium">{i.number}</Text><Text>{i.payload.customer?.name}</Text></View><Chip compact>{financeStatus(i)}</Chip></View><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 16 }}><Text variant="bodySmall">Due {i.payload.due_date}</Text><Text variant="titleMedium">{money(i.balance)}</Text></View><Button mode="outlined" onPress={() => { setHistoryDocument(null); setHistoryError(''); setSelected(i); }}>View invoice</Button></Surface>)}
         {!error && !invoices.length && <View style={{ padding: space['2xl'], alignItems: 'center', gap: space.md }}><Text variant="titleMedium" style={{ alignSelf: 'stretch', textAlign: 'center' }}>Create your first invoice</Text><Text>Save a customer and an item, then bill your work.</Text><Button mode="contained" onPress={() => setEditor({ key: key() })}>Create invoice</Button></View>}
       </>}
       {tab === 'Received' && <>
@@ -244,10 +291,25 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
         </Surface>)}
         {!error && !receivedInvoices.length && <View style={{ padding: space['2xl'], alignItems: 'center' }}><Text variant="titleMedium">No received invoices yet</Text><Text>Internal invoices will appear after the contractor sends them.</Text></View>}
       </>}
-      {tab === 'Customers' && <><Button icon="plus" onPress={() => customerForm()} style={{ marginBottom: 16 }}>Create customer</Button>{customers.filter(c => matches(c.name, c.abn)).map(c => <Surface key={c.id} elevation={0} style={panel}><Text variant="titleMedium">{c.name}</Text><Text>{c.email || 'No invoice email'}</Text><Text variant="bodySmall">{c.payment_terms_days}-day terms · ABN {c.abn || 'not supplied'}</Text><View style={{ flexDirection: 'row' }}><Button onPress={() => customerForm(c)}>Edit</Button><Button disabled={busy || !c.abn} onPress={() => void run(async () => { await finance.lookupAbn(c.id); await load(); })}>Check ABN</Button></View></Surface>)}</>}
+      {tab === 'Customers' && <><Button icon="plus" onPress={() => customerForm()} style={{ marginBottom: 16 }}>Create customer</Button>{customers.filter(c => matches(c.name, c.abn)).map(c => <Surface key={c.id} elevation={0} style={panel}><Text variant="titleMedium">{c.name}</Text><Text>{c.email || 'No invoice email'}</Text><Text variant="bodySmall">{c.payment_terms_days}-day terms · ABN {c.abn || 'not supplied'}</Text>{c.abn_checked_at && c.abn_result ? <View style={{ marginVertical: space.sm }}>
+          <Text variant="bodyMedium">{String(c.abn_result.entity_name || 'ABR entity not provided')}</Text>
+          <Text variant="bodySmall">{String(c.abn_result.entity_type || 'Entity type unavailable')} · ABN status: {String(c.abn_result.abn_status || 'Unknown')}</Text>
+          <Text variant="bodySmall">{c.abn_result.abn_gst_registered === true ? 'GST registered' : 'GST not registered'} · Checked {new Date(c.abn_checked_at).toLocaleDateString('en-AU')}</Text>
+          <Text variant="bodySmall">ABR information does not establish legal ownership or customer identity.</Text>
+        </View> : null}<View style={{ flexDirection: 'row' }}><Button onPress={() => customerForm(c)}>Edit</Button><Button disabled={busy || !c.abn} onPress={() => void run(async () => { await finance.lookupAbn(c.id); await load(); })}>Check ABN</Button></View></Surface>)}</>}
       {tab === 'Items' && <><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}><Button icon="plus" onPress={() => itemForm()}>Create item</Button><Button disabled={busy} onPress={() => void run(async () => { await finance.seedItems(); await load(); })}>Starter items</Button></View>{items.filter(i => matches(i.code, i.name)).map(i => <Surface key={i.id} elevation={0} style={panel}><Text variant="titleMedium">{i.name}</Text><Text>{i.code} · {money(i.unit_price)} / {i.unit}</Text><Text variant="bodySmall">{i.tax_code.replaceAll('_', ' ')}</Text><Button onPress={() => itemForm(i)}>Edit item</Button></Surface>)}</>}
-      {tab === 'Expenses' && <><Button icon="plus" onPress={() => expenseForm()} style={{ marginBottom: 16 }}>Create expense</Button>{expenses.filter(e => matches(e.supplier, e.description)).map(e => <Surface key={e.id} elevation={0} style={panel}><Text variant="titleMedium">{e.supplier}</Text><Text>{e.description}</Text><Text>{money(e.amount)} · {e.incurred_on}</Text><Text variant="bodySmall">{e.receipts.length} receipts · {e.paid_on ? 'Paid' : 'Unpaid'}</Text><Button onPress={() => expenseForm(e)}>Edit expense</Button></Surface>)}</>}
-      {tab === 'GST / BAS' && <View style={{ gap: 16 }}><Text variant="titleMedium">GST worksheet</Text><Text>Estimate only. Legacy invoices and unsupported adjustments are excluded; this is not a complete BAS.</Text><TextInput mode="outlined" label="Start (YYYY-MM-DD)" value={start} onChangeText={v => { setStart(v); setWorksheet(null); }} /><TextInput mode="outlined" label="End (YYYY-MM-DD)" value={end} onChangeText={v => { setEnd(v); setWorksheet(null); }} /><View style={{ flexDirection: 'row', gap: 8 }}>{(['cash', 'accrual'] as const).map(b => <Chip key={b} selected={basis === b} onPress={() => { setBasis(b); setWorksheet(null); }}>{b === 'cash' ? 'Cash' : 'Accrual'}</Chip>)}</View><Button mode="contained" disabled={busy} onPress={() => void run(async () => setWorksheet(await finance.worksheet(start, end, basis)))}>Calculate worksheet</Button>{worksheet && <Surface elevation={0} style={panel}>{[['G1 · Sales', worksheet.G1], ['1A · GST on sales', worksheet['1A']], ['1B · GST credits', worksheet['1B']], ['Estimated net GST', worksheet.estimated_gst_net]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }}><Text>{label}</Text><Text>{money(amount)}</Text></View>)}{worksheet.warnings.map(w => <Text key={w} variant="bodySmall">{w}</Text>)}<Text>Excluded legacy invoices: {worksheet.excluded_legacy_invoice_count}</Text></Surface>}</View>}
+      {tab === 'Expenses' && <>
+        <Button mode="outlined" icon="file-delimited" disabled={csvBusy || loading} loading={csvBusy}
+          onPress={() => void shareCsv('workspace-expenses.csv', expenseCsvRows(expenses))}>
+          Export expenses CSV
+        </Button>
+        <Button icon="plus" onPress={() => expenseForm()} style={{ marginBottom: 16 }}>Create expense</Button>{expenses.filter(e => matches(e.supplier, e.description)).map(e => <Surface key={e.id} elevation={0} style={panel}><Text variant="titleMedium">{e.supplier}</Text><Text>{e.description}</Text><Text>{money(e.amount)} · {e.incurred_on}</Text><Text variant="bodySmall">{e.receipts.length} receipts · {e.paid_on ? 'Paid' : 'Unpaid'}</Text><Button onPress={() => expenseForm(e)}>Edit expense</Button></Surface>)}</>}
+      {tab === 'GST / BAS' && <View style={{ gap: 16 }}><Text variant="titleMedium">GST worksheet</Text><Text>Estimate only. Legacy invoices and unsupported adjustments are excluded; this is not a complete BAS.</Text><TextInput mode="outlined" label="Start (YYYY-MM-DD)" value={start} onChangeText={v => { setStart(v); setWorksheet(null); }} /><TextInput mode="outlined" label="End (YYYY-MM-DD)" value={end} onChangeText={v => { setEnd(v); setWorksheet(null); }} /><View style={{ flexDirection: 'row', gap: 8 }}>{(['cash', 'accrual'] as const).map(b => <Chip key={b} selected={basis === b} onPress={() => { setBasis(b); setWorksheet(null); }}>{b === 'cash' ? 'Cash' : 'Accrual'}</Chip>)}</View><Button mode="contained" disabled={busy} onPress={() => void run(async () => setWorksheet(await finance.worksheet(start, end, basis)))}>Calculate worksheet</Button>{worksheet && <>
+          <Button mode="outlined" icon="file-delimited" disabled={csvBusy || loading} loading={csvBusy}
+            onPress={() => void shareCsv('DRAFT-gst-worksheet.csv', worksheetCsvRows(worksheet))}>
+            Export draft worksheet CSV
+          </Button>
+          <Surface elevation={0} style={panel}>{[['G1 · Sales', worksheet.G1], ['1A · GST on sales', worksheet['1A']], ['1B · GST credits', worksheet['1B']], ['Estimated net GST', worksheet.estimated_gst_net]].map(([label, amount]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }}><Text>{label}</Text><Text>{money(amount)}</Text></View>)}{worksheet.warnings.map(w => <Text key={w} variant="bodySmall">{w}</Text>)}<Text>Excluded legacy invoices: {worksheet.excluded_legacy_invoice_count}</Text></Surface></>}</View>}
       </>}
       </View>
     </ScrollView>}
