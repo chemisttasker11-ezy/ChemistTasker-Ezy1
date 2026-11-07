@@ -123,3 +123,70 @@ test('R window_range: mounted posting screen passes the window to its multiple p
   assert.equal(picker.props.validRange.startDate.getTime(), new Date('2026-11-07T00:00:00+11:00').getTime());
   assert.equal(picker.props.validRange.endDate.getTime(), new Date('2027-03-31T23:59:59+11:00').getTime());
 });
+
+test('R midnight rollover: mounted Post Shift picker must advance its minimum day on rerender', () => {
+  let now = '2026-11-07T23:58:00+11:00';
+  class MovingDate extends Date {
+    constructor(...args) { super(...(args.length ? args : [now])); }
+    static now() { return new Date(now).getTime(); }
+  }
+  const policy = load('shared-core/src/domains/shifts/postingWindow.ts', {}, true);
+  const core = { ...policy, isPrivateShiftBooking: () => false, expandShiftDraftSlots: () => [],
+    getPharmacyHoursForDate: () => null, pharmacySoftwareDefaults: () => [], normalizeShiftRequirements: () => [],
+    canNotifyShiftChainMembers: () => false };
+  const helpers = load('frontend_mobile/roles/shared/shifts/PostShiftScreen.helpers.ts', { '@chemisttasker/shared-core': core });
+  const memo = [];
+  let memoIndex = 0;
+  const hooks = {
+    ...react,
+    useMemo(fn, deps) {
+      const index = memoIndex++;
+      const previous = memo[index];
+      if (previous && deps && previous.deps &&
+          previous.deps.length === deps.length && deps.every((v, i) => v === previous.deps[i])) {
+        return previous.value;
+      }
+      const next = { value: fn(), deps: deps ? [...deps] : null };
+      memo[index] = next;
+      return next.value;
+    },
+    useState: value => [typeof value === 'function' ? value() : value, () => {}],
+  };
+  hooks.default = hooks;
+  const components = Object.fromEntries(
+    ['NativeShiftBoardPreview', 'PostShiftDetailsStep', 'PostShiftSkillsStep', 'PostShiftVisibilityStep',
+      'PostShiftProgress', 'PostShiftPayRateStep', 'PostShiftTimetableStep']
+      .map(name => [`./${name}`, { default: name }]));
+  const imports = { ...common, ...components, react: hooks, '@chemisttasker/shared-core': core,
+    '@chemisttasker/shared-core/skills_registry.json': { default: {} },
+    './PostShiftScreen.helpers': helpers,
+    '@/components/security/GuardedModal': { GuardedDatePickerModal: 'DatePickerModal', GuardedTimePickerModal: 'TimePickerModal' },
+    'expo-router': { useFocusEffect: () => {}, useLocalSearchParams: () => ({}), useRouter: () => ({}) },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    '@/context/AuthContext': { useAuth: () => ({ hasCapability: () => true }) },
+    '@/components/ui': { ContentState: 'ContentState' },
+    './useShiftSurface': { useShiftSurface: () => ({ ready: true, persona: 'owner', canManageShifts: true, scopeKey: 'owner' }) },
+    './shiftSurface': { shiftRoute: () => '' },
+    '../forms/useUnsavedChangesGuard': { useUnsavedChangesGuard: () => ({ markClean() {} }) },
+  };
+  const relative = 'frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx';
+  const source = fs.readFileSync(path.join(root, relative), 'utf8');
+  const output = ts.transpileModule(source, { compilerOptions: {
+    module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
+    jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
+  } }).outputText;
+  const module = { exports: {} };
+  vm.runInNewContext(output, { module, exports: module.exports, Date: MovingDate, console, URLSearchParams,
+    require(name) { if (!(name in imports)) throw Error(`Unmocked import ${name}`); return imports[name]; } });
+  const picker = () => {
+    memoIndex = 0;
+    return nodes(module.exports.default()).find(n => n.type === 'DatePickerModal' && n.props.mode === 'multiple');
+  };
+
+  assert.equal(picker().props.validRange.startDate.getTime(),
+    new Date('2026-11-07T00:00:00+11:00').getTime());
+  now = '2026-11-08T00:02:00+11:00';
+  assert.equal(picker().props.validRange.startDate.getTime(),
+    new Date('2026-11-08T00:00:00+11:00').getTime(),
+    'a wizard left open overnight must not permit yesterday');
+});
