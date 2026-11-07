@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 const require = createRequire(import.meta.url);
@@ -23,7 +23,8 @@ function transpile(path, imports) {
 }
 test('C web audience levels retain existing labels, reach, scope, order, icons and lookup', () => {
   // The web production module must execute; the shared contract is imported from production source.
-  const shared = transpile('../../../../../../../shared-core/src/domains/shifts/audience.ts', {});
+  const sharedPath = new URL('../../../../../../../shared-core/src/domains/shifts/audience.ts', import.meta.url);
+  const shared = existsSync(sharedPath) ? transpile('../../../../../../../shared-core/src/domains/shifts/audience.ts', {}) : {};
   const web = transpile('./audience.ts', {
     'lucide-react': icons, '@chemisttasker/shared-core': shared,
   });
