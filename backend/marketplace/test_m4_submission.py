@@ -59,7 +59,7 @@ class M4MarketplaceSubmissionContracts(TestCase):
         MarketplaceTermsAcceptance.objects.create(user=user, version='2026-09')
         return user, profile
 
-    def client(self, user=None):
+    def api_client(self, user=None):
         http = APIClient()
         if user is not None:
             http.force_authenticate(user=user)
@@ -101,7 +101,7 @@ class M4MarketplaceSubmissionContracts(TestCase):
         return {**doc, **change}
 
     def create_listing(self, user=None):
-        response = self.client(user or self.tom).post(
+        response = self.api_client(user or self.tom).post(
             API + 'listings/', self.payload(), format='json',
         )
         self.assertEqual(response.status_code, 201, response.data)
@@ -110,7 +110,7 @@ class M4MarketplaceSubmissionContracts(TestCase):
     def test_owner_listing_create_is_idempotent_with_frozen_payload(self):
         value = self.payload()
         url = API + 'listings/'
-        client = self.client(self.tom)
+        client = self.api_client(self.tom)
         first = client.post(url, value, format='json')
         self.assertEqual(first.status_code, 201, first.data)
         second = client.post(url, value, format='json')
@@ -132,22 +132,22 @@ class M4MarketplaceSubmissionContracts(TestCase):
         value = self.payload()
         for user in (self.nadia, self.omar, self.ali, self.zoe):
             with self.subTest(role=user.role, actor=user.email):
-                rejected = self.client(user).post(API + 'listings/', value, format='json')
+                rejected = self.api_client(user).post(API + 'listings/', value, format='json')
                 self.assertEqual(rejected.status_code, 403, rejected.data)
         self.assertFalse(MarketplaceListing.objects.exists())
-        no_login = self.client().post(API + 'listings/', value, format='json')
+        no_login = self.api_client().post(API + 'listings/', value, format='json')
         self.assertEqual(no_login.status_code, 401)
 
     def test_personal_category_options_are_role_scoped_and_read_does_not_grant_writes(self):
         for user in (self.tom, self.omar, self.ali, self.zoe):
-            options = self.client(user).get(API + 'me/listing-options/')
+            options = self.api_client(user).get(API + 'me/listing-options/')
             self.assertEqual(options.status_code, 200, options.data)
-            self.assertIn(self.personal.pk, {
-                row['id'] for row in options.data['personal_categories'],
-            })
+            self.assertIn(self.personal.pk, set(
+                row['id'] for row in options.data['personal_categories']
+            ))
             if user != self.tom:
                 self.assertEqual(options.data['pharmacy_categories'], [])
-        anon = self.client()
+        anon = self.api_client()
         self.assertEqual(anon.get(API + 'me/listing-options/').status_code, 401)
         self.assertEqual(anon.get(API + 'listings/').status_code, 200)
         self.assertEqual(anon.get(API + 'categories/').status_code, 200)
@@ -155,8 +155,8 @@ class M4MarketplaceSubmissionContracts(TestCase):
     def test_version_and_publication_changes_come_only_from_the_creator(self):
         made = self.create_listing()
         listing_id = made.data['id']
-        owner = self.client(self.tom)
-        foreign = self.client(self.nadia)
+        owner = self.api_client(self.tom)
+        foreign = self.api_client(self.nadia)
         url = API + f'listings/{listing_id}/'
         self.assertEqual(foreign.patch(
             url, {'title': 'Foreign edit', 'expected_version': 1},
@@ -193,20 +193,20 @@ class M4MarketplaceSubmissionContracts(TestCase):
         made = self.create_listing()
         image_url = API + f'listings/{made.data["id"]}/images/'
         image = SimpleUploadedFile('photo.jpg', b'not an image', content_type='image/jpeg')
-        self.assertEqual(self.client(self.nadia).post(
+        self.assertEqual(self.api_client(self.nadia).post(
             image_url, {'image': image}, format='multipart',
         ).status_code, 403)
         image = SimpleUploadedFile('photo.jpg', b'not an image', content_type='image/jpeg')
-        invalid = self.client(self.tom).post(
+        invalid = self.api_client(self.tom).post(
             image_url, {'image': image}, format='multipart',
         )
         self.assertEqual(invalid.status_code, 400, invalid.data)
         oversize = SimpleUploadedFile(
             'large.jpg', b'0' * (4 * 1024 * 1024 + 1), content_type='image/jpeg',
         )
-        refused = self.client(self.tom).post(
+        refused = self.api_client(self.tom).post(
             image_url, {'image': oversize}, format='multipart',
         )
         self.assertEqual(refused.status_code, 413, refused.data)
         self.assertEqual(MarketplaceImage.objects.count(), 0)
-        self.assertEqual(self.client().post(image_url, {}, format='multipart').status_code, 401)
+        self.assertEqual(self.api_client().post(image_url, {}, format='multipart').status_code, 401)
