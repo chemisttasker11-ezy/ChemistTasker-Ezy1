@@ -94,7 +94,7 @@ export default function ShiftsScreen() {
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.pageBg },
   state: { margin: space.lg },
-  top: { gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm },
+  top: { gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.md },
   subtitle: {
     color: colors.textSecondary,
     fontFamily: font.inter.regular,

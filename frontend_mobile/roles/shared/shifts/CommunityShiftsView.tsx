@@ -694,6 +694,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     state: {
+        width: undefined,
         margin: space.lg,
     },
 });

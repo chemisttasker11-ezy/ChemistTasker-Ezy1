@@ -70,6 +70,7 @@ export type ShiftsBoardProps = {
     filters?: FilterConfig;
     onRefresh?: () => Promise<void> | void;
     totalCount?: number;
+    pageExclusions?: number;
     page?: number;
     pageSize?: number;
     onPageChange?: (page: number) => void;

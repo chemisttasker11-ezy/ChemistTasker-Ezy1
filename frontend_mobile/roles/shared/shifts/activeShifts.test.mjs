@@ -197,7 +197,7 @@ test('scope keying: surface keys differ per scope and persona for isolated cachi
   // Changing pharmacy scope produces distinct keys, preventing stale response leakage
   assert.notEqual(ownerPharm4.scopeKey, ownerPharm9.scopeKey);
   assert.notEqual(ownerPharm4.scopeKey, adminPharm7.scopeKey);
-});
+});
 // ==========================================
 // 4. Request Generations & Scope Key Isolation
 // ==========================================
@@ -250,7 +250,7 @@ test('scope keying: buildActiveShiftsScopeKey binds surface scope with shiftId',
 
   // Key differs when scopeKey changes (preventing pharmacy/workspace switch bleed)
   assert.notEqual(shift42Key, otherScopeKey);
-});
+});
 
 test('W3 Shift Centre notification links select only valid shift-owned slots', () => {
   assert.equal(positiveShiftLinkId('52'), 52);
@@ -284,4 +284,15 @@ test('linked shift scroll offset is isolated by shift and workspace', () => {
   assert.equal(getLinkedShiftScrollY(offset, 41, 'pharmacy:8'), null);
   assert.equal(getLinkedShiftScrollY(null, 41, 'pharmacy:7'), null);
   assert.equal(getLinkedShiftScrollY({ ...offset, y: NaN }, 41, 'pharmacy:7'), null);
+});
+
+
+test('slot signature recomputation preserves state identity until values change', () => {
+  const previous = { 1: { 2: true } };
+  assert.equal(runtime.unchangedSlotState(previous, { 1: { 2: true } }), previous);
+  const changed = { 1: { 2: false } };
+  assert.equal(runtime.unchangedSlotState(previous, changed), changed);
+  const seen = { '1:PUBLIC:2': 'baseline' };
+  const result = mergeSlotSignatures(seen, {});
+  assert.equal(runtime.unchangedSlotState(seen, result.mergedSeen), seen);
 });

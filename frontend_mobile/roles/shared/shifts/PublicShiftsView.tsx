@@ -121,6 +121,7 @@ function PublicShiftsBoard({
     const [page, setPage] = useState(1);
     const pageSize = 10;
     const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
+    const [pageExclusions, setPageExclusions] = useState(0);
     const [savedShiftIds, setSavedShiftIds] = useState<Set<number>>(new Set());
     const [savedMap, setSavedMap] = useState<Map<number, number>>(new Map());
     const [boardTab, setBoardTab] = useState<'browse' | 'saved' | 'interested' | 'rejected' | 'accepted'>(
@@ -209,6 +210,7 @@ function PublicShiftsBoard({
 
                 setShifts((prev) => (prev.length === 0 && available.length === 0 ? prev : available));
                 setTotalCount(publicShifts.count);
+                setPageExclusions((publicShifts.results ?? []).length - available.length);
 
                 const nextShiftIds = new Set<number>();
                 const nextSlotIds = new Set<number>();
@@ -741,6 +743,7 @@ function PublicShiftsBoard({
                     filters={filters}
                     onFiltersChange={handleFiltersChange}
                     totalCount={totalCount}
+                    pageExclusions={pageExclusions}
                     page={page}
                     pageSize={pageSize}
                     onPageChange={setPage}
@@ -792,6 +795,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     state: {
+        width: undefined,
         margin: space.lg,
     },
     placeholderText: {
