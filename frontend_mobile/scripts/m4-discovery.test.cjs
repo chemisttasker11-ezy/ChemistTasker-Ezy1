@@ -255,3 +255,165 @@ test('R OTHER_STAFF technician receives a pathway from server role_code, not gen
   assert.ok(h.calls.some(c=>c[0]==='role'),'real listing-options context must be queried');
   h.host.unmount();
 });
+
+
+test('R #1 actual native role/state/work/skill/date/travel/placement filters find page-two-only candidate and clear',async()=>{
+  const h=boardHarness();
+  const other={...fixture(1),location_state:'NSW',location_suburb:'Sydney',open_to_travel:false};
+  const target={...fixture(2,'Intern'),work_types:['PLACEMENT'],skills:['WEBSTER_PACKING_DAA'],
+    open_to_travel:true,availability_days:[{date:'2027-03-10'}]};
+  h.pages.push({count:2,next:'/api/v1/explorer-posts/public-feed/?page=2',results:[other]});
+  h.pages.push({count:2,next:null,results:[other,target]}); // duplicate ID must be removed
+  let tree=await h.render();
+  assert.equal(collect(tree,'Card').length,2,'all complete pages deduped before filtering');
+  const choose=async label=>{
+    const chip=collect(tree,'Chip').find(p=>p.children===label);
+    assert.ok(chip,'missing rendered filter chip '+label);
+    chip.onPress(); tree=await h.render();
+  };
+  await choose('Intern'); await choose('QLD'); await choose('Placement');
+  await choose('WEBSTER_PACKING_DAA'); await choose('Travel'); await choose('Placement');
+  let search=collect(tree,'TextInput').find(p=>p.accessibilityLabel==='Search talent');
+  assert.ok(search);
+  search.onChangeText('REF-2');tree=await h.render();
+  for(const [label,value] of [
+    ['Availability start (YYYY-MM-DD)','2027-03-09'],
+    ['Availability end (YYYY-MM-DD)','2027-03-11'],
+  ]){
+    const input=collect(tree,'TextInput').find(p=>p.label===label);
+    assert.ok(input,label);input.onChangeText(value);tree=await h.render();
+  }
+  assert.equal(collect(tree,'Card').length,1,'only the second-page matching candidate remains');
+  const count=collect(tree,'Text').map(p=>String(p.children)).join(' ');
+  assert.match(count,/1 public candidates/);
+  collect(tree,'Button').find(p=>p.children==='Clear filters').onPress();
+  tree=await h.render();
+  assert.equal(collect(tree,'Card').length,2,'clear restores full deduplicated collection');
+  assert.equal(h.calls.length,2,'client filtering does not issue unauthorized server filter URLs');
+  h.host.unmount();
+});
+
+test('C #3 stale account response cannot overwrite new account, even on success', async()=>{
+  const h=boardHarness(), old=deferred();
+  h.pages.push(old);
+  let tree=await h.render();
+  assert.equal(h.calls.length,1);
+  h.user.current={id:99,role:'OWNER'};
+  h.pages.push({count:1,results:[fixture(9,'Pharmacist')],next:null});
+  tree=await h.render();
+  old.resolve({count:1,results:[fixture(1,'Technician')],next:null});
+  tree=await h.render();
+  assert.equal(h.calls.length,2);
+  assert.equal(collect(tree,'Card').length,1);
+  assert.ok(collect(tree,'Text').some(p=>p.children==='Pharmacist'));
+  h.host.unmount();
+});
+
+test('C #3 same-render retry has one pending request and invalid next URL is never fetched',async()=>{
+  const h=boardHarness();
+  h.pages.push(Error('Initial public outage'));
+  let tree=await h.render();
+  const retry=collect(tree,'Button').find(p=>/^(Retry|Load more talent)$/.test(String(p.children)));
+  assert.ok(retry,'failure presents a working retry');
+  const pending=deferred();
+  h.pages.push(pending);
+  retry.onPress(); retry.onPress(); // no render between attempts
+  await h.render();
+  assert.equal(h.calls.length,2,'synchronous pending mutex prevents a duplicate request');
+  pending.resolve({count:1,next:'https://untrusted.example/feed/?page=999',results:[fixture(7)]});
+  tree=await h.render();
+  assert.equal(h.calls.length,2,'foreign pagination URL never drives a request');
+  assert.equal(collect(tree,'Card').length,1);
+  h.host.unmount();
+});
+
+test('R #4 blog search stays trimmed through topic changes, page two and clearing topic',async()=>{
+  const h=articleHarness('blog');
+  h.pages.push({results:[article(1)],next:null});
+  let tree=await h.render();
+  const bar=collect(tree,'Searchbar')[0];
+  assert.ok(bar);h.pages.push({results:[article(2)],next:null});
+  bar.onChangeText('  clinical handover  ');tree=await h.render();
+  assert.equal(h.calls.at(-1).q,'clinical handover');
+  h.pages.push({results:[article(3,'career')],next:'/api/v1/public-hub/articles/?page=2'});
+  collect(tree,'Chip').find(p=>p.children==='Career').onPress();tree=await h.render();
+  assert.equal(h.calls.at(-1).kind,'blog');
+  assert.equal(h.calls.at(-1).topic,'career');
+  assert.equal(h.calls.at(-1).q,'clinical handover');
+  h.pages.push({results:[article(4,'career')],next:null});
+  collect(tree,'Button').find(p=>p.children==='Load more articles').onPress();
+  tree=await h.render();
+  assert.equal(h.calls.at(-1).page,2);
+  assert.equal(h.calls.at(-1).q,'clinical handover');
+  assert.equal(collect(tree,'Card').length,2);
+  h.pages.push({results:[article(5)],next:null});
+  collect(tree,'Chip').find(p=>p.children==='All topics').onPress();
+  await h.render();
+  assert.equal(h.calls.at(-1).topic,undefined,'clearing topic keeps kind but removes topic');
+  assert.equal(h.calls.at(-1).kind,'blog');
+  assert.equal(h.calls.at(-1).page,undefined,'new topic starts on page one');
+  h.host.unmount();
+});
+
+test('R #5 all OTHER_STAFF subtypes use server role_code and real pathway text',async()=>{
+  const paths={
+    TECHNICIAN:'Dispensary workflow and workplace development',
+    ASSISTANT:'Customer service and workplace development',
+    INTERN:'Internship, registration and workplace development',
+    STUDENT:'Study, placement and transition to practice',
+  };
+  for(const [roleCode,expected] of Object.entries(paths)){
+    const h=learningHarness();
+    h.options.push({role_code:roleCode});
+    h.results.push({results:[],next:null});
+    const tree=await h.render();
+    assert.ok(collect(tree,'Text').some(p=>p.children===expected),roleCode);
+    assert.ok(h.calls.some(c=>c[0]==='role'));
+    h.host.unmount();
+  }
+});
+
+test('C #5 previously supported Tom/Omar/Zoe pathways retain their own copy',async()=>{
+  for(const [role,expected] of [
+    ['OWNER','Business, leadership and pharmacy operations'],
+    ['PHARMACIST','Clinical practice, career and professional development'],
+    ['EXPLORER','Career discovery and pharmacy pathways'],
+  ]){
+    const h=learningHarness();
+    h.user.current={id:51,role};
+    h.options.push({role_code:role});
+    h.results.push({results:[],next:null});
+    const tree=await h.render();
+    assert.ok(collect(tree,'Text').some(p=>p.children===expected),role);
+    h.host.unmount();
+  }
+});
+
+test('R #5 role-options error shows neutral pathway then retry recovers',async()=>{
+  const h=learningHarness();
+  h.options.push(Error('Permission denied'));
+  h.results.push({results:[],next:null});
+  let tree=await h.render();
+  assert.ok(collect(tree,'Text').some(p=>String(p.children).includes('Explore professional learning')));
+  const retry=collect(tree,'Button').find(p=>p.children==='Retry pathway');
+  assert.ok(retry,'the real pathway retry is exposed on service failure');
+  h.options.push({role_code:'ASSISTANT'});
+  retry.onPress();tree=await h.render();
+  assert.ok(collect(tree,'Text').some(p=>p.children==='Customer service and workplace development'));
+  h.host.unmount();
+});
+
+test('R #5 switching OTHER_STAFF account ignores delayed old role-code response',async()=>{
+  const h=learningHarness(), pending=deferred();
+  h.options.push(pending);
+  h.results.push({results:[],next:null});
+  await h.render();
+  h.user.current={id:202,role:'OTHER_STAFF'};
+  h.options.push({role_code:'INTERN'});
+  let tree=await h.render();
+  pending.resolve({role_code:'TECHNICIAN'});
+  tree=await h.render();
+  assert.ok(collect(tree,'Text').some(p=>p.children==='Internship, registration and workplace development'));
+  assert.equal(collect(tree,'Text').some(p=>p.children==='Dispensary workflow and workplace development'),false);
+  h.host.unmount();
+});
