@@ -83,11 +83,11 @@ function createHost(apiOverrides = {}) {
     '@chemisttasker/shared-core': core,
     '../../../contexts/WorkspaceContext': { useWorkspace: () => ({
       workspace: 'platform', selectedPharmacyId: null }) },
-    './ShiftsBoard': { default: 'ShiftsBoard' },
+    './ShiftsBoard': { __esModule: true, default: 'ShiftsBoard' },
     './ShiftsBoard/utils/submitCounterOffer': { submitCounterOfferDirect: async () => {} },
-    './ShiftsBoard/components/ShiftEngagementTermsDialog': { default: 'ShiftEngagementTermsDialog' },
-    '../../../components/ui/PageHeader': { default: 'PageHeader' },
-    '../../../components/ui/SegmentTabs': { default: 'SegmentTabs' },
+    './ShiftsBoard/components/ShiftEngagementTermsDialog': { __esModule: true, default: 'ShiftEngagementTermsDialog' },
+    '../../../components/ui/PageHeader': { __esModule: true, default: 'PageHeader' },
+    '../../../components/ui/SegmentTabs': { __esModule: true, default: 'SegmentTabs' },
     '../shiftCenter/StaffShiftCentreTabs': tabs,
   };
   const publicBoard = execute('../sidebar/PublicShiftsPage.tsx', base);
