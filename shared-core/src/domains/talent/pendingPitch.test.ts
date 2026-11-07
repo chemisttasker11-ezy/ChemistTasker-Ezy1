@@ -5,6 +5,31 @@ import { createBrowserPendingPitchStore, createPendingPitchStore, pitchIntentSco
 import { claimUserBrowserStorage, clearUserBrowserStorage } from '../../../../frontend_web/landing_next/shared/browser-session';
 
 const key = '165416cf-c485-4aad-8914-d7580f831843';
+
+it.each([400, 500])('only a pitch POST 400 rejects its captured intent (%s)', async (status) => {
+  const store = fixture().open();
+  const intent = await store.acquire({ headline: 'Original' }, 'EXPLORER');
+  configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => 'token',
+    fetchImpl: async () => new Response('{}', { status, headers: { 'content-type': 'application/json' } }) });
+  await expect(sendPendingPitch(store, intent, () => true)).rejects.toMatchObject({ status });
+  expect(Boolean((await store.read())?.rejected)).toBe(status === 400);
+});
+
+it('does not reject an unrelated in-flight intent when another operation returns 400', async () => {
+  const store = fixture().open();
+  const intent = await store.acquire({ headline: 'Tab B' }, 'EXPLORER');
+  let respond!: (response: Response) => void;
+  configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => 'token',
+    fetchImpl: () => new Promise<Response>((resolve) => { respond = resolve; }) });
+  const pending = sendPendingPitch(store, intent, () => true);
+  await vi.waitFor(() => expect(respond).toBeDefined());
+  const onboarding = Promise.reject({ status: 400 });
+  await expect(onboarding).rejects.toMatchObject({ status: 400 });
+  expect((await store.read())?.rejected).toBeUndefined();
+  await expect(store.resolve(intent.key)).rejects.toThrow();
+  respond(new Response('{"id":7}', { status: 201, headers: { 'content-type': 'application/json' } }));
+  expect(await pending).toBe(7);
+});
 function fixture() {
   const records = new Map<string, string>();
   let queue = Promise.resolve();

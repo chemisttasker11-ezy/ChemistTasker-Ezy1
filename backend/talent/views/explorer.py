@@ -122,6 +122,9 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         self._require_create_access()
+        # Lock order: user, receipt, then newcomer profile.
+        request.user = type(request.user).objects.select_for_update().get(pk=request.user.pk)
+        self._require_create_access()
         try:
             key = serializers.UUIDField().run_validation(request.headers.get('Idempotency-Key'))
         except ValidationError:
@@ -142,7 +145,7 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
                 code, detail, status = 'IDEMPOTENCY_PAYLOAD_MISMATCH', 'This pitch was saved with different details. Open the original pitch for editing.', 409
             elif receipt.post_id is None:
                 code, detail = 'PITCH_DELETED', 'This pitch was deleted. Review your pitches before starting a new one.'
-            elif receipt.replay_expires_at <= timezone.now():
+            elif receipt.response_body is None or receipt.replay_expires_at <= timezone.now():
                 code, detail = 'IDEMPOTENCY_REPLAY_EXPIRED', 'This save receipt has expired. Review the original pitch before starting a new one.'
             if code:
                 return Response({'code': code, 'detail': detail, 'post_id': receipt.original_post_id}, status=status)

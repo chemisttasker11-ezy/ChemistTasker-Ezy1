@@ -105,7 +105,17 @@ export async function sendPendingPitch(store: ReturnType<typeof createPendingPit
   assertAccount();
   if (intent.terminalCode || intent.rejected) throw new Error('Review the original pitch before continuing.');
   if (intent.acknowledged && intent.resultId) return intent.resultId;
-  const result = await createExplorerPost(intent.exactPayload, intent.key, signal);
+  let result;
+  try {
+    result = await createExplorerPost(intent.exactPayload, intent.key, signal);
+  } catch (error: any) {
+    if (isCurrentAccount() && error?.status === 400 && error?.payload?.code !== 'IDEMPOTENCY_KEY_REQUIRED') {
+      await store.reject(intent.key);
+    } else if (isCurrentAccount() && ['IDEMPOTENCY_PAYLOAD_MISMATCH', 'PITCH_DELETED', 'IDEMPOTENCY_REPLAY_EXPIRED'].includes(error?.payload?.code)) {
+      await store.reconcile(intent.key, error.payload.code, error.payload.post_id);
+    }
+    throw error;
+  }
   assertAccount();
   await store.acknowledge(intent.key, result.id);
   assertAccount();

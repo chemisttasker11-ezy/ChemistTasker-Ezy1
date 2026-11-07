@@ -122,6 +122,12 @@ class PitchReceiptTests(TestCase):
         self.assertEqual(submit(self.user, self.key).status_code, 410)
         self.assertEqual(ExplorerPost.objects.count(), 1)
 
+    def test_scrubbed_receipt_is_expired_even_before_app_clock_expiry(self):
+        self.assertEqual(submit(self.user, self.key).status_code, 201)
+        self.ledger().update(response_body=None)
+        response = submit(self.user, self.key)
+        self.assertEqual((response.status_code, response.data['code']), (410, 'IDEMPOTENCY_REPLAY_EXPIRED'))
+
     def test_account_soft_deletion_purges_receipts(self):
         from users.account_deletion import _anonymize_user
         submit(self.user, self.key)
@@ -193,6 +199,45 @@ class PitchReceiptTests(TestCase):
 class PitchPostgresConcurrencyTests(TransactionTestCase):
     def setUp(self):
         self.user, self.key = worker(), str(uuid4())
+
+    def test_deletion_after_eligibility_refuses_create(self):
+        from django.db import transaction
+        from talent.models import PitchCreateRequest
+        from talent.views.explorer import ExplorerPostViewSet
+        from users.account_deletion import _anonymize_user
+        barrier, results = Barrier(2), Queue()
+        original = ExplorerPostViewSet._require_create_access
+        calls = 0
+        def paused(view):
+            nonlocal calls
+            original(view)
+            calls += 1
+            if calls == 1:
+                barrier.wait(timeout=10)
+                barrier.wait(timeout=10)
+        def post():
+            close_old_connections()
+            try:
+                response = submit(User.objects.get(pk=self.user.pk), self.key)
+                results.put(response.status_code)
+            except Exception as exc:
+                results.put(repr(exc))
+            finally:
+                close_old_connections()
+        with mock.patch.object(ExplorerPostViewSet, '_require_create_access', paused):
+            thread = Thread(target=post)
+            thread.start()
+            try:
+                barrier.wait(timeout=10)
+                with transaction.atomic(), mock.patch('users.account_deletion.transaction.on_commit'):
+                    _anonymize_user(User.objects.get(pk=self.user.pk))
+            finally:
+                barrier.wait(timeout=10)
+                thread.join(timeout=30)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(results.get(timeout=5), 403)
+        self.assertFalse(ExplorerPost.objects.filter(author_user_id=self.user.pk).exists())
+        self.assertFalse(PitchCreateRequest.objects.filter(author_id=self.user.pk).exists())
 
     def race(self, requests):
         barrier, results = Barrier(2), Queue()
