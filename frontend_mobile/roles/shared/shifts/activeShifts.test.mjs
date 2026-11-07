@@ -296,3 +296,6 @@ test('slot signature recomputation preserves state identity until values change'
   const result = mergeSlotSignatures(seen, {});
   assert.equal(runtime.unchangedSlotState(seen, result.mergedSeen), seen);
 });
+
+// Exercise mounted Shift Centre and real ActiveShiftCards in standard mobile CI.
+import '../../../scripts/m5-active-shifts.test.cjs';
