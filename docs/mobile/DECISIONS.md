@@ -39,8 +39,11 @@ B. **Leftover folder `C:\m`** (a temporary build copy, ~1.5 GB, no longer a git 
 
 6g. **Organization tabs hide when Lina lacks the capability** (same as web), instead of showing a tab that leads
    to "not allowed".
-6h. **Admin Attendance approvals and Roster need staff AND roster rights**, as web does (Argon suggested roster
-   rights alone; web parity wins).
+6h. **Admin Attendance approvals and Roster require MANAGE_ROSTER on the selected pharmacy**, not a combined
+   MANAGE_STAFF + MANAGE_ROSTER grant. The earlier assumption that web required both capabilities was incorrect.
+   Web parity wins: frontend_web/src/main.tsx gates attendance reviews and workforce timesheets with
+   requiredCapability="MANAGE_ROSTER"; backend/workforce/roster/permissions.py delegates to
+   workforce/permissions.py:can_manage_roster_pharmacy. M4-01 preserves server scope and roster-only delegates.
 6i. **Learning for owner/org is not wired yet**: the mobile Learning screen is still a placeholder; listed as a gap.
 
 ## SDK upgrade

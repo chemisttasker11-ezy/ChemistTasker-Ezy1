@@ -494,13 +494,24 @@ function ReviewDetail({screen,row,timeline,loading,error,onReload}:{screen:Atten
   const [reason,setReason]=useState('');
   const [busy,setBusy]=useState(false);
   const [localError,setLocalError]=useState('');
+  const activeRef=useRef(true);
+  const submitRef=useRef(false);
+  useEffect(()=>{activeRef.current=true;return()=>{activeRef.current=false;};},[]);
   const act=async(kind:'approve'|'reject')=>{
-    if(!row)return;setBusy(true);setLocalError('');
+    if(!row||submitRef.current)return;
+    if(kind==='reject'&&!reason.trim()){
+      setLocalError('A rejection reason is required.');
+      return;
+    }
+    submitRef.current=true;setBusy(true);setLocalError('');
     try{
       if(kind==='approve') await attendance.approve(Number(row.provisional_id),reason.trim());
-      else await attendance.reject(Number(row.provisional_id),reason.trim()||'Rejected by attendance manager');
-      await onReload();router.replace('/attendance/reviews' as any);
-    }catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}
+      else await attendance.reject(Number(row.provisional_id),reason.trim());
+      if(!activeRef.current)return;
+      await onReload();
+      if(activeRef.current)router.replace('/attendance/reviews' as any);
+    }catch(e){if(activeRef.current)setLocalError(errorMessage(e));}
+    finally{submitRef.current=false;if(activeRef.current)setBusy(false);}
   };
   const events=asArray<any>(timeline?.timeline);
   return <ParityPage title={titles[screen]} subtitle="Session chronology and audit-safe manager decision." loading={loading} error={error||localError}>
