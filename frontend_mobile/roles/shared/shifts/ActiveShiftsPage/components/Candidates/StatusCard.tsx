@@ -40,7 +40,7 @@ const colorMap = {
 };
 
 function StatusIllustration({ title, fg }: { title: string; fg: string }) {
-    const isHourglass = title === 'No Response';
+    const isHourglass = title === 'No Response' || title === 'No reply';
     const isInterested = title === 'Interested';
     const isAssigned = title === 'Assigned';
     const isRejected = title === 'Rejected';
@@ -159,7 +159,7 @@ export default function StatusCard({
                                             </View>
                                             <View style={styles.memberBadges}>
                                                 {title === 'Interested' && isPendingConfirmation && (
-                                                    <Pill label="Pending" tone="amber" />
+                                                    <Pill label="Offer sent · awaiting reply" tone="amber" />
                                                 )}
                                                 {title === 'Interested' && awaitingPayment && (
                                                     <Pill label="Awaiting payment" tone="red" />

@@ -299,3 +299,9 @@ test('slot signature recomputation preserves state identity until values change'
 
 // Exercise mounted Shift Centre and real ActiveShiftCards in standard mobile CI.
 import '../../../scripts/m5-active-shifts.test.cjs';
+
+// M5-02 mounted network/platform workspace parity tests.
+import '../../../scripts/m5-shift-centre.test.cjs';
+
+// Mounted same-render business-action regressions for M5-02 candidate workspace.
+import '../../../scripts/m5-shift-actions.test.cjs';

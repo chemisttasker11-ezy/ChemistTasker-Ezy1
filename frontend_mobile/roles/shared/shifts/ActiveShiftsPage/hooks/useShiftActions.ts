@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
     Shift,
     escalateShiftService,
@@ -11,10 +11,15 @@ export function useShiftActions(
     showSnackbar: (msg: string) => void
 ) {
     const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+    // State updates are asynchronous; use a synchronous lock for same-render taps.
+    const pendingActions = useRef<Set<string>>(new Set());
 
     const handleEscalate = useCallback(
         async (shiftId: number, targetVisibility?: string) => {
-            setActionLoading(prev => ({ ...prev, [`escalate_${shiftId}`]: true }));
+            const key = `escalate_${shiftId}`;
+            if (pendingActions.current.has(key)) return false;
+            pendingActions.current.add(key);
+            setActionLoading(prev => ({ ...prev, [key]: true }));
             try {
                 await escalateShiftService(shiftId, { targetVisibility });
                 if (targetVisibility) {
@@ -31,7 +36,8 @@ export function useShiftActions(
                 showSnackbar('Failed to escalate shift');
                 return false;
             } finally {
-                setActionLoading(prev => ({ ...prev, [`escalate_${shiftId}`]: false }));
+                pendingActions.current.delete(key);
+                setActionLoading(prev => ({ ...prev, [key]: false }));
             }
         },
         [setShifts, showSnackbar]
@@ -39,7 +45,10 @@ export function useShiftActions(
 
     const handleDelete = useCallback(
         async (shiftId: number) => {
-            setActionLoading(prev => ({ ...prev, [`delete_${shiftId}`]: true }));
+            const key = `delete_${shiftId}`;
+            if (pendingActions.current.has(key)) return false;
+            pendingActions.current.add(key);
+            setActionLoading(prev => ({ ...prev, [key]: true }));
             try {
                 await deleteActiveShiftService(shiftId);
                 setShifts(prev => prev.filter(s => s.id !== shiftId));
@@ -50,7 +59,8 @@ export function useShiftActions(
                 showSnackbar('Failed to delete shift');
                 return false;
             } finally {
-                setActionLoading(prev => ({ ...prev, [`delete_${shiftId}`]: false }));
+                pendingActions.current.delete(key);
+                setActionLoading(prev => ({ ...prev, [key]: false }));
             }
         },
         [setShifts, showSnackbar]
@@ -58,7 +68,10 @@ export function useShiftActions(
 
     const handleAccept = useCallback(
         async (shiftId: number, userId: number, slotId: number | null) => {
-            setActionLoading(prev => ({ ...prev, [`accept_${shiftId}_${userId}`]: true }));
+            const key = `accept_${shiftId}_${userId}`;
+            if (pendingActions.current.has(key)) return false;
+            pendingActions.current.add(key);
+            setActionLoading(prev => ({ ...prev, [key]: true }));
             try {
                 const result = await acceptShiftCandidateService(shiftId, { userId, slotId });
                 showSnackbar('Offer sent. Waiting for candidate confirmation.');
@@ -68,7 +81,8 @@ export function useShiftActions(
                 showSnackbar('Failed to assign candidate');
                 return false;
             } finally {
-                setActionLoading(prev => ({ ...prev, [`accept_${shiftId}_${userId}`]: false }));
+                pendingActions.current.delete(key);
+                setActionLoading(prev => ({ ...prev, [key]: false }));
             }
         },
         [showSnackbar]

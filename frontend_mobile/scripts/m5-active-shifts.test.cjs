@@ -255,9 +255,11 @@ function mountedActive(overrides = {}) {
     persona: 'owner', scopedPharmacyId: 7, ...overrides.surface };
   const params = { ...overrides.params };
   const user = { id: 91, role: 'OWNER' };
-  const calls = { posts: [], share: [], checkout: [], reload: 0 };
+  const calls = { posts: [], share: [], checkout: [], buzz: [], reload: 0 };
   let settledCheckout;
   const waitCheckout = new Promise(resolve => { settledCheckout = resolve; });
+  let settledBuzz;
+  const waitBuzz = new Promise(resolve => { settledBuzz = resolve; });
   const stateSlots = [], refSlots = [];
   let stateIndex = 0, refIndex = 0;
   const react = {
@@ -291,7 +293,7 @@ function mountedActive(overrides = {}) {
     },
     resumeFulfillmentCheckout: async () => ({}),
     expireFulfillmentCheckout: async () => ({}),
-    buzzShiftOffer: async () => ({}),
+    buzzShiftOffer: async (...args) => { calls.buzz.push(args); await waitBuzz; return { detail: 'Reminder sent' }; },
   };
   const page = load('roles/shared/shifts/ActiveShiftsPage/index.tsx', {
     react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
@@ -358,7 +360,7 @@ function mountedActive(overrides = {}) {
     '@/components/ui/ContentState': { ContentState: 'ContentState' },
     '@/components/ui/ConfirmDialog': { ConfirmDialog: 'ConfirmDialog' },
     './components/Dialogs/CounterOfferDialog': { default: 'CounterOfferDialog' },
-    './ActiveShiftCards': { default: card.component },
+    './ActiveShiftCards': { default: props => { overrides.captureActions?.(props.actions); return card.component(props); } },
     './utils/shiftHelpers': shiftHelpers,
     './utils/candidateHelpers': candidate,
     './utils/offerHelpers': offerHelpers,
@@ -381,7 +383,7 @@ function mountedActive(overrides = {}) {
     stateIndex = 0; refIndex = 0;
     return expanded(page({ title: 'Active Shifts' }));
   }
-  return { render, calls, surface, params, finishCheckout: () => settledCheckout(), card };
+  return { render, calls, surface, params, finishCheckout: () => settledCheckout(), finishBuzz: () => settledBuzz(), card };
 }
 
 test('C mounted ActiveShiftsPage renders the real cards with audience, metrics and review attention', () => {
@@ -443,4 +445,20 @@ test('C mounted ActiveShiftsPage keeps rapid payment taps single-flight', async 
     h.finishCheckout();
     await Promise.resolve();
   }
+});
+
+test('R mounted M5-02 Buzz action does not double-send from same render', async () => {
+  let actions;
+  const h=mountedActive({captureActions: captured=>{actions=captured;}});
+  h.render();
+  assert.equal(typeof actions.handleBuzzWorker,'function');
+  const first=actions.handleBuzzWorker(901);
+  const second=actions.handleBuzzWorker(901);
+  assert.equal(h.calls.buzz.length,1,'a second immediate tap must not send a duplicate reminder');
+  h.finishBuzz();
+  await Promise.all([first,second]);
+  await actions.handleBuzzWorker(0);
+  assert.equal(h.calls.buzz.length,1,'invalid offers cannot send reminders');
+  await actions.handleBuzzWorker(901);
+  assert.equal(h.calls.buzz.length,2,'completed reminder permits an explicit later retry');
 });

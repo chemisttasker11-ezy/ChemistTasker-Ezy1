@@ -10,7 +10,7 @@ import {
     TrendingUp,
     Lock,
 } from 'lucide-react-native';
-import { EscalationLevelKey, Shift } from '@chemisttasker/shared-core';
+import { EscalationLevelKey, Shift, getShiftAudienceLevel } from '@chemisttasker/shared-core';
 import { colors as tokenColors, font, radius, space, touch } from '@/constants/tokens';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { customTheme, levelColors } from '../../theme';
@@ -87,7 +87,7 @@ export default function EscalationStepper({
     const selectedIndex = levelSequence.indexOf(selectedLevel);
     const uiCurrentIndex = showPrivateFirst ? -1 : currentIndex;
     const resolveLabel = (level: EscalationLevelKey) =>
-        level === 'PLATFORM' ? 'Chemisttasker' : labelOverrides?.[level] ?? getLevelLabel(level);
+        level === 'PLATFORM' ? getLevelLabel(level) : labelOverrides?.[level] ?? getLevelLabel(level);
 
     // Check if can escalate to selected level
     const canEscalateToSelected =
@@ -107,6 +107,9 @@ export default function EscalationStepper({
 
     return (
         <View style={styles.wrapper}>
+            <Text accessibilityRole="header" style={[styles.escalateTitle, { color: tokenColors.textPrimary }]}>
+                Who can see this shift
+            </Text>
             <View style={styles.container}>
                 {/* Background Track */}
                 <View style={[styles.track, { left: 20, right: 20 }]} />
@@ -225,6 +228,9 @@ export default function EscalationStepper({
                                 >
                                     {label}
                                 </Text>
+                                <Text numberOfLines={1} style={{ fontSize: 10, color: tokenColors.textMuted }}>
+                                    {isActive ? 'Live now' : isCompleted ? 'Notified' : index === uiCurrentIndex + 1 ? 'Next' : 'Later'}
+                                </Text>
                             </Surface>
                         </TouchableOpacity>
                     );
@@ -247,8 +253,8 @@ export default function EscalationStepper({
                         <TrendingUp size={22} color="#FFFFFF" />
                     </View>
                     <View style={styles.escalateCopy}>
-                        <Text style={styles.escalateTitle}>Ready to widen your search?</Text>
-                        <Text style={styles.escalateText}>Escalate to the next audience to find the right candidate.</Text>
+                        <Text style={styles.escalateTitle}>Need more candidates?</Text>
+                        <Text style={styles.escalateText}>Escalating notifies {getShiftAudienceLevel(targetEscalateLevel)?.reach ?? 'the next candidate audience'}.</Text>
                     </View>
                     <TouchableOpacity
                         style={styles.escalateBtn}
