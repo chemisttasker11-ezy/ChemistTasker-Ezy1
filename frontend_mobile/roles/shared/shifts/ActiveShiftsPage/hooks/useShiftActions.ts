@@ -68,7 +68,8 @@ export function useShiftActions(
 
     const handleAccept = useCallback(
         async (shiftId: number, userId: number, slotId: number | null) => {
-            const key = `accept_${shiftId}_${userId}`;
+            // The server offers distinct slots independently; only duplicate taps for the same slot share a lock.
+            const key = `accept_${shiftId}_${userId}_${slotId ?? 'all'}`;
             if (pendingActions.current.has(key)) return false;
             pendingActions.current.add(key);
             setActionLoading(prev => ({ ...prev, [key]: true }));
