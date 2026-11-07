@@ -129,7 +129,7 @@ export const SHIFT_SECTION_LABELS: Record<ShiftSection, string> = {
 
 /**
  * The Shifts screen sections in tab order, from web: posters get the Shift Centre; pharmacists and other staff
- * get Community (internal) or Public (platform) with Confirmed and History; Explorer gets four routes.
+ * get Community (internal) or Public (platform) with Confirmed and History; Explorer gets public/community only.
  * Owner/organization also retain their web public/community discovery routes.
  */
 export function shiftSections(surface: Pick<ShiftSurface, 'persona' | 'workspace'>): ShiftSection[] {
@@ -140,7 +140,7 @@ export function shiftSections(surface: Pick<ShiftSurface, 'persona' | 'workspace
   // authority for viewing, interest, offers and each available action.
   if (persona === 'owner' || persona === 'organization') return ['active', 'confirmed', 'history', 'public', 'community'];
   if (persona === 'admin') return ['active', 'confirmed', 'history'];
-  if (persona === 'explorer') return ['public', 'community', 'confirmed', 'history'];
+  if (persona === 'explorer') return ['public', 'community'];
   return [surface.workspace === 'platform' ? 'public' : 'community', 'confirmed', 'history'];
 }
 
@@ -193,6 +193,18 @@ export function shiftRoute(persona: ShiftPersona, link: Partial<Pick<ShiftLink, 
   const suffix = link.suffix ?? '';
   const base = `/${persona}/shifts`;
   if (link.shiftId != null) return `${base}/${link.shiftId}${suffix}`;
-  if (link.section === 'roster') return persona === 'pharmacist' || persona === 'otherstaff' ? `/my-roster${suffix}` : `${base}${suffix}`;
-  return link.section ? `${base}${withParam(suffix, 'section', link.section)}` : `${base}${suffix}`;
+  // Personal Confirmed/History and manager sections are not Explorer routes.
+  // Normalize stale notification/dashboard links here as well as in the tab UI.
+  const section = persona === 'explorer' && link.section &&
+    link.section !== 'public' && link.section !== 'community' ? 'public' : link.section;
+  if (section !== link.section) {
+    const hashAt = suffix.indexOf('#');
+    const query = hashAt < 0 ? suffix : suffix.slice(0, hashAt);
+    const fragment = hashAt < 0 ? '' : suffix.slice(hashAt);
+    const params = new URLSearchParams(query);
+    params.set('section', 'public');
+    return `${base}?${params.toString()}${fragment}`;
+  }
+  if (section === 'roster') return persona === 'pharmacist' || persona === 'otherstaff' ? `/my-roster${suffix}` : `${base}${suffix}`;
+  return section ? `${base}${withParam(suffix, 'section', section)}` : `${base}${suffix}`;
 }

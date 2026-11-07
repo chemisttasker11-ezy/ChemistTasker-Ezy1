@@ -2,6 +2,7 @@
 // Public, Community, Confirmed and History pages, matching the owner Shift Centre. Each section keeps its own route.
 import { useLocation, useNavigate } from "react-router-dom";
 import SegmentTabs, { type SegmentTab } from "../../../components/ui/SegmentTabs";
+import { useAuth } from "../../../contexts/AuthContext";
 
 export type StaffSection = "public" | "community" | "confirmed" | "history";
 
@@ -21,12 +22,13 @@ const TABS: SegmentTab<StaffSection>[] = [
 ];
 
 export function StaffShiftCentreTabs({ value }: { value: StaffSection }) {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   // /dashboard/pharmacist/shifts/public -> /dashboard/pharmacist/shifts; keeps the workspace query (scope) as it is.
   const base = /^(\/dashboard\/[a-z-]+(?:\/\d+)?\/shifts)/.exec(pathname)?.[1] ?? pathname.replace(/\/[^/]*$/, "");
   return (
-    <SegmentTabs label="Shift Centre sections" idPrefix="staff-shift-centre" tabs={TABS} value={value}
+    <SegmentTabs label="Shift Centre sections" idPrefix="staff-shift-centre" tabs={user?.role === 'EXPLORER' ? TABS.slice(0, 2) : TABS} value={value}
       onChange={next => navigate(`${base}/${next}${search}`)} />
   );
 }
