@@ -1,6 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { correctionTimestamp } from './correctionTimestamp.ts';
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const require = createRequire(import.meta.url);
+// Node's test runner cannot import extensionless shared-core dist through the web wrapper.
+const source = readFileSync(new URL('../../../../shared-core/src/utils/correctionTimestamp.ts', import.meta.url), 'utf8');
+const { outputText } = ts.transpileModule(source, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+});
+const exports = {};
+vm.runInNewContext(outputText, { exports, Date, Intl, Set, Object });
+const { correctionTimestamp } = exports;
 
 test('ordinary unchanged and edited pharmacy times (positive controls)', () => {
   for (const [zone, original, edited] of [

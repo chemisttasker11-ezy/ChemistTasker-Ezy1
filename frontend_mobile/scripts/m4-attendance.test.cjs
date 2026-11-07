@@ -1,10 +1,11 @@
+process.env.TZ = 'UTC';
 // M4-01: mount complete Expo source modules; assertions inspect rendered actions/real API calls.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const ts = require('typescript');
+const ts = require('../node_modules/typescript');
 const root = path.resolve(__dirname, '..');
 const jsx = (type, props, key) => ({ type, props: { ...(props || {}), key } });
 
@@ -50,7 +51,7 @@ function hooks() {
       if (!(i in slot) || depsChanged(slot[i].deps, deps)) slot[i] = { value: fn(), deps };
       return slot[i].value;
     },
-    useCallback(fn, deps) { return this.useMemo(() => fn, deps); },
+    useCallback(fn, deps) { return react.useMemo(() => fn, deps); },
     useEffect(fn, deps) {
       const i = take(), fiber = active, prior = fiber.effects.get(i);
       if (!prior || depsChanged(prior.deps, deps)) {
@@ -102,12 +103,13 @@ function screenHarness() {
   ] }, pharmacy: 11, adminPharmacy: 11, params: {}, pathname: '/attendance/reviews' };
   const io = { pending: [], timeline: [], correct: [], missing: [], comments: [], navigations: [] };
   const engine = hooks();
-  const capability = (name, pharmacy) => Boolean(
-    env.user?.admin_assignments?.some(a => Number(a.pharmacy_id) === Number(pharmacy) &&
-      a.capabilities.includes(name)) ||
-    env.user?.owner_pharmacies?.some(p => Number(p.id) === Number(pharmacy)) ||
-    env.user?.memberships?.some(m => m.capabilities?.includes(name) &&
-      (m.pharmacies ?? []).some(p => Number(p.id) === Number(pharmacy))));
+  // Inject the actual shared-core policy, not a test-owned permission algorithm.
+  const capabilityPolicy = load('../shared-core/src/policy/accessPolicy.ts', {
+    '../constants/capabilities': load('../shared-core/src/constants/capabilities.ts', {}),
+    '../constants/roles': load('../shared-core/src/constants/roles.ts', {}),
+  }).hasAdminCapability;
+  const capability = (name, pharmacy) =>
+    capabilityPolicy(env.user, name, { pharmacyId: pharmacy });
   const auth = { useAuth: () => ({ user: env.user, hasCapability: capability }) };
   const router = { push: url => io.navigations.push(url), replace: url => io.navigations.push(url) };
   const expo = { useRouter: () => router, useLocalSearchParams: () => env.params,

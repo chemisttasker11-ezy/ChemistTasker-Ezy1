@@ -1,3 +1,4 @@
+process.env.TZ = 'UTC';
 // M4-01: actual Vite manager form submits the existing shared pharmacy-wall-time contract.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -146,7 +147,7 @@ function mount() {
     const button = nodes.find(n => (n.type === 'Button' || n.type === 'IconButton') &&
       (label(n) === text || n.props['aria-label'] === text));
     assert.ok(button, 'Expected rendered action: ' + text);
-    assert.equal(button.props.disabled, true, 'Expected enabled control: ' + text);
+    assert.notEqual(button.props.disabled, true, 'Expected enabled control: ' + text);
   }
   return { calls, stable, render, flush, label };
 }
@@ -163,7 +164,7 @@ test('C: clicking Vite event correction sends an ISO instant for the pharmacy ti
   await button('Correct clock_in time').props.onClick({ type: 'click' });
   tree = await h.stable();
   const date = tree.find(n => n.type === 'TextField' && n.props.label === 'Correct date and time');
-  const reason = tree.find(n => n.type === 'TextField' && n.props.label === 'Reason');
+  const reason = tree.find(n => n.type === 'TextField' && n.props.label === 'Reason' && n.props.placeholder === 'Explain why the time is being corrected');
   assert.ok(date && reason);
   date.props.onChange({ target: { value: '2026-07-10T09:00' } });
   reason.props.onChange({ target: { value: 'Verified after kiosk outage' } });

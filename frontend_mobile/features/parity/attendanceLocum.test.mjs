@@ -83,7 +83,7 @@ async function attendanceScreen({ screen = 'reviews', rows = [locum], status = p
     'expo-camera': { CameraView: 'CameraView', useCameraPermissions: () => [{ granted: true }, async () => ({ granted: true })] },
     'expo-router': { useRouter: () => ({ push: route => routes.push(route) }), useLocalSearchParams: () => detail ? { id: String(locum.provisional_id) } : {} },
     '@/context/WorkspaceContext': { useWorkspace: () => ({ selectedPharmacyId: 9 }) },
-    '@/context/AuthContext': { useAuth: () => ({ user: { role: manager ? 'OWNER' : 'PHARMACIST' } }) },
+    '@/context/AuthContext': { useAuth: () => ({ user: { id: 90, role: manager ? 'OWNER' : 'PHARMACIST' }, hasCapability: () => manager }) },
     '@chemisttasker/shared-core': {
       attendance: {
         async getWorkerCoverTerms() { return []; },

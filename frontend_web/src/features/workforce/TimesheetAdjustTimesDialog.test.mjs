@@ -64,7 +64,7 @@ async function dialog({ zone = 'Australia/Brisbane', events } = {}) {
       timeline.find((event) => event.event_id === id).effective_timestamp = timestamp;
     },
   };
-  const { correctionTimestamp } = loadComponent('../../pages/attendance/correctionTimestamp.ts', {});
+  const { correctionTimestamp } = loadComponent('../../../../shared-core/src/utils/correctionTimestamp.ts', {});
   const { default: Component } = loadComponent('./TimesheetAdjustTimesDialog.tsx', {
     react: hooks, 'react/jsx-runtime': runtime, '@mui/material': mui,
     '@chemisttasker/shared-core': { attendance },
