@@ -459,4 +459,6 @@ test('R mounted M5-02 Buzz action does not double-send from same render', async 
   await Promise.all([first,second]);
   await actions.handleBuzzWorker(0);
   assert.equal(h.calls.buzz.length,1,'invalid offers cannot send reminders');
+  await actions.handleBuzzWorker(901);
+  assert.equal(h.calls.buzz.length,2,'completed reminder permits an explicit later retry');
 });
