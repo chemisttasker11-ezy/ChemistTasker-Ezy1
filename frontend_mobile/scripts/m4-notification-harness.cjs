@@ -53,7 +53,11 @@ function createHookScheduler() {
       if (!(idx in slots) || !same(slots[idx].deps, deps)) slots[idx] = { deps, value: fn() };
       return slots[idx].value;
     },
-    useCallback(fn, deps) { return this.useMemo(() => fn, deps); },
+    useCallback(fn, deps) {
+      const idx = hookIndex++, slots = active.slots;
+      if (!(idx in slots) || !same(slots[idx].deps, deps)) slots[idx] = { deps, value: fn };
+      return slots[idx].value;
+    },
     useEffect(effect, deps) {
       const idx = hookIndex++, fiber = active, old = fiber.effects.get(idx);
       if (!old || !same(old.deps, deps)) afterRender.push(() => {
