@@ -31,6 +31,8 @@ function PublicHubFeedView() {
   const generation = useRef(0);
   const postGeneration = useRef(0);
   const postPaging = useRef(false);
+  const searching = useRef(false);
+  const currentQuery = useRef('');
   const pollPaging = useRef(false);
   const submitting = useRef(false);
   const [info, setInfo] = useState<PublicHubSummary | null>(null);
@@ -58,7 +60,7 @@ function PublicHubFeedView() {
   const load = useCallback(async () => {
     const ticket = ++generation.current;
     const postTicket = ++postGeneration.current;
-    postPaging.current = false; pollPaging.current = false;
+    postPaging.current = false; pollPaging.current = false; searching.current = false; currentQuery.current = '';
     setLoading(true); setError(''); setActionError(''); setMoreError('');
     setPollMoreError(''); setSearchError(''); setSearchDraft(''); setSearchTerm('');
     setPosts([]); setPolls([]); setInfo(null); setNext(null); setPollNext(null);
@@ -93,12 +95,14 @@ function PublicHubFeedView() {
     const q = raw.trim().slice(0, 200);
     const ticket = generation.current;
     const postTicket = ++postGeneration.current;
+    searching.current = true;
     postPaging.current = false;
     setMoreBusy(false);
     setSearchBusy(true); setSearchError(''); setMoreError('');
     try {
       const result = await chemistTaskerApi.publicContent.listCommunityPosts(hub, { page: 1, ...(q ? { q } : {}) });
       if (ticket !== generation.current || postTicket !== postGeneration.current) return;
+      currentQuery.current = q;
       setSearchTerm(q);
       setPosts(result.results || []);
       setNext(nextPage(result.next));
@@ -106,18 +110,19 @@ function PublicHubFeedView() {
       if (ticket === generation.current && postTicket === postGeneration.current)
         setSearchError(failure?.message || 'Search could not load. Try again.');
     } finally {
-      if (ticket === generation.current && postTicket === postGeneration.current) setSearchBusy(false);
+      if (ticket === generation.current && postTicket === postGeneration.current) { searching.current = false; setSearchBusy(false); }
     }
   };
   const loadMore = async () => {
-    if (next === null || postPaging.current) return;
+    if (next === null || postPaging.current || searching.current || searchTerm !== currentQuery.current) return;
     const ticket = generation.current;
     const postTicket = postGeneration.current;
+    const query = currentQuery.current;
     postPaging.current = true;
     setMoreBusy(true); setMoreError('');
     try {
-      const page = await chemistTaskerApi.publicContent.listCommunityPosts(hub, { page: next, ...(searchTerm ? { q: searchTerm } : {}) });
-      if (ticket !== generation.current || postTicket !== postGeneration.current) return;
+      const page = await chemistTaskerApi.publicContent.listCommunityPosts(hub, { page: next, ...(query ? { q: query } : {}) });
+      if (ticket !== generation.current || postTicket !== postGeneration.current || query !== currentQuery.current) return;
       setPosts(existing => {
         const ids = new Map(existing.map(post => [post.id, post]));
         for (const item of page.results || []) ids.set(item.id, item);
@@ -263,7 +268,7 @@ function PublicHubFeedView() {
               <Button mode="text" onPress={() => router.push({ pathname: '/explore/hubs/post/[id]', params: { id: String(post.id) } } as any)}>Read conversation</Button>
             </Card.Content>
           </Card>)}
-          {next !== null ? <Button mode="outlined" contentStyle={styles.button} disabled={moreBusy} loading={moreBusy} onPress={() => void loadMore()}>Load more posts</Button> : null}
+          {next !== null ? <Button mode="outlined" contentStyle={styles.button} disabled={moreBusy || searchBusy} loading={moreBusy} onPress={() => void loadMore()}>Load more posts</Button> : null}
           {moreError ? <Text accessibilityRole="alert" style={styles.error}>{moreError}</Text> : null}
           {actionError ? <Text accessibilityRole="alert" style={styles.error}>{actionError}</Text> : null}
           <Button mode="text" icon="share-variant" onPress={() => void Share.share({ message: publicWebUrl('/hubs/' + encodeURIComponent(hub)) }).catch(() => setActionError('Sharing unavailable.'))}>Share community</Button>
