@@ -33,7 +33,7 @@ function env(overrides={}) {
   const api={
     listHubs: async()=>[{key:hub,label:'Demo Hub',can_interact:true}],
     listCommunityPosts:async(h,q)=>{calls.posts.push([h,q]);return page([post(q?.page===2?13:1)],q?.page===2?null:'?page=2');},
-    listCommunityPolls:async(h,q)=>{calls.polls.push([h,q]);return page(Array.from({length:12},(_,i)=>poll((q?.page===2?13:1)+i)),q?.page===2?null:'?page=2');},
+    listCommunityPolls:async(h,q)=>{calls.polls.push([h,q]);return page(Array.from({length:q?.page===2?1:12},(_,i)=>poll((q?.page===2?13:1)+i)),q?.page===2?null:'?page=2');},
     voteCommunityPoll:async(id,option)=>{calls.votes.push([id,option]);return{};},
     createCommunityPost:async()=>({}),
     ...overrides.api,
