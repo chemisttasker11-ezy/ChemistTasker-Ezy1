@@ -1,4 +1,4 @@
-import { getPharmacyHoursForDate, isValidShiftPostingTimeRange } from '@chemisttasker/shared-core';
+import { getPharmacyHoursForDate, isValidShiftPostingTimeRange, splitPostableDates } from '@chemisttasker/shared-core';
 export const ROLE_OPTIONS = ['PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'STUDENT'];
 export const EMPLOYMENT_TYPES = ['LOCUM', 'PART_TIME', 'FULL_TIME'];
 export const PRIMARY = '#4F46E5';
@@ -314,6 +314,9 @@ export function validateSlotEntries(entries: SlotEntry[]): string | null {
     for (const entry of entries) {
         const error = validateSlotEntry(entry);
         if (error) return error;
+        if (!splitPostableDates([entry.date], new Date()).valid.length) {
+            return 'That date has passed. Pick today or later.';
+        }
     }
     return null;
 }
