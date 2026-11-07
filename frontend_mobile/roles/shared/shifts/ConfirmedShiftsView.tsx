@@ -54,6 +54,7 @@ function ScopedConfirmedShifts({ surface }: { surface: ReturnType<typeof useShif
     const { user } = useAuth();
     const chatGenRef = useRef(0);
     const pendingChatsRef = useRef<Set<number>>(new Set());
+    const pendingPayrollRef = useRef<Set<number>>(new Set());
 
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [loading, setLoading] = useState(true);
@@ -124,7 +125,8 @@ function ScopedConfirmedShifts({ surface }: { surface: ReturnType<typeof useShif
     }, [loadDeferredPayroll]);
 
     const activateDeferredPayroll = async (offer: DeferredPayrollOffer) => {
-        if (activatingPayrollOfferIds.has(offer.id)) return;
+        if (pendingPayrollRef.current.has(offer.id)) return;
+        pendingPayrollRef.current.add(offer.id);
         setActivatingPayrollOfferIds((prev) => new Set(prev).add(offer.id));
         try {
             await activateShiftOfferPayrollService(offer.id);
@@ -133,6 +135,7 @@ function ScopedConfirmedShifts({ surface }: { surface: ReturnType<typeof useShif
         } catch (err: any) {
             setSnackbar(err?.message || 'Complete the worker TFN/super details before activating payroll.');
         } finally {
+            pendingPayrollRef.current.delete(offer.id);
             setActivatingPayrollOfferIds((prev) => {
                 const next = new Set(prev);
                 next.delete(offer.id);
@@ -164,7 +167,7 @@ function ScopedConfirmedShifts({ surface }: { surface: ReturnType<typeof useShif
         // Synchronous lock: two presses from the same render initiate one DM only.
         if (pendingChatsRef.current.has(userId)) return;
         pendingChatsRef.current.add(userId);
-        const gen = chatGenRef.current;
+        const gen = ++chatGenRef.current;
         const scope = surface.scopeKey;
         try {
             const room: any = await startDirectChat({ userId });
@@ -181,7 +184,7 @@ function ScopedConfirmedShifts({ surface }: { surface: ReturnType<typeof useShif
                 setSnackbar(err?.message || 'Could not start message');
             }
         } finally {
-            if (chatGenRef.current === gen) pendingChatsRef.current.delete(userId);
+            pendingChatsRef.current.delete(userId);
         }
     };
 
