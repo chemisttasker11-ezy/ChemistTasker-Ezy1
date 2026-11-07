@@ -234,17 +234,20 @@ test('R: recurrence projects each overnight occurrence; calendar selection edits
       [['2027-01-08','22:00','06:00'],['2027-01-09','22:00','06:00'],
        ['2027-01-10','09:00','17:00']], 'both saved sources remain in the final calendar');
   }));
-test('C: posting validator rejects equal times and invalid clock/date entries do not crash the calendar', () => {
+test('C: posting validator rejects equal times and accepts overnight times', () => {
   assert.equal(posting.isValidShiftPostingTimeRange('22:00','22:00'), false);
   assert.equal(posting.isValidShiftPostingTimeRange('22:00','06:00'), true);
+});
+
+test('R: invalid clock/date entries do not crash the calendar', () => {
   const host = harness();
   host.render().setSlots([slot('not-a-date'), slot('2026-07-10','bogus','06:00'),
     slot('2026-07-10','09:00','09:00')]);
   assert.equal(host.render().calendarEvents.length, 0);
 });
 
-test('R: calendar day rollover across December and leap dates', () =>
-  inTimezone('Australia/Brisbane', () => {
+test('R: calendar day rollover across December and leap dates', () => {
+    assert.equal(Intl.DateTimeFormat().resolvedOptions().timeZone, process.env.TZ);
     for (const [date, expected] of [
       ['2026-12-31','2027-01-01T06:00'],
       ['2028-02-29','2028-03-01T06:00'],
@@ -252,10 +255,17 @@ test('R: calendar day rollover across December and leap dates', () =>
       const host = harness(); host.render().setSlots([slot(date)]);
       assert.equal(local(host.render().calendarEvents[0]).end, expected);
     }
-  }));
+  });
 
-test('R: DST spring-forward and fall-back preserve next calendar day 06:00, not a fixed duration', () =>
-  inTimezone('Australia/Sydney', () => {
+test('R: DST spring-forward and fall-back preserve next calendar day 06:00, not a fixed duration', () => {
+    assert.equal(Intl.DateTimeFormat().resolvedOptions().timeZone, process.env.TZ);
+    if (process.env.TZ === 'Australia/Sydney') {
+      assert.equal(new Date(2026, 9, 4, 6).getTimezoneOffset(), -660);
+      assert.equal(new Date(2026, 3, 5, 6).getTimezoneOffset(), -600);
+    } else if (process.env.TZ === 'Australia/Brisbane') {
+      assert.equal(new Date(2026, 9, 4, 6).getTimezoneOffset(), -600);
+      assert.equal(new Date(2026, 3, 5, 6).getTimezoneOffset(), -600);
+    }
     for (const [date, expected] of [
       ['2026-10-03','2026-10-04T06:00'],
       ['2026-04-04','2026-04-05T06:00'],
@@ -263,7 +273,7 @@ test('R: DST spring-forward and fall-back preserve next calendar day 06:00, not 
       const host = harness(); host.render().setSlots([slot(date)]);
       assert.equal(local(host.render().calendarEvents[0]).end, expected);
     }
-  }));
+  });
 test('C: actual Vite owner/admin entry wrappers preserve the same shared PostShiftForm contract', () => {
   const jsx = (type, props) => ({ type, props });
   const hostImports = {
