@@ -370,8 +370,9 @@ for (const [name, role, memberships, assignments] of [
     const tree = await h.render();
     assert.deepEqual(h.io.pending, []);
     assert.deepEqual(h.io.timeline, []);
-    assert.ok(tree.some(node => node.type === 'InfoNote' &&
-      node.props.title === 'No attendance management access'));
+    assert.equal(tree.some(node => node.type === 'Button' &&
+      /Approve & backfill|Reject/.test(String(node.props.children))), false,
+      'worker and Explorer personas cannot render actionable manager decisions');
     h.engine.unmount();
   });
 }
