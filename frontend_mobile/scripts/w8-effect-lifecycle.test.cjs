@@ -14,10 +14,11 @@ test('C W8 native public talent effect unmount invalidates a late fetch without 
   assert.equal(h.calls.length,1);
   assert.equal(collect(tree,'Card').length,0);
   h.ui.unmount();
+  const stateBefore=h.ui.snapshot();
   pending.resolve({count:1,results:[datum(3)],next:null});
   await settle();
-  tree=await h.render();
-  assert.equal(collect(tree,'Card').length,0,'unmounted response cannot repopulate the screen');
+  assert.equal(h.ui.snapshot(),stateBefore,'late public result cannot mutate unmounted hook state');
+  assert.equal(h.calls.length,1,'no new network request on unmount');
   assert.equal(h.routes.length,0);
 });
 
@@ -27,11 +28,12 @@ test('C W8 native blog feed unmount ignores a late article reply',async()=>{
   let tree=await h.render();
   assert.equal(h.calls.length,1);
   h.ui.unmount();
+  const stateBefore=h.ui.snapshot();
   pending.resolve({results:[{id:17,kind:'news',title:'Late news',
     slug:'late-news',read_minutes:3,cover_url:null}],next:null});
   await settle();
-  tree=await h.render();
-  assert.equal(collect(tree,'Card').length,0,'unmounted article response is discarded');
+  assert.equal(h.ui.snapshot(),stateBefore,'late article result cannot mutate unmounted hook state');
+  assert.equal(h.calls.length,1,'no extra page call after unmount');
   assert.equal(h.routes.length,0);
 });
 test('C W8 unaffected public hosts retain the original deferred effect cancellation controls',()=>{
