@@ -190,3 +190,109 @@ test('R midnight rollover: mounted Post Shift picker must advance its minimum da
     new Date('2026-11-08T00:00:00+11:00').getTime(),
     'a wizard left open overnight must not permit yesterday');
 });
+
+test('R success_destination: actual mounted Post Shift keeps confirmation visible before navigation', async () => {
+  const slots = [], refs = [];
+  let index = 0, refIndex = 0;
+  const hooks = {
+    useState(init) {
+      const i = index++;
+      if (!(i in slots)) slots[i] = typeof init === 'function' ? init() : init;
+      return [slots[i], next => {
+        slots[i] = typeof next === 'function' ? next(slots[i]) : next;
+      }];
+    },
+    useRef(init) {
+      const i = refIndex++;
+      return refs[i] ||= { current: init };
+    },
+    useMemo: fn => fn(),
+    useCallback: fn => fn,
+    useEffect: () => {},
+  };
+  hooks.default = hooks;
+  const draftSlots = load('shared-core/src/domains/shifts/draftSlots.ts', {});
+  const visibility = load('shared-core/src/domains/shifts/visibility.ts', {
+    './context': { autoEscalationDates: () => ({}) },
+  });
+  const posting = load('shared-core/src/domains/shifts/postingDraft.ts', {
+    './draftSlots': draftSlots,
+    './visibility': visibility,
+    './mappers': { mapShift: row => row },
+  });
+  const window = load('shared-core/src/domains/shifts/postingWindow.ts', {});
+  const core = { ...posting, ...window, ...draftSlots, ...visibility,
+    getPharmacyHoursForDate: () => null,
+    pharmacySoftwareDefaults: () => [], normalizeShiftRequirements: () => [],
+    canNotifyShiftChainMembers: () => false };
+  const helpers = load('frontend_mobile/roles/shared/shifts/PostShiftScreen.helpers.ts', {
+    '@chemisttasker/shared-core': core,
+  });
+  const components = Object.fromEntries(
+    ['NativeShiftBoardPreview','PostShiftDetailsStep','PostShiftSkillsStep','PostShiftVisibilityStep',
+     'PostShiftProgress','PostShiftPayRateStep','PostShiftTimetableStep']
+      .map(name => [`./${name}`, { default: name }]));
+  const destinations = [], submissions = [];
+  const api = { ...core,
+    createOwnerShiftService: async payload => { submissions.push(payload); return { id: 95 }; },
+    updateOwnerShiftService: async () => { throw Error('edit not part of the posting control'); },
+  };
+  const imports = { ...common, ...components, react: hooks,
+    '@chemisttasker/shared-core': api,
+    '@chemisttasker/shared-core/skills_registry.json': { default: {} },
+    './PostShiftScreen.helpers': helpers,
+    '@/components/security/GuardedModal': {
+      GuardedDatePickerModal: 'DatePickerModal', GuardedTimePickerModal: 'TimePickerModal',
+    },
+    'expo-router': {
+      useFocusEffect: () => {}, useLocalSearchParams: () => ({}),
+      useRouter: () => ({ replace: route => destinations.push(route) }),
+    },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    '@/context/AuthContext': { useAuth: () => ({ hasCapability: () => true }) },
+    '@/components/ui': { ContentState: 'ContentState' },
+    './useShiftSurface': {
+      useShiftSurface: () => ({
+        ready: true, persona: 'owner', canManageShifts: true, scopeKey: 'owner:7',
+        scopedPharmacyId: 7,
+      }),
+    },
+    './shiftSurface': { shiftRoute: () => '/owner/shifts?section=active' },
+    '../forms/useUnsavedChangesGuard': {
+      useUnsavedChangesGuard: () => ({ markClean() {} }),
+    },
+  };
+  const component = load('frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx', imports).default;
+  function render() {
+    index = 0; refIndex = 0;
+    return nodes(component());
+  }
+
+  // These values are established through the actual form's state setters during normal
+  // hydrated use. Start from the same hydrated values to focus this mounted test
+  // on the submit-success/navigation boundary.
+  render();
+  slots[1] = [{ id: 7, name: 'Pharmacy A', allowed_escalation_levels: ['FULL_PART_TIME','LOCUM_CASUAL'] }];
+  slots[2] = 7;
+  slots[3] = true;
+  slots[19] = [{
+    date: '2026-11-12', startTime: '09:00', endTime: '17:00',
+    isRecurring: false, recurringDays: [], recurringEndDate: '',
+  }];
+  slots[45] = 'review';
+
+  let tree = render();
+  const post = tree.find(n => n.type === 'Button' && n.props.children === 'Post Shift');
+  assert.ok(post, 'real mounted wizard has its Post Shift control');
+  assert.notEqual(post.props.disabled, true);
+  await post.props.onPress();
+  assert.equal(submissions.length, 1, 'one real shared-domain posting payload reaches the API boundary');
+  assert.equal(destinations.length, 0,
+    'success navigation must wait until the visible confirmation has been acknowledged or dismissed');
+  tree = render();
+  const snackbar = tree.find(n => n.type === 'Snackbar' && n.props.visible);
+  assert.ok(snackbar, 'success feedback remains mounted on the posting screen');
+  assert.equal(snackbar.props.children, 'Shift posted successfully!');
+  snackbar.props.onDismiss();
+  assert.deepEqual(destinations, ['/owner/shifts?section=active']);
+});
