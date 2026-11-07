@@ -305,3 +305,6 @@ import '../../../scripts/m5-shift-centre.test.cjs';
 
 // Combine M5-04 native Post Shift mounted regression acceptance.
 import '../../../scripts/m5-post-shift-components.test.cjs';
+
+// Run M5-05 mounted native Post Shift visual assertions in the standard mobile gate.
+import '../../../scripts/m5-post-shift-look.test.cjs';
