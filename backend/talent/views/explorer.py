@@ -3,7 +3,7 @@ import json
 
 from rest_framework import permissions, serializers, viewsets
 from rest_framework.renderers import JSONRenderer
-from core.request_fingerprint import request_fingerprint
+from infrastructure.request_fingerprint import request_fingerprint
 from rest_framework.pagination import PageNumberPagination
 from datetime import timedelta
 

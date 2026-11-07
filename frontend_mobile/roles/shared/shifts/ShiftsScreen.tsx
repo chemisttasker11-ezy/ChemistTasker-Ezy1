@@ -34,6 +34,13 @@ export default function ShiftsScreen() {
   const tabParam = typeof tab === 'string' ? tab : null;
   const section = shownShiftSection(requested, sections, surface.workspace, tabParam);
   const worker = isWorkerPersona(surface.persona);
+  const posterSubtitle = surface.persona === 'owner'
+    ? 'Fill open shifts, check who is booked and look back at past shifts across your pharmacies.'
+    : surface.persona === 'organization'
+      ? "Fill open shifts and check coverage across your organisation's pharmacies."
+      : surface.persona === 'admin'
+        ? 'Fill open shifts and check who is booked at this pharmacy.'
+        : null;
   const rosterRoute = workerRosterRoute(surface);
   const boardTab = incomingBoardTab(tabParam);
 
@@ -63,6 +70,12 @@ export default function ShiftsScreen() {
   return (
     <View style={styles.page}>
       <View style={styles.top}>
+        {posterSubtitle ? (
+          <View style={styles.pageHeading}>
+            <Text accessibilityRole="header" style={styles.pageTitle}>Shift Centre</Text>
+            <Text style={styles.subtitle}>{posterSubtitle}</Text>
+          </View>
+        ) : null}
         <ShiftSectionTabs sections={sections} value={section} onChange={select} label="Shift Centre sections" idPrefix={ID_PREFIX} />
         <Text style={styles.subtitle}>{shiftSectionSubtitle(section, surface.persona)}</Text>
         {rosterRoute ? (
@@ -95,6 +108,8 @@ const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.pageBg },
   state: { margin: space.lg },
   top: { gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.md },
+  pageHeading: { gap: space.sm },
+  pageTitle: { color: colors.textPrimary, fontFamily: font.inter.semiBold, fontSize: 26, lineHeight: 32 },
   subtitle: {
     color: colors.textSecondary,
     fontFamily: font.inter.regular,

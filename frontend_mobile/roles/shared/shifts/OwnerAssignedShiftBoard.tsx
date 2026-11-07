@@ -19,11 +19,15 @@ type Props = {
     loading: boolean;
     mode: 'confirmed' | 'history';
     onRateAssigned?: (userId: number) => void;
+    onMessageAssigned?: (userId: number) => void;
     onViewAssigned: (shiftId: number, slotId: number | null, userId: number) => void;
     refreshing?: boolean;
     shifts: Shift[];
     title: string;
 };
+
+const humanizeLabel = (value: string) =>
+    value.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
 
 export const getAssignmentSlotId = (assignment: AssignmentLike): number | null =>
     'slotId' in assignment ? assignment.slotId ?? null : assignment.slot_id ?? null;
@@ -151,13 +155,14 @@ export default function OwnerAssignedShiftBoard({
     loading,
     mode,
     onRateAssigned,
+    onMessageAssigned,
     onViewAssigned,
     shifts,
     title,
 }: Props) {
     const [expandedShiftIds, setExpandedShiftIds] = useState<Record<number, boolean>>({});
     const { width: screenWidth } = useWindowDimensions();
-    const useTwoColumnSlots = screenWidth <= 420;
+    const slotColumns = screenWidth <= 420 ? 1 : screenWidth < 768 ? 2 : 3;
 
     const toggleShift = (shiftId: number) => {
         setExpandedShiftIds((prev) => ({
@@ -177,7 +182,7 @@ export default function OwnerAssignedShiftBoard({
     if (!shifts.length) {
         return (
             <Surface style={styles.emptyState} elevation={0}>
-                <Text style={styles.emptyTitle}>{title}</Text>
+                <Text style={styles.emptyTitle}>{mode === 'history' ? 'No past shifts yet' : 'No confirmed shifts yet'}</Text>
                 <Text style={styles.emptyText}>{emptyText}</Text>
             </Surface>
         );
@@ -216,11 +221,11 @@ export default function OwnerAssignedShiftBoard({
                                         <Text style={styles.shiftTitle}>{shift.pharmacyDetail?.name ?? 'Unknown Pharmacy'}</Text>
                                         <View style={styles.chipRow}>
                                             <Chip compact style={[styles.metaChip, { backgroundColor: colors.status.green.bg }]} textStyle={[styles.metaChipText, { color: colors.status.green.fg }]}>
-                                                {shift.roleLabel ?? shift.roleNeeded ?? shiftAny.role_needed ?? 'Role'}
+                                                {humanizeLabel(String(shift.roleLabel ?? shift.roleNeeded ?? shiftAny.role_needed ?? 'Role'))}
                                             </Chip>
                                             {shift.employmentType ? (
                                                 <Chip compact style={[styles.metaChip, { backgroundColor: colors.tone.blue.bg }]} textStyle={[styles.metaChipText, { color: colors.tone.blue.fg }]}>
-                                                    {String(shift.employmentType).replace('_', ' ')}
+                                                    {humanizeLabel(String(shift.employmentType))}
                                                 </Chip>
                                             ) : null}
                                             {shift.uiIsUrgent ? (
@@ -238,7 +243,25 @@ export default function OwnerAssignedShiftBoard({
                             <View style={styles.statsRow}>
                                 <StatPill icon={<Calendar size={18} color={colors.primary} />} label="Slots" value={totalSlots} />
                                 <StatPill icon={<Users size={18} color={colors.primary} />} label="Assigned" value={assignedEntries.length} />
-                                <StatPill icon={<Heart size={18} color={colors.primary} />} label="Interests" value={interests} />
+                                <StatPill icon={<Heart size={18} color={colors.primary} />} label="Interested" value={interests} />
+                            </View>
+
+                            <View style={styles.sectionHeader}>
+                                <Chip compact style={[styles.stateChip, { backgroundColor: modeColors.chipBg }]}
+                                    textStyle={[styles.metaChipText, { color: modeColors.chipFg }]}>
+                                    {mode === 'history'
+                                        ? `Completed · ${assignedEntries.length} of ${totalSlots} ${totalSlots === 1 ? 'date' : 'dates'} booked`
+                                        : `Confirmed · ${assignedEntries.length} ${assignedEntries.length === 1 ? 'date' : 'dates'} booked`}
+                                </Chip>
+                                <Button
+                                    accessibilityRole="button"
+                                    accessibilityState={{ expanded: isExpanded }}
+                                    accessibilityLabel={isExpanded ? 'Hide dates' : mode === 'history' ? 'View dates' : 'View booked dates'}
+                                    onPress={(event) => { event?.stopPropagation?.(); toggleShift(shift.id); }}
+                                    style={styles.secondaryBtn}
+                                >
+                                    {isExpanded ? 'Hide dates' : mode === 'history' ? 'View dates' : 'View booked dates'}
+                                </Button>
                             </View>
 
                             {isExpanded && (
@@ -267,10 +290,10 @@ export default function OwnerAssignedShiftBoard({
                                                     key={`${shift.id}_${slot?.id}`}
                                                     activeOpacity={assigned ? 0.84 : 1}
                                                     disabled={!assigned}
-                                                    onPress={() => assigned ? onViewAssigned(shift.id, slot?.id ?? null, userId as number) : undefined}
+                                                    onPress={(event) => { event?.stopPropagation?.(); if (assigned) onViewAssigned(shift.id, slot?.id ?? null, userId as number); }}
                                                     style={[
                                                         styles.slotGridCell,
-                                                        useTwoColumnSlots ? styles.slotGridCellHalf : styles.slotGridCellThird,
+                                                        slotColumns === 1 ? styles.slotGridCellFull : slotColumns === 2 ? styles.slotGridCellHalf : styles.slotGridCellThird,
                                                     ]}
                                                 >
                                                     <Surface
@@ -290,6 +313,10 @@ export default function OwnerAssignedShiftBoard({
                                                                 <Text style={[styles.slotDate, mode === 'history' ? styles.slotDateCompact : null]}>{dateBits.date}</Text>
                                                             </View>
                                                             <View style={styles.slotTopMeta}>
+                                                                <Chip compact style={[styles.stateChip, { backgroundColor: assigned ? modeColors.chipBg : colors.status.amber.bg }]}
+                                                                    textStyle={[styles.metaChipText, { color: assigned ? modeColors.chipFg : colors.status.amber.fg }]}>
+                                                                    {assigned ? mode === 'history' ? 'Worked' : 'Booked' : 'Not filled'}
+                                                                </Chip>
                                                                 <View style={[styles.slotAvatarWrap, { backgroundColor: assigned ? colors.primarySoft : colors.subtleBg }]}>
                                                                     <User size={16} color={assigned ? colors.primary : colors.textMuted} />
                                                                 </View>
@@ -312,41 +339,34 @@ export default function OwnerAssignedShiftBoard({
                                                                 </>
                                                             ) : (
                                                                 <Text style={[styles.assignedCopy, mode === 'history' ? styles.assignedCopyCompact : null]}>
-                                                                    No assignment
+                                                                    No one was booked for this date.
                                                                 </Text>
                                                             )}
                                                         </Surface>
 
-                                                        {mode !== 'history' && (
+                                                        {assigned ? (
                                                             <View style={styles.slotActionRow}>
-                                                                {assigned ? (
-                                                                    <Button
-                                                                        mode="contained"
-                                                                        onPress={() => onViewAssigned(shift.id, slot?.id ?? null, userId as number)}
-                                                                        style={styles.primaryBtn}
-                                                                        labelStyle={styles.primaryBtnText}
-                                                                    >
-                                                                        View Assigned
+                                                                <Button mode="contained"
+                                                                    onPress={(event) => { event?.stopPropagation?.(); onViewAssigned(shift.id, slot?.id ?? null, userId as number); }}
+                                                                    style={styles.primaryBtn} labelStyle={styles.primaryBtnText}>
+                                                                    View profile
+                                                                </Button>
+                                                                {mode === 'confirmed' && onMessageAssigned ? (
+                                                                    <Button mode="outlined" accessibilityLabel="Message"
+                                                                        onPress={(event) => { event?.stopPropagation?.(); onMessageAssigned(userId as number); }}
+                                                                        style={styles.secondaryBtn} labelStyle={styles.secondaryBtnText}>
+                                                                        Message
                                                                     </Button>
-                                                                ) : (
-                                                                    <Button mode="outlined" disabled style={styles.secondaryBtn} labelStyle={styles.secondaryBtnText}>
-                                                                        No Assignment
+                                                                ) : null}
+                                                                {mode === 'history' && onRateAssigned ? (
+                                                                    <Button mode="outlined"
+                                                                        icon={({ size, color }) => <Star size={size} color={color} />}
+                                                                        onPress={(event) => { event?.stopPropagation?.(); onRateAssigned(userId as number); }}
+                                                                        style={styles.secondaryBtn} labelStyle={styles.secondaryBtnText}>
+                                                                        Rate
                                                                     </Button>
-                                                                )}
+                                                                ) : null}
                                                             </View>
-                                                        )}
-
-                                                        {assigned && mode === 'history' && onRateAssigned ? (
-                                                            <Button
-                                                                mode="outlined"
-                                                                compact
-                                                                icon={({ size, color }) => <Star size={size} color={color} />}
-                                                                onPress={() => onRateAssigned(userId as number)}
-                                                                style={styles.secondaryBtn}
-                                                                labelStyle={styles.secondaryBtnText}
-                                                            >
-                                                                Rate
-                                                            </Button>
                                                         ) : null}
                                                     </Surface>
                                                 </TouchableOpacity>
@@ -543,6 +563,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
         marginBottom: 8,
     },
+    slotGridCellFull: { width: '100%' },
     slotGridCellHalf: {
         width: '50%',
     },

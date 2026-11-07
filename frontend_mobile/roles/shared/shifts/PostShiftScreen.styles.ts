@@ -200,6 +200,7 @@ export const styles = StyleSheet.create({
     slotRecurringText: { color: colors.textSecondary, fontSize: 12 },
     hint: { color: colors.textSecondary },
     navRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+    stickyFooter: { paddingHorizontal: space.lg, paddingVertical: space.sm, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surfaceBg },
     navBtnOutlined: {
         minHeight: touch.min,
         justifyContent: 'center',
