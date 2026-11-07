@@ -436,14 +436,17 @@ test('C mounted ActiveShiftsPage keeps rapid payment taps single-flight', async 
   const open = tree.find(n => n.type === 'Button' && n.props.children === 'Manage candidates');
   open.props.onPress();
   tree = h.render();
-  const checkout = tree.find(n => n.type === 'Button' && /Stripe/.test(String(n.props.children)));
-  if (checkout) {
-    const action = checkout.props.onPress;
-    action(); action();
-    assert.equal(h.calls.checkout.length, 1, 'rapid taps create one checkout attempt');
-    h.finishCheckout();
-    await Promise.resolve();
-  }
+  const checkout = tree.find(n => n.type === 'TouchableOpacity' &&
+    JSON.stringify(n.props.children).includes('Pay selected with Stripe'));
+  assert.ok(checkout, 'the expanded payment box must expose the real Stripe action');
+  const action = checkout.props.onPress;
+  const first = action(), second = action();
+  assert.equal(h.calls.checkout.length, 1, 'rapid taps create one checkout attempt');
+  assert.equal(h.calls.checkout[0][0], 12, 'checkout uses the selected shift');
+  assert.equal(JSON.stringify(h.calls.checkout[0][1]), JSON.stringify({ offerIds: [81], platform: 'mobile' }),
+    'checkout uses the payable offer ID selected for this date');
+  h.finishCheckout();
+  await Promise.all([first, second]);
 });
 
 test('R mounted candidate Buzz is single-flight for rapid presses on the same render',async()=>{
