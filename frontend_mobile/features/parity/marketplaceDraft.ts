@@ -28,5 +28,21 @@ export async function loadMarketplaceDraft(scope:string):Promise<MarketplaceMobi
   try{return {...emptyMarketplaceDraft(),...JSON.parse(raw)};}catch{return emptyMarketplaceDraft();}
 }
 export async function saveMarketplaceDraft(scope:string,value:MarketplaceMobileDraft){await AsyncStorage.setItem(key(scope),JSON.stringify(value));}
-export async function patchMarketplaceDraft(scope:string,patch:Partial<MarketplaceMobileDraft>){const next={...(await loadMarketplaceDraft(scope)),...patch};await saveMarketplaceDraft(scope,next);return next;}
+// Serialize read/modify/write operations by account so concurrent field edits and
+// server receipt progress cannot erase one another. A failed write releases its queue.
+const writes=new Map<string,Promise<unknown>>();
+export function patchMarketplaceDraft(
+ scope:string,patch:Partial<MarketplaceMobileDraft>,isCurrent:()=>boolean=()=>true,
+):Promise<MarketplaceMobileDraft>{
+ const previous=writes.get(scope)??Promise.resolve();
+ const operation=previous.catch(()=>undefined).then(async()=>{
+  const existing=await loadMarketplaceDraft(scope);
+  const next={...existing,...patch};
+  if(isCurrent())await saveMarketplaceDraft(scope,next);
+  return next;
+ });
+ writes.set(scope,operation);
+ void operation.finally(()=>{if(writes.get(scope)===operation)writes.delete(scope);}).catch(()=>undefined);
+ return operation;
+}
 export async function clearMarketplaceDraft(scope:string){await AsyncStorage.removeItem(key(scope));}
