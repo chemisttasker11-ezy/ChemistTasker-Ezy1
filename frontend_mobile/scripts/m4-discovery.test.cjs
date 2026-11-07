@@ -110,6 +110,15 @@ function boardHarness() {
     const reply=pages.shift();
     return reply.promise || (reply instanceof Error ? Promise.reject(reply) : reply);
   };
+  const sharedTalent=load('../shared-core/src/talent.ts', {
+    './domains/talent/api': {}, './utils/serialization': {},
+  });
+  const presentation=load('../shared-core/src/domains/talent/presentation.ts', {
+    '../../skills': {
+      skillId: (_registry, value) => value, isMatchableSkill: () => true,
+      findSkill: () => ({ group: 'Clinical Services' }), SOFTWARE_GROUP: 'Dispense Software',
+    },
+  });
   const module=load('app/explore/talent-board.tsx', {
     react:host.react, 'react/jsx-runtime':{jsx,jsxs:jsx},
     'react-native':{ScrollView:'ScrollView',StyleSheet:{create:x=>x},View:'View'},
@@ -118,7 +127,7 @@ function boardHarness() {
       useLocalSearchParams:()=>({})},
     '@/components/ui/BrandActivityIndicator':{BrandActivityIndicator:'Spinner'},
     'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
-    '@chemisttasker/shared-core':{getPublicTalentFeed},
+    '@chemisttasker/shared-core':{getPublicTalentFeed,...sharedTalent,...presentation},
     '@chemisttasker/shared-core/skills_registry.json':{skills:[]},
     '@/context/AuthContext':{useAuth:()=>({user:user.current})},
     '@/constants/tokens':{colors:{pageBg:'white',textPrimary:'black',textSecondary:'gray',border:'gray',surfaceBg:'white',status:{red:{fg:'red'}}},radius:{card:4},space:{lg:16,md:8,sm:4,'3xl':32},touch:{min:40}},
