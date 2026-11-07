@@ -158,7 +158,19 @@ function ListingDetail({listing,loading,error}:{listing:MarketplacePublicListing
  </ParityPage>;
 }
 
-function useDraftStep(initial:MarketplaceMobileDraft){const{user}=useAuth();const scope=String(user?.id??user?.email??user?.username??'anonymous');const[value,setValue]=useState(initial);useEffect(()=>setValue(initial),[initial]);const patch=async(p:Partial<MarketplaceMobileDraft>)=>{const next={...value,...p};setValue(next);await patchMarketplaceDraft(scope,p);return next;};return{value,patch,scope};}
+function useDraftStep(initial:MarketplaceMobileDraft){
+ const{user}=useAuth(),scope=String(user?.id??user?.email??user?.username??'anonymous');
+ const[value,setValue]=useState(initial),generation=useRef(0);
+ useEffect(()=>setValue(initial),[initial]);
+ useEffect(()=>{generation.current++;return()=>{generation.current++;};},[scope]);
+ const current=()=>{const captured=generation.current;return()=>captured===generation.current;};
+ const patch=async(p:Partial<MarketplaceMobileDraft>,stillCurrent:()=>boolean=current())=>{
+  if(!stillCurrent())return value;
+  setValue(previous=>({...previous,...p}));
+  return patchMarketplaceDraft(scope,p,stillCurrent);
+ };
+ return{value,patch,scope,current};
+}
 function SellerStep({draft,options,loading,error,onReload}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string;onReload:()=>Promise<void>}){
  const router=useRouter();const{value,patch}=useDraftStep(draft);
  const pharmacies=asArray<any>(options?.eligible_pharmacies);
@@ -183,19 +195,20 @@ function SellerStep({draft,options,loading,error,onReload}:{draft:MarketplaceMob
 }
 function CategoryStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string}){const router=useRouter();const{value,patch}=useDraftStep(draft);const categories=categoriesForSellerContext(options,value.seller_context);const choose=(category:MarketplaceCategory)=>{const modes=permittedModesForCategory(category);const roles=permittedBuyerRolesForCategory(category,value.seller_context);void patch({category:category.id,category_name:category.name,mode:modes.includes(value.mode)?value.mode:modes[0],allowed_buyer_roles:roles,current_circle:'OWNED_CHAIN'});};return <ParityPage title="Choose category" subtitle="Only categories permitted for the selected seller context are shown." loading={loading} error={error}><Section title="Categories">{categories.map(category=><DataRow key={category.id} title={category.name} subtitle={category.description} status={value.category===category.id?'Selected':undefined} onPress={()=>choose(category)}/>)}</Section><Button mode="contained" disabled={!value.category} onPress={()=>router.push('/marketplace/new/details' as any)}>Continue</Button></ParityPage>;}
 function DetailsStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string}){
- const router=useRouter();const{value,patch}=useDraftStep(draft);const categories=categoriesForSellerContext(options,value.seller_context);const selectedCategory=categories.find(category=>category.id===value.category);const modeOptions=permittedModesForCategory(selectedCategory).map(mode=>({value:mode,label:mode==='SELL'?'Sell':mode==='FREE'?'Free':'Swap'}));
+ const router=useRouter();const{value,patch,current}=useDraftStep(draft);const categories=categoriesForSellerContext(options,value.seller_context);const selectedCategory=categories.find(category=>category.id===value.category);const modeOptions=permittedModesForCategory(selectedCategory).map(mode=>({value:mode,label:mode==='SELL'?'Sell':mode==='FREE'?'Free':'Swap'}));
  const[barcode,setBarcode]=useState(''),[lookupMessage,setLookupMessage]=useState(''),[lookupBusy,setLookupBusy]=useState(false);
- const lookup=async()=>{if(!barcode.trim())return;setLookupBusy(true);setLookupMessage('');try{
-   const result=await api.lookupCatalogue({barcode:barcode.trim()});const product=asArray<any>((result as any)?.results)[0];
+ const lookup=async()=>{if(!barcode.trim())return;const stillCurrent=current();setLookupBusy(true);setLookupMessage('');try{
+   const result=await api.lookupCatalogue({barcode:barcode.trim()});if(!stillCurrent())return;const product=asArray<any>((result as any)?.results)[0];
    if(!product){setLookupMessage('No reviewed ordinary product matched. Continue with manual details.');return;}
    const matchedCategory=categories.find((category:any)=>String(category.slug||'')===String(product.category?.slug||'')||String(category.name||'').toLowerCase()===String(product.category?.name||'').toLowerCase());
    await patch({
      ...(product.name?{title:[product.brand,product.name].filter(Boolean).join(' ').trim()}:{}),
      ...(product.description?{description:product.description}:{}),
      ...(matchedCategory?{category:Number(matchedCategory.id),category_name:matchedCategory.name,mode:permittedModesForCategory(matchedCategory)[0],allowed_buyer_roles:permittedBuyerRolesForCategory(matchedCategory,value.seller_context)}:{}),
-   });
+   },stillCurrent);
+   if(!stillCurrent())return;
    setLookupMessage(matchedCategory?'Reviewed product details and category added.':'Reviewed product details added. Confirm the selected category before continuing.');
- }catch(e){setLookupMessage(errorMessage(e,'Catalogue lookup failed. You can continue manually.'));}finally{setLookupBusy(false);}};
+ }catch(e){if(stillCurrent())setLookupMessage(errorMessage(e,'Catalogue lookup failed. You can continue manually.'));}finally{if(stillCurrent())setLookupBusy(false);}};
  return <ParityPage title="Item details" subtitle="Describe the item accurately." loading={loading} error={error}>
   <Section title="Catalogue assist" description="Optional. Use a barcode to prefill reviewed ordinary-product details; medicines still belong in Ethical Marketplace.">
    <Field label="Barcode / identifier" value={barcode} onChangeText={setBarcode}/>
@@ -216,7 +229,7 @@ function DetailsStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft
   <Button mode="contained" disabled={!value.title.trim()||!value.description.trim()||!value.suburb.trim()} onPress={()=>router.push('/marketplace/new/photos' as any)}>Continue</Button>
  </ParityPage>;
 }
-function PhotosStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:boolean;error:string}){const router=useRouter();const{value,patch}=useDraftStep(draft);const add=async()=>{const r=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsMultipleSelection:true,quality:.85});if(!r.canceled)await patch({image_uris:[...value.image_uris,...r.assets.map(a=>a.uri)].slice(0,6)});};return <ParityPage title="Photos" subtitle="Add clear photos of the actual item." loading={loading} error={error}><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{value.image_uris.map((uri,i)=><Card key={uri+i} style={{width:'47%',overflow:'hidden'}}><Image source={{uri}} style={{width:'100%',height:130}}/><Card.Actions><Button onPress={()=>void patch({image_uris:value.image_uris.filter((_,x)=>x!==i)})}>Remove</Button></Card.Actions></Card>)}</View><Button mode="outlined" icon="image-plus" onPress={()=>void add()}>Add photos</Button><Button mode="contained" onPress={()=>router.push('/marketplace/new/audience' as any)}>Continue</Button></ParityPage>;}
+function PhotosStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:boolean;error:string}){const router=useRouter();const{value,patch,current}=useDraftStep(draft);const add=async()=>{const stillCurrent=current();const r=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsMultipleSelection:true,quality:.85});if(stillCurrent()&&!r.canceled)await patch({image_uris:[...value.image_uris,...r.assets.map(a=>a.uri)].slice(0,6)},stillCurrent);};return <ParityPage title="Photos" subtitle="Add clear photos of the actual item." loading={loading} error={error}><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{value.image_uris.map((uri,i)=><Card key={uri+i} style={{width:'47%',overflow:'hidden'}}><Image source={{uri}} style={{width:'100%',height:130}}/><Card.Actions><Button onPress={()=>void patch({image_uris:value.image_uris.filter((_,x)=>x!==i)})}>Remove</Button></Card.Actions></Card>)}</View><Button mode="outlined" icon="image-plus" onPress={()=>void add()}>Add photos</Button><Button mode="contained" onPress={()=>router.push('/marketplace/new/audience' as any)}>Continue</Button></ParityPage>;}
 function AudienceStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft;options:MarketplaceListingOptions|null;loading:boolean;error:string}){
  const router=useRouter();const{value,patch}=useDraftStep(draft);const categories=categoriesForSellerContext(options,value.seller_context);const category=categories.find(row=>row.id===value.category);const allowedRoles=permittedBuyerRolesForCategory(category,value.seller_context);const toggle=(role:string)=>{if(!allowedRoles.includes(role)||value.seller_context==='PHARMACY')return;void patch({allowed_buyer_roles:value.allowed_buyer_roles.includes(role)?value.allowed_buyer_roles.filter(x=>x!==role):[...value.allowed_buyer_roles,role]});};
  const circles=[{value:'OWNED_CHAIN',label:'Owned pharmacies'},{value:'ORGANISATION',label:'Organisation'},{value:'PLATFORM',label:'Platform owners'}];const setMaximum=(next:string)=>void patch({maximum_circle:clampMaximumAudience(next)});
