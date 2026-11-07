@@ -101,7 +101,8 @@ export default function PostShiftScreen() {
     const parsedParams = useMemo(() => parsePostShiftSearchParams(params), [paramsKey]);
     const { editingId, routePharmacyId, isEmbedded } = parsedParams;
     const hasAccess = canAccessPostShift(surface, routePharmacyId, hasCapability);
-    const postingWindow = useMemo(() => shiftPostingDateWindow(new Date()), []);
+    // Recompute on render so a wizard open through midnight never accepts yesterday.
+    const postingWindow = shiftPostingDateWindow(new Date());
 
     const loadedVisibilityRef = React.useRef<string | null>(null);
     const loadGenRef = React.useRef(0);
