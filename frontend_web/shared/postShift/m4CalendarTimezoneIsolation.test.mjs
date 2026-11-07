@@ -9,10 +9,15 @@ const target = fileURLToPath(new URL('./m4CalendarPreview.test.mjs', import.meta
 const cwd = fileURLToPath(new URL('.', import.meta.url));
 for (const zone of ['Australia/Brisbane', 'Australia/Sydney']) {
   test('R: isolated '+zone+' subprocess runs every calendar preview test', () => {
+    const env = { ...process.env, TZ: zone };
+    // node --test sets NODE_TEST_CONTEXT in the parent. Passing it through
+    // makes a nested node --test print a warning and run ZERO tests with exit
+    // code 0. Remove it so each subprocess actually executes the target file.
+    delete env.NODE_TEST_CONTEXT;
     const run = spawnSync(process.execPath, [
       '--test', '--test-reporter=tap', target,
     ], {
-      cwd, env: { ...process.env, TZ: zone }, encoding: 'utf8',
+      cwd, env, encoding: 'utf8',
       timeout: 120000, maxBuffer: 8 * 1024 * 1024,
     });
     const output = ['TZ='+zone, 'command=node --test --test-reporter=tap '+target,
