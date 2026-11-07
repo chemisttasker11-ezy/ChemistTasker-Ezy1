@@ -109,7 +109,7 @@ function mount() {
     react, 'react/jsx-runtime': { jsx, jsxs: jsx },
     ...timezonePackages, '@mui/material': mui, 'lucide-react': icons,
     '@chemisttasker/shared-core': {
-      attendance, fetchPharmaciesService: async () => [{ id: 23, name: 'Perth A' }],
+      attendance, correctionTimestamp: converter, fetchPharmaciesService: async () => [{ id: 23, name: 'Perth A' }],
       formatAttendanceMinutes: n => n + 'min',
     },
     '../../components/ui/PageHeader': { default: 'PageHeader' },
