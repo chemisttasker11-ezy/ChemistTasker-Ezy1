@@ -235,7 +235,7 @@ function learningHarness() {
       marketplace:{getListingOptions:async()=>{
         calls.push(['role',user.current?.id]);
         const result=options.shift();
-       if(result instanceof Error)throw result;
+       if(result instanceof Error || result?.name === 'ApiError')throw result;
        return result?.promise ? result.promise : result || {role_code:null};
       }},
     }},
@@ -392,9 +392,12 @@ test('C #5 previously supported Tom/Omar/Zoe pathways retain their own copy',asy
   }
 });
 
-test('R #5 role-options error shows neutral pathway then retry recovers',async()=>{
+test('R #5 real 403 role-options refusal shows neutral pathway then retry recovers',async()=>{
   const h=learningHarness();
-  h.options.push(Error('Permission denied'));
+  const { ApiError }=load('../shared-core/src/transport/errors.ts', {
+    '../domains/onboarding/ahpra':{reportAhpraError:()=>null,AHPRA_UNREADABLE_MESSAGE:''},
+  });
+  h.options.push(new ApiError('Permission denied',403,{detail:'Permission denied'}));
   h.results.push({results:[],next:null});
   let tree=await h.render();
   assert.ok(collect(tree,'Text').some(p=>String(p.children).includes('Explore professional learning')));
