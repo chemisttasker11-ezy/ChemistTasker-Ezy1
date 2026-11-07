@@ -77,10 +77,10 @@ function env(overrides={}) {
     await new Promise(resolve=>setTimeout(resolve,0));
     await new Promise(resolve=>setTimeout(resolve,0));
   }
-  function render(){cursor=0;return screen();}
+  function render(){cursor=0;const shell=screen();return shell.type(shell.props);}
   function button(label,tree=render()){const items=find(tree,n=>n.type==='Button');
     return items.find(n=>find(n.props?.children,x=>x===label).length||n.props?.children===label||String(n.props?.children).includes(label));}
-  return {render,tick,button,calls,api,find,changeHub:newHub=>{hub=newHub;},changeUser:newUser=>{user=newUser;},
+  return {render,tick,button,calls,api,find,key:()=>screen().props.key,changeHub:newHub=>{hub=newHub;},changeUser:newUser=>{user=newUser;},
     unmount(){Object.values(cleanups).forEach(fn=>typeof fn==='function'&&fn());}};
 }
 test('R: search submit trims and caps at 200; post pagination retains q and clear resets',async()=>{
@@ -137,7 +137,7 @@ test('C: poll vote refreshes active poll page, not the post query; closed cannot
   assert.ok(choice&&!choice.props.disabled);
   choice.props.onPress();await h.tick();
   assert.equal(h.calls.votes.length,1);
-  assert.equal(h.calls.votes[0][1],choice.props?.children?.id||h.calls.votes[0][1]);
+  assert.ok(Number.isInteger(h.calls.votes[0][1]),'option id is forwarded as a number');
   assert.equal(h.calls.posts.length,before,'vote must not reload or erase post discussion');
   assert.equal(h.calls.polls.at(-1)[1].page,2);
 });
@@ -148,8 +148,8 @@ test('C: changing hub drops stale responses and errors, distinct account key rem
   first.reject(Error('stale 403'));await h.tick();
   assert.equal(h.find(h.render(),n=>n.type==='Text'&&n.props.children==='Post 777').length,1);
   assert.equal(h.find(h.render(),n=>n.props?.accessibilityRole==='alert').length,0);
-  const key=h.render().props.children.props.key;
+  const key=h.key();
   h.changeUser({id:88,role:'EXPLORER'});
-  const other=h.render().props.children.props.key;
+  const other=h.key();
   assert.notEqual(key,other);
 });
