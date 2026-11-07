@@ -779,7 +779,8 @@ export function TalentBoardInner({
     } catch (err: any) {
       if (!isCurrentSave()) return;
       if (pendingStore) {
-        try { const intent = await pendingStore.read(); if (isCurrentSave()) setPendingPitch(intent); } catch {}
+        try { const intent = await pendingStore.read(); if (isCurrentSave()) setPendingPitch(intent); }
+        catch { if (isCurrentSave()) { setPendingPitch(null); setPendingReady(false); setPendingError('Your saved pitch could not be read. Review your pitches to recover.'); } }
       }
       if (!isCurrentSave()) return;
       const detail = err?.payload || err?.response?.data || err?.data || err;
@@ -821,8 +822,12 @@ export function TalentBoardInner({
       try { await reload(); } catch {}
     } catch (err: any) {
       if (!isCurrent()) return;
-      try { setPendingPitch(await pendingStore.read()); } catch {}
-      if (isCurrent()) setPendingError(err?.message || 'Unable to finish your pitch. Please try again.');
+      try {
+        const intent = await pendingStore.read();
+        if (isCurrent()) { setPendingPitch(intent); setPendingError(err?.message || 'Unable to finish your pitch. Please try again.'); }
+      } catch {
+        if (isCurrent()) { setPendingPitch(null); setPendingReady(false); setPendingError('Your saved pitch could not be read. Review your pitches to recover.'); }
+      }
     } finally {
       if (saveGeneration.current === generation) {
         saveInFlightRef.current = false;
@@ -850,8 +855,10 @@ export function TalentBoardInner({
           try {
             await pendingStore.recoverCorruptAfterReview();
             if (!isCurrent()) return;
-            const intent = await pendingStore.read();
-            if (isCurrent()) { setPendingPitch(intent); setPendingReady(true); setPendingError(null); }
+            try {
+              const intent = await pendingStore.read();
+              if (isCurrent()) { setPendingPitch(intent); setPendingReady(true); setPendingError(null); }
+            } catch { if (isCurrent()) { setPendingPitch(null); setPendingReady(false); setPendingError('Your saved pitch could not be read. Review your pitches to recover.'); } }
           } catch (err: any) { if (isCurrent()) setPendingError(err?.message || 'Unable to recover your saved pitch.'); }
         })(); } },
       ]);

@@ -248,8 +248,9 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
   mocks['../forms/useUnsavedChangesGuard'] = guardModule.exports;
 
   const storageData = new Map();
+  let readStorage = async (key) => storageData.get(key) ?? null;
   const storage = {
-    getItem: async (key) => storageData.get(key) ?? null,
+    getItem: (key) => readStorage(key),
     setItem: async (key, value) => { storageData.set(key, value); },
     removeItem: async (key) => { storageData.delete(key); },
   };
@@ -398,6 +399,8 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
     onboardingUpdateCalls,
     setOnboardingService: (fn) => { onboardingImplementation = fn; },
     setOnboardingUpdateService: (fn) => { onboardingUpdateImplementation = fn; },
+    setStorageRead: (fn) => { readStorage = fn; },
+    storeFor: (id) => mocks['./pendingPitch'].mobilePendingPitchStore('test', id),
     corruptStorage: () => { storageData.set('talent.pitch.create:v1:' + JSON.stringify(['test', String(initialUser.id)]), 'bad'); },
     pendingStore: mocks['./pendingPitch'].mobilePendingPitchStore('test', initialUser.id),
     changeEditorPost: (newPost) => {
@@ -1351,4 +1354,35 @@ test('storage corrupted after mount offers reviewed recovery on save', async () 
   await dialog.props.onSave();
   const tree = h.renderInner();
   assert.ok(h.walkTree(tree, n => n.props?.children === 'Review my pitches'));
+});
+
+
+test('late failed-finish reread cannot replace the new account pending pitch', async () => {
+  const h = createPitchHarness({ id: 7001, role: 'PHARMACIST' }, null);
+  await h.pendingStore.acquire({ headline: 'Account A' }, 'PHARMACIST');
+  const b = await h.storeFor(7002).acquire({ headline: 'Account B' }, 'PHARMACIST');
+  let release, entered;
+  const waiting = new Promise(r => { release = r; });
+  const started = new Promise(r => { entered = r; });
+  h.setCreatePostService(async () => {
+    h.setStorageRead(async key => { if (key.includes('7001')) { entered(); await waiting; return null; } return JSON.stringify(b); });
+    throw new Error('failed');
+  });
+  const tree = await h.mountWithPitch();
+  h.walkTree(tree, n => n.props?.children === 'Finish saving pitch').props.onPress();
+  await started;
+  h.setCurrentUser({ id: 7002, role: 'PHARMACIST' });
+  h.renderInner(); await h.runEffects();
+  release(); for (let i = 0; i < 30; i++) await Promise.resolve();
+  assert.ok(h.walkTree(h.renderInner(), n => n.props?.children === 'Finish saving pitch'));
+});
+
+test('corrupt reread after failed finish offers reviewed recovery', async () => {
+  const h = createPitchHarness({ id: 7001, role: 'PHARMACIST' }, null);
+  await h.pendingStore.acquire({ headline: 'Account A' }, 'PHARMACIST');
+  h.setCreatePostService(async () => { h.corruptStorage(); throw new Error('failed'); });
+  const tree = await h.mountWithPitch();
+  h.walkTree(tree, n => n.props?.children === 'Finish saving pitch').props.onPress();
+  for (let i = 0; i < 50; i++) await Promise.resolve();
+  assert.ok(h.walkTree(h.renderInner(), n => n.props?.children === 'Review my pitches'));
 });
