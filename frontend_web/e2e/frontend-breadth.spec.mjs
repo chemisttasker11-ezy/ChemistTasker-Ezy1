@@ -67,7 +67,9 @@ async function openAuthenticatedRoute(page, user, path) {
   const expectedPath =
     path.split('?')[0].endsWith('/pharmacy-hub')
       ? '/dashboard/pharmacy-hub'
-      : path.split('?')[0];
+      : /^\/dashboard\/explorer\/shifts\/(confirmed|history)\/?$/.test(path.split('?')[0])
+        ? '/dashboard/explorer/shifts/public'
+        : path.split('?')[0];
   await expect.poll(() => new URL(page.url()).pathname, { message: `canonical route while opening ${path}` }).toBe(expectedPath);
   await expect(page.locator('body')).toBeVisible();
   await expect(page.locator('body')).not.toContainText('Page not found');

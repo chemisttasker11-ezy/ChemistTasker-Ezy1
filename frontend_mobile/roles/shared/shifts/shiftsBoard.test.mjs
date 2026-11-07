@@ -103,7 +103,7 @@ test('every persona gets its sections; a worker board follows the workspace', ()
   assert.deepEqual(sections({ pathname: '/otherstaff/shifts', workspace: 'platform', canUsePlatform: true }), ['public', 'confirmed', 'history']);
   // Platform asked for but not allowed: the worker stays on Community.
   assert.deepEqual(sections({ pathname: '/pharmacist/shifts', workspace: 'platform', canUsePlatform: false }), ['community', 'confirmed', 'history']);
-  assert.deepEqual(sections({ pathname: '/explorer/shifts' }), ['public', 'community', 'confirmed', 'history']);
+  assert.deepEqual(sections({ pathname: '/explorer/shifts' }), ['public', 'community']);
   assert.equal(resolveShiftSurface({ pathname: '/explorer/shifts' }).publicOnly, true, 'explorer Community is the locked state');
   assert.equal(resolveShiftSurface({ pathname: '/pharmacist/shifts' }).publicOnly, false);
 });
