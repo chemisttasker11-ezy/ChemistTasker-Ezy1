@@ -497,11 +497,12 @@ test('C mounted ActiveShiftsPage keeps rapid payment taps single-flight', async 
   const [checkout] = touchableWith(tree, /Pay selected with Stripe/);
   assert.ok(checkout, 'a payable shift must render the Stripe control');
   assert.notEqual(checkout.props.disabled, true);
-  checkout.props.onPress(); checkout.props.onPress();
+  const first = checkout.props.onPress(), second = checkout.props.onPress();
   assert.equal(h.calls.checkout.length, 1, 'rapid taps create one checkout attempt');
   assert.deepEqual(JSON.parse(JSON.stringify(h.calls.checkout[0])), [12, { offerIds: [81, 83], platform: 'mobile' }],
     'one default offer per slot is charged on the mobile platform');
   h.finishCheckout();
+  await Promise.all([first, second]);
   await new Promise(resolve => setImmediate(resolve));
   touchableWith(h.render(), /Offer #82/)[0].props.onPress();
   touchableWith(h.render(), /Pay selected with Stripe/)[0].props.onPress();
