@@ -97,8 +97,8 @@ test('R: real hook projects overnight 22:00–06:00 into next calendar day, keep
     for (const event of state.calendarEvents) assert.ok(event.end.getTime() > event.start.getTime());
     assert.deepEqual([...state.slots.map(s=>[s.date,s.startTime,s.endTime])],
       [['2026-07-10','22:00','06:00'],['2026-07-10','09:00','17:00']]);
-    assert.deepEqual(slotDomain.buildShiftDraftSlotPayload(state.slots, state.expandedSlots,
-      state.expandedSlots.map(() => ({ rate: 67 }))).map(x=>[x.date,x.start_time,x.end_time]),
+    assert.deepEqual(Array.from(slotDomain.buildShiftDraftSlotPayload(state.slots, state.expandedSlots,
+      state.expandedSlots.map(() => ({ rate: 67 }))), x=>[x.date,x.start_time,x.end_time]),
       [['2026-07-10','22:00','06:00'],['2026-07-10','09:00','17:00']]);
   }));
 test('R: recurrence projects each individual overnight event and editing retains source identity', () =>
@@ -111,9 +111,9 @@ test('R: recurrence projects each individual overnight event and editing retains
     ]);
     const state = host.render();
     assert.equal(state.calendarEvents.length, 3);
-    assert.deepEqual(state.calendarEvents.map(x => local(x).end),
+    assert.deepEqual(Array.from(state.calendarEvents, x => local(x).end),
       ['2026-07-11T06:00', '2026-07-12T06:00', '2026-07-12T17:00']);
-    assert.deepEqual(state.calendarEvents.map(x=>x.resource),
+    assert.deepEqual(Array.from(state.calendarEvents, x=>({ ...x.resource })),
       [{slotIndex:0,occurrenceIndex:0},{slotIndex:0,occurrenceIndex:1},
        {slotIndex:1,occurrenceIndex:0}]);
     assert.equal(new Set(state.calendarEvents.map(x=>x.id)).size,3);
