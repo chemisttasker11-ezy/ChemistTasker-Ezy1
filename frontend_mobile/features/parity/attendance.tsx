@@ -44,8 +44,10 @@ export function AttendanceParityScreen({screen}:{screen:AttendanceScreen}) {
   const manager=Boolean(pharmacyId && hasCapability('MANAGE_ROSTER',pharmacyId));
   const accountKey=user ? String(user.id ?? user.email ?? '') : '';
 
-  const detailScope = `${params.id || ''}:${params.sessionId || ''}:${params.eventId || ''}:${params.timesheetId || ''}`;
-  const scopeKey = `${accountKey}:${pharmacyId ?? 'none'}:${manager?'manager':'worker'}:${screen}:${detailScope}`;
+  // Binding the manager persona to detailScope also invalidates previously
+  // mounted content on permission changes without altering the route contract.
+  const detailScope = `${manager ? 'manager' : 'worker'}:${params.id || ''}:${params.sessionId || ''}:${params.eventId || ''}:${params.timesheetId || ''}`;
+  const scopeKey = `${accountKey}:${pharmacyId ?? 'none'}:${screen}:${detailScope}`;
 
   return (
     <AttendanceParityContent
