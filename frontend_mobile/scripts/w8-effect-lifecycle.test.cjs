@@ -34,6 +34,19 @@ test('C W8 native blog feed unmount ignores a late article reply',async()=>{
   assert.equal(collect(tree,'Card').length,0,'unmounted article response is discarded');
   assert.equal(h.routes.length,0);
 });
+test('C W8 unaffected public hosts retain the original deferred effect cancellation controls',()=>{
+  for(const file of [
+    "features/explore/ArticleDetail.tsx",
+    "app/explore/hubs/index.tsx",
+    "app/explore/hubs/[hub].tsx",
+    "app/explore/hubs/post/[id].tsx",
+    "app/explore/organization/[slug].tsx",
+  ]){
+    const src=read(file);
+    assert.match(src,/Promise\\.resolve\\(\\)\\.then\\(\\(\\) => \\{ if \\(active\\) void load\\(\\); \\}\\)/);
+    assert.match(src,/active = false/);
+  }
+});
 test('publisher link cannot leak across account transitions',()=>{
  const src=read('components/shell/MoreScreen.tsx');
  assert.match(src,/publisherAccess\?\.id === publisherId/);
