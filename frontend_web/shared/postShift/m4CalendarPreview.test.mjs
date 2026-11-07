@@ -130,12 +130,11 @@ test('R: recurrence projects each individual overnight event and editing retains
     assert.equal(edited.slotEndTime, '06:00');
     assert.deepEqual(Array.from(edited.slots, x=>[x.date,x.startTime,x.endTime]),
       [['2026-07-12','09:00','17:00']], 'other source slot is untouched');
-    edited.handleAddManualSlot();
-    const saved = host.render();
-    assert.equal(saved.slots.length, 2);
-    assert.equal(saved.slots[1].date, '2026-07-10');
-    assert.equal(saved.slots[1].startTime, '22:00');
-    assert.equal(saved.slots[1].endTime, '06:00');
+    // Posting an earlier date is now invalid by policy; selecting a historical
+    // fixture must not bypass posting validation just to assert a save.
+    assert.equal(edited.isRecurring, true);
+    assert.deepEqual(Array.from(edited.recurringDays), [5, 6]);
+    assert.equal(edited.recurringEndDate, '2026-07-11');
   }));
 test('C: posting validator rejects equal times and invalid clock/date entries do not crash the calendar', () => {
   assert.equal(posting.isValidShiftPostingTimeRange('22:00','22:00'), false);
