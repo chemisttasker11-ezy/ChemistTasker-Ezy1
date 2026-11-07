@@ -3,7 +3,7 @@ import { Alert, Linking, StyleSheet, View } from 'react-native';
 import { Button, Chip, Icon, Text } from 'react-native-paper';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { attendance, canManageKioskDevices, workforce } from '@chemisttasker/shared-core';
+import { attendance, canManageKioskDevices, correctionTimestamp, workforce } from '@chemisttasker/shared-core';
 import type { AttendanceClockOptions, ShiftOffer, WorkerCoverTerms } from '@chemisttasker/shared-core';
 import ShiftEngagementTermsDialog from '../../roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog';
 import { useWorkspace } from '@/context/WorkspaceContext';
@@ -521,42 +521,132 @@ function ReviewDetail({screen,row,timeline,loading,error,onReload}:{screen:Atten
   </ParityPage>;
 }
 
-function CorrectionScreen({manager,rows,params,loading,error}:{manager:boolean;rows:any[];params:any;loading:boolean;error:string}) {
+function attendanceWallTime(instant:string,timeZone:string):string {
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{
+    timeZone,year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',hourCycle:'h23',
+  }).formatToParts(new Date(instant)).filter((p)=>p.type!=='literal').map((p)=>[p.type,p.value]));
+  return [parts.year,parts.month,parts.day].join('-')+'T'+[parts.hour,parts.minute].join(':');
+}
+
+function isValidAttendanceLocal(value:string):boolean {
+  const match=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value.trim());
+  if(!match)return false;
+  const [y,m,d,h,min]=match.slice(1).map(Number);
+  const stamp=new Date(Date.UTC(y,m-1,d,h,min));
+  return stamp.getUTCFullYear()===y&&stamp.getUTCMonth()===m-1&&
+    stamp.getUTCDate()===d&&stamp.getUTCHours()===h&&stamp.getUTCMinutes()===min;
+}
+
+function CorrectionScreen({manager,pharmacyId,rows,params,loading,error}:{
+  manager:boolean;pharmacyId:number|null;rows:any[];params:any;loading:boolean;error:string;
+}) {
   const [eventId,setEventId]=useState(String(params.eventId||''));
   const [timesheetId,setTimesheetId]=useState(String(params.timesheetId||''));
   const [sessionId,setSessionId]=useState(String(params.sessionId||''));
   const [kind,setKind]=useState<'CLOCK_IN'|'CLOCK_OUT'>('CLOCK_IN');
-  const [timestamp,setTimestamp]=useState(new Date().toISOString().slice(0,16));
+  const [timestamp,setTimestamp]=useState('');
   const [reason,setReason]=useState('');
   const [busy,setBusy]=useState(false);
+  const busyRef=useRef(false);
+  const mounted=useRef(true);
   const [localError,setLocalError]=useState('');
   const [success,setSuccess]=useState('');
+  const [context,setContext]=useState<{timeZone:string;event:any}|null>(null);
+  const [contextLoading,setContextLoading]=useState(false);
+  const [contextError,setContextError]=useState('');
+
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+  useEffect(()=>{
+    if(!manager)return;
+    let active=true;
+    const requestedSession=toNumber(params.sessionId);
+    const requestedEvent=toNumber(params.eventId);
+    setContext(null);setContextError('');
+    if(!pharmacyId||!Number.isSafeInteger(requestedSession)||requestedSession<=0||
+       !Number.isSafeInteger(requestedEvent)||requestedEvent<=0){
+      setContextError('Open an event from the attendance review timeline. A session and event are required.');
+      return;
+    }
+    setContextLoading(true);
+    void attendance.getManagerTimeline(requestedSession)
+      .then((timeline:any)=>{
+        if(!active)return;
+        if(Number(timeline?.pharmacy_id)!==pharmacyId){
+          throw new Error('This event belongs to a different pharmacy. Return to the selected pharmacy.');
+        }
+        const event=asArray<any>(timeline?.timeline)
+          .find((entry:any)=>Number(entry.event_id)===requestedEvent);
+        if(!event||!event.effective_timestamp||!timeline.pharmacy_timezone){
+          throw new Error('The original event or pharmacy timezone is unavailable. Reload the attendance review.');
+        }
+        const timeZone=String(timeline.pharmacy_timezone);
+        const local=attendanceWallTime(event.effective_timestamp,timeZone);
+        setContext({timeZone,event});
+        setEventId(String(event.event_id));
+        setTimestamp(local);
+      })
+      .catch((e)=>{if(active)setContextError(errorMessage(e,'Unable to verify attendance event context.'));})
+      .finally(()=>{if(active)setContextLoading(false);});
+    return()=>{active=false;};
+  },[manager,pharmacyId,params.eventId,params.sessionId]);
+
+  const selectedTimesheet=rows.find((row:any)=>String(row.id)===timesheetId);
   const submit=async()=>{
-    setBusy(true);setLocalError('');setSuccess('');
+    if(busyRef.current)return;
+    if(!reason.trim()){setLocalError('Explain the requested attendance change.');return;}
+    if(!isValidAttendanceLocal(timestamp)){
+      setLocalError('Enter a valid pharmacy-local date and time (YYYY-MM-DDTHH:mm).');
+      return;
+    }
+    busyRef.current=true;setBusy(true);setLocalError('');setSuccess('');
     try{
       if(manager){
-        if(!eventId.trim()) throw new Error('Attendance event ID is required for a manager correction.');
-        await attendance.correct(toNumber(eventId),new Date(timestamp).toISOString(),reason.trim());
-        setSuccess('Correction appended to the attendance audit history.');
+        if(!context||Number(eventId)!==Number(context.event.event_id)){
+          throw new Error('Open and verify an event from the attendance timeline before correcting it.');
+        }
+        const instant=correctionTimestamp(timestamp,context.event.effective_timestamp,context.timeZone);
+        await attendance.correct(toNumber(eventId),instant,reason.trim());
+        if(mounted.current)setSuccess('Correction appended to the attendance audit history.');
       }else{
-        if(!timesheetId.trim()||!sessionId.trim()) throw new Error('Select a timesheet/session from My Hours before requesting a missing punch.');
-        await workforce.addMissingPunch(toNumber(timesheetId),{session_id:toNumber(sessionId),event_type:kind,occurred_at:new Date(timestamp).toISOString(),reason:reason.trim()});
-        setSuccess('Missing-punch request recorded on the timesheet.');
+        if(!selectedTimesheet)throw new Error('Select one of your own timesheets before requesting a correction.');
+        const requested='Missing '+(kind==='CLOCK_IN'?'clock in':'clock out')+
+          ' ('+kind+') on '+timestamp+' pharmacy local time'+
+          (sessionId.trim()?', session '+sessionId.trim():'')+
+          '. Reason: '+reason.trim()+'. This is a request, not a completed attendance event.';
+        await workforce.addTimesheetComment(toNumber(timesheetId),requested,true);
+        if(mounted.current)setSuccess('Request sent to the timesheet reviewer.');
       }
-    }catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}
+    }catch(e){if(mounted.current)setLocalError(errorMessage(e,'Unable to submit attendance correction.'));}
+    finally{busyRef.current=false;if(mounted.current)setBusy(false);}
   };
-  return <ParityPage title="Attendance correction" subtitle={manager?'Append a manager correction without deleting original scan evidence.':'Request a missing punch through the workforce timesheet audit trail.'} loading={loading} error={error||localError}>
-    {success?<InfoNote title="Saved" tone="success">{success}</InfoNote>:null}
-    {manager?<Field label="Attendance event ID" value={eventId} keyboardType="numeric" onChangeText={setEventId}/>:<>
-      <InfoNote title="Worker workflow">Select the relevant timesheet, then provide the attendance session identifier for the missing punch. Requests are reviewed through workforce timesheet checks.</InfoNote>
-      {rows.length?<Section title="Timesheet period">{rows.map((row:any)=><DataRow key={row.id} title={row.pharmacy?.name||'Pharmacy'} subtitle={String(row.start_date||'')+' – '+String(row.end_date||'')+' · '+replaceUnderscore(row.status||'')} status={timesheetId===String(row.id)?'Selected':undefined} onPress={()=>setTimesheetId(String(row.id))}/>)}</Section>:null}
+
+  return <ParityPage title="Attendance correction" subtitle={manager
+      ? 'Append a manager correction without deleting original scan evidence.'
+      : 'Request a review of a missing punch on your own timesheet.'}
+    loading={loading||contextLoading} error={error||contextError||localError}>
+    {success?<InfoNote title={manager?'Saved':'Request sent'} tone="success">{success}</InfoNote>:null}
+    {manager?<>
+      <InfoNote title="Audited event context">Open an event from the selected pharmacy's session timeline. Freehand event IDs and device-local time are not accepted.</InfoNote>
+      {context?<DataRow title={'Event '+eventId} subtitle={'Session '+String(params.sessionId)+' · '+context.timeZone}/>:null}
+    </>:<>
+      <InfoNote title="Worker correction request">Choose your timesheet and describe the missing clock entry. This records a comment for the manager; it does not change recorded attendance.</InfoNote>
+      {rows.length?<Section title="Your timesheets">{rows.map((row:any)=>
+        <DataRow key={row.id} title={row.pharmacy?.name||'Pharmacy'}
+          subtitle={String(row.start_date||'')+' – '+String(row.end_date||'')+' · '+replaceUnderscore(row.status||'')}
+          status={timesheetId===String(row.id)?'Selected':undefined}
+          onPress={()=>setTimesheetId(String(row.id))}/>)}</Section>:null}
       <Field label="Timesheet ID" value={timesheetId} keyboardType="numeric" onChangeText={setTimesheetId}/>
-      <Field label="Session ID" value={sessionId} keyboardType="numeric" onChangeText={setSessionId}/>
-      <View style={{flexDirection:'row',gap:8}}><Chip selected={kind==='CLOCK_IN'} onPress={()=>setKind('CLOCK_IN')}>Missing clock in</Chip><Chip selected={kind==='CLOCK_OUT'} onPress={()=>setKind('CLOCK_OUT')}>Missing clock out</Chip></View>
+      <Field label="Session ID (optional)" value={sessionId} keyboardType="numeric" onChangeText={setSessionId}/>
+      <View style={{flexDirection:'row',gap:8}}>
+        <Chip selected={kind==='CLOCK_IN'} onPress={()=>setKind('CLOCK_IN')}>Missing clock in</Chip>
+        <Chip selected={kind==='CLOCK_OUT'} onPress={()=>setKind('CLOCK_OUT')}>Missing clock out</Chip>
+      </View>
     </>}
     <Field label="Corrected date/time" value={timestamp} onChangeText={setTimestamp}/>
     <Field label="Reason" value={reason} multiline onChangeText={setReason}/>
-    <Button mode="contained" loading={busy} disabled={busy||!reason.trim()} onPress={()=>void submit()}>{manager?'Save correction':'Request correction'}</Button>
+    <Button mode="contained" loading={busy} disabled={busy||!reason.trim()||(manager&&!context)}
+      onPress={()=>void submit()}>{manager?'Save correction':'Request correction'}</Button>
   </ParityPage>;
 }
 
