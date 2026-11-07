@@ -1,0 +1,51 @@
+diff --git a/frontend_mobile/scripts/m4-explorer-shifts.test.cjs b/frontend_mobile/scripts/m4-explorer-shifts.test.cjs
+index b04ba2f0..72b1606c 100644
+--- a/frontend_mobile/scripts/m4-explorer-shifts.test.cjs
++++ b/frontend_mobile/scripts/m4-explorer-shifts.test.cjs
+@@ -22,7 +22,7 @@ function load(relative, imports) {
+       if (!Object.prototype.hasOwnProperty.call(imports, name)) {
+         throw new Error('Unmocked import ' + name + ' in ' + relative);
+       }
+-      return imports[name];
++      const m = imports[name]; return m && typeof m === 'object' && 'default' in m && !m.__esModule ? { __esModule: true, ...m } : m;
+     },
+   }, { filename: relative });
+   return module.exports;
+@@ -55,7 +55,7 @@ function mount() {
+       slots[i] = { deps: deps ? [...deps] : [], value };
+       return value;
+     },
+-    useCallback(fn, deps) { return this.useMemo(() => fn, deps); },
++    useCallback(fn, deps) { return react.useMemo(() => fn, deps); },
+   };
+   react.default = react;
+   const router = {
+diff --git a/frontend_web/src/pages/dashboard/shiftCenter/m4Explorer.test.mjs b/frontend_web/src/pages/dashboard/shiftCenter/m4Explorer.test.mjs
+index fedc2fe5..c712651d 100644
+--- a/frontend_web/src/pages/dashboard/shiftCenter/m4Explorer.test.mjs
++++ b/frontend_web/src/pages/dashboard/shiftCenter/m4Explorer.test.mjs
+@@ -72,7 +72,7 @@ function createHost() {
+   const tabs = execute('./StaffShiftCentreTabs.tsx', {
+     react, 'react/jsx-runtime': { jsx, jsxs: jsx },
+     'react-router-dom': router,
+-    '../../../components/ui/SegmentTabs': { default: 'SegmentTabs' },
++    '../../../components/ui/SegmentTabs': { __esModule: true, default: 'SegmentTabs' },
+     '../../../contexts/AuthContext': auth,
+   });
+   const base = {
+@@ -86,13 +86,13 @@ function createHost() {
+     './ShiftsBoard/utils/submitCounterOffer': { submitCounterOfferDirect: async () => {} },
+     './ShiftsBoard/components/ShiftEngagementTermsDialog': { default: 'ShiftEngagementTermsDialog' },
+     '../../../components/ui/PageHeader': { default: 'PageHeader' },
+-    '../../../components/ui/SegmentTabs': { default: 'SegmentTabs' },
++    '../../../components/ui/SegmentTabs': { __esModule: true, default: 'SegmentTabs' },
+     '../shiftCenter/StaffShiftCentreTabs': tabs,
+   };
+   const publicBoard = execute('../sidebar/PublicShiftsPage.tsx', base);
+   const communityBoard = execute('../sidebar/CommunityShiftsPage.tsx', base);
+   function mount(board) {
+-    stateIndex = 0;
++    stateIndex = 0; state.length = 0;
+     const tree = board.default();
+     const tabNodes = nodes(tree, n => n.type === tabs.StaffShiftCentreTabs);
+     assert.equal(tabNodes.length, 1, 'must mount the real shared tabs from this Vite board');
