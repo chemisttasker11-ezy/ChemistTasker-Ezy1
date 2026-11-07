@@ -52,7 +52,13 @@ export default function NotificationsScreen() {
   // Only the newest list response may set rows: an older one would restore rows from before a mark-read.
   const generation = useRef(0);
   const refreshGeneration = useRef(0);
-  const currentAccount = () => visibleAccount.current === accountId;
+  const renderedAccount = useRef(accountId);
+  if (renderedAccount.current !== accountId) {
+    renderedAccount.current = accountId;
+    generation.current += 1;
+    refreshGeneration.current += 1;
+  }
+  const currentAccount = () => visibleAccount.current === accountId && renderedAccount.current === accountId;
 
   // Load on every focus (the first one included) and mark any unread as read.
   useFocusEffect(
@@ -315,7 +321,7 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {loading && shownNotifications.length === 0 && !loadError ? (
+      {!currentAccount() || (loading && shownNotifications.length === 0 && !loadError) ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
