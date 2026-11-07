@@ -126,8 +126,10 @@ function PublicHubFeedView() {
       if (ticket === generation.current && postTicket === postGeneration.current)
         setMoreError(failure?.message || 'More posts could not load.');
     } finally {
-      postPaging.current = false;
-      if (ticket === generation.current && postTicket === postGeneration.current) setMoreBusy(false);
+      if (ticket === generation.current && postTicket === postGeneration.current) {
+        postPaging.current = false;
+        setMoreBusy(false);
+      }
     }
   };
   const loadMorePolls = async () => {
@@ -149,8 +151,10 @@ function PublicHubFeedView() {
     } catch (failure: any) {
       if (ticket === generation.current) setPollMoreError(failure?.message || 'More polls could not load.');
     } finally {
-      pollPaging.current = false;
-      if (ticket === generation.current) setPollMoreBusy(false);
+      if (ticket === generation.current) {
+        pollPaging.current = false;
+        setPollMoreBusy(false);
+      }
     }
   };
 
