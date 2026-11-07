@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const ts = require('typescript');
+const ts = require('../node_modules/typescript');
 
 const root = path.resolve(__dirname, '..');
 const jsx = (type, props) => ({ type, props: props || {} });
@@ -22,7 +22,7 @@ function load(relative, imports) {
       if (!Object.prototype.hasOwnProperty.call(imports, name)) {
         throw new Error('Unmocked import ' + name + ' in ' + relative);
       }
-      return imports[name];
+      const m = imports[name]; return m && typeof m === 'object' && 'default' in m && !m.__esModule ? { __esModule: true, ...m } : m;
     },
   }, { filename: relative });
   return module.exports;
@@ -55,7 +55,7 @@ function mount() {
       slots[i] = { deps: deps ? [...deps] : [], value };
       return value;
     },
-    useCallback(fn, deps) { return this.useMemo(() => fn, deps); },
+    useCallback(fn, deps) { return react.useMemo(() => fn, deps); },
   };
   react.default = react;
   const router = {

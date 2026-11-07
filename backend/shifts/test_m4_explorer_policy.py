@@ -28,10 +28,10 @@ class ExplorerWorkerShiftAccessTests(TestCase):
         self.staff = [make_staff_member(self.pharmacy, role=role)[0]
                       for role in ("TECHNICIAN", "ASSISTANT", "INTERN")]
 
-    def create_assignment(self, user, *, past=False, recurring=False):
+    def create_assignment(self, user, *, past=False, recurring=False, pharmacy=None, poster=None):
         work_day = date.today() + timedelta(days=-20 if past else 20)
         shift = Shift.objects.create(
-            pharmacy=self.pharmacy, created_by=self.owner,
+            pharmacy=pharmacy or self.pharmacy, created_by=poster or self.owner,
             role_needed="PHARMACIST" if user.role == "PHARMACIST" else "ASSISTANT",
             employment_type="LOCUM", visibility="PLATFORM",
         )
@@ -104,3 +104,39 @@ class ExplorerWorkerShiftAccessTests(TestCase):
         self.assertIn(shift.pk, self.ids(worker, HISTORY))
         # An unsupported matching value cannot expand the worker's history.
         self.assertEqual(self.ids(worker, HISTORY + "?payment_preference=NO_MATCH"), {})
+
+    def test_manager_history_is_scoped_and_does_not_call_personal_worker_history(self):
+        from client_profile.models import Organization
+        from users.models import OrganizationMembership
+
+        group = Organization.objects.create(name="M4 history scope")
+        self.pharmacy.organization = group
+        self.pharmacy.save(update_fields=["organization"])
+        own_shift, _ = self.create_assignment(self.staff[0], past=True)
+        other_shift, _ = self.create_assignment(
+            self.pharmacists[0], past=True,
+            pharmacy=self.foreign_pharmacy, poster=self.foreign_owner,
+        )
+        lina = make_user("ORG_STAFF")
+        OrganizationMembership.objects.create(user=lina, organization=group, role="ORG_ADMIN")
+        grace = make_user("ORG_STAFF")
+        member = OrganizationMembership.objects.create(
+            user=grace, organization=group, role="REGION_ADMIN",
+            admin_level="ROSTER_MANAGER", region="North",
+        )
+        member.pharmacies.add(self.pharmacy)
+        denied = make_user("ORG_STAFF")
+        for manager in (self.owner, lina, grace):
+            with self.subTest(manager=manager.email):
+                response = client_for(manager).get(BASE + "shifts/history/")
+                self.assertEqual(response.status_code, 200, getattr(response, "data", None))
+                rows = response.data["results"] if isinstance(response.data, dict) else response.data
+                self.assertIn(own_shift.pk, {row["id"] for row in rows})
+                self.assertNotIn(other_shift.pk, {row["id"] for row in rows})
+                self.assertEqual(client_for(manager).get(BASE + HISTORY).status_code, 403)
+        for actor in (self.explorer, denied, self.foreign_owner):
+            with self.subTest(denied=actor.email):
+                response = client_for(actor).get(BASE + "shifts/history/")
+                self.assertEqual(response.status_code, 200, getattr(response, "data", None))
+                rows = response.data["results"] if isinstance(response.data, dict) else response.data
+                self.assertNotIn(own_shift.pk, {row["id"] for row in rows})

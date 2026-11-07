@@ -33,7 +33,7 @@ const nodes = (node, predicate, result = []) => {
   return result;
 };
 
-function createHost() {
+function createHost(apiOverrides = {}) {
   const session = { role: 'EXPLORER', pathname: '/dashboard/explorer/shifts/public',
     search: '?ref=notice' };
   const nav = [];
@@ -68,11 +68,12 @@ function createHost() {
     fetchSavedShifts: async () => [], fetchShiftInterests: async () => [],
     fetchShiftRejections: async () => [], fetchShiftOffersService: async () => [],
     getOnboardingDetail: async () => ({ verified: true }),
+    ...apiOverrides,
   };
   const tabs = execute('./StaffShiftCentreTabs.tsx', {
     react, 'react/jsx-runtime': { jsx, jsxs: jsx },
     'react-router-dom': router,
-    '../../../components/ui/SegmentTabs': { default: 'SegmentTabs' },
+    '../../../components/ui/SegmentTabs': { __esModule: true, default: 'SegmentTabs' },
     '../../../contexts/AuthContext': auth,
   });
   const base = {
@@ -91,16 +92,20 @@ function createHost() {
   };
   const publicBoard = execute('../sidebar/PublicShiftsPage.tsx', base);
   const communityBoard = execute('../sidebar/CommunityShiftsPage.tsx', base);
-  function mount(board) {
+  function render(board, reset = false) {
     stateIndex = 0;
-    const tree = board.default();
+    if (reset) state.length = 0;
+    return board.default();
+  }
+  function mount(board) {
+    const tree = render(board, true);
     const tabNodes = nodes(tree, n => n.type === tabs.StaffShiftCentreTabs);
     assert.equal(tabNodes.length, 1, 'must mount the real shared tabs from this Vite board');
     const actual = tabs.StaffShiftCentreTabs(tabNodes[0].props);
     assert.equal(actual.type, 'SegmentTabs');
     return actual.props;
   }
-  return { session, nav, mount, publicBoard, communityBoard };
+  return { session, nav, mount, render, publicBoard, communityBoard };
 }
 
 test('R: both Vite Explorer board mounts hide worker Confirmed/History routes', () => {
@@ -185,4 +190,64 @@ test('R: Vite direct Explorer Confirmed/History routes redirect without mounting
   for (const section of ['public', 'community']) {
     assert.ok(shifts.children.find(node => node.path === section));
   }
+});
+
+test('C: auth hydrates before rendering Explorer deep-link handoff', () => {
+  let pending = true, user = null;
+  const react = { useEffect() {} };
+  react.default = react;
+  const guard = execute('../../../components/ProtectedRoute.tsx', {
+    react, 'react/jsx-runtime': { jsx, jsxs: jsx },
+    '../contexts/AhpraContext': { useAhpra: () => ({ loading: false, summary: null, refusal: null }) },
+    './AhpraStatus': { __esModule: true, default: 'AhpraStatus' },
+    '../../landing_next/shared/browser-session': { loginHref: next => next },
+    'react-router-dom': { Navigate: 'Navigate', Link: 'Link', useLocation: () => ({
+      pathname: '/dashboard/explorer/shifts/history', search: '?ref=activity', hash: '',
+    }) },
+    '@mui/material': { Box: 'Box', Button: 'Button', CircularProgress: 'CircularProgress',
+      Container: 'Container', Paper: 'Paper', Typography: 'Typography' },
+    '../contexts/AuthContext': { useAuth: () => ({
+      user, isLoading: pending, isAdminUser: false, hasCapability: () => false,
+    }) },
+    '@chemisttasker/shared-core': { hasOrganizationAccess: () => false },
+    '../utils/dashboardPath': { resolveDashboardPath: () => '/dashboard/explorer' },
+    './routeAccess': { canAccessRoute: ({ userRole, requiredRole }) => userRole === requiredRole },
+  });
+  const loading = guard.default({ requiredRole: 'EXPLORER', children: jsx('AllowedBoard') });
+  assert.equal(loading.type, 'div');
+  assert.match(String(loading.props.children), /Loading authentication/);
+  pending = false;
+  user = { id: 57, role: 'EXPLORER', is_mobile_verified: true };
+  assert.equal(guard.default({ requiredRole: 'EXPLORER',
+    children: jsx('AllowedBoard') }).type, 'AllowedBoard');
+});
+
+test('C: Explorer public board failure retains a working refresh; no personal API calls', async () => {
+  let calls = 0, personal = 0;
+  const ui = createHost({
+    fetchPublicShifts: async () => {
+      calls++;
+      if (calls === 1) throw new Error('public list unavailable');
+      return { results: [{ id: 904, slots: [] }], count: 1 };
+    },
+    fetchPersonalConfirmedShifts: async () => { personal++; throw Error('forbidden'); },
+    fetchPersonalHistoryShifts: async () => { personal++; throw Error('forbidden'); },
+  });
+  const render = () => {
+    const tree = ui.render(ui.publicBoard);
+    const components = nodes(tree, n => n.type === 'ShiftsBoard');
+    assert.equal(components.length, 1, 'real board must expose refresh callback');
+    return { tree, props: components[0].props };
+  };
+  await render().props.onRefresh();
+  const failed = render();
+  const snack = nodes(failed.tree, n => n.type === 'Snackbar');
+  assert.equal(snack.length, 1);
+  assert.equal(snack[0].props.open, true, 'failure must remain visible');
+  await failed.props.onRefresh();
+  const recovered = render();
+  assert.equal(calls, 2);
+  assert.equal(recovered.props.shifts.length, 1);
+  assert.equal(recovered.props.shifts[0].id, 904);
+  assert.equal(personal, 0);
 });
