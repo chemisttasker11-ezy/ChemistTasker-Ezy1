@@ -11,7 +11,7 @@ const text = node => typeof node === 'string' || typeof node === 'number' ? Stri
   : node && typeof node === 'object' ? text(node.props?.children) : '';
 
 function nextWizard(options = {}) {
-  const state = { session: 'authenticated', role: 'PHARMACIST' };
+  const state = { session: 'authenticated', role: 'PHARMACIST', id: 101 };
   const calls = [], routes = [], slots = [], effects = [];
   let cursor = 0;
   const equal = (a, b) => !!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
@@ -72,7 +72,12 @@ function nextWizard(options = {}) {
     lookupCatalogue: async () => ({ results: [] }),
     createListing: async body => {
       calls.push({ method: 'create', body });
-      return { id: 'a1111111-1111-4111-8111-111111111111', version: 1 };
+      if (options.create) return options.create(body);
+       return { id: 'a1111111-1111-4111-8111-111111111111', version: 1 };
+    },
+    updateListing: async (id, body) => {
+      calls.push({ method: 'update', id, body });
+      return options.update ? options.update(id, body) : { id, version: body.expected_version + 1 };
     },
     updateAudience: async (id, body) => {
       calls.push({ method: 'audience', id, body });
@@ -80,7 +85,7 @@ function nextWizard(options = {}) {
     },
     uploadImage: async (id, body) => {
       calls.push({ method: 'upload', id, body });
-      return { id: 88 };
+      return options.upload ? options.upload(id, body) : { id: 88 };
     },
     actOnListing: async (id, action, version) => {
       calls.push({ method: 'submit', id, action, version });
@@ -93,7 +98,8 @@ function nextWizard(options = {}) {
     'next/navigation': { useRouter: () => ({ push: url => routes.push(url) }) },
     'lucide-react': new Proxy({}, { get: (_, name) => String(name) }),
     '@/shared/browser-session': { loginHref: next => '/login?next=' + encodeURIComponent(next) },
-    '@/shared/session-provider': { useSession: () => ({ status: state.session }) },
+    '@/shared/session-provider': { useSession: () => ({ status: state.session,
+      user: state.session === 'authenticated' ? { id: state.id, role: state.role } : null }) },
     './api': { marketplaceApi: api },
     './access-steps': { default: 'MarketplaceAccessSteps' },
     './add-item-wizard.module.css': { default: {}, __esModule: true },
@@ -160,7 +166,8 @@ function nextWizard(options = {}) {
     const nodes = await stable();
     assert.ok(nodes.some(n => n.type === 'h2' && text(n).includes('Ready to finalize')));
   }
-  return { state, calls, routes, access, api, stable, click, fill, toFinal };
+  function unmount() { for (const slot of slots) slot?.cleanup?.(); }
+  return { state, calls, routes, access, api, stable, click, fill, toFinal, unmount };
 }
 
 test('C: anonymous Next marketplace new route does not create/submit; links back to authentication', async () => {
@@ -207,4 +214,72 @@ test('C: real Next Submit for review uses same create payload then explicit serv
   assert.equal(app.calls[1].action, 'submit');
   assert.equal(app.calls[1].version, 1);
   assert.ok(nodes.some(n => n.type === 'h1' && text(n).includes('Listing submitted')));
+});
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+const spin = async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); };
+
+test('R: Next account switch while create is pending blocks all subsequent writes and stale completion', async () => {
+  const pending = deferred();
+  const app = nextWizard({ create: () => pending.promise });
+  await app.toFinal();
+  await app.click('Submit for review');
+  assert.equal(app.calls.filter(x => x.method === 'create').length, 1);
+  app.state.id = 202; app.state.role = 'OWNER';
+  await app.stable();
+  pending.resolve({ id: 'a1111111-1111-4111-8111-111111111111', version: 1 });
+  await spin(); await app.stable();
+  assert.deepEqual(app.calls.map(x => x.method), ['create']);
+  assert.equal(app.routes.length, 0);
+  app.unmount();
+});
+
+test('R: Next unmount during create prevents all further writes', async () => {
+  const pending = deferred();
+  const app = nextWizard({ create: () => pending.promise });
+  await app.toFinal();
+  await app.click('Submit for review');
+  app.unmount();
+  pending.resolve({ id: 'a1111111-1111-4111-8111-111111111111', version: 1 });
+  await spin();
+  assert.deepEqual(app.calls.map(x => x.method), ['create']);
+});
+
+test('R: Next failed create retains client_request_id on retry', async () => {
+  let count = 0;
+  const app = nextWizard({ create: async () => {
+    if (++count === 1) throw Error('Connection dropped');
+    return { id: 'a1111111-1111-4111-8111-111111111111', version: 1 };
+  } });
+  await app.toFinal();
+  await app.click('Submit for review');
+  await app.stable();
+  await app.click('Submit for review');
+  await app.stable();
+  const creates = app.calls.filter(x => x.method === 'create');
+  assert.equal(creates.length, 2);
+  assert.ok(creates[0].body.client_request_id);
+  assert.equal(creates[1].body.client_request_id, creates[0].body.client_request_id);
+});
+
+test('R: Next failed submit resumes same listing/version rather than creating another', async () => {
+  const app = nextWizard();
+  let attempts = 0;
+  app.api.actOnListing = async (id, action, version) => {
+    app.calls.push({ method: 'submit', id, action, version });
+    if (++attempts === 1) throw Error('Cannot submit yet');
+    return { publication_status: 'PENDING_REVIEW', version: version + 1 };
+  };
+  await app.toFinal();
+  await app.click('Submit for review');
+  await app.stable();
+  await app.click('Submit for review');
+  await app.stable();
+  assert.equal(app.calls.filter(x => x.method === 'create').length, 1);
+  assert.equal(app.calls.filter(x => x.method === 'update').length, 1);
+  assert.equal(app.calls.filter(x => x.method === 'submit').length, 2);
 });
