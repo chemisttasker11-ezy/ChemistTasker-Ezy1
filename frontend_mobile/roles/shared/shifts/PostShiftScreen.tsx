@@ -439,8 +439,11 @@ export default function PostShiftScreen() {
             data.pharmacy ??
             data.pharmacy_id ??
             '';
+        const hydratedPharmacyId = typeof pharmacyValue === 'object' && pharmacyValue !== null
+            ? Number((pharmacyValue as any).id)
+            : Number(pharmacyValue);
         if (surface.persona === 'admin' && surface.scopedPharmacyId != null &&
-            Number(pharmacyValue) !== surface.scopedPharmacyId) {
+            hydratedPharmacyId !== surface.scopedPharmacyId) {
             setLoadError({ kind: 'shift', message: 'You do not have access to this shift.' });
             setError('You do not have access to this shift.');
             router.back();
@@ -1585,6 +1588,10 @@ export default function PostShiftScreen() {
             <DatePickerModal
                 mode="single"
                 locale="en"
+                validRange={{
+                    startDate: new Date(`${postingWindow.minIso}T00:00:00`),
+                    endDate: new Date(`${postingWindow.maxIso}T23:59:59`),
+                }}
                 visible={recurringEndPickerOpen}
                 onDismiss={() => setRecurringEndPickerOpen(false)}
                 date={toIsoDate(slotRecurringEnd) ?? new Date()}
