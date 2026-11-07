@@ -62,9 +62,11 @@ export function likeExplorerPost(id: number | string) {
 export function unlikeExplorerPost(id: number | string) {
     return fetchApi(`/explorer-posts/${id}/unlike/`, { method: 'POST' });
 }
-export function createExplorerPost(data: unknown) {
+export function createExplorerPost(data: unknown, idempotencyKey?: string, signal?: AbortSignal) {
     const body = data instanceof FormData ? data : JSON.stringify(data);
-    return fetchApi<ExplorerPostApi>('/explorer-posts/', { method: 'POST', body });
+    return fetchApi<ExplorerPostApi>('/explorer-posts/', { method: 'POST', body, signal,
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+    });
 }
 export function updateExplorerPost(id: number | string, data: unknown) {
     const body = data instanceof FormData ? data : JSON.stringify(data);

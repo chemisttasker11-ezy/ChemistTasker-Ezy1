@@ -10,7 +10,7 @@ export async function platformProxy(request: NextRequest, path: string, method =
   const originMatches = origin != null && (origin === expected || normalizedOrigin === normalizedExpected);
   if (!['GET','HEAD','OPTIONS'].includes(method) && !originMatches) return Response.json({detail:'Request origin could not be verified.'},{status:403});
   const headers = new Headers();
-  for (const name of ['authorization','content-type','accept','cookie','origin','x-csrftoken','x-client-platform','x-device-token']) { const value=request.headers.get(name); if(value) headers.set(name,value); }
+  for (const name of ['authorization','content-type','accept','cookie','origin','x-csrftoken','x-client-platform','x-device-token','idempotency-key']) { const value=request.headers.get(name); if(value) headers.set(name,value); }
   headers.set('x-forwarded-proto',new URL(expected).protocol.replace(':',''));
   const base=canonicalApiRoot(baseOverride || process.env.PLATFORM_API_URL);
   try {

@@ -1,4 +1,5 @@
 """New to pharmacy: sign-up questions and minimum age, the overseas mobile skip, and the one-post talent rules."""
+from uuid import uuid4
 from datetime import date, timedelta
 from unittest import mock
 
@@ -64,7 +65,7 @@ class NewcomerTalentPostTests(TestCase):
         return user
 
     def post(self, user):
-        return client_for(user).post(self.URL, {"headline": "Keen to learn", "body": "b", "role_category": "EXPLORER"}, format="json")
+        return client_for(user).post(self.URL, {"headline": "Keen to learn", "body": "b", "role_category": "EXPLORER"}, format="json", HTTP_IDEMPOTENCY_KEY=str(uuid4()))
 
     def test_unverified_newcomers_cannot_post(self):
         self.assertEqual(self.post(self.newcomer(verified=False)).status_code, 403)

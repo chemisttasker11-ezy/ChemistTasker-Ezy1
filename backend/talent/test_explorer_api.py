@@ -1,4 +1,5 @@
 """Characterization of the Talent/Explorer posts API (/api/v1/explorer-posts/)."""
+from uuid import uuid4
 from datetime import timedelta
 
 from django.test import TestCase
@@ -128,14 +129,14 @@ class ExplorerCreatePermissionTests(TestCase):
 
     def test_owner_role_cannot_create(self):
         owner, _ = make_owner_with_pharmacy()
-        res = client_for(owner).post(URL, self.PAYLOAD, format="json")
+        res = client_for(owner).post(URL, self.PAYLOAD, format="json", HTTP_IDEMPOTENCY_KEY=str(uuid4()))
         self.assertEqual(res.status_code, 403)
         self.assertIn("Only pharmacists, the pharmacy team and people new to pharmacy", str(res.json()))
 
     def test_explorer_can_create_and_is_stamped_as_author_with_reference_code(self):
         user = make_user("EXPLORER")
         ExplorerOnboarding.objects.create(user=user, verified=True)
-        res = client_for(user).post(URL, self.PAYLOAD, format="json")
+        res = client_for(user).post(URL, self.PAYLOAD, format="json", HTTP_IDEMPOTENCY_KEY=str(uuid4()))
         self.assertEqual(res.status_code, 201)
         post = ExplorerPost.objects.get()
         self.assertEqual(post.author_user, user)
@@ -144,13 +145,13 @@ class ExplorerCreatePermissionTests(TestCase):
     def test_unverified_other_staff_cannot_publish(self):
         user = make_user("OTHER_STAFF")
         OtherStaffOnboarding.objects.create(user=user, role_type="ASSISTANT")
-        res = client_for(user).post(URL, self.PAYLOAD, format="json")
+        res = client_for(user).post(URL, self.PAYLOAD, format="json", HTTP_IDEMPOTENCY_KEY=str(uuid4()))
         self.assertEqual(res.status_code, 403)
         self.assertIn("Verify your public-platform onboarding", str(res.json()))
         self.assertEqual(ExplorerPost.objects.count(), 0)
 
     def test_other_staff_without_any_profile_cannot_publish(self):
-        res = client_for(make_user("OTHER_STAFF")).post(URL, self.PAYLOAD, format="json")
+        res = client_for(make_user("OTHER_STAFF")).post(URL, self.PAYLOAD, format="json", HTTP_IDEMPOTENCY_KEY=str(uuid4()))
         self.assertEqual(res.status_code, 403)
 
 
