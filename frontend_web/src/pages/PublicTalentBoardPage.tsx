@@ -20,6 +20,11 @@ export default function PublicTalentBoardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [publicReturnPath, setPublicReturnPath] = useState('/talent/public-board');
+  useEffect(() => {
+    // Preserve the published QR code reference across sign-in and registration.
+    setPublicReturnPath(window.location.pathname + window.location.search);
+  }, []);
   const [loginReason, setLoginReason] = useState<"like" | "calendar" | "booking" | null>(null);
 
   useEffect(() => {
@@ -107,10 +112,10 @@ export default function PublicTalentBoardPage() {
           </DialogContent>
           <DialogActions>
             <Button onClick={closeLoginDialog}>Cancel</Button>
-            <Button component={RouterLink} to="/register" variant="outlined">
+            <Button component={RouterLink} to={`/register?next=${encodeURIComponent(publicReturnPath)}`} variant="outlined">
               Create account
             </Button>
-            <Button component={RouterLink} to="/login" variant="contained">
+            <Button component={RouterLink} to={`/login?next=${encodeURIComponent(publicReturnPath)}`} variant="contained">
               Log in
             </Button>
           </DialogActions>
