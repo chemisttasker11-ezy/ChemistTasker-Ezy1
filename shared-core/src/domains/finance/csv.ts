@@ -46,7 +46,7 @@ export function expenseCsvRows(expenses: readonly FinanceExpense[]): FinanceCsvR
 /** Every field stays a projection of the server estimate, explicitly NOT a BAS filing. */
 export function worksheetCsvRows(worksheet: FinanceWorksheet): FinanceCsvRows {
   return [
-    ['DRAFT · GST worksheet', 'Not a complete BAS'],
+    ['DRAFT ONLY', 'Not a complete BAS'],
     ['Lodgement ready', String(worksheet.lodgement_ready)],
     ['Start', worksheet.start],
     ['End', worksheet.end],

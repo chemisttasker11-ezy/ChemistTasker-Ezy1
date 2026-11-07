@@ -1,4 +1,4 @@
-import { finance, financeStatus, invoiceCsvRows, expenseCsvRows, type FinanceCustomer, type FinanceExpense, type FinanceInvoice, type FinanceItem, type FinanceWorksheet } from '@chemisttasker/shared-core';
+import { finance, financeStatus, invoiceCsvRows, expenseCsvRows, worksheetCsvRows, type FinanceCustomer, type FinanceExpense, type FinanceInvoice, type FinanceItem, type FinanceWorksheet } from '@chemisttasker/shared-core';
 import {
   Alert, Box, Button, CircularProgress,
   Divider,
@@ -330,7 +330,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
               </Box>
               <Typography sx={rowMeta}>Older invoices left out: {worksheet.excluded_legacy_invoice_count}. Expenses to check for receipts: {worksheet.expenses_needing_evidence.length || 'none'}. These checks don't mean the period is ready to lodge.</Typography>
               {worksheet.warnings.map(warning => <Typography key={warning} sx={rowMeta}>{warning}</Typography>)}
-              <Button startIcon={<Download size={15} />} sx={{ alignSelf: 'flex-start' }} onClick={() => downloadCsv('gst-worksheet-DRAFT.csv', [['DRAFT ONLY', 'Not a complete BAS'], ['Start', worksheet.start], ['End', worksheet.end], ['Basis', worksheet.basis], ['G1', worksheet.G1], ['1A', worksheet['1A']], ['1B', worksheet['1B']], ['Estimated GST net', worksheet.estimated_gst_net], ['Excluded legacy invoices', worksheet.excluded_legacy_invoice_count]])}>Download worksheet (CSV)</Button>
+               <Button startIcon={<Download size={15} />} sx={{ alignSelf: 'flex-start' }} onClick={() => downloadCsv('gst-worksheet-DRAFT.csv', worksheetCsvRows(worksheet))}>Download worksheet (CSV)</Button>
             </>}
           </Stack>
         </SectionCard>}
