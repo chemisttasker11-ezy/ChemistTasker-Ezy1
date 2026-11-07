@@ -61,8 +61,16 @@ export function useShiftTimetable({ selectedPharmacy, editingShiftId, showSnackb
       if (!date) return [];
       const occurrenceIndex = counts.get(slot.sourceIndex) ?? 0;
       counts.set(slot.sourceIndex, occurrenceIndex + 1);
+      // Match the posting validator: midnight-crossing drafts finish on the next
+      // calendar date, not after an assumed 24-hour UTC interval (DST varies).
+      if (!isValidShiftPostingTimeRange(slot.startTime, slot.endTime)) return [];
       const start = applyTimeToDate(date, slot.startTime);
-      const end = applyTimeToDate(date, slot.endTime);
+      const endDate = new Date(date.getTime());
+      if (slot.endTime.slice(0, 5) < slot.startTime.slice(0, 5)) {
+        endDate.setDate(endDate.getDate() + 1);
+      }
+      const end = applyTimeToDate(endDate, slot.endTime);
+      if (!isValidDate(start) || !isValidDate(end) || end <= start) return [];
       return [{ id: `${slot.sourceIndex}-${occurrenceIndex}-${start.toISOString()}`,
         title: `${formatSlotTime(slot.startTime)} — ${formatSlotTime(slot.endTime)}`,
         start, end, resource: { slotIndex: slot.sourceIndex, occurrenceIndex } }];
