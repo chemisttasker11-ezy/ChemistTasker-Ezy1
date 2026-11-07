@@ -1,0 +1,210 @@
+// M4-04 qualification: execute the actual Next migrated AddItemWizard host.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+
+const jsx = (type, props, key) => ({ type, props: props || {}, key });
+const text = node => typeof node === 'string' || typeof node === 'number' ? String(node)
+  : Array.isArray(node) ? node.map(text).join(' ')
+  : node && typeof node === 'object' ? text(node.props?.children) : '';
+
+function nextWizard(options = {}) {
+  const state = { session: 'authenticated', role: 'PHARMACIST' };
+  const calls = [], routes = [], slots = [], effects = [];
+  let cursor = 0;
+  const equal = (a, b) => !!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
+  const react = {
+    useState(initial) {
+      const i = cursor++;
+      if (!(i in slots)) slots[i] = { value: typeof initial === 'function' ? initial() : initial };
+      return [slots[i].value, update => {
+        slots[i].value = typeof update === 'function' ? update(slots[i].value) : update;
+      }];
+    },
+    useRef(initial) {
+      const i = cursor++;
+      if (!(i in slots)) slots[i] = { current: initial };
+      return slots[i];
+    },
+    useMemo(fn, deps) {
+      const i = cursor++;
+      if (!(i in slots) || !equal(slots[i].deps, deps)) slots[i] = { value: fn(), deps };
+      return slots[i].value;
+    },
+    useCallback(fn, deps) {
+      const i = cursor++;
+      if (!(i in slots) || !equal(slots[i].deps, deps)) slots[i] = { value: fn, deps };
+      return slots[i].value;
+    },
+    useEffect(fn, deps) {
+      const i = cursor++;
+      if (!(i in slots) || !equal(slots[i].deps, deps)) {
+        const previous = slots[i];
+        slots[i] = { deps };
+        effects.push(() => {
+          previous?.cleanup?.();
+          slots[i].cleanup = fn();
+        });
+      }
+    },
+  };
+  react.default = react;
+  const source = readFileSync(new URL('./add-item-wizard.tsx', import.meta.url), 'utf8');
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { target: ts.ScriptTarget.ES2020,
+      module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
+    fileName: 'add-item-wizard.tsx',
+  }).outputText;
+  const category = { id: 7, slug: 'textbooks', name: 'Professional books',
+    description: 'Used reference material', context: 'PERSONAL',
+    maximum_buyer_roles: ['PHARMACIST'], permitted_modes: ['SELL', 'FREE'] };
+  const access = {
+    can_trade_personally: true, can_trade_for_pharmacy: false,
+    role_code: 'PHARMACIST', role_label: 'Pharmacist', blockers: [],
+    eligible_pharmacies: [], personal_categories: [category],
+    pharmacy_categories: [], role_guidance: ['Use safe categories'], ethical_entry_available: false,
+    ...options.access,
+  };
+  const api = {
+    getListingOptions: async () => access,
+    lookupCatalogue: async () => ({ results: [] }),
+    createListing: async body => {
+      calls.push({ method: 'create', body });
+      return { id: 'a1111111-1111-4111-8111-111111111111', version: 1 };
+    },
+    updateAudience: async (id, body) => {
+      calls.push({ method: 'audience', id, body });
+      return { version: 2 };
+    },
+    uploadImage: async (id, body) => {
+      calls.push({ method: 'upload', id, body });
+      return { id: 88 };
+    },
+    actOnListing: async (id, action, version) => {
+      calls.push({ method: 'submit', id, action, version });
+      return { publication_status: 'PENDING_REVIEW', version: version + 1 };
+    },
+  };
+  const modules = {
+    react, 'react/jsx-runtime': { jsx, jsxs: jsx },
+    'next/link': { default: 'Link' },
+    'next/navigation': { useRouter: () => ({ push: url => routes.push(url) }) },
+    'lucide-react': new Proxy({}, { get: (_, name) => String(name) }),
+    '@/shared/browser-session': { loginHref: next => '/login?next=' + encodeURIComponent(next) },
+    '@/shared/session-provider': { useSession: () => ({ status: state.session }) },
+    './api': { marketplaceApi: api },
+    './access-steps': { default: 'MarketplaceAccessSteps' },
+    './add-item-wizard.module.css': { default: {}, __esModule: true },
+  };
+  const module = { exports: {} };
+  vm.runInNewContext(compiled, {
+    module, exports: module.exports, URL, FormData, Blob, console,
+    require(id) {
+      if (!(id in modules)) throw Error('Unknown Next wizard import ' + id);
+      return modules[id];
+    },
+  }, { filename: 'add-item-wizard.tsx' });
+  function flatten(node, result = []) {
+    if (Array.isArray(node)) { node.forEach(entry => flatten(entry, result)); return result; }
+    if (!node || typeof node !== 'object') return result;
+    if (typeof node.type === 'function') return flatten(node.type(node.props), result);
+    result.push(node);
+    flatten(node.props?.children, result);
+    return result;
+  }
+  function render() {
+    cursor = 0;
+    return flatten(module.exports.default());
+  }
+  async function flush() {
+    while (effects.length) effects.shift()();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+  }
+  async function stable() {
+    for (let i = 0; i < 5; i++) { render(); await flush(); }
+    return render();
+  }
+  async function click(label) {
+    const tree = await stable();
+    const found = tree.find(n => n.type === 'button' &&
+      text(n).trim().includes(label));
+    assert.ok(found, 'Could not find genuine Next action: ' + label);
+    assert.notEqual(found.props.disabled, true, 'Next action disabled: ' + label);
+    found.props.onClick();
+    await flush();
+  }
+  async function fill(placeholder, value) {
+    const tree = await stable();
+    const input = tree.find(n => (n.type === 'input' || n.type === 'textarea') &&
+      n.props.placeholder === placeholder);
+    assert.ok(input, 'Missing real input ' + placeholder);
+    input.props.onChange({ target: { value } });
+    await flush();
+  }
+  async function toFinal() {
+    await click('Personal item');
+    await click('Free');
+    await click('Continue to Category');
+    await click('Professional books');
+    await click('Continue to Details');
+    await fill('e.g. AMH 2024 Reference Guide', 'Used pharmacology textbook');
+    await fill('Describe condition, edition, markings, or included accessories...',
+      'Clean pages, no patient information');
+    await click('Continue to Audience');
+    await click('Continue to Delivery');
+    await fill('e.g. Brisbane', 'Brisbane');
+    await click('Review Listing');
+    await click('Proceed to Submit');
+    const nodes = await stable();
+    assert.ok(nodes.some(n => n.type === 'h2' && text(n).includes('Ready to finalize')));
+  }
+  return { state, calls, routes, access, api, stable, click, fill, toFinal };
+}
+
+test('C: anonymous Next marketplace new route does not create/submit; links back to authentication', async () => {
+  const app = nextWizard();
+  app.state.session = 'anonymous';
+  const nodes = await app.stable();
+  assert.ok(nodes.some(n => n.type === 'a' &&
+    String(n.props.href).includes(encodeURIComponent('/marketplace/new'))));
+  assert.equal(app.calls.length, 0);
+  assert.equal(nodes.some(n => n.type === 'button' && text(n).includes('Submit for review')), false);
+});
+
+test('C: authenticated but blocked viewer has no personal/pharmacy create step', async () => {
+  const app = nextWizard({ access: {
+    can_trade_personally: false, can_trade_for_pharmacy: false,
+    blockers: [{ code: 'MARKETPLACE_TERMS_REQUIRED', message: 'Accept current terms first' }],
+    personal_categories: [], pharmacy_categories: [],
+  } });
+  const nodes = await app.stable();
+  assert.equal(nodes.some(n => n.type === 'button' && text(n).includes('Personal item')), false);
+  assert.equal(nodes.some(n => n.type === 'button' && text(n).includes('Pharmacy-owned item')), false);
+  assert.equal(app.calls.length, 0);
+});
+
+test('C: real Next wizard Save private draft performs only a server create', async () => {
+  const app = nextWizard();
+  await app.toFinal();
+  await app.click('Save as private draft');
+  const nodes = await app.stable();
+  assert.deepEqual(app.calls.map(c => c.method), ['create']);
+  assert.equal(app.calls[0].body.mode, 'FREE');
+  assert.equal(app.calls[0].body.amount, '0');
+  assert.equal(app.calls[0].body.seller_context, 'PERSONAL');
+  assert.equal(app.calls[0].body.pharmacy, null);
+  assert.ok(nodes.some(n => n.type === 'h1' && text(n).includes('Draft created')));
+});
+
+test('C: real Next Submit for review uses same create payload then explicit server submit', async () => {
+  const app = nextWizard();
+  await app.toFinal();
+  await app.click('Submit for review');
+  const nodes = await app.stable();
+  assert.deepEqual(app.calls.map(c => c.method), ['create', 'submit']);
+  assert.equal(app.calls[1].action, 'submit');
+  assert.equal(app.calls[1].version, 1);
+  assert.ok(nodes.some(n => n.type === 'h1' && text(n).includes('Listing submitted')));
+});
