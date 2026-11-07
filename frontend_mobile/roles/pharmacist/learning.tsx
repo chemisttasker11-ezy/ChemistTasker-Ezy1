@@ -138,7 +138,7 @@ export default function LearningScreen() {
   const subtype = serverRole?.account === accountId ? serverRole.code : null;
   // Generic OTHER_STAFF is never treated as one of its distinct subtypes.
   const roleCode = subtype || (knownAccountRole === 'OTHER_STAFF' ? '' : knownAccountRole);
-  const pathway = rolePath[roleCode] || 'Explore professional learning and pharmacy career resources.';
+  const pathway = rolePath[roleCode] || (knownAccountRole === 'EXPLORER' ? rolePath.EXPLORER : 'Explore professional learning and pharmacy career resources.');
 
   const openArticle = useCallback(async (article: PublicArticle) => {
     setOpenError(null);

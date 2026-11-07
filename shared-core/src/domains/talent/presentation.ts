@@ -127,8 +127,9 @@ export function projectPublicTalentCandidate(
     return id != null && Number.isSafeInteger(id) && id > 0 ? id : null;
   };
 
-  const roleTitle = string('role_title', 'roleTitle', 'explorer_role_type',
-    'explorerRoleType', 'role_category', 'roleCategory') || 'New to pharmacy';
+  const roleTitle = ['role_title', 'roleTitle', 'explorer_role_type',
+    'explorerRoleType', 'role_category', 'roleCategory']
+    .map(key => string(key)).find(Boolean) || 'New to pharmacy';
   const code = roleTitle.toUpperCase();
   const role = code === 'EXPLORER' ? 'New to pharmacy'
     : code === 'OTHER_STAFF' ? 'Pharmacy team'
