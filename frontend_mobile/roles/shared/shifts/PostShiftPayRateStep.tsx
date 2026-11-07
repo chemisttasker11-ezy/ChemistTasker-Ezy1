@@ -141,7 +141,8 @@ export default function PostShiftPayRateStep({
 
     return (
       <View style={styles.slotRatePreviewPanel}>
-        <Text style={styles.label}>Rate for each date</Text>
+        <Text style={styles.label} accessibilityRole="header">Rate for each date</Text>
+        <Text style={styles.helper}>Change any date that pays differently.</Text>
         {expandedSlots.map((slot, index) => {
           const row = slotRateRows[index] ?? {
             rate: '',
@@ -217,11 +218,12 @@ export default function PostShiftPayRateStep({
 
   return (
     <Surface style={styles.card} elevation={1}>
-      <Text style={styles.label}>Pay</Text>
+      <Text style={styles.label} accessibilityRole="header">How they are paid</Text>
 
       {!isLocumLike ? (
         <>
-          <Text style={[styles.label, { marginTop: 16 }]}>Salary Range</Text>
+          <Text style={[styles.label, { marginTop: 16 }]} accessibilityRole="header">Pay</Text>
+          <Text style={styles.helper}>Shown to applicants as a range.</Text>
           <View style={styles.pills}>
             {(['HOURLY', 'ANNUAL'] as const).map((mode) => {
               const selected = ftptPayMode === mode;
@@ -288,6 +290,7 @@ export default function PostShiftPayRateStep({
         </>
       ) : roleNeeded === 'PHARMACIST' ? (
         <>
+          <Text style={styles.label} accessibilityRole="header">How is the rate set?</Text>
           <View style={styles.pills}>
             {(['FLEXIBLE', 'FIXED', 'PHARMACIST_PROVIDED'] as RateType[]).map(
               (mode) => {
@@ -417,6 +420,7 @@ export default function PostShiftPayRateStep({
         </>
       ) : (
         <>
+          <Text style={styles.label} accessibilityRole="header">Award rate</Text>
           <TouchableOpacity
             style={{ minHeight: touch.min, justifyContent: 'center' }}
             onPress={() => Linking.openURL(GOVERNMENT_AWARD_GUIDE_URL)}

@@ -617,3 +617,6 @@ test('W3b post-shift deep links preserve the web query contract and apply once',
   assert.notEqual(changedKey, getStablePostShiftParamsKey({ visibility: 'PLATFORM', employment_type: 'CASUAL' }));
   assert.equal(parsePostShiftSearchParams({ start: '25:99', end: '17:10' }).hasStartTime, false);
 });
+
+// M5-05 native Post Shift mounted step parity acceptance.
+import '../../../scripts/m5-post-shift-look.test.cjs';
