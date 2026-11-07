@@ -50,7 +50,8 @@ function renderer() {
       while(effects.length)effects.shift()();
       for(let n=0;n<12;n++)await Promise.resolve();}
     cursor=0;return Component(props);
-  },unmount(){cleanups.forEach(fn=>fn?.());effects.length=0;}};
+  },snapshot(){return JSON.stringify(cells.map(c=>c?.value));},
+    unmount(){cleanups.forEach(fn=>fn?.());effects.length=0;}};
 }
 function collect(tree,kind,found=[]) {
   if(Array.isArray(tree)){tree.forEach(n=>collect(n,kind,found));return found;}
