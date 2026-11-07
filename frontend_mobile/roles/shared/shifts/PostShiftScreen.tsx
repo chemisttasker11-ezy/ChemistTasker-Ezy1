@@ -5,7 +5,7 @@ import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults,
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 import { normalizeShiftRequirements, canNotifyShiftChainMembers, isPrivateShiftBooking, automaticShiftEscalationDates, type ShiftEscalationPlan } from '@chemisttasker/shared-core';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, View, ScrollView, TouchableOpacity } from 'react-native';
+import { Alert, View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import {
     Text,
     Button,
@@ -17,6 +17,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { ContentState } from '@/components/ui';
+import { space } from '@/constants/tokens';
 import { useShiftSurface } from './useShiftSurface';
 import { shiftRoute } from './shiftSurface';
 import {
@@ -1447,7 +1448,14 @@ export default function PostShiftScreen() {
                     />
                 );
             case 'review':
-                return <NativeShiftBoardPreview shift={buildShiftPostingPreview(postingDraft(), selectedPharmacy) as any} />;
+                return (
+                    <View style={{ gap: space.sm }}>
+                        <Text style={styles.helper} accessibilityRole="text">
+                            This is how your shift appears on the job board. Go back to change anything.
+                        </Text>
+                        <NativeShiftBoardPreview shift={buildShiftPostingPreview(postingDraft(), selectedPharmacy) as any} />
+                    </View>
+                );
             default: return null;
         }
     };
@@ -1510,6 +1518,7 @@ export default function PostShiftScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['left', 'right']}>
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={[styles.content, isEmbedded && styles.contentEmbedded]} style={{ flex: 1 }} pointerEvents={hydrating ? 'none' : 'auto'}>
                 {!isEmbedded ? (
                     <>
@@ -1529,7 +1538,9 @@ export default function PostShiftScreen() {
 
                 {error ? <HelperText type="error" accessibilityLiveRegion="polite" style={{ fontSize: 14, fontWeight: '600' }}>{error}</HelperText> : null}
 
-                <View style={styles.navRow}>
+            </ScrollView>
+
+                <View style={[styles.navRow, styles.stickyFooter]}>
                     <Button
                         mode="outlined"
                         onPress={goBack}
@@ -1569,7 +1580,7 @@ export default function PostShiftScreen() {
                         </Button>
                     )}
                 </View>
-            </ScrollView>
+            </KeyboardAvoidingView>
 
             <Snackbar
                 visible={!!toast}

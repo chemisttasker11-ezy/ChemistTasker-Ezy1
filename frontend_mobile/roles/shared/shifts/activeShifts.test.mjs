@@ -299,3 +299,6 @@ test('slot signature recomputation preserves state identity until values change'
 
 // Include the mounted native Post Shift picker regressions in the standard mobile gate.
 import '../../../scripts/m5-post-shift-components.test.cjs';
+
+// Run M5-05 mounted native Post Shift visual assertions in the standard mobile gate.
+import '../../../scripts/m5-post-shift-look.test.cjs';
