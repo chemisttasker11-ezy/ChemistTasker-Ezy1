@@ -1087,7 +1087,7 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                 assignLabel={reviewOfferDialog.slotId != null ? 'Assign to Slot' : 'Assign to Shift'}
                 assignLoading={
                     reviewOfferDialog.shiftId != null && reviewOfferDialog.candidate?.userId != null
-                        ? actionLoading[`accept_${reviewOfferDialog.shiftId}_${reviewOfferDialog.candidate.userId}`] ?? false
+                        ? actionLoading[`accept_${reviewOfferDialog.shiftId}_${reviewOfferDialog.candidate.userId}_${reviewOfferDialog.slotId ?? 'all'}`] ?? false
                         : false
                 }
                 workerRatingSummary={workerRatingSummary}
