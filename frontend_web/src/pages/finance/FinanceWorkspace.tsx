@@ -1,4 +1,4 @@
-import { finance, financeStatus, type FinanceCustomer, type FinanceExpense, type FinanceInvoice, type FinanceItem, type FinanceWorksheet } from '@chemisttasker/shared-core';
+import { finance, financeStatus, invoiceCsvRows, expenseCsvRows, type FinanceCustomer, type FinanceExpense, type FinanceInvoice, type FinanceItem, type FinanceWorksheet } from '@chemisttasker/shared-core';
 import {
   Alert, Box, Button, CircularProgress,
   Divider,
@@ -178,11 +178,8 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const toReview = receivedInvoices.filter(invoice => receivedKey(invoice) === 'review').length;
   const needsChanges = invoices.filter(invoice => statusKey(invoice) === 'revision').length;
   const overdueCount = invoices.filter(invoice => statusKey(invoice) === 'overdue').length;
-  const invoiceCsv = () => downloadCsv('workspace-invoices.csv', [['Number', 'Kind', 'Customer', 'Date', 'Due', 'Worker or fund payable AUD', 'GST AUD', 'Paid AUD', 'Balance AUD', 'Status'],
-    ...visibleInvoices.map(invoice => [invoice.number, invoice.kind, invoice.payload.customer?.name || '', invoice.payload.invoice_date, invoice.payload.due_date,
-      invoice.calculation.payable, invoice.calculation.gst, invoice.paid, invoice.balance, invoice.status])]);
-  const expenseCsv = () => downloadCsv('workspace-expenses.csv', [['Supplier', 'Description', 'Incurred', 'Paid', 'Gross AUD', 'GST AUD', 'Creditable business use %', 'Estimated GST credit AUD', 'Reference'],
-    ...expenses.map(expense => [expense.supplier, expense.description, expense.incurred_on, expense.paid_on || '', expense.amount, expense.gst_amount, expense.business_use_percent, expense.gst_credit, expense.reference])]);
+  const invoiceCsv = () => downloadCsv('workspace-invoices.csv', invoiceCsvRows(visibleInvoices));
+  const expenseCsv = () => downloadCsv('workspace-expenses.csv', expenseCsvRows(expenses));
 
   if (editor?.kind === 'invoice') return <Box data-ct-tokens="" sx={{ maxWidth: 1600, mx: 'auto' }}><InvoiceComposer key={linkKey} initial={editor.value} prefillShiftId={editor.prefillShiftId} previous={serviceInvoices[0]} customers={customers} items={items} onClose={() => setLink(null)} onSaved={refreshAfterSave} /></Box>;
 
