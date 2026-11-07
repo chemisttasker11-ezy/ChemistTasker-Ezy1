@@ -129,3 +129,46 @@ test('C pharmacy and personal payloads never mix ownership after a switch', asyn
   assert.equal(h.callsOf('upload').length, 0);
   h.unmount();
 });
+
+test('R retained Photos removes a previously uploaded image before retrying submission', async () => {
+  const h = createMarketplace();
+  await h.setDraft(1001, {});
+  h.env.stack = ['photos'];
+  await h.render();
+  h.click('Continue');
+  h.env.stack.push('audience');
+  await h.render();
+  h.click('Review');
+  h.env.stack.push('review');
+  await h.render();
+  h.queue('submit', Error('Submission unavailable'));
+  h.click('Submit for review');
+  await settle(h);
+  assert.equal(h.callsOf('upload').length, 1);
+  assert.equal(h.callsOf('submit').length, 1);
+  assert.deepEqual(h.callsOf('submit')[0].images, [17]);
+  assert.equal(h.nav.filter(row => row[0] === 'replace').length, 0);
+
+  h.env.stack.pop();
+  await h.render();
+  h.env.stack.pop();
+  await h.render();
+  h.click('Remove');
+  await settle(h);
+  assert.deepEqual(h.callsOf('delete').map(call => call.id), [17]);
+  assert.deepEqual(Array.from((await h.getDraft(1001)).image_uris), []);
+  h.click('Continue');
+  h.env.stack.push('audience');
+  await h.render();
+  h.click('Review');
+  h.env.stack.push('review');
+  await h.render();
+  h.click('Submit for review');
+  await settle(h);
+  assert.equal(h.callsOf('create').length, 1);
+  assert.equal(h.callsOf('upload').length, 1);
+  assert.equal(h.callsOf('submit').length, 2);
+  assert.deepEqual(h.callsOf('submit')[1].images, []);
+  assert.equal(h.nav.filter(row => row[0] === 'replace').length, 1);
+  h.unmount();
+});

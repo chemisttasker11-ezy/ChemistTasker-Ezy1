@@ -120,6 +120,7 @@ function createMarketplace() {
   const scheduler = createScheduler();
   const env = { user: { id: 1001, role: 'OWNER' }, params: {}, screen: 'review' };
   const storage = new Map(), calls = [], nav = [], fetchQueue = new Map(), responses = new Map();
+  const serverImages = new Set();
   const writeBarriers = [], readBarriers = [], photoQueue = [];
   const store = {
     async getItem(key) { const value = storage.get(key) ?? null; const gate = readBarriers.shift(); if (gate) await gate.promise; return value; },
@@ -167,11 +168,13 @@ function createMarketplace() {
     },
     uploadImage: async (id, body) => {
       calls.push({ step: 'upload', owner: env.user?.id, id, form: body });
-      return take('upload', { id: 17, moderation_status: 'PENDING' });
+      const image = await take('upload', { id: 17, moderation_status: 'PENDING' });
+      serverImages.add(image.id);
+      return image;
     },
-    deleteImage: async id => { calls.push({ step: 'delete', id }); return take('delete', undefined); },
+    deleteImage: async id => { calls.push({ step: 'delete', id }); const result = await take('delete', undefined); serverImages.delete(id); return result; },
     actOnListing: async (id, action, version) => {
-      calls.push({ step: 'submit', owner: env.user?.id, id, action, version });
+      calls.push({ step: 'submit', owner: env.user?.id, id, action, version, images: [...serverImages] });
       return take('submit', { publication_status: 'PENDING_REVIEW', version: version + 1 });
     },
   };
@@ -220,8 +223,11 @@ function createMarketplace() {
     './marketplaceBrowseModel': model,
     './MarketplaceAccessResolution': { MarketplaceAccessResolution: 'MarketplaceAccessResolution' },
   }, { fetch: mockedFetch });
-  async function render() { return scheduler.settled(module.MarketplaceParityScreen, { screen: env.screen }); }
-  const currentNodes = () => scheduler.render(module.MarketplaceParityScreen, { screen: env.screen });
+  // Native stack screens remain mounted after another route is pushed.
+  function Stack() { return env.stack.map(screen => jsx(module.MarketplaceParityScreen, { screen }, screen)); }
+  const component = () => env.stack ? Stack : module.MarketplaceParityScreen;
+  async function render() { return scheduler.settled(component(), { screen: env.screen }); }
+  const currentNodes = () => scheduler.render(component(), { screen: env.screen });
   function button(label) {
     const nodes = currentNodes();
     const match = nodes.find(node => node.type === 'Button' &&
