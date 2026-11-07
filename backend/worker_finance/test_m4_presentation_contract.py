@@ -118,3 +118,71 @@ class FinancePresentationContractTests(TestCase):
         self.assertEqual(updated.status_code, 200, updated.data)
         self.assertEqual(updated.data['abn_result'], {})
         self.assertIsNone(updated.data['abn_checked_at'])
+
+    def test_finance_responses_are_private_no_store_and_content_type_safe(self):
+        targets = (
+            ('invoices/', self.worker),
+            (f'invoices/{self.invoice.pk}/', self.worker),
+            ('received-invoices/', self.owner),
+            ('customers/', self.worker),
+            ('expenses/', self.worker),
+            ('bas-worksheet/?start=2026-07-01&end=2026-09-30&basis=cash', self.worker),
+        )
+        for uri, actor in targets:
+            with self.subTest(uri=uri):
+                response = client_for(actor).get(ROOT + uri)
+                self.assertEqual(response.status_code, 200, getattr(response, 'data', None))
+                self.assertIn('no-store', response['Cache-Control'])
+                self.assertEqual(response['X-Content-Type-Options'], 'nosniff')
+                self.assertIn('Authorization', response.get('Vary', ''))
+
+    def test_abr_result_strips_unknown_sensitive_fields(self):
+        parsed = {
+            'entity_name': 'M4 Trading',
+            'entity_type': 'Australian Private Company',
+            'abn_status': 'Active',
+            'abn_gst_registered': True,
+            'abn_gst_from': None,
+            'abn_gst_to': None,
+            'bank_account': 'do-not-persist',
+            'verified_owner': True,
+        }
+        with patch('infrastructure.integrations.abr.abn_lookup',
+                   return_value=('M4 Trading', '<html>fixture</html>')), patch(
+                'infrastructure.integrations.abr._parse_abn_html_fields',
+                return_value=parsed):
+            response = client_for(self.worker).post(
+                ROOT + f'customers/{self.customer.pk}/lookup_abn/', {}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(set(response.data['abn_result']), {
+            'entity_name', 'entity_type', 'abn_status', 'abn_gst_registered',
+            'abn_gst_from', 'abn_gst_to',
+        })
+        self.assertNotIn('bank_account', str(response.data['abn_result']))
+        self.assertNotIn('verified_owner', response.data['abn_result'])
+
+    def test_abr_abn_changed_during_lookup_is_rejected_without_stale_result(self):
+        def changed_during_lookup(_abn):
+            Customer.objects.filter(pk=self.customer.pk).update(abn='53004085616')
+            return 'M4 Trading', '<html>fixture</html>'
+
+        with patch('infrastructure.integrations.abr.abn_lookup',
+                   side_effect=changed_during_lookup), patch(
+                'infrastructure.integrations.abr._parse_abn_html_fields',
+                return_value={'entity_name': 'M4 Trading', 'abn_status': 'Active'}):
+            response = client_for(self.worker).post(
+                ROOT + f'customers/{self.customer.pk}/lookup_abn/', {}, format='json')
+        self.assertEqual(response.status_code, 400, getattr(response, 'data', None))
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.abn, '53004085616')
+        self.assertFalse(self.customer.abn_result)
+        self.assertIsNone(self.customer.abn_checked_at)
+
+    def test_outsider_cannot_list_received_invoices_or_foreign_customers(self):
+        outsider = client_for(self.foreign_owner).get(ROOT + 'received-invoices/')
+        self.assertEqual(outsider.status_code, 200, outsider.data)
+        self.assertNotIn(self.invoice.pk, {
+            row['id'] for row in outsider.data.get('results', [])
+        })
+        self.assertEqual(client_for(self.other).get(
+            ROOT + f'customers/{self.customer.pk}/').status_code, 404)
