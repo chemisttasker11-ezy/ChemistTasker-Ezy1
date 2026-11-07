@@ -79,12 +79,14 @@ const settle = async () => { for (let i = 0; i < 5; i++) await new Promise(resol
 
 test('R: Explorer deep link redirects synchronously, without mounting personal loader or touching snapshot/API', async () => {
   const app = mount('EXPLORER');
-  assert.equal(app.entry.type, 'Redirect');
-  assert.equal(app.entry.props.href, '/explorer/shifts?section=public');
+  // Effects must run before the *first* red assertion: on the base, the
+  // rendered ScopedNextShifts still fetches while an ancestor redirects.
   app.runEffects();
   await settle();
-  assert.equal(app.fetches, 0);
-  assert.equal(app.snapshots, 0);
+  assert.equal(app.fetches, 0, 'Explorer must never start fetchMyConfirmedShifts on this deep link');
+  assert.equal(app.snapshots, 0, 'Explorer must never read another worker\'s cached shifts');
+  assert.equal(app.entry.type, 'Redirect');
+  assert.equal(app.entry.props.href, '/explorer/shifts?section=public');
 });
 
 test('R: while identity hydrates /next-shifts cannot start a personal request', async () => {
@@ -106,7 +108,7 @@ test('C: both pharmacist and OTHER_STAFF mount the real loadNextShiftsSequence p
   }
 });
 
-test('C: signed-out route cannot load cached or live personal shifts', async () => {
+test('R: signed-out route redirects synchronously without mounting a personal loader', async () => {
   const app = mount(null, false);
   assert.equal(app.entry.type, 'Redirect');
   app.runEffects();

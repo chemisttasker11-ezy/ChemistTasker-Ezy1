@@ -30,6 +30,19 @@ function loadOfflineShifts(asyncStorageMock) {
   return scope.exports;
 }
 
+// The loader module gained a synchronous persona guard. Import its *real*
+ // pure policy in this loader-only harness rather than duplicating its rules.
+function loadShiftSurfacePolicy() {
+  const file = new URL('../../roles/shared/shifts/shiftSurface.ts', import.meta.url);
+  const compiled = ts.transpileModule(readFileSync(file, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const scope = { exports: {}, URLSearchParams };
+  runInNewContext(compiled, scope);
+  return scope.exports;
+}
+const shiftSurfacePolicy = loadShiftSurfacePolicy();
+
 function loadSequenceHelper() {
   const source = readFileSync(new URL('../../app/next-shifts.tsx', import.meta.url), 'utf8');
   const js = ts.transpileModule(source, {
@@ -45,6 +58,7 @@ function loadSequenceHelper() {
           upcomingShifts: (r) => r,
         };
       }
+      if (id === '@/roles/shared/shifts/shiftSurface') return shiftSurfacePolicy;
       if (id === '@/features/nextShift/offlineConfirmedShifts') {
         return { readConfirmedShiftSnapshot: async () => null, saveConfirmedShiftSnapshot: async () => {} };
       }
