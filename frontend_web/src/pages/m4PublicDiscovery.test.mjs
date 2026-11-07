@@ -56,7 +56,10 @@ const talent=load('shared-core/src/talent.ts',{
   './domains/talent/api':{},'./utils/serialization':{},
 });
 const skill=load('shared-core/src/skills.ts',{});
-const presentation=load('shared-core/src/domains/talent/presentation.ts',{'../../skills':skill});
+const newcomer=load('shared-core/src/domains/onboarding/newcomer.ts',{});
+const presentation=load('shared-core/src/domains/talent/presentation.ts',{
+  '../../skills':skill,'../onboarding/newcomer':newcomer,
+});
 function mount(next) {
   const h=hooks(),requests=[],routes=[];
   const window={location:{origin:'https://chemisttasker.test',pathname:'/talent/public-board',
