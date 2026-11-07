@@ -17,6 +17,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { ContentState } from '@/components/ui';
+import { space } from '@/constants/tokens';
 import { useShiftSurface } from './useShiftSurface';
 import { shiftRoute } from './shiftSurface';
 import {
@@ -1447,7 +1448,14 @@ export default function PostShiftScreen() {
                     />
                 );
             case 'review':
-                return <NativeShiftBoardPreview shift={buildShiftPostingPreview(postingDraft(), selectedPharmacy) as any} />;
+                return (
+                    <View style={{ gap: space.sm }}>
+                        <Text style={styles.helper} accessibilityRole="text">
+                            This is how your shift appears on the job board. Go back to change anything.
+                        </Text>
+                        <NativeShiftBoardPreview shift={buildShiftPostingPreview(postingDraft(), selectedPharmacy) as any} />
+                    </View>
+                );
             default: return null;
         }
     };
