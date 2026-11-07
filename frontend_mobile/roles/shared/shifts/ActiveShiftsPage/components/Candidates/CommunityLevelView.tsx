@@ -5,7 +5,7 @@ import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Divider, Surface, Text } from 'react-native-paper';
 import { Store } from 'lucide-react-native';
-import { Shift, ShiftMemberStatus } from '@chemisttasker/shared-core';
+import { Shift, ShiftMemberStatus, getShiftAudienceLevel } from '@chemisttasker/shared-core';
 import { radius, space } from '@/constants/tokens';
 import StatusCard from './StatusCard';
 import SlotSelector from './SlotSelector';
@@ -79,11 +79,14 @@ export default function CommunityLevelView({
                 <Divider style={styles.divider} />
                 <Surface style={styles.dividerChip} elevation={1}>
                     <Store size={18} color="#059669" />
-                    <Text style={styles.dividerChipText}>Community Candidates</Text>
+                    <Text style={styles.dividerChipText}>Your network</Text>
                 </Surface>
                 <Divider style={styles.divider} />
             </View>
 
+            <Text style={styles.dividerChipText}>
+                Internal candidates reached through {getShiftAudienceLevel((shift as any).visibility)?.reach ?? 'your pharmacy network'}.
+            </Text>
             <View style={styles.grid}>
                 <StatusCard
                     title="Interested"
@@ -108,8 +111,8 @@ export default function CommunityLevelView({
                     reviewLoadingId={reviewLoadingId}
                 />
                 <StatusCard
-                    title="Rejected"
-                    members={rejected}
+                    title="No reply"
+                    members={noResponse}
                     icon="account-remove"
                     color="error"
                     shiftId={shift.id}
@@ -118,8 +121,8 @@ export default function CommunityLevelView({
                     reviewLoadingId={reviewLoadingId}
                 />
                 <StatusCard
-                    title="No Response"
-                    members={noResponse}
+                    title="Rejected"
+                    members={rejected}
                     icon="clock-outline"
                     color="warning"
                     shiftId={shift.id}
