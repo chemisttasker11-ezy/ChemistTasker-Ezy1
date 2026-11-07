@@ -114,6 +114,9 @@ function screenHarness() {
   const router = { push: url => io.navigations.push(url), replace: url => io.navigations.push(url) };
   const expo = { useRouter: () => router, useLocalSearchParams: () => env.params,
     usePathname: () => env.pathname };
+  const timeUtils = fs.existsSync(path.join(root, '../shared-core/src/utils/correctionTimestamp.ts'))
+    ? load('../shared-core/src/utils/correctionTimestamp.ts', {})
+    : {};
   const api = {
     attendance: {
       getManagerPending: async id => { io.pending.push(id); return []; },
@@ -136,9 +139,11 @@ function screenHarness() {
       addTimesheetComment: async (...args) => { io.comments.push(args); },
     },
     canManageKioskDevices: () => false,
-    correctionTimestamp: fs.existsSync(path.join(root, '../shared-core/src/utils/correctionTimestamp.ts'))
-      ? load('../shared-core/src/utils/correctionTimestamp.ts', {}).correctionTimestamp
-      : () => { throw Error('Shared correction helper is absent on the red base'); },
+    correctionTimestamp: timeUtils.correctionTimestamp ?? (() => {
+      throw Error('Shared correction helper is absent on the red base');
+    }),
+    attendanceWallTime: timeUtils.attendanceWallTime,
+    isValidAttendanceLocal: timeUtils.isValidAttendanceLocal,
   };
   const widgets = Object.fromEntries(
     ['ActionButtons', 'DataRow', 'EmptyState', 'Field', 'InfoNote', 'MetricGrid',
@@ -195,7 +200,7 @@ test('R Grace region coverage is scoped to A, and account changes cannot retain 
   h.engine.unmount(); h.env.pharmacy = 12; h.io.pending.length = 0;
   await h.render(); await h.render();
   assert.deepEqual(h.io.pending, []);
-  h.engine.unmount(); h.env.user = { id: 77, role: 'OWNER', owner_pharmacies: [{ id: 19 }] };
+  h.engine.unmount(); h.env.user = { id: 77, role: 'OWNER', memberships: [{ pharmacy_id: 19, role: 'OWNER' }] };
   h.env.pharmacy = 11;
   await h.render(); await h.render();
   assert.deepEqual(h.io.pending, []);
@@ -225,7 +230,7 @@ test('R worker correction sends a readable own-timesheet comment, never an event
 
 test('R manager correction refuses a freehand unknown event rather than using device timezone', async () => {
   const h = screenHarness();
-  h.env.user = { id: 11, role: 'OWNER', owner_pharmacies: [{ id: 11 }] };
+  h.env.user = { id: 11, role: 'OWNER', memberships: [{ pharmacy_id: 11, role: 'OWNER' }] };
   h.env.screen = 'correction';
   h.env.params = { eventId: '22', sessionId: '78' };
   let tree = await h.render(); tree = await h.render();

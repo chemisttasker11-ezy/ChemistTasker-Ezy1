@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 function loadComponent(filename, imports) {
   const source = readFileSync(new URL(filename, import.meta.url), 'utf8');
   const { outputText } = ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   });
   const exports = {};
   new Function('require', 'exports', outputText)((name) => imports[name] ?? require(name), exports);
