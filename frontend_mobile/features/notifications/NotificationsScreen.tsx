@@ -36,6 +36,8 @@ export default function NotificationsScreen() {
   // /admin/notifications opens admin routes even though a delegated admin's role is PHARMACIST, OWNER etc.
   const persona = shiftPersonaFromPath(usePathname());
   const adminCan = useAdminCan();
+  const accountId = String(user?.id ?? 'signed-out');
+  const visibleAccount = useRef(accountId);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -49,27 +51,39 @@ export default function NotificationsScreen() {
 
   // Only the newest list response may set rows: an older one would restore rows from before a mark-read.
   const generation = useRef(0);
+  const refreshGeneration = useRef(0);
+  const currentAccount = () => visibleAccount.current === accountId;
 
   // Load on every focus (the first one included) and mark any unread as read.
   useFocusEffect(
     useCallback(() => {
-      // Worker identity is part of the inbox scope: never display cached
-      // notifications or read receipts from a different signed-in account.
+      // A focus change is not an identity change. Keep previously loaded rows
+      // and confirmed local receipts if only this same account returns.
+      const changedAccount = visibleAccount.current !== accountId;
       generation.current += 1;
-      locallyReadIds.current.clear();
+      refreshGeneration.current += 1;
+      if (changedAccount) {
+        visibleAccount.current = accountId;
+        locallyReadIds.current.clear();
+        setNotifications([]);
+        setNextPage(null);
+        setReadError('');
+        setLoadError('');
+        setOlderError('');
+      }
       moreLoadingRef.current = false;
       setLoadingMore(false);
-      setNotifications([]);
-      setNextPage(null);
-      setReadError('');
+      setRefreshing(false);
       if (user?.id != null) void fetchNotifications(true, 1);
-      else setLoading(false);
+      else { setNotifications([]); setLoading(false); }
       return () => {
         generation.current += 1;
+        refreshGeneration.current += 1;
         moreLoadingRef.current = false;
         setLoadingMore(false);
+        setRefreshing(false);
       };
-    }, [user?.id])
+    }, [accountId])
   );
 
   const normalizeNotification = (raw: any): Notification => ({
@@ -91,7 +105,8 @@ export default function NotificationsScreen() {
       setLoading(true);
       setLoadError('');
       setOlderError('');
-      setNextPage(null);
+      // Keep existing page and next-page information until a successful refresh;
+      // only a real account change may invalidate those cached rows.
       moreLoadingRef.current = false;
       setLoadingMore(false);
     } else {
@@ -101,7 +116,7 @@ export default function NotificationsScreen() {
     }
     try {
       const response = await getNotifications(page);
-      if (request !== generation.current) return;
+      if (request !== generation.current || !currentAccount()) return;
       if (!Array.isArray(response) && !Array.isArray((response as any)?.results)) {
         throw new Error('Unexpected notifications response.');
       }
@@ -121,7 +136,7 @@ export default function NotificationsScreen() {
           // the server actually confirms the mutation.
           try {
             await markNotificationsAsRead(unreadIds);
-            if (request !== generation.current) return;
+            if (request !== generation.current || !currentAccount()) return;
             unreadIds.forEach(id => locallyReadIds.current.add(id));
             setNotifications(previous => previous.map(row =>
               locallyReadIds.current.has(row.id) ? { ...row, readAt: row.readAt || new Date().toISOString() } : row
@@ -129,16 +144,16 @@ export default function NotificationsScreen() {
             setReadError('');
             DeviceEventEmitter.emit(NOTIFICATIONS_READ_EVENT);
           } catch (failure: any) {
-            if (request === generation.current) setReadError(failure?.message || 'Notifications could not be marked as read.');
+            if (request === generation.current && currentAccount()) setReadError(failure?.message || 'Notifications could not be marked as read.');
           }
         }
       }
     } catch (failure: any) {
-      if (request !== generation.current) return;
+      if (request !== generation.current || !currentAccount()) return;
       if (first) setLoadError(failure?.message || 'Unable to load notifications.');
       else setOlderError(failure?.message || 'Unable to load older notifications.');
     } finally {
-      if (request === generation.current) {
+      if (request === generation.current && currentAccount()) {
         if (first) setLoading(false);
         else { setLoadingMore(false); moreLoadingRef.current = false; }
       }
@@ -146,14 +161,22 @@ export default function NotificationsScreen() {
   };
 
   const onRefresh = async () => {
+    const token = ++refreshGeneration.current;
+    const owner = accountId;
     setRefreshing(true);
     await fetchNotifications(true, 1);
-    setRefreshing(false);
+    if (currentAccount() && owner === accountId && token === refreshGeneration.current) {
+      setRefreshing(false);
+    }
   };
 
   const markAsRead = async (id: number) => {
+    const request = generation.current;
+    const owner = accountId;
+    if (!currentAccount()) return;
     try {
       await markNotificationsAsRead([id]);
+      if (request !== generation.current || owner !== accountId || !currentAccount()) return;
       locallyReadIds.current.add(id);
       setNotifications(previous =>
         previous.map(row => row.id === id ? { ...row, readAt: row.readAt || new Date().toISOString() } : row)
@@ -161,7 +184,9 @@ export default function NotificationsScreen() {
       setReadError('');
       DeviceEventEmitter.emit(NOTIFICATIONS_READ_EVENT);
     } catch (failure: any) {
-      setReadError(failure?.message || 'Unable to mark the notification as read.');
+      if (request === generation.current && owner === accountId && currentAccount()) {
+        setReadError(failure?.message || 'Unable to mark the notification as read.');
+      }
     }
   };
 
@@ -241,6 +266,7 @@ export default function NotificationsScreen() {
     }
   };
 
+  const shownNotifications = currentAccount() ? notifications : [];
   const renderItem = ({ item }: { item: Notification }) => (
     <Surface
       style={[styles.notificationItem, !item.readAt && styles.unreadItem]}
@@ -289,13 +315,13 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {loading && notifications.length === 0 && !loadError ? (
+      {loading && shownNotifications.length === 0 && !loadError ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
-          data={notifications}
+          data={shownNotifications}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContent}
