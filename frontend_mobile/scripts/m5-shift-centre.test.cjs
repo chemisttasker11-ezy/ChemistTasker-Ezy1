@@ -52,7 +52,8 @@ react.default=react;
 const shared=load('../shared-core/src/domains/shifts/audience.ts',{});
 const audience=shared.SHIFT_AUDIENCE_LEVELS;
 const helper=load('roles/shared/shifts/ActiveShiftsPage/utils/displayHelpers.ts',{
- '../theme':{levelColors:{}}});
+ '../theme':{levelColors:{}},
+ '@chemisttasker/shared-core':shared});
 const cand=load('roles/shared/shifts/ActiveShiftsPage/utils/candidateHelpers.ts',{});
 const base={'react':react,'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
  'react-native':{View:'View',Image:'Image',ScrollView:'ScrollView',TouchableOpacity:'TouchableOpacity',
