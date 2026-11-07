@@ -8,6 +8,11 @@ const vm = require('node:vm');
 const ts = require('../node_modules/typescript');
 const root = path.resolve(__dirname, '..');
 const jsx = (type, props) => ({ type, props: props || {} });
+const Card = props => jsx('Card', props);
+Card.Content = props => jsx('CardContent', props);
+Card.Cover = props => jsx('CardCover', props);
+const TextInput = props => jsx('TextInput', props);
+TextInput.Icon = props => jsx('TextInputIcon', props);
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
@@ -86,6 +91,7 @@ function load(relative, modules) {
 function collect(node, type, out=[]) {
   if (Array.isArray(node)) { node.forEach(x=>collect(x,type,out)); return out; }
   if (node == null || typeof node !== 'object') return out;
+  if (typeof node.type === 'function') return collect(node.type(node.props),type,out);
   if (node.type === type) out.push(node.props);
   collect(node.props?.children,type,out);
   return out;
@@ -107,7 +113,7 @@ function boardHarness() {
   const module=load('app/explore/talent-board.tsx', {
     react:host.react, 'react/jsx-runtime':{jsx,jsxs:jsx},
     'react-native':{ScrollView:'ScrollView',StyleSheet:{create:x=>x},View:'View'},
-    'react-native-paper':{Button:'Button',Card:Object.assign('Card',{Content:'CardContent'}),Text:'Text',TextInput:'TextInput',Chip:'Chip'},
+    'react-native-paper':{Button:'Button',Card,Text:'Text',TextInput:'TextInput',Chip:'Chip'},
     'expo-router':{useRouter:()=>({push:x=>routes.push(x),replace:x=>routes.push(x),back(){},canGoBack:()=>false}),
       useLocalSearchParams:()=>({})},
     '@/components/ui/BrandActivityIndicator':{BrandActivityIndicator:'Spinner'},
@@ -151,7 +157,7 @@ function articleHarness(section='blog') {
   const module=load('features/explore/ArticleFeed.tsx', {
     react:host.react,'react/jsx-runtime':{jsx,jsxs:jsx},
     'react-native':{Image:'Image',ScrollView:'ScrollView',StyleSheet:{create:x=>x},View:'View'},
-    'react-native-paper':{Button:'Button',Card:{__esModule:true,default:'Card',Content:'CardContent'},
+    'react-native-paper':{Button:'Button',Card,
       Searchbar:'Searchbar',Text:'Text',Chip:'Chip'},
     'expo-router':{useRouter:()=>({push:x=>routes.push(x),replace(){},back(){},canGoBack:()=>false})},
     '@/components/ui/BrandActivityIndicator':{BrandActivityIndicator:'Spinner'},
@@ -207,8 +213,8 @@ function learningHarness() {
     react:host.react,'react/jsx-runtime':{jsx,jsxs:jsx},
     'react-native':{Linking:{openURL:async()=>{}},ScrollView:'ScrollView',StyleSheet:{create:x=>x},View:'View'},
     'expo-router':{useFocusEffect:cb=>host.react.useEffect(cb,[cb])},
-    'react-native-paper':{Button:'Button',Card:{__esModule:true,default:'Card',Content:'CardContent',Cover:'CardCover'},
-      Chip:'Chip',Text:'Text',TextInput:{__esModule:true,default:'TextInput',Icon:'TextInputIcon'}},
+    'react-native-paper':{Button:'Button',Card,
+      Chip:'Chip',Text:'Text',TextInput},
     '@/components/ui/BrandActivityIndicator':{BrandActivityIndicator:'Spinner'},
     '@/config/api':{chemistTaskerApi:{
       publicContent:{listArticles:async args=>{
