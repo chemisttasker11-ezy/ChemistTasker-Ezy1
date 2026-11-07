@@ -87,6 +87,7 @@ function nextWizard(options = {}) {
       calls.push({ method: 'upload', id, body });
       return options.upload ? options.upload(id, body) : { id: 88 };
     },
+    deleteImage: async id => { calls.push({ method: 'delete', id }); },
     actOnListing: async (id, action, version) => {
       calls.push({ method: 'submit', id, action, version });
       return { publication_status: 'PENDING_REVIEW', version: version + 1 };
@@ -360,4 +361,28 @@ test('R: Next upload failure is visible and no submit/created state is falsely r
   assert.equal(app.calls.filter(c => c.method === 'create').length, 1);
   assert.equal(app.calls.filter(c => c.method === 'upload').length, 2);
   assert.equal(app.calls.filter(c => c.method === 'submit').length, 1);
+});
+
+for (const remove of [true, false]) test(`${remove ? 'R' : 'C'}: Next failed submit ${remove ? 'removes uploaded photo on server' : 'retains photo without duplicate upload'}`, async () => {
+  const app = nextWizard(); let attempts = 0;
+  app.api.actOnListing = async (id, action, version) => {
+    app.calls.push({ method: 'submit', id, action, version });
+    if (++attempts === 1) throw Error('Submit failed');
+    return { publication_status: 'PENDING_REVIEW', version: version + 1 };
+  };
+  await app.toFinal(true); await app.click('Submit for review');
+  for (let i = 0; i < 4; i++) await app.click('Back');
+  let nodes = await app.stable();
+  assert.equal(nodes.filter(n => n.type === 'img' && String(n.props.alt).startsWith('Upload')).length, 1);
+  if (remove) {
+    const button = nodes.find(n => n.type === 'button' && n.props['aria-label'] === 'Remove photo');
+    assert.ok(button); button.props.onClick(); await app.stable();
+  }
+  nodes = await app.stable();
+  const visible = nodes.filter(n => n.type === 'img' && String(n.props.alt).startsWith('Upload')).length;
+  await app.click('Continue to Audience'); await app.click('Continue to Delivery');
+  await app.click('Review Listing'); await app.click('Proceed to Submit'); await app.click('Submit for review');
+  assert.equal(app.calls.filter(c => c.method === 'upload').length, 1);
+  assert.equal(app.calls.filter(c => c.method === 'upload').length - app.calls.filter(c => c.method === 'delete').length, visible);
+  assert.equal(app.calls.filter(c => c.method === 'submit').length, 2);
 });

@@ -127,3 +127,23 @@ test('C local file read fails without starting upload and existing draft remains
   assert.equal((await h.getDraft(1001)).title, 'Used textbook');
   h.unmount();
 });
+
+for (const remove of [true, false]) test(`${remove ? 'R' : 'C'}: native failed submit ${remove ? 'removes uploaded photo on server' : 'retains photo without duplicate upload'}`, async () => {
+  const h = await ready(); h.queue('submit', Error('Submit failed'));
+  h.click('Submit for review'); await settled(h);
+  assert.equal(h.callsOf('upload').length, 1);
+  h.env.screen = 'photos'; await h.render();
+  let nodes = h.currentNodes();
+  assert.equal(nodes.filter(n => n.type === 'Image').length, 1);
+  if (remove) { h.click('Remove'); await settled(h); }
+  nodes = h.currentNodes();
+  const visible = nodes.filter(n => n.type === 'Image').length;
+  h.env.screen = 'review'; await h.render();
+  nodes = h.currentNodes();
+  assert.ok(nodes.some(n => n.type === 'DataRow' && n.props.title === 'Photos' && n.props.subtitle === `${visible} selected`));
+  h.click('Submit for review'); await settled(h);
+  assert.equal(h.callsOf('upload').length, 1);
+  assert.equal(h.callsOf('upload').length - h.callsOf('delete').length, visible);
+  assert.equal(h.callsOf('submit').length, 2);
+  h.unmount();
+});

@@ -169,6 +169,7 @@ function createMarketplace() {
       calls.push({ step: 'upload', owner: env.user?.id, id, form: body });
       return take('upload', { id: 17, moderation_status: 'PENDING' });
     },
+    deleteImage: async id => { calls.push({ step: 'delete', id }); return take('delete', undefined); },
     actOnListing: async (id, action, version) => {
       calls.push({ step: 'submit', owner: env.user?.id, id, action, version });
       return take('submit', { publication_status: 'PENDING_REVIEW', version: version + 1 });
