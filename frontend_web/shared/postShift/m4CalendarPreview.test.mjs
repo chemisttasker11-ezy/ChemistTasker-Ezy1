@@ -16,6 +16,7 @@ function execute(file, imports) {
   const module = { exports: {} };
   vm.runInNewContext(transpiled, {
     module, exports: module.exports, console, URLSearchParams, Date, Map, Set,
+    setTimeout, clearTimeout,
     require(name) {
       if (!Object.prototype.hasOwnProperty.call(imports, name)) throw new Error('Unmocked import: ' + name + ' in ' + file);
       const value = imports[name];
@@ -191,3 +192,190 @@ test('C: actual Vite owner/admin entry wrappers preserve the same shared PostShi
   assert.equal(adminElement.type,owner.default);
   assert.equal(adminElement.type(adminElement.props).type,'RealSharedPostShiftForm');
 });
+
+
+function realPostShiftHost(persona) {
+  const fibers = new Map(), effects = [], submitted = [], completed = [];
+  let active = null, cursor = 0, search = '?context=initial';
+  let callback = () => completed.push('original');
+  const same = (a,b) => a && b && a.length === b.length && a.every((x,i) => x === b[i]);
+  const react = {
+    useState(initial) {
+      const id = cursor++, fields = active.fields;
+      if (!(id in fields)) fields[id] = { value: typeof initial === 'function' ? initial() : initial };
+      return [fields[id].value, update => {
+        fields[id].value = typeof update === 'function' ? update(fields[id].value) : update;
+      }];
+    },
+    useRef(initial) {
+      const id = cursor++, fields = active.fields;
+      if (!(id in fields)) fields[id] = { current: initial };
+      return fields[id];
+    },
+    useMemo(fn, deps) {
+      const id = cursor++, fields = active.fields;
+      if (!(id in fields) || !same(fields[id].deps, deps)) fields[id] = { value: fn(), deps };
+      return fields[id].value;
+    },
+    useCallback(fn, deps) { return react.useMemo(() => fn, deps); },
+    useEffect(effect, deps) {
+      const id = cursor++, fiber = active, prev = fiber.effects.get(id);
+      if (!prev || !same(prev.deps, deps)) effects.push(() => {
+        prev?.cleanup?.();
+        fiber.effects.set(id, { deps, cleanup: effect() });
+      });
+    },
+  };
+  react.default = react;
+  const jsx = (type, props) => ({ type, props: props || {} });
+  const fullReact = { __esModule: true, default: react, ...react };
+  const timetable = execute('./useShiftTimetable.ts', {
+    react: fullReact, dayjs, './helpers': helpers,
+    '@chemisttasker/shared-core': core,
+  });
+  const pricing = ({ expandedSlots }) => {
+    const defaults = {
+      rateType: 'FLEXIBLE', paymentPreference: 'ABN', rateWeekday: '',
+      rateSaturday: '', rateSunday: '', ratePublicHoliday: '',
+      rateEarlyMorning: '', rateLateNight: '', ownerBonus: '',
+      ftptPayMode: 'HOURLY', minHourly: '', maxHourly: '',
+      minAnnual: '', maxAnnual: '', superPercent: '',
+      locumSuperIncluded: true, savingPharmacyRates: false,
+      slotRateRows: expandedSlots.map(() => ({ rate: '67.00', status: 'idle' })),
+    };
+    for (const key of Object.keys(defaults)) if (!key.startsWith('set')) {
+      defaults['set' + key[0].toUpperCase() + key.slice(1)] = () => {};
+    }
+    return { ...defaults, handleSlotRateChange() {}, handleSavePharmacyRateDefaults() {} };
+  };
+  const display = name => ({ __esModule: true, default: name });
+  const uiComponents = Object.fromEntries('Container Alert Paper Snackbar Stack Typography'.split(' ').map(n => [n,n]));
+  const shared = {
+    ...core, ...posting,
+    buildShiftPostingPayload: posting.buildShiftPostingPayload,
+    buildShiftPostingPreview: posting.buildShiftPostingPreview,
+    haveShiftPostingSlotRatesChanged: posting.haveShiftPostingSlotRatesChanged,
+    getShiftPostingOwnerAdjustedRate: posting.getShiftPostingOwnerAdjustedRate,
+    normalizeWorkloadTags: (_registry, items) => items,
+    normalizeShiftRequirements: (_registry, items) => items,
+    pharmacySoftwareDefaults: () => [], mergeSoftwareDefaults: current => current,
+    canNotifyShiftChainMembers: () => false, isPrivateShiftBooking: () => false,
+    automaticShiftEscalationDates: () => ({}),
+    fetchPharmaciesService: async () => [{ id: 4, name: 'Site A', software: [], hasChain: false, claimed: false }],
+    createOwnerShiftService: async payload => { submitted.push(payload); return { id: 900 }; },
+    updateOwnerShiftService: async (_id, payload) => { submitted.push(payload); return { id: 900 }; },
+  };
+  const form = execute('./PostShiftForm.tsx', {
+    './useShiftDescriptionTemplate': { useShiftDescriptionTemplate: () => ({
+      descriptionTemplate: null, descriptionTemplateLoading: false,
+      descriptionTemplateSaving: false, handleUseDescriptionTemplate() {},
+      handleSaveDescriptionTemplate() {},
+    }) },
+    './useShiftPricing': { useShiftPricing: pricing },
+    './useShiftTimetable': timetable,
+    '@chemisttasker/shared-core': shared,
+    '@chemisttasker/shared-core/skills_registry.json': { __esModule:true, default: {} },
+    react: fullReact, 'react/jsx-runtime': { jsx, jsxs:jsx, Fragment:'Fragment' },
+    '@mui/material': { ...uiComponents, useTheme: () => ({ breakpoints: { down: () => 'sm' } }),
+      useMediaQuery: () => false },
+    'lucide-react': new Proxy({}, { get: (_o,n) => String(n) }),
+    dayjs,
+    './PostShiftWizardShell': display('PostShiftWizardShell'),
+    './PostShiftDetailsStep': display('PostShiftDetailsStep'),
+    './PostShiftSkillsStep': display('PostShiftSkillsStep'),
+    './PostShiftVisibilityStep': display('PostShiftVisibilityStep'),
+    './PostShiftPayStep': display('PostShiftPayStep'),
+    './PostShiftTimetableStep': display('PostShiftTimetableStep'),
+    './helpers': helpers,
+  });
+  const auth = { user: { id: 22, role: persona === 'admin' ? 'ADMIN' : 'OWNER' },
+    activePersona: persona, activeAdminPharmacyId: persona === 'admin' ? 4 : null };
+  const owner = execute('../../src/pages/dashboard/sidebar/PostShiftPage.tsx', {
+    'react/jsx-runtime': { jsx, jsxs:jsx },
+    'react-router-dom': { useNavigate: () => () => {}, useLocation: () => ({ search }) },
+    '../../../contexts/AuthContext': { useAuth: () => auth },
+    '../../../theme/sleekTheme': { useColorMode: () => ({ mode:'light' }) },
+    '../../../utils/apiClient': { __esModule:true, default:{} },
+    '../../../components/ui/PageHeader': display('PageHeader'),
+    '../../../../shared/postShift/PostShiftForm': { __esModule:true, default:form.default },
+    './ShiftsBoard/components/ShiftBoardPreview': display('ShiftBoardPreview'),
+  });
+  const admin = execute('../../src/pages/dashboard/admin/AdminPostShiftPage.tsx', {
+    'react/jsx-runtime': { jsx, jsxs:jsx },
+    '../../../contexts/AdminScopeContext': { useAdminScope: () => ({ pharmacyId:4 }) },
+    '../sidebar/PostShiftPage': { __esModule:true, default:owner.default },
+  });
+  function flatten(element, key = 'root', output = []) {
+    if (Array.isArray(element)) element.forEach((child,i) => flatten(child, key+'.'+i, output));
+    else if (element && typeof element === 'object') {
+      if (typeof element.type === 'function') {
+        const fiberKey = key + ':' + element.type.name;
+        if (!fibers.has(fiberKey)) fibers.set(fiberKey, { fields:[], effects:new Map() });
+        const previous = active, previousCursor = cursor;
+        active = fibers.get(fiberKey); cursor=0;
+        const rendered = element.type(element.props);
+        active = previous; cursor = previousCursor;
+        flatten(rendered, fiberKey, output);
+      } else {
+        output.push(element);
+        flatten(element.props?.children, key+'.children', output);
+      }
+    }
+    return output;
+  }
+  const entry = persona === 'admin' ? admin.default : owner.default;
+  const render = () => flatten(jsx(entry, persona === 'admin' ? {} : { onCompleted:callback }));
+  async function settle() {
+    for(let i=0;i<6;i++) {
+      render();
+      while(effects.length) effects.shift()();
+      for(let j=0;j<8;j++) await Promise.resolve();
+    }
+    return render();
+  }
+  return { render, settle, submitted, completed,
+    changeCallback(fn) { callback=fn; },
+    changeContext(value) { search=value; } };
+}
+
+for (const persona of ['owner','admin']) {
+  test('C: real '+persona+' PostShiftForm displays overnight events and submits unchanged draft clocks', async () => {
+    const host = realPostShiftHost(persona);
+    let nodes = await host.settle();
+    const details = nodes.find(n => n.type === 'PostShiftDetailsStep');
+    assert.ok(details, persona+' must mount the real details step');
+    details.props.setRoleNeeded('PHARMACIST');
+    details.props.setPharmacyId(4);
+    nodes = await host.settle();
+    let shell = nodes.find(n => n.type === 'PostShiftWizardShell');
+    assert.ok(shell, 'real PostShiftForm must expose wizard actions');
+    const step = shell.props.steps.findIndex(s => s.key === 'timetable');
+    assert.ok(step >= 0);
+    shell.props.setActiveStep(step);
+    nodes = await host.settle();
+    let dateStep = nodes.find(n => n.type === 'PostShiftTimetableStep');
+    assert.ok(dateStep, 'actual timetable props must be rendered');
+    dateStep.props.setSlots([slot('2027-07-10')]);
+    nodes = await host.settle();
+    dateStep = nodes.find(n => n.type === 'PostShiftTimetableStep');
+    assert.equal(dateStep.props.calendarEvents.length, 1);
+    assert.deepEqual(local(dateStep.props.calendarEvents[0]), {
+      start:'2027-07-10T22:00', end:'2027-07-11T06:00',
+    });
+    // Change callbacks and time-context search without replacing the mounted form.
+    host.changeCallback(() => host.completed.push('new callback'));
+    host.changeContext('?context=rerender');
+    nodes = await host.settle();
+    dateStep = nodes.find(n => n.type === 'PostShiftTimetableStep');
+    assert.equal(dateStep.props.slots[0].startTime, '22:00');
+    assert.equal(dateStep.props.slots[0].endTime, '06:00');
+    shell = nodes.find(n => n.type === 'PostShiftWizardShell');
+    await shell.props.onSubmit();
+    assert.equal(host.submitted.length, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(host.submitted[0].slots.map(s =>
+      [s.date,s.start_time,s.end_time]))),
+      [['2027-07-10','22:00','06:00']]);
+    assert.equal(host.submitted[0].pharmacy, 4);
+    if(persona === 'owner') assert.deepEqual(host.completed, ['new callback']);
+  });
+}
