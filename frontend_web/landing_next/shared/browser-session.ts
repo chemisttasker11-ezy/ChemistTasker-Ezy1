@@ -40,7 +40,7 @@ export function safeNext(value:unknown):string|null {
 export function rememberDestination(value:unknown){const path=safeNext(value);if(path)sessionStorage.setItem('ct:return-to',path);return path;}
 export function returnDestination(){return safeNext(new URLSearchParams(window.location.search).get('next'))||safeNext(sessionStorage.getItem('ct:return-to'));}
 export function finishDestination(path:string){sessionStorage.removeItem('ct:return-to');window.location.assign(path);}
-export function loginHref(path:string){return `/login?next=${encodeURIComponent(safeNext(path)||'/dashboard')}`;}
+export function loginHref(path:string){const next=safeNext(path);return next?`/login?next=${encodeURIComponent(next)}`:'/login';}
 export function bearerBelongsToDifferentUser(bearerUserId:unknown,cookieUserId:unknown){return bearerUserId!=null&&cookieUserId!=null&&String(bearerUserId)!==String(cookieUserId);}
 
 async function decode<T>(response:Response):Promise<T>{
