@@ -35,7 +35,7 @@ class FinancePresentationContractTests(TestCase):
         self.expense = Expense.objects.create(
             owner=self.worker, supplier='=Supplier', description='Real evidence',
             incurred_on=date(2026, 7, 10), amount='55.00', gst_amount='5.00',
-            business_use_percent='80.00',
+            business_use_percent='80.00', tax_code='GST',
         )
 
     def test_managed_invoice_detail_is_owner_or_recipient_scoped(self):

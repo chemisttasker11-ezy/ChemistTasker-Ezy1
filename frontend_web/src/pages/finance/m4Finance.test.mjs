@@ -5,6 +5,14 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 const jsx = (type, props) => ({ type, props: props || {} });
+const errorsSource = readFileSync(new URL('../../../../shared-core/src/transport/errors.ts', import.meta.url), 'utf8');
+const errorsOutput = ts.transpileModule(errorsSource, { compilerOptions: {
+  module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
+}}).outputText;
+const errorModule = { exports: {} };
+vm.runInNewContext(errorsOutput, { module: errorModule, exports: errorModule.exports,
+  require: () => ({ reportAhpraError: () => null }) });
+const { ApiError } = errorModule.exports;
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => {
   resolve = yes; reject = no;
 }); return { promise, resolve, reject }; };
@@ -77,8 +85,8 @@ function invoiceUi(options = {}) {
   const modules = {
     react, 'react/jsx-runtime': { jsx, jsxs: jsx },
     '@mui/material': MUI, '@mui/icons-material': icons, 'lucide-react': icons,
-    '../../../components/ui/PageHeader': { default: 'PageHeader' },
-    '../../../components/dashboard/DashboardContentState': { default: 'DashboardContentState' },
+    '../../../components/ui/PageHeader': { __esModule: true, default: 'PageHeader' },
+    '../../../components/dashboard/DashboardContentState': { __esModule: true, default: 'DashboardContentState' },
     './Invoices/invoiceParts': parts,
     'react-router-dom': {
       useParams: () => ({ id: request.id }),
@@ -127,9 +135,8 @@ function invoiceUi(options = {}) {
   return { request, calls, destinations, render, flush, settle, unmount };
 }
 
-const refusal = status => Object.assign(new Error('Managed invoice refused'), {
-  response: { status, data: { detail: 'Not permitted to inspect this finance invoice' } },
-});
+const refusal = status => new ApiError('Managed invoice refused', status,
+  { detail: 'Not permitted to inspect this finance invoice' });
 
 test('R: managed auth/conflict/server/network failures never open the legacy edit surface', async () => {
   for (const failure of [refusal(401), refusal(403), refusal(409), refusal(500), new TypeError('Network unavailable')]) {
@@ -151,8 +158,8 @@ test('C: explicit 404 allows exactly one legacy lookup without managed write', a
     legacy: () => ({ id: 48, status: 'draft', line_items: [], reference: 'LEGACY-48' }) });
   const nodes = await ui.settle();
   assert.equal(ui.calls.filter(([source]) => source === 'legacy').length, 1);
-  assert.ok(nodes.some(node => node.type === 'Typography' &&
-    JSON.stringify(node.props.children).includes('Invoice')));
+  assert.ok(nodes.some(node => node.type === 'PageHeader' &&
+    /invoice/i.test(String(node.props.title || node.props.heading || ''))));
   assert.deepEqual(ui.destinations, []);
 });
 

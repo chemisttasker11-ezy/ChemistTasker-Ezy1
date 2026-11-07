@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const ts = require('typescript');
+const ts = require('../node_modules/typescript');
 
 const repo = path.resolve(__dirname, '../..');
 const jsx = (type, props) => ({ type, props: props || {} });
@@ -13,8 +13,12 @@ const later = () => {
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 };
-const refusal = status => Object.assign(new Error('Managed invoice unavailable'),
-  { response: { status, data: { detail: 'Finance invoice not accessible' } } });
+// Execute the real shared-core ApiError, including its status contract.
+const { ApiError } = compile('shared-core/src/transport/errors.ts', {
+  '../domains/onboarding/ahpra': { reportAhpraError: () => null },
+});
+const refusal = status => new ApiError('Managed invoice unavailable', status,
+  { detail: 'Finance invoice not accessible' });
 
 function compile(relative, modules) {
   const source = fs.readFileSync(path.join(repo, relative), 'utf8');
@@ -57,7 +61,7 @@ function createHooks() {
       if (!(id in slots) || !equal(slots[id].deps, deps)) slots[id] = { value: fn(), deps };
       return slots[id].value;
     },
-    useCallback(fn, deps) { return this.useMemo(() => fn, deps); },
+    useCallback(fn, deps) { return react.useMemo(() => fn, deps); },
     useEffect(effect, deps) {
       const id = cursor++, fiber = active, prior = fiber.effects.get(id);
       if (!prior || !equal(prior.deps, deps)) {
@@ -168,7 +172,7 @@ test('C: mobile explicit managed 404 retains genuine legacy invoice editor, mana
     legacy: () => ({ id: 48, status: 'draft', line_items: [], reference: 'LEGACY-48' }) });
   const nodes = await old.render();
   assert.equal(old.calls.filter(c => c[0] === 'legacy').length, 1);
-  assert.ok(nodes.some(node => node.type === 'Text' && /invoice #48/i.test(text(node))));
+  assert.ok(nodes.some(node => node.type === 'Text' && /invoice #\s*48/i.test(text(node))));
   const modern = invoiceScreen({ managed: async () => ({ id: 48, number: 'MODERN-48' }) });
   await modern.render();
   assert.equal(modern.calls.some(c => c[0] === 'legacy'), false);
@@ -288,6 +292,13 @@ const navigateTab = async (app, name) => {
   tabs.props.onChange(name);
   return app.render();
 };
+const awaitAsyncWork = async (app, ready) => {
+  for (let i = 0; i < 12 && !ready(); i++) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await app.h.flush();
+  }
+  assert.ok(ready(), 'pending platform action must settle');
+};
 const click = async (app, label) => {
   const nodes = await app.render(), action = button(nodes, label);
   assert.ok(action, 'Missing native control ' + label);
@@ -301,13 +312,13 @@ test('R: native finance provides CSV exports for filtered issued invoices and al
   await click(app, 'Export invoices CSV');
   assert.equal(app.shares.length, 1);
   assert.equal(app.shares[0].opts.mimeType, 'text/csv');
-  const written = new TextDecoder().decode(app.files[0].bytes);
+  const written = new TextDecoder('utf-8', { ignoreBOM: true }).decode(app.files[0].bytes);
   assert.ok(written.startsWith('\ufeff"Number"'));
   assert.ok(written.includes('"INV-51"'), 'page two invoice is exported');
   assert.ok(app.files[0].deleted, 'temporary file is removed after share');
   await navigateTab(app, 'Expenses');
   await click(app, 'Export expenses CSV');
-  const expenses = new TextDecoder().decode(app.files[1].bytes);
+  const expenses = new TextDecoder('utf-8', { ignoreBOM: true }).decode(app.files[1].bytes);
   assert.ok(expenses.includes('"\'=SUM(1,2)"'), 'spreadsheet injection is escaped');
   assert.ok(expenses.includes('"Travel ""A"", room 2"'));
   assert.ok(app.files[1].deleted);
@@ -319,7 +330,7 @@ test('R: native BAS worksheet export is explicitly draft and never represented a
   await click(app, 'Calculate worksheet');
   await click(app, 'Export draft worksheet CSV');
   assert.equal(app.shares.length, 1);
-  const csv = new TextDecoder().decode(app.files[0].bytes);
+  const csv = new TextDecoder('utf-8', { ignoreBOM: true }).decode(app.files[0].bytes);
   for (const value of ['DRAFT', 'Not a complete BAS', 'cash', '1000.00', '80.00', '4']) {
     assert.ok(csv.includes(value), 'missing draft worksheet value ' + value);
   }
@@ -341,7 +352,8 @@ test('C: CSV share cancellation/failure cleans private file and leaves a retry a
   const nodes = await app.render();
   const action = button(nodes, 'Export invoices CSV');
   assert.ok(action);
-  await action.props.onPress(); await app.h.flush();
+  await action.props.onPress();
+  await awaitAsyncWork(app, () => app.files.length === 1 && app.files[0].deleted);
   assert.equal(app.files.length, 1);
   assert.ok(app.files[0].deleted);
   const retryNodes = await app.render();

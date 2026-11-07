@@ -73,6 +73,7 @@ describe('M4-02 actual finance CSV serializer', () => {
   it('labels the BAS worksheet DRAFT and makes the exclusion of legacy invoices explicit', () => {
     const rows = worksheetCsvRows(worksheet);
     const csv = renderFinanceCsv(rows);
+    expect(rows[0]).toEqual(['DRAFT ONLY', 'Not a complete BAS']);
     expect(csv).toContain('DRAFT');
     expect(csv).toContain('Not a complete BAS');
     for (const value of ['2026-07-01', '2026-09-30', 'cash', '10000.00',
