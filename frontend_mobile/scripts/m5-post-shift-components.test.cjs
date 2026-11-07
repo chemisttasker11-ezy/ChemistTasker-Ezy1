@@ -39,7 +39,7 @@ react.default = react;
 const tokens = { colors: { status: { red: {} }, tone: { cyan: {} } }, radius: {}, space: {}, touch: { min: 44 },
   type: new Proxy({}, { get: () => ({ fontSize: 14, lineHeight: 20 }) }) };
 const paper = { Button: 'Button', Checkbox: 'Checkbox', Chip: 'Chip', Surface: 'Surface',
-  Text: 'Text', TextInput: { Icon: 'Icon' }, Switch: 'Switch', Menu: 'Menu' };
+  Text: 'Text', TextInput: { Icon: 'Icon' }, Switch: 'Switch', Menu: 'Menu', Snackbar: 'Snackbar' };
 const native = { TouchableOpacity: 'TouchableOpacity', View: 'View', ScrollView: 'ScrollView',
   KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: {}, Alert: {},
   StyleSheet: { create: styles => styles } };
