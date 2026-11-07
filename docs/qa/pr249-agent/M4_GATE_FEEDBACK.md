@@ -196,3 +196,24 @@ F6 backend public_hub/test_m4_community.py:88 `assertIn(status,(401,403))` -> `a
 F7 (P3, production) frontend_mobile/app/explore/hubs/[hub].tsx:200 a vote refresh landing after a poll page load can drop
    the newly loaded page (it captured the old pollPages): read the page count from a ref or ignore a stale refresh. R test first.
 Also relabel the mobile "C" poll-page retry (:126) and "C" vote keeps feed (:134) as R (they fail on base: rule 14).
+
+## M4-05 round 3 (Codex A re-gate of 71b434a4): FIX FIRST
+Guarded: synchronous worker eligibility in frontend_mobile/app/next-shifts.tsx:58; worker controls pass; no old assertion
+weakened. Mobile gate 739/742 at head (RED 740/742).
+1. frontend_mobile features/nextShift/offlineConfirmedShifts.test.mjs:59: three EXISTING tests now fail because
+   next-shifts.tsx imports shiftSurface: add that module to the harness mocks (rule 12). Head must not break them.
+2. scripts/m4-next-shifts-guard.test.cjs:82: in RED the test stops at the redirect assertion before effects run, so the
+   forbidden fetch is never counted: let effects run and assert fetchMyConfirmedShifts call count (rule 22). The
+   signed-out case is labelled C but expects the new redirect: relabel it R or split it.
+3. frontend_web m4Explorer.test.mjs:254 imports the real canAccessRoute but jumps from the Next overview redirect to a
+   fabricated public-board location: follow the ACTUAL destination and navigation, prove no loop and zero personal calls.
+
+## M4-08 round 3 (Codex A re-gate of 6a6231d7): FIX FIRST
+Red at base for overnight, recurrence, rollover and DST. Head: web post-shift 8/10 (exit 1), tsc 0, mobile 733/733.
+1. m4CalendarTimezoneIsolation.test.mjs:16: both child-process checks FAIL at head with empty stdout: make the child
+   process actually run the test file (node --test <file> with env TZ=<zone>, capture and assert its exit code and output).
+2. m4CalendarPreview.test.mjs:125 calls handleEditSlot directly instead of the calendar's real selection handler and never
+   saves: select a recurring event through the real UI callback, then save, and assert source mapping and saved dates.
+3. m4CalendarPreview.test.mjs:342 owner/admin cases assert the corrected overnight preview, so they are R (fail on base),
+   not C: label them R and add separate base-passing C controls for payload and state. The diff also removed the earlier
+   daytime-slot edit assertions: restore that coverage (never drop an assertion, rule 13).
