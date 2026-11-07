@@ -38,7 +38,10 @@ class PublicHubM4Tests(TestCase):
             PharmacyHubPollOption.objects.create(poll=poll, label="Yes")
 
     def test_anon_every_role_reads_bounded_pages_without_private_leakage(self):
-        for user in (None, self.owner, self.member, self.outsider):
+        for user in (None, self.owner, self.member, self.outsider,
+                     make_user("OTHER_STAFF", is_otp_verified=True),
+                     make_user("OTHER_STAFF", is_otp_verified=False),
+                     make_user("PHARMACIST", is_otp_verified=False)):
             client = client_for(user)
             for kind in ("posts", "polls"):
                 first = client.get(BASE + "public-hub/community/public/" + kind + "/")
@@ -67,6 +70,31 @@ class PublicHubM4Tests(TestCase):
         self.assertEqual(len(nxt.data["results"]),2)
         self.assertEqual(client.get(url,{"q":"   "}).data["count"],27)
         self.assertEqual(client.get(BASE+"public-hub/community/public/polls/").data["count"],26)
+
+    def test_every_persona_reads_every_hub_with_personal_interaction_flags(self):
+        from onboarding.models import OtherStaffOnboarding
+
+        staff = make_user("OTHER_STAFF", is_otp_verified=True)
+        intern = make_user("OTHER_STAFF", is_otp_verified=True)
+        OtherStaffOnboarding.objects.create(user=staff, role_type="ASSISTANT")
+        OtherStaffOnboarding.objects.create(user=intern, role_type="INTERN")
+        unverified = make_user("PHARMACIST", is_otp_verified=False)
+        inactive = make_user("PHARMACIST", is_otp_verified=True, is_active=False)
+        personas = ((None, set()), (self.owner, {"public", "owner"}),
+                    (self.member, {"public", "pharmacist"}), (self.outsider, {"public", "explorer"}),
+                    (staff, {"public", "staff"}), (intern, {"public", "intern"}),
+                    (unverified, set()), (inactive, set()))
+        for hub in ("public", "owner", "pharmacist", "explorer", "staff", "intern"):
+            post = PharmacyHubPost.objects.create(platform_hub=hub, author_user=self.owner, body="Matrix " + hub)
+            poll = PharmacyHubPoll.objects.create(platform_hub=hub, created_by=self.owner, question="Matrix " + hub)
+            PharmacyHubPollOption.objects.create(poll=poll, label="Yes")
+            for user, allowed in personas:
+                for kind, item in (("posts", post), ("polls", poll)):
+                    with self.subTest(hub=hub, persona=getattr(user, "pk", None), kind=kind):
+                        response = client_for(user).get(BASE + f"public-hub/community/{hub}/{kind}/")
+                        self.assertEqual(response.status_code, 200, response.data)
+                        row = next(row for row in response.data["results"] if row["id"] == item.pk)
+                        self.assertEqual(row["can_interact"], hub in allowed)
 
     def test_poll_can_interact_flags_match_role_and_closed_state(self):
         closed=self.public_polls[0]

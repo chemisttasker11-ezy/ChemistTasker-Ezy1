@@ -257,3 +257,54 @@ test('R: vote response after page-2 fetch refreshes every visible poll, never tr
   assert.ok(remaining.some(n=>n.props.children==='Poll 13'));
   assert.equal(h.calls.polls.at(-1)[1].page,2,'vote refresh re-fetches the current final poll page');
 });
+
+
+test('R: pending search blocks stale-query post pagination',async()=>{
+  const pending=deferred();
+  const h=env({api:{listCommunityPosts:async(_hub,q)=>{
+    h.calls.posts.push([_hub,q]);
+    if(q.q==='MATCH') return pending.promise;
+    return page([post(q.page===2?99:1)],q.page===1?'?page=2':null);
+  }}});
+  h.render();await h.tick();
+  h.find(h.render(),n=>n.type==='TextInput'&&n.props.label==='Search community posts')[0].props.onChangeText('MATCH');
+  const tree=h.render();
+  h.button('Search',tree).props.onPress();
+  h.button('Load more posts',tree).props.onPress();
+  await h.tick();
+  pending.resolve(page([post(42)],'?page=2'));await h.tick();
+  assert.equal(h.calls.posts.filter(([,q])=>q.page===2).length,0);
+  assert.equal(h.find(h.render(),n=>n.type==='Text'&&n.props.children==='Post 99').length,0);
+});
+
+test('C: double post load is guarded and failed vote retains feeds',async()=>{
+  const pending=deferred();let calls=0;
+  const h=env({api:{listCommunityPosts:async(_hub,q)=>{if(q.page===2){calls++;return pending.promise;}return page([post(1)],'?page=2');},voteCommunityPoll:async()=>{throw Error('vote failed');}}});
+  h.render();await h.tick();const tree=h.render();
+  const more=h.button('Load more posts',tree);more.props.onPress();more.props.onPress();
+  assert.equal(calls,1);pending.resolve(page([post(2)]));await h.tick();
+  h.find(h.render(),n=>n.type==='Button'&&String(n.props.children).includes('Yes'))[0].props.onPress();await h.tick();
+  assert.ok(h.find(h.render(),n=>n.type==='Text'&&n.props.children==='Post 2').length);
+  assert.ok(h.find(h.render(),n=>n.type==='Text'&&n.props.children==='Poll 1').length);
+  assert.ok(h.find(h.render(),n=>n.props?.accessibilityRole==='alert').length);
+});
+
+test('C: unknown hub failure can recover on retry',async()=>{
+  let fail=true;const h=env({api:{listHubs:async()=>{if(fail)throw Error('unknown hub');return [{key:'public',label:'Recovered',can_interact:false}];}}});
+  h.render();await h.tick();assert.ok(h.button('Retry'));fail=false;h.button('Retry').props.onPress();await h.tick();
+  assert.ok(h.find(h.render(),n=>n.type==='Text'&&n.props.children==='Recovered').length);
+});
+
+test('C: stale poll and post completions from the former account cannot replace the new feed',async()=>{
+  const oldPosts=deferred(),oldPolls=deferred();let account=1;
+  const h=env({api:{
+    listCommunityPosts:()=>account===1?oldPosts.promise:Promise.resolve(page([post(77)])),
+    listCommunityPolls:()=>account===1?oldPolls.promise:Promise.resolve(page([poll(77)])),
+  }});
+  h.render();await h.tick();account=2;h.changeUser({id:88,role:'EXPLORER'});h.render();await h.tick();
+  oldPosts.resolve(page([post(1)]));oldPolls.resolve(page([poll(1)]));await h.tick();
+  const tree=h.render();
+  assert.equal(h.find(tree,n=>n.type==='Text'&&n.props.children==='Post 77').length,1);
+  assert.equal(h.find(tree,n=>n.type==='Text'&&n.props.children==='Poll 77').length,1);
+  assert.equal(h.find(tree,n=>n.type==='Text'&&['Post 1','Poll 1'].includes(n.props.children)).length,0);
+});

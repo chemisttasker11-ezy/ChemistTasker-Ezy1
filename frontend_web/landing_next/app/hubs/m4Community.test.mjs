@@ -18,7 +18,7 @@ test('C: Next community uses public shared-core APIs for separate search and pol
   const compiled=ts.transpileModule(readFileSync(path,'utf8'),{fileName:path.pathname,
     compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,
       jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
-  const slots=[];let index=0;const effects=[];const queries={posts:[],polls:[]};
+  const slots=[];let index=0;const effects=[];const pending={};const queries={posts:[],polls:[]};
   const react={
     useState(initial){const i=index++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;
       return [slots[i],v=>{slots[i]=typeof v==='function'?v(slots[i]):v;}];},
@@ -30,7 +30,7 @@ test('C: Next community uses public shared-core APIs for separate search and pol
   react.default=react;
   const api={publicContent:{
     listHubs:async()=>[{key:'public',can_interact:false}],
-    listCommunityPosts:async(hub,q)=>{queries.posts.push([hub,q]);return{results:[],next:null,count:0};},
+    listCommunityPosts:async(hub,q)=>{queries.posts.push([hub,q]);if(q.q==='FIRST'||q.q==='SECOND')return new Promise((resolve,reject)=>{pending[q.q]={resolve,reject};});return{results:[],next:null,count:0};},
     listCommunityPolls:async(hub,q)=>{queries.polls.push([hub,q]);return{results:[{id:q?.page===2?13:1,
       question:'Poll '+(q?.page===2?13:1), options:[],can_interact:false,is_closed:false}],
       next:q?.page===2?null:'?page=2',count:13};},
@@ -92,4 +92,15 @@ test('C: Next community uses public shared-core APIs for separate search and pol
   assert.equal(queries.polls.at(-1)[1].page,2);
   assert.equal(queries.posts.at(-1)[1].q,'pharmacy roster');
   assert.equal(queries.posts.length,2,'poll page change must not reload discussions');
+  for(const word of ['FIRST','SECOND']) {
+    traverse(render(),n=>n.type==='input'&&n.props['aria-label']==='Search this group')[0].props.onChange({target:{value:word}});
+    traverse(render(),n=>n.type==='form'&&n.props.role==='search')[0].props.onSubmit({preventDefault(){}});
+    render();await flush();
+  }
+  const result=word=>({results:[{id:word,body:word}],next:null,count:1});
+  pending.SECOND.resolve(result('SECOND'));await flush();
+  pending.FIRST.resolve(result('FIRST'));await flush();
+  const entries=traverse(render(),n=>n.type==='PostEntry');
+  assert.equal(entries[0].props.post.body,'SECOND');
+
 });

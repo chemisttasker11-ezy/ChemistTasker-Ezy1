@@ -21,7 +21,34 @@ test('C: post search and page remain on public AllowAny URL, polls independently
   assert.equal(requests[0].url,
     '/api/v1/public-hub/community/pharmacist/posts/?page=2&q=Roster+%26+work');
   assert.equal(requests[1].url,'/api/v1/public-hub/community/pharmacist/polls/?page=3');
-  assert.ok(requests.every(x=>x.authorization===null),'public reads never send bearer');
+  assert.ok(requests.every(x=>x.authorization==='Bearer private-secret'),'signed-in public reads send bearer');
+  const anonymous=createChemistTaskerApi({baseUrl:'https://api.example.test/api/v1/',fetchImpl:fakeFetch});
+  const result=await anonymous.publicContent.listCommunityPosts('public');
+  assert.equal(requests[2].authorization,null);
+  assert.deepEqual(result.results,[]);
+});
+test('R: invalid bearer retries a public read once anonymously without refresh or logout',async()=>{
+  const headers:Array<string|null>=[];let refreshes=0,logouts=0;
+  const api=createChemistTaskerApi({baseUrl:'https://api.example.test/api/v1/',
+    getAuthToken:()=> 'expired',refreshAuthToken:()=>{refreshes++;return null;},onAuthFailure:()=>{logouts++;},
+    fetchImpl:async(_input,init)=>{const auth=new Headers(init?.headers).get('Authorization');headers.push(auth);
+      return auth?new Response('{}',{status:401}):new Response(JSON.stringify({results:[{id:1}]}),{headers:{'Content-Type':'application/json'}});}});
+  assert.deepEqual((await api.publicContent.listCommunityPosts('public')).results,[{id:1}]);
+  assert.deepEqual(headers,['Bearer expired',null]);
+  assert.equal(refreshes,0);assert.equal(logouts,0);
+});
+test('C: cookie public reads stay cookie-backed; a second 401 stops the bearer fallback',async()=>{
+  const calls:Array<{auth:string|null;credentials:RequestCredentials|undefined}>=[];let failures=0;
+  const fetchImpl:typeof fetch=async(_input,init)=>{calls.push({auth:new Headers(init?.headers).get('Authorization'),credentials:init?.credentials});
+    return new Response('{}',{status:401});};
+  const cookie=createChemistTaskerApi({baseUrl:'https://api.example.test/api/v1/',credentials:'include',fetchImpl});
+  await assert.rejects(cookie.publicContent.listHubs());
+  assert.deepEqual(calls,[{auth:null,credentials:'include'}]);
+  calls.length=0;
+  const bearer=createChemistTaskerApi({baseUrl:'https://api.example.test/api/v1/',getAuthToken:()=> 'bad',fetchImpl,onAuthFailure:()=>{failures++;}});
+  await assert.rejects(bearer.publicContent.listHubs());
+  assert.deepEqual(calls.map(x=>x.auth),['Bearer bad',null]);
+  assert.equal(failures,0);
 });
 test('C: vote submits option_id via authenticated shared core only',async()=>{
   const calls:Array<{url:string;body:string|null;authorization:string|null}>=[];
