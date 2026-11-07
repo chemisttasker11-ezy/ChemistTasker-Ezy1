@@ -113,7 +113,8 @@ export default function AddItemWizard() {
   // One receipt per draft, including retries after an uncertain create response.
   const createReceipt = useRef<string>(crypto.randomUUID());
   const durable = useRef<{ id: string; version: number; audienceCircle: string | null } | null>(null);
-  const uploaded = useRef(new Set<string>());
+  const uploaded = useRef(new Map<string, number | undefined>());
+  const removingPhoto = useRef(false);
   const completing = useRef(false);
   const generation = useRef(0);
   const account = String(session.user?.id ?? 'anonymous');
@@ -182,15 +183,27 @@ export default function AddItemWizard() {
     setPhotos((prev) => [...prev, ...newItems].slice(0, 6));
   }
 
-  function handlePhotoRemove(index: number) {
-    setPhotos((prev) => {
-      const target = prev[index];
-      if (target?.url) {
-        URL.revokeObjectURL(target.url);
-        photoUrls.current.delete(target.url);
+  async function handlePhotoRemove(index: number) {
+    const target = photos[index];
+    if (!target || removingPhoto.current) return;
+    removingPhoto.current = true;
+    setBusy(true);
+    try {
+      const id = uploaded.current.get(target.url);
+      if (uploaded.current.has(target.url)) {
+        if (id == null) throw new Error('This uploaded photo cannot be removed here.');
+        await marketplaceApi.deleteImage(id);
+        uploaded.current.delete(target.url);
       }
-      return prev.filter((_, i) => i !== index);
-    });
+      URL.revokeObjectURL(target.url);
+      photoUrls.current.delete(target.url);
+      setPhotos((prev) => prev.filter((item) => item !== target));
+    } catch (reason) {
+      setError((reason as Error).message || 'Unable to remove photo.');
+    } finally {
+      removingPhoto.current = false;
+      setBusy(false);
+    }
   }
 
   async function lookup() {
@@ -282,9 +295,9 @@ export default function AddItemWizard() {
         const formData = new FormData();
         formData.append('image', item.file);
         // Never swallow an upload failure or claim publication with missing photos.
-        await marketplaceApi.uploadImage(receipt.id, formData);
+        const image = await marketplaceApi.uploadImage(receipt.id, formData);
         if (!current()) return;
-        uploaded.current.add(item.url);
+        uploaded.current.set(item.url, image?.id);
       }
 
       let finalStatus = 'DRAFT';
@@ -666,7 +679,8 @@ export default function AddItemWizard() {
                       <button
                         type="button"
                         className={styles.photoRemove}
-                        onClick={() => handlePhotoRemove(idx)}
+                        disabled={busy}
+                        onClick={() => void handlePhotoRemove(idx)}
                         aria-label="Remove photo"
                       >
                         <X size={12} />
