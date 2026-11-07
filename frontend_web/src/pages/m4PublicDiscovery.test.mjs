@@ -14,7 +14,9 @@ function load(file,mocks,window={}) {
   }}).outputText;
   const module={exports:{}};
   vm.runInNewContext(code,{module,exports:module.exports,window,URL,URLSearchParams,Date,
-    console,setTimeout:fn=>{fn();return 1;},clearTimeout(){},
+    console,localStorage:window.localStorage||{},sessionStorage:window.sessionStorage||{},
+    CustomEvent:class{constructor(type,init){this.type=type;this.detail=init.detail;}},
+    setTimeout:fn=>{fn();return 1;},clearTimeout(){},
     require(id){if(!Object.prototype.hasOwnProperty.call(mocks,id))
       throw Error('Unmocked dependency '+id+' for '+file);
       const item=mocks[id];
