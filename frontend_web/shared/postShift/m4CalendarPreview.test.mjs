@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import dayjs from 'dayjs';
+// Each node:test process is isolated from external host time-zone assumptions.
+process.env.TZ = 'Australia/Brisbane';
 
 function execute(file, imports) {
   const source = readFileSync(new URL(file, import.meta.url), 'utf8');
@@ -117,31 +119,54 @@ test('R: recurrence projects each individual overnight event and editing retains
       [{slotIndex:0,occurrenceIndex:0},{slotIndex:0,occurrenceIndex:1},
        {slotIndex:1,occurrenceIndex:0}]);
     assert.equal(new Set(state.calendarEvents.map(x=>x.id)).size,3);
-    state.handleEditSlot(1);
+    // Selection must be routed through the clicked occurrence's actual source mapping.
+    const chosen = state.calendarEvents[1];
+    assert.deepEqual({ ...chosen.resource }, { slotIndex: 0, occurrenceIndex: 1 });
+    state.handleEditSlot(chosen.resource.slotIndex);
     const edited = host.render();
-    assert.equal(edited.slots.length,1);
-    assert.equal(edited.slotDate,'2026-07-12');
-    assert.equal(edited.slotStartTime,'09:00');
-    assert.equal(edited.slotEndTime,'17:00');
+    assert.equal(edited.slots.length, 1);
+    assert.equal(edited.slotDate, '2026-07-10');
+    assert.equal(edited.slotStartTime, '22:00');
+    assert.equal(edited.slotEndTime, '06:00');
+    assert.deepEqual(Array.from(edited.slots, x=>[x.date,x.startTime,x.endTime]),
+      [['2026-07-12','09:00','17:00']], 'other source slot is untouched');
+    edited.handleAddManualSlot();
+    const saved = host.render();
+    assert.equal(saved.slots.length, 2);
+    assert.equal(saved.slots[1].date, '2026-07-10');
+    assert.equal(saved.slots[1].startTime, '22:00');
+    assert.equal(saved.slots[1].endTime, '06:00');
   }));
-test('C: invalid values, equal clocks, year/month/leap rollovers and DST remain safe', () => {
-  assert.equal(posting.isValidShiftPostingTimeRange('22:00','22:00'),false);
-  assert.equal(posting.isValidShiftPostingTimeRange('22:00','06:00'),true);
-  for (const [zone, date, expected] of [
-    ['Australia/Brisbane','2026-12-31','2027-01-01T06:00'],
-    ['Australia/Brisbane','2028-02-29','2028-03-01T06:00'],
-    ['Australia/Sydney','2026-10-03','2026-10-04T06:00'],
-    ['Australia/Sydney','2026-04-04','2026-04-05T06:00'],
-  ]) inTimezone(zone,()=>{
-    const host=harness();host.render().setSlots([slot(date)]);
-    assert.equal(local(host.render().calendarEvents[0]).end,expected);
-  });
-  const host=harness();
-  host.render().setSlots([slot('not-a-date'),slot('2026-07-10','bogus','06:00'),
+test('C: posting validator rejects equal times and invalid clock/date entries do not crash the calendar', () => {
+  assert.equal(posting.isValidShiftPostingTimeRange('22:00','22:00'), false);
+  assert.equal(posting.isValidShiftPostingTimeRange('22:00','06:00'), true);
+  const host = harness();
+  host.render().setSlots([slot('not-a-date'), slot('2026-07-10','bogus','06:00'),
     slot('2026-07-10','09:00','09:00')]);
-  assert.equal(host.render().calendarEvents.length,0,
-    'invalid posted drafts may not crash toISOString or show misleading calendar events');
+  assert.equal(host.render().calendarEvents.length, 0);
 });
+
+test('R: calendar day rollover across December and leap dates', () =>
+  inTimezone('Australia/Brisbane', () => {
+    for (const [date, expected] of [
+      ['2026-12-31','2027-01-01T06:00'],
+      ['2028-02-29','2028-03-01T06:00'],
+    ]) {
+      const host = harness(); host.render().setSlots([slot(date)]);
+      assert.equal(local(host.render().calendarEvents[0]).end, expected);
+    }
+  }));
+
+test('R: DST spring-forward and fall-back preserve next calendar day 06:00, not a fixed duration', () =>
+  inTimezone('Australia/Sydney', () => {
+    for (const [date, expected] of [
+      ['2026-10-03','2026-10-04T06:00'],
+      ['2026-04-04','2026-04-05T06:00'],
+    ]) {
+      const host = harness(); host.render().setSlots([slot(date)]);
+      assert.equal(local(host.render().calendarEvents[0]).end, expected);
+    }
+  }));
 test('C: actual Vite owner/admin entry wrappers preserve the same shared PostShiftForm contract', () => {
   const jsx = (type, props) => ({ type, props });
   const hostImports = {
