@@ -22,8 +22,8 @@ import MobileInstallPrompt from './components/MobileInstallPrompt';
 import PublicRouteBridge from './components/PublicRouteBridge';
 function WebRoot(){return <PublicRouteBridge><App/><MobileInstallPrompt path={window.location.pathname} /></PublicRouteBridge>;}
 function ExplorerShiftBoardRedirect() {
-  const { search } = useLocation();
-  return <Navigate to={`/dashboard/explorer/shifts/public${search}`} replace />;
+  const { search, hash } = useLocation();
+  return <Navigate to={`/dashboard/explorer/shifts/public${search}${hash}`} replace />;
 }
 import RouteLoadingState from './components/ui/RouteLoadingState';
 import RouteErrorState from './components/RouteErrorState';
