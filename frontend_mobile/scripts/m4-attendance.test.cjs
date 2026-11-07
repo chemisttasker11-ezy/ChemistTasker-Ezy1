@@ -134,12 +134,9 @@ function screenHarness() {
       addTimesheetComment: async (...args) => { io.comments.push(args); },
     },
     canManageKioskDevices: () => false,
-    correctionTimestamp: (local, original, tz) => {
-      // A production helper is not mocked as the behavior under test.
-      // Caller tests assert the full payload; this is a fail-fast placeholder
-      // until the shared-core helper is loaded as a real module below.
-      throw Error('Use the production conversion helper, not a stub');
-    },
+    correctionTimestamp: fs.existsSync(path.join(root, '../shared-core/src/utils/correctionTimestamp.ts'))
+      ? load('../shared-core/src/utils/correctionTimestamp.ts', {}).correctionTimestamp
+      : () => { throw Error('Shared correction helper is absent on the red base'); },
   };
   const widgets = Object.fromEntries(
     ['ActionButtons', 'DataRow', 'EmptyState', 'Field', 'InfoNote', 'MetricGrid',
