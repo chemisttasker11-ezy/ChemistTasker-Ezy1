@@ -70,9 +70,8 @@ function talentHarness(reference='', role=null) {
   const registry=JSON.parse(fs.readFileSync(path.resolve(root,'../shared-core/skills_registry.json'),'utf8'));
   const talent=load('../shared-core/src/talent.ts', {'./domains/talent/api':{},'./utils/serialization':{}});
   const presentation=load('../shared-core/src/domains/talent/presentation.ts',{
-    '../../skills':load('../shared-core/src/skills.ts', {
-      './skills_registry.json':registry,
-    }),
+    '../../skills':load('../shared-core/src/skills.ts', {}),
+    '../onboarding/newcomer':load('../shared-core/src/domains/onboarding/newcomer.ts', {}),
   });
   const getPublicTalentFeed=async opts=>{
     calls.push({...opts});const item=queue.shift();
