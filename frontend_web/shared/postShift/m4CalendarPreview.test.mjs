@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
-import dayjs from 'dayjs';
-// Each node:test process is isolated from external host time-zone assumptions.
-process.env.TZ = 'Australia/Brisbane';
+// Set the test zone before importing dayjs or any production date modules.
+process.env.TZ ||= 'Australia/Brisbane';
+const { default: dayjs } = await import('dayjs');
 
 function execute(file, imports) {
   const source = readFileSync(new URL(file, import.meta.url), 'utf8');
