@@ -580,7 +580,8 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     let onboardingSkills: string[] = [];
     let inheritedAvailabilitySlots: PitchFormState["availabilitySlots"] = [];
     try {
-      const pending = await pendingStore?.read();
+      let storageFailed = false;
+      const pending = await pendingStore?.read().catch(() => { storageFailed = true; return null; });
       if (!isCurrent()) return;
       setPendingPitch(pending ?? null);
       if (pending && !pending.acknowledged) {
@@ -716,6 +717,10 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
       } else if (onboardingSkills.length > 0) {
         setPitchSkills(onboardingSkills);
       }
+      if (storageFailed && !mine) {
+        setPitchNeedsRecovery(true);
+        setPitchError("Browser storage is unavailable. Review your pitches before creating a new one.");
+      }
       setPitchReady(true);
     } catch (err: any) {
       if (!isCurrent()) return;
@@ -832,7 +837,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     setPitchSaving(true);
     setPitchError(null);
     try {
-      const pending = await pendingStore.read();
+      const pending = existingPostId ? null : await pendingStore.read();
       assertAccount();
       if (pending && (!pending.acknowledged || pending.resultId !== existingPostId)) {
         setPendingPitch(pending);
@@ -1238,7 +1243,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             const account = pitchAccount;
             await deleteExplorerPost(existingPostId);
             if (pitchAccountRef.current !== account) return;
-            const pending = await pendingStore?.read();
+            const pending = await pendingStore?.read().catch(() => null);
             if (pending?.acknowledged && pending.resultId === existingPostId) await pendingStore?.resolve(pending.key);
             if (pitchAccountRef.current !== account) return;
             setExistingPostId(null);

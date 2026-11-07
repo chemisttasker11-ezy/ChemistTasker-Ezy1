@@ -15,7 +15,7 @@ import {
   updateOnboardingForm,
 } from '@chemisttasker/shared-core';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Chip, IconButton, Text } from 'react-native-paper';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -393,6 +393,19 @@ export function TalentBoardInner({
   const [pitchSaving, setPitchSaving] = useState(false);
   const [pitchDeleting, setPitchDeleting] = useState(false);
   const [pitchError, setPitchError] = useState<string | null>(null);
+  const pitchAccount = JSON.stringify([getApiConfig().baseURL, user?.id, normalizedRole]);
+  const pitchAccountRef = useRef(pitchAccount);
+  const pitchAbortRef = useRef(new AbortController());
+  if (pitchAccountRef.current !== pitchAccount) {
+    pitchAbortRef.current.abort();
+    pitchAbortRef.current = new AbortController();
+  }
+  pitchAccountRef.current = pitchAccount;
+  useEffect(() => {
+    if (pitchAbortRef.current.signal.aborted) pitchAbortRef.current = new AbortController();
+    const controller = pitchAbortRef.current;
+    return () => controller.abort();
+  }, [pitchAccount]);
   const pendingStore = useMemo(() => user?.id != null ? mobilePendingPitchStore(getApiConfig().baseURL, user.id) : null, [user?.id]);
   const [pendingPitch, setPendingPitch] = useState<PendingPitch | null>(null);
   const [pendingError, setPendingError] = useState<string | null>(null);
@@ -406,7 +419,7 @@ export function TalentBoardInner({
     void pendingStore.read().then((intent) => {
       if (current) { setPendingPitch(intent); setPendingReady(true); }
     }).catch(() => {
-      if (current) setPendingError('Your saved pitch could not be read. Reopen this screen to retry.');
+      if (current) setPendingError('Your saved pitch could not be read. Review your pitches to recover.');
     });
     return () => { current = false; };
   }, [pendingStore]);
@@ -652,7 +665,7 @@ export function TalentBoardInner({
     if (saveInFlightRef.current || deleteInFlightRef.current || activeDeleteTokenRef.current !== null || deleteConfirmState.open) {
       return;
     }
-    if (!isMountedRef.current || !pendingStore || !pendingReady || pitchDefaultsReady.current !== `${user?.id}:${normalizedRole}`) return;
+    if (!isMountedRef.current || !pendingStore || (!existingPostId && !pendingReady) || pitchDefaultsReady.current !== `${user?.id}:${normalizedRole}`) return;
 
     saveInFlightRef.current = true;
     const currentSaveGen = ++saveGeneration.current;
@@ -729,7 +742,7 @@ export function TalentBoardInner({
         const intent = await pendingStore.acquire(payload, normalizedRole);
         if (!isCurrentSave()) return;
         setPendingPitch(intent);
-        await submitPendingPitch(pendingStore, intent, isCurrentSave);
+        await submitPendingPitch(pendingStore, intent, isCurrentSave, pitchAbortRef.current.signal);
         if (!isCurrentSave()) return;
         await pendingStore.resolve(intent.key);
         if (!isCurrentSave()) return;
@@ -778,7 +791,7 @@ export function TalentBoardInner({
     setPitchSaving(true);
     setPendingError(null);
     try {
-      if (!pendingPitch.terminalCode && !pendingPitch.rejected) await submitPendingPitch(pendingStore, pendingPitch, isCurrent);
+      if (!pendingPitch.terminalCode && !pendingPitch.rejected) await submitPendingPitch(pendingStore, pendingPitch, isCurrent, pitchAbortRef.current.signal);
       if (!isCurrent()) return;
       await pendingStore.resolve(pendingPitch.key);
       if (!isCurrent()) return;
@@ -788,6 +801,37 @@ export function TalentBoardInner({
       if (!isCurrent()) return;
       try { setPendingPitch(await pendingStore.read()); } catch {}
       if (isCurrent()) setPendingError(err?.message || 'Unable to finish your pitch. Please try again.');
+    } finally {
+      saveInFlightRef.current = false;
+      if (isCurrent()) setPitchSaving(false);
+    }
+  };
+
+  const reviewCorruptPitch = async () => {
+    if (!pendingStore || saveInFlightRef.current) return;
+    const account = pitchAccount;
+    const isCurrent = () => isMountedRef.current && pitchAccountRef.current === account;
+    saveInFlightRef.current = true;
+    setPitchSaving(true);
+    try {
+      const mine = await getExplorerPostForEditing();
+      if (!isCurrent()) return;
+      Alert.alert('Review my pitches', mine
+        ? 'A saved pitch was found. Confirm you have reviewed your pitches and want to recover.'
+        : 'No saved pitch was found. Confirm you have reviewed your pitches and want to start a new posting intention.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Confirm', onPress: () => { void (async () => {
+          if (!isCurrent()) return;
+          try {
+            await pendingStore.recoverCorruptAfterReview();
+            if (!isCurrent()) return;
+            const intent = await pendingStore.read();
+            if (isCurrent()) { setPendingPitch(intent); setPendingReady(true); setPendingError(null); }
+          } catch (err: any) { if (isCurrent()) setPendingError(err?.message || 'Unable to recover your saved pitch.'); }
+        })(); } },
+      ]);
+    } catch (err: any) {
+      if (isCurrent()) setPendingError(err?.message || 'Unable to review your pitches.');
     } finally {
       saveInFlightRef.current = false;
       if (isCurrent()) setPitchSaving(false);
@@ -980,6 +1024,7 @@ export function TalentBoardInner({
             <Text style={styles.subtitle} accessibilityLiveRegion="polite">
               {pendingError || (pendingPitch?.terminalCode === 'PITCH_DELETED' ? 'This pitch was deleted.' : pendingPitch?.terminalCode === 'IDEMPOTENCY_REPLAY_EXPIRED' ? 'This pitch retry has expired. Review your saved pitches before starting again.' : pendingPitch?.terminalCode ? 'This save key was used for a different pitch. Review your saved pitches before starting again.' : pendingPitch?.rejected ? 'The pitch was rejected. Review your saved pitches before starting again.' : 'A pitch save is waiting to finish. Retry to send the saved pitch.')}
             </Text>
+            {!pendingPitch && pendingError ? <Button mode="outlined" disabled={pitchSaving} onPress={() => void reviewCorruptPitch()}>Review my pitches</Button> : null}
             {pendingPitch ? <Button mode="outlined" disabled={pitchSaving} onPress={() => void finishPendingPitch()}>{pendingPitch.terminalCode || pendingPitch.rejected ? 'I have reviewed my pitches' : 'Finish saving pitch'}</Button> : null}
           </View>
         ) : null}

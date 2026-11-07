@@ -19,7 +19,7 @@ function existingHarness(file, marker, edits, exported) {
   // The modified InvoiceGenerate and PitchDialog must always come from __dirname.
   source = source.replace("path.join(directory, filename)", "filename === 'invoiceGeneration.ts' && !fs.existsSync(path.join(directory, filename)) ? path.join(harnessRoot, 'roles/shared/invoices', filename) : path.join(directory, filename)");
   source = source.replace("const indexPath = path.resolve(__dirname, '../roles/shared/talent-board/index.tsx');", "const candidateIndex = path.resolve(__dirname, '../roles/shared/talent-board/index.tsx'); const indexPath = fs.existsSync(candidateIndex) ? candidateIndex : path.join(harnessRoot, 'roles/shared/talent-board/index.tsx');");
-  const sandbox = { require: dependency, harnessRoot, __dirname, console, setImmediate, setTimeout, clearTimeout, FormData, structuredClone, exports: {} };
+  const sandbox = { require: dependency, harnessRoot, __dirname, console, setImmediate, setTimeout, clearTimeout, FormData, structuredClone, AbortController, exports: {} };
   vm.runInNewContext(source + `\nexports.result = ${exported};`, sandbox);
   return sandbox.exports.result;
 }

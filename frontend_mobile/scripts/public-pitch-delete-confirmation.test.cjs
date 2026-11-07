@@ -190,7 +190,7 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
       projectTalentSkills: () => ({ clinicalServices: [], dispenseSoftware: [], expandedScope: [], skills: [] }),
       resolveTalentBookingRole: () => 'PHARMACIST',
       newcomerTypeLabel: () => 'New to pharmacy',
-      createExplorerPost: async (payload) => createPostImplementation(payload),
+      createExplorerPost: async (...args) => createPostImplementation(...args),
       updateExplorerPost: async (id, payload) => updatePostImplementation(id, payload),
       deleteExplorerPost: async (id) => deleteServiceImplementation(id),
       fetchUserAvailabilityService: async () => availabilityImplementation(),
@@ -293,7 +293,7 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
     exports: dialogExports,
     require: customRequire,
     FormData: FormDataClass,
-    console, Date, String, Number, Boolean, Array, Object, Set, Map, RegExp, Promise, Error, TypeError, RangeError, setTimeout, clearTimeout,
+    console, Date, String, Number, Boolean, Array, Object, Set, Map, RegExp, Promise, Error, TypeError, RangeError, AbortController, setTimeout, clearTimeout,
   });
   vm.runInContext(dialogCompiled, dialogContext);
   const PitchDialogComponent = dialogContext.module.exports.default || dialogContext.module.exports;
@@ -315,7 +315,7 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
     exports: indexExports,
     require: customRequire,
     FormData: FormDataClass,
-    console, Date, String, Number, Boolean, Array, Object, Set, Map, RegExp, Promise, Error, TypeError, RangeError, setTimeout, clearTimeout,
+    console, Date, String, Number, Boolean, Array, Object, Set, Map, RegExp, Promise, Error, TypeError, RangeError, AbortController, setTimeout, clearTimeout,
   });
   vm.runInContext(indexCompiled, indexContext);
   const { TalentBoardInner, default: TalentBoardScreen } = indexContext.module.exports;
@@ -398,6 +398,7 @@ function createPitchHarness(initialUser = { id: 7001, role: 'PHARMACIST' }, init
     onboardingUpdateCalls,
     setOnboardingService: (fn) => { onboardingImplementation = fn; },
     setOnboardingUpdateService: (fn) => { onboardingUpdateImplementation = fn; },
+    corruptStorage: () => { storageData.set('talent.pitch.create:v1:' + JSON.stringify(['test', String(initialUser.id)]), 'bad'); },
     pendingStore: mocks['./pendingPitch'].mobilePendingPitchStore('test', initialUser.id),
     changeEditorPost: (newPost) => {
       currentPost = newPost;
@@ -1272,4 +1273,47 @@ test('onboarding 400 leaves an unrelated pending pitch intact', async () => {
   assert.equal(harness.onboardingUpdateCalls.length, 1);
   assert.equal(harness.createPostCalls.length, 0);
   assert.equal(harness.updatePostCalls.length, 0);
+});
+
+test('corrupt intent permits existing pitch update and deletion and offers reviewed recovery', async () => {
+  const h = createPitchHarness();
+  h.corruptStorage();
+  let tree = await h.mountWithPitch();
+  let dialog = h.findPitchDialog(tree);
+  await dialog.props.onSave();
+  assert.equal(h.updatePostCalls.length, 1);
+  tree = h.renderInner();
+  const review = h.walkTree(tree, n => n.props?.children === 'Review my pitches');
+  assert.ok(review);
+  review.props.onPress();
+  for (let i = 0; i < 30; i++) await Promise.resolve();
+  h.getAlertButtons().find(b => b.text === 'Confirm').onPress();
+  for (let i = 0; i < 30; i++) await Promise.resolve();
+  assert.equal(await h.pendingStore.read(), null);
+});
+
+test('account switch during create authentication aborts the old intent', async () => {
+  const h = createPitchHarness({ id: 7001, role: 'PHARMACIST' }, null);
+  let release, started;
+  const waiting = new Promise(r => { release = r; });
+  const entered = new Promise(r => { started = r; });
+  let completed = 0;
+  h.setCreatePostService(async (_payload, _key, signal) => { started(); await waiting; if (!signal?.aborted) completed++; return { id: 7 }; });
+  const dialog = h.findPitchDialog(await h.mountWithPitch());
+  const save = dialog.props.onSave();
+  await entered;
+  h.setCurrentUser({ id: 7002, role: 'PHARMACIST' });
+  h.renderInner(); await h.runEffects();
+  release(); await save;
+  assert.equal(completed, 0);
+});
+
+test('corrupt intent does not block deleting an existing pitch', async () => {
+  const h = createPitchHarness();
+  h.corruptStorage();
+  let dialog = h.findPitchDialog(await h.mountWithPitch());
+  dialog.props.onRequestDelete();
+  dialog = h.findPitchDialog(h.renderInner());
+  await dialog.props.onConfirmDelete();
+  assert.equal(h.deleteCalls.length, 1);
 });

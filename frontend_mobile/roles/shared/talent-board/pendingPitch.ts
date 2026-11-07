@@ -18,20 +18,18 @@ const lock: PitchIntentLock = async (name, run) => {
 export const mobilePendingPitchStore = (environment: string, userId: string | number) =>
   createPendingPitchStore(AsyncStorage, lock, pitchIntentScope(environment, userId), () => idempotencyKey() as `${string}-${string}-${string}-${string}-${string}`);
 
-export async function submitPendingPitch(store: ReturnType<typeof mobilePendingPitchStore>, intent: PendingPitch, isCurrent: () => boolean) {
+export async function submitPendingPitch(store: ReturnType<typeof mobilePendingPitchStore>, intent: PendingPitch, isCurrent: () => boolean, signal?: AbortSignal) {
   try {
-    return await sendPendingPitch(store, intent, isCurrent);
+    return await sendPendingPitch(store, intent, isCurrent, signal);
   } catch (error: any) {
     if (!isCurrent()) throw error;
     const detail = error?.payload ?? error?.response?.data ?? error?.data;
     const status = error?.status ?? error?.response?.status;
     const code = detail?.code;
     if ((status === 409 || status === 410) && ['IDEMPOTENCY_PAYLOAD_MISMATCH', 'PITCH_DELETED', 'IDEMPOTENCY_REPLAY_EXPIRED'].includes(code)) {
-      await store.reconcile(intent.key, code, detail?.post_id);
       const message = code === 'PITCH_DELETED' ? 'This pitch was deleted.' : code === 'IDEMPOTENCY_REPLAY_EXPIRED' ? 'This pitch retry has expired. Review your saved pitches before starting again.' : 'This save key was used for a different pitch. Review your saved pitches before starting again.';
       throw new Error(message);
     }
-    if (status === 400 && code !== 'IDEMPOTENCY_KEY_REQUIRED') await store.reject(intent.key);
     throw error;
   }
 }
