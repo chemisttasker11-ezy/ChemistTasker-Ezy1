@@ -32,6 +32,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   scopeRef.current = ownerScope;
   const loadGen = useRef(0);
   const historyGen = useRef(0);
+  const worksheetGen = useRef(0);
   const { invoice: invoiceParam } = useLocalSearchParams<{ invoice?: string | string[] }>();
   const linkedId = Array.isArray(invoiceParam) ? invoiceParam[0] : invoiceParam;
   const requestedInvoiceId = typeof linkedId === 'string' && /^[1-9]\d*$/.test(linkedId)
@@ -90,7 +91,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     setHistoryLoading(false); setHistoryError(''); setWorksheet(null);
     setError(''); setLoading(true);
     void load().catch(() => {});
-    return () => { loadGen.current += 1; historyGen.current += 1; };
+    return () => { loadGen.current += 1; historyGen.current += 1; csvGeneration.current += 1; worksheetGen.current += 1; };
   }, [load]);
   // Consume ?invoice= only after the authorized finance list has loaded. A
   // re-fetch or screen re-render must not reopen a dismissed review modal.
@@ -304,7 +305,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
           Export expenses CSV
         </Button>
         <Button icon="plus" onPress={() => expenseForm()} style={{ marginBottom: 16 }}>Create expense</Button>{expenses.filter(e => matches(e.supplier, e.description)).map(e => <Surface key={e.id} elevation={0} style={panel}><Text variant="titleMedium">{e.supplier}</Text><Text>{e.description}</Text><Text>{money(e.amount)} · {e.incurred_on}</Text><Text variant="bodySmall">{e.receipts.length} receipts · {e.paid_on ? 'Paid' : 'Unpaid'}</Text><Button onPress={() => expenseForm(e)}>Edit expense</Button></Surface>)}</>}
-      {tab === 'GST / BAS' && <View style={{ gap: 16 }}><Text variant="titleMedium">GST worksheet</Text><Text>Estimate only. Legacy invoices and unsupported adjustments are excluded; this is not a complete BAS.</Text><TextInput mode="outlined" label="Start (YYYY-MM-DD)" value={start} onChangeText={v => { setStart(v); setWorksheet(null); }} /><TextInput mode="outlined" label="End (YYYY-MM-DD)" value={end} onChangeText={v => { setEnd(v); setWorksheet(null); }} /><View style={{ flexDirection: 'row', gap: 8 }}>{(['cash', 'accrual'] as const).map(b => <Chip key={b} selected={basis === b} onPress={() => { setBasis(b); setWorksheet(null); }}>{b === 'cash' ? 'Cash' : 'Accrual'}</Chip>)}</View><Button mode="contained" disabled={busy} onPress={() => void run(async () => setWorksheet(await finance.worksheet(start, end, basis)))}>Calculate worksheet</Button>{worksheet && <>
+      {tab === 'GST / BAS' && <View style={{ gap: 16 }}><Text variant="titleMedium">GST worksheet</Text><Text>Estimate only. Legacy invoices and unsupported adjustments are excluded; this is not a complete BAS.</Text><TextInput mode="outlined" label="Start (YYYY-MM-DD)" value={start} onChangeText={v => { setStart(v); worksheetGen.current += 1; setWorksheet(null); }} /><TextInput mode="outlined" label="End (YYYY-MM-DD)" value={end} onChangeText={v => { setEnd(v); worksheetGen.current += 1; setWorksheet(null); }} /><View style={{ flexDirection: 'row', gap: 8 }}>{(['cash', 'accrual'] as const).map(b => <Chip key={b} selected={basis === b} onPress={() => { setBasis(b); worksheetGen.current += 1; setWorksheet(null); }}>{b === 'cash' ? 'Cash' : 'Accrual'}</Chip>)}</View><Button mode="contained" disabled={busy} onPress={() => void run(async () => { const request = ++worksheetGen.current; const result = await finance.worksheet(start, end, basis); if (request === worksheetGen.current) setWorksheet(result); })}>Calculate worksheet</Button>{worksheet && <>
           <Button mode="outlined" icon="file-delimited" disabled={csvBusy || loading} loading={csvBusy}
             onPress={() => void shareCsv('DRAFT-gst-worksheet.csv', worksheetCsvRows(worksheet))}>
             Export draft worksheet CSV

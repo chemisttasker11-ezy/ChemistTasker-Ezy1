@@ -153,7 +153,7 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def owned(self, request, pk, lock=False):
-        qs = Invoice.objects.select_related('customer', 'user').filter(user=request.user)
+        qs = Invoice.objects.select_related('customer', 'user').filter(user=request.user, request_key__isnull=False)
         if lock:
             qs = qs.select_for_update(of=('self',))
         return get_object_or_404(qs, pk=pk)

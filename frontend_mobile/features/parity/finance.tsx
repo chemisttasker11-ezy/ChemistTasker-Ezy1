@@ -297,11 +297,14 @@ export function ReceiptScreenInner({accountScope,receiptId,loading,error}:{accou
 function BasScreen() {
   const router=useRouter();
   const [start,setStart]=useState(`${financeToday().slice(0,4)}-01-01`),[end,setEnd]=useState(financeToday()),[basis,setBasis]=useState<'cash'|'accrual'>('cash'),[worksheet,setWorksheet]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const calculate=async()=>{setBusy(true);setError('');try{setWorksheet(await finance.worksheet(start,end,basis));}catch(e){setError(errorMessage(e));}finally{setBusy(false);}};
+  const worksheetGen=useRef(0);
+  useEffect(()=>()=>{worksheetGen.current+=1;},[]);
+  const invalidate=()=>{worksheetGen.current+=1;setWorksheet(null);};
+  const calculate=async()=>{const request=++worksheetGen.current;setBusy(true);setError('');try{const result=await finance.worksheet(start,end,basis);if(request===worksheetGen.current)setWorksheet(result);}catch(e){if(request===worksheetGen.current)setError(errorMessage(e));}finally{setBusy(false);}};
   return <ParityPage title="GST / BAS worksheet" subtitle="Estimate GST fields from supported ChemistTasker finance records." error={error}>
     <InfoNote title="Estimate only" tone="warning">DRAFT: Not a complete BAS. This worksheet is not a lodged BAS and may exclude legacy invoices or unsupported adjustments.</InfoNote>
     <Button mode="outlined" onPress={()=>router.push('/finance' as any)}>Open Finance workspace for draft CSV export</Button>
-    <Field label="Start (YYYY-MM-DD)" value={start} onChangeText={setStart}/><Field label="End (YYYY-MM-DD)" value={end} onChangeText={setEnd}/><ChoiceChips value={basis} onChange={v=>setBasis(v as any)} options={[{value:'cash',label:'Cash'},{value:'accrual',label:'Accrual'}]}/><Button mode="contained" loading={busy} onPress={()=>void calculate()}>Calculate worksheet</Button>
+    <Field label="Start (YYYY-MM-DD)" value={start} onChangeText={v=>{setStart(v);invalidate();}}/><Field label="End (YYYY-MM-DD)" value={end} onChangeText={v=>{setEnd(v);invalidate();}}/><ChoiceChips value={basis} onChange={v=>{setBasis(v as any);invalidate();}} options={[{value:'cash',label:'Cash'},{value:'accrual',label:'Accrual'}]}/><Button mode="contained" loading={busy} onPress={()=>void calculate()}>Calculate worksheet</Button>
     {worksheet?<><MetricGrid items={[{label:'G1',value:money(worksheet.G1)},{label:'1A',value:money(worksheet['1A'])},{label:'1B',value:money(worksheet['1B'])},{label:'Estimated GST net',value:money(worksheet.estimated_gst_net),tone:'primary'}]}/>
       <InfoNote title="Excluded legacy invoices">{String(worksheet.excluded_legacy_invoice_count||0)} legacy invoice(s) excluded. Review the warnings and evidence before any BAS lodgement.</InfoNote></>:null}
     {worksheet?.warnings?.length?<Section title="Warnings">{worksheet.warnings.map((w:string,i:number)=><DataRow key={i} title={w} status="Review"/>)}</Section>:null}

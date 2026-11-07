@@ -65,6 +65,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [reviewAction, setReviewAction] = useState<ReviewAction | null>(null);
   const [worksheet, setWorksheet] = useState<FinanceWorksheet | null>(null);
+  const worksheetGen = useRef(0);
   const [periodStart, setPeriodStart] = useState(`${Number(today().slice(0, 4)) - (Number(today().slice(5, 7)) < 7 ? 1 : 0)}-07-01`);
   const [periodEnd, setPeriodEnd] = useState(today()); const [basis, setBasis] = useState<'cash' | 'accrual'>('cash');
 
@@ -92,7 +93,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const linkNew = params.get('new');
   const linkKey = `${linkInvoice ?? ''}|${linkShift ?? ''}|${linkNew ?? ''}`;
   const linkRequest = useRef(0);
-  useEffect(() => () => { linkRequest.current += 1; }, []);
+  useEffect(() => () => { linkRequest.current += 1; worksheetGen.current += 1; }, []);
   const setLink = (link: { invoice?: string | number; shift?: string | number; new?: boolean } | null) => {
     const opening = Boolean(link);
     setParams(current => {
@@ -316,10 +317,10 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
           <Stack spacing={2.5}>
             <Alert severity="warning">A starting point only: not a full BAS, not lodged for you and not tax advice. Older invoices and unsupported adjustments are left out.</Alert>
             <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1.4fr auto' }, alignItems: 'center' }}>
-              <TextField type="date" label="Period start" InputLabelProps={{ shrink: true }} value={periodStart} onChange={event => { setPeriodStart(event.target.value); setWorksheet(null); }} />
-              <TextField type="date" label="Period end" InputLabelProps={{ shrink: true }} value={periodEnd} onChange={event => { setPeriodEnd(event.target.value); setWorksheet(null); }} />
-              <TextField select label="GST basis" value={basis} onChange={event => { setBasis(event.target.value as 'cash' | 'accrual'); setWorksheet(null); }}><MenuItem value="cash">Cash: payments received</MenuItem><MenuItem value="accrual">Accrual: invoices issued</MenuItem></TextField>
-              <Button variant="contained" disabled={busy} startIcon={busy ? <CircularProgress size={15} color="inherit" /> : undefined} onClick={() => void run(async () => setWorksheet(await finance.worksheet(periodStart, periodEnd, basis)))}>Calculate</Button>
+              <TextField type="date" label="Period start" InputLabelProps={{ shrink: true }} value={periodStart} onChange={event => { setPeriodStart(event.target.value); worksheetGen.current += 1; setWorksheet(null); }} />
+              <TextField type="date" label="Period end" InputLabelProps={{ shrink: true }} value={periodEnd} onChange={event => { setPeriodEnd(event.target.value); worksheetGen.current += 1; setWorksheet(null); }} />
+              <TextField select label="GST basis" value={basis} onChange={event => { setBasis(event.target.value as 'cash' | 'accrual'); worksheetGen.current += 1; setWorksheet(null); }}><MenuItem value="cash">Cash: payments received</MenuItem><MenuItem value="accrual">Accrual: invoices issued</MenuItem></TextField>
+              <Button variant="contained" disabled={busy} startIcon={busy ? <CircularProgress size={15} color="inherit" /> : undefined} onClick={() => void run(async () => { const request = ++worksheetGen.current; const result = await finance.worksheet(periodStart, periodEnd, basis); if (request === worksheetGen.current) setWorksheet(result); })}>Calculate</Button>
             </Box>
             {worksheet && <>
               <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 1, columnGap: 2, maxWidth: 520 }}>
