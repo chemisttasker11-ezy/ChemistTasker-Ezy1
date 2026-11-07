@@ -67,11 +67,13 @@ export function canPublishTalent(
 export async function loadAllTalentPages<T>(
   fetchPage: (page: number) => Promise<TalentPage<T>>,
   concurrency = 4,
+  onPage?: (rows: readonly T[]) => void,
 ): Promise<T[]> {
   const first = await fetchPage(1);
-  if (Array.isArray(first)) return first;
+  if (Array.isArray(first)) { onPage?.(first); return first; }
 
   const rows = Array.isArray(first?.results) ? [...first.results] : [];
+  onPage?.(rows.slice());
   if (!rows.length) return rows;
 
   const count = Number(first.count ?? rows.length);
@@ -89,6 +91,7 @@ export async function loadAllTalentPages<T>(
     );
     for (const page of pages) {
       rows.push(...(Array.isArray(page) ? page : page.results ?? []));
+      onPage?.(rows.slice());
     }
   }
 

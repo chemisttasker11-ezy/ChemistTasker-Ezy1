@@ -51,18 +51,24 @@ export default function PublicTalentBoard() {
     try {
       // Server has no role/skill/date query support. Fetch the entire public
       // collection BEFORE filtering, as both web Talent Boards already do.
+      const publish = (raw: readonly any[], isComplete: boolean) => {
+        if (request !== generation.current || scopeRef.current !== scope) return;
+        const projected = raw.map(post => projectPublicTalentCandidate(
+          post as Record<string, unknown>, registry as any));
+        const unique = new Map(projected.filter(item =>
+          Number.isSafeInteger(item.id) && item.id > 0).map(item => [item.id, item]));
+        const visible = Array.from(unique.values());
+        setRows(referenceCode
+          ? visible.filter(item => item.referenceCode === referenceCode ||
+            item.refId === referenceCode) : visible);
+        if (isComplete) setComplete(true);
+      };
+      // Preserve confirmed page-one rows when a later page fails. The
+      // complete flag prevents presenting a partial filter as "no results".
       const raw = await loadAllTalentPages((page: number) =>
-        getPublicTalentFeed({ page, page_size: 200 }));
-      if (request !== generation.current || scopeRef.current !== scope) return;
-      const projected = raw.map(post => projectPublicTalentCandidate(
-        post as Record<string, unknown>, registry as any));
-      const unique = new Map(projected.filter(item =>
-        Number.isSafeInteger(item.id) && item.id > 0).map(item => [item.id, item]));
-      const visible = Array.from(unique.values());
-      setRows(referenceCode
-        ? visible.filter(item => item.referenceCode === referenceCode ||
-          item.refId === referenceCode) : visible);
-      setComplete(true);
+        getPublicTalentFeed({ page, page_size: 200 }), 1,
+        partial => publish(partial, false));
+      publish(raw, true);
     } catch (failure: any) {
       if (request === generation.current && scopeRef.current === scope) {
         setError(failure?.message || 'Public talent could not load completely. Retry to search all pages.');
@@ -142,7 +148,7 @@ export default function PublicTalentBoard() {
       <Button mode="outlined" onPress={() => {setFilters(clear);setPage(1);}}>Clear filters</Button>
       {loading && !rows.length ? <ActivityIndicator /> : null}
       {error ? <View style={styles.status}><Text accessibilityRole="alert" style={styles.error}>{error}</Text>
-        <Button onPress={() => void load()}>Retry all pages</Button></View> : null}
+        <Button onPress={() => void load()}>Load more talent</Button></View> : null}
       {complete ? <Text style={styles.muted}>{filtered.filtered.length} public candidates</Text> : null}
       {shown.map(item => <Card key={item.id} mode="outlined" style={styles.card}>
         <Card.Content style={styles.cardBody}>
