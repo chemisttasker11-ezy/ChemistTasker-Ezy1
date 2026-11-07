@@ -101,7 +101,9 @@ function screenHarness() {
   const env = { screen: 'reviews', user: { id: 5, role: 'PHARMACIST', admin_assignments: [
     { pharmacy_id: 11, admin_level: 'ROSTER_MANAGER', capabilities: ['MANAGE_ROSTER'] },
   ] }, pharmacy: 11, adminPharmacy: 11, params: {}, pathname: '/attendance/reviews' };
-  const io = { pending: [], timeline: [], correct: [], missing: [], comments: [], navigations: [] };
+  const io = { pending: [], pendingRows: [], pendingReplies: [], timeline: [],
+    timelineReplies: [], correct: [], approve: [], reject: [],
+    approveReply: null, rejectReply: null, missing: [], comments: [], navigations: [] };
   const engine = hooks();
   // Inject the actual shared-core policy, not a test-owned permission algorithm.
   const capabilityPolicy = load('../shared-core/src/policy/accessPolicy.ts', {
@@ -119,16 +121,29 @@ function screenHarness() {
     : {};
   const api = {
     attendance: {
-      getManagerPending: async id => { io.pending.push(id); return []; },
+      getManagerPending: async id => {
+        io.pending.push(id);
+        const next = io.pendingReplies.shift();
+        return next ? await next.promise : io.pendingRows;
+      },
       getManagerTimeline: async id => {
         io.timeline.push(id);
+        const reply = io.timelineReplies.shift();
+        if (reply) return await reply.promise;
         return { session_id: id, pharmacy_id: env.pharmacy,
           pharmacy_timezone: 'Australia/Perth', timeline: [
             { event_id: 22, effective_timestamp: '2026-07-10T00:00:00.000Z' },
           ] };
       },
       correct: async (...args) => { io.correct.push(args); return { status: 'CORRECTED' }; },
-      approve: async () => ({}), reject: async () => ({}),
+      approve: async (...args) => {
+        io.approve.push(args);
+        return io.approveReply ? await io.approveReply.promise : {};
+      },
+      reject: async (...args) => {
+        io.reject.push(args);
+        return io.rejectReply ? await io.rejectReply.promise : {};
+      },
       getWorkerStatus: async () => ({ has_active_session: false }),
       getWorkerCoverTerms: async () => [], getPinPharmacies: async () => ({ pharmacies: [] }),
     },
@@ -284,4 +299,193 @@ test('R roster-only admin has actionable Attendance approvals and Roster entries
   const staffOnly = child.type(child.props);
   const staffVisible = staffOnly.props.more.flatMap(group => group.items.filter(item => !item.hidden));
   assert.equal(staffVisible.some(item => item.label === 'Attendance approvals'), false);
+});
+
+
+const deferred = () => {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+};
+function approvedReview(h) {
+  h.env.user = { id: 11, role: 'OWNER',
+    memberships: [{ pharmacy_id: 11, role: 'OWNER' }] };
+  h.env.pharmacy = 11;
+  h.env.screen = 'review-decision';
+  h.env.params = { id: '7', sessionId: '78' };
+  h.io.pendingRows = [{ provisional_id: 7, session_id: 78,
+    worker_name: 'Ali', worker_email: 'ali@example.test',
+    cover_type: 'UNROSTERED_LOCAL', status: 'PENDING',
+    started_at: '2026-07-10T00:00:00Z' }];
+}
+async function reviewTree(h) { await h.render(); return await h.render(); }
+const action = (tree, label) => {
+  const button = tree.find(node => node.type === 'Button' &&
+    String(node.props.children).includes(label));
+  assert.ok(button, 'real review decision action ' + label);
+  return button;
+};
+
+test('R: live pharmacy switch while A timeline is pending cannot load or reveal A data at B', async () => {
+  const h = screenHarness();
+  approvedReview(h);
+  h.env.screen = 'review-detail';
+  const old = deferred();
+  h.io.timelineReplies.push(old);
+  await h.render();
+  assert.deepEqual(h.io.timeline, [78], 'A timeline must have started before switching');
+  // No unmount: the actual mounted screen changes workspace to unauthorized B.
+  h.env.pharmacy = 12;
+  h.env.adminPharmacy = 12;
+  let tree = await h.render();
+  assert.deepEqual(h.io.pending, [11], 'the B branch must not contact manager endpoints');
+  assert.deepEqual(h.io.timeline, [78], 'B must never start a manager timeline');
+  assert.ok(tree.some(node => node.type === 'InfoNote' &&
+    node.props.title === 'No attendance management access'), 'B displays scoped access denial');
+  old.resolve({ session_id: 78, pharmacy_id: 11,
+    pharmacy_timezone: 'Australia/Perth', timeline: [
+      { event_id: 9001, event_type: 'CLOCK_IN', effective_timestamp: '2026-07-10T00:00:00Z' },
+    ] });
+  await h.engine.settle();
+  tree = await h.render();
+  assert.ok(!tree.some(node => node.type === 'DataRow' &&
+    String(node.props.title).includes('CLOCK_IN')), 'late A event must not appear in B');
+  assert.deepEqual(h.io.pending, [11]);
+  h.engine.unmount();
+});
+
+for (const [name, role, memberships, assignments] of [
+  ['Ali', 'OTHER_STAFF', [{ pharmacy_id: 11, role: 'TECHNICIAN' }], []],
+  ['Mia', 'OTHER_STAFF', [{ pharmacy_id: 11, role: 'ASSISTANT' }], []],
+  ['Jack', 'OTHER_STAFF', [{ pharmacy_id: 11, role: 'INTERN' }], []],
+  ['Zoe', 'EXPLORER', [], []],
+]) {
+  test('C: ' + name + ' does not acquire manager pending or timeline authority', async () => {
+    const h = screenHarness();
+    h.env.user = { id: 100 + name.length, role,
+      memberships, admin_assignments: assignments };
+    h.env.screen = 'review-detail';
+    h.env.params = { id: '7', sessionId: '78' };
+    await h.render();
+    const tree = await h.render();
+    assert.deepEqual(h.io.pending, []);
+    assert.deepEqual(h.io.timeline, []);
+    assert.ok(tree.some(node => node.type === 'InfoNote' &&
+      node.props.title === 'No attendance management access'));
+    h.engine.unmount();
+  });
+}
+test('R: Sara communications-only delegate has no MANAGE_ROSTER access', async () => {
+  const h = screenHarness();
+  h.env.user = { id: 106, role: 'PHARMACIST', admin_assignments: [{
+    pharmacy_id: 11, admin_level: 'COMMUNICATION_MANAGER',
+    capabilities: ['MANAGE_COMMUNICATIONS'],
+  }] };
+  h.env.screen = 'review-detail';
+  h.env.params = { id: '7', sessionId: '78' };
+  await h.render();
+  const tree = await h.render();
+  assert.deepEqual(h.io.pending, [], 'a communications delegation cannot call manager pending');
+  assert.deepEqual(h.io.timeline, [], 'a communications delegation cannot call manager timeline');
+  assert.ok(tree.some(node => node.type === 'InfoNote' &&
+    node.props.title === 'No attendance management access'));
+  h.engine.unmount();
+});
+
+test('R: blank rejection is refused by real decision handler without a server call', async () => {
+  const h = screenHarness();
+  approvedReview(h);
+  let tree = await reviewTree(h);
+  const button = action(tree, 'Reject');
+  assert.equal(button.props.disabled, true, 'blank reject reason blocks the action');
+  button.props.onPress();
+  await h.engine.settle();
+  tree = await h.render();
+  assert.deepEqual(h.io.reject, [], 'even a programmatic press cannot bypass blank-reason validation');
+  assert.ok(tree.some(node => node.type === 'ParityPage' &&
+    /rejection reason is required/i.test(String(node.props.error))),
+    'render the rejection explanation');
+  h.engine.unmount();
+});
+
+test('R: invalid pharmacy-local calendar date never reaches correction event API', async () => {
+  const h = screenHarness();
+  h.env.user = { id: 11, role: 'OWNER',
+    memberships: [{ pharmacy_id: 11, role: 'OWNER' }] };
+  h.env.screen = 'correction';
+  h.env.params = { eventId: '22', sessionId: '78' };
+  let tree = await h.render(); tree = await h.render();
+  h.find(tree, 'Field', 'Corrected date/time').props.onChangeText('2026-13-40T09:00');
+  h.find(tree, 'Field', 'Reason').props.onChangeText('Confirmed offline correction');
+  tree = await h.render();
+  action(tree, 'Save correction').props.onPress();
+  await h.engine.settle();
+  tree = await h.render();
+  assert.deepEqual(h.io.correct, [], 'invalid date cannot be converted or posted');
+  assert.ok(tree.some(node => node.type === 'ParityPage' &&
+    /valid pharmacy-local date/i.test(String(node.props.error))),
+    'invalid date reports recoverable validation feedback');
+  h.engine.unmount();
+});
+
+test('R: same-render double tap makes exactly one approve call and one navigation', async () => {
+  const h = screenHarness();
+  approvedReview(h);
+  const pending = deferred();
+  h.io.approveReply = pending;
+  const tree = await reviewTree(h);
+  const button = action(tree, 'Approve & backfill');
+  button.props.onPress();
+  button.props.onPress();
+  assert.equal(h.io.approve.length, 1, 'synchronous mutex prevents two writes from same render');
+  pending.resolve({ status: 'APPROVED' });
+  await new Promise(setImmediate);
+  await h.render();
+  assert.deepEqual(h.io.navigations, ['/attendance/reviews']);
+  h.engine.unmount();
+});
+
+test('C: failed approval exposes reason and retry succeeds on same review', async () => {
+  const h = screenHarness();
+  approvedReview(h);
+  const refused = deferred();
+  h.io.approveReply = refused;
+  let tree = await reviewTree(h);
+  action(tree, 'Approve & backfill').props.onPress();
+  refused.reject(new Error('Temporary network failure'));
+  await new Promise(setImmediate);
+  tree = await h.render();
+  assert.ok(tree.some(node => node.type === 'ParityPage' &&
+    /temporary network failure/i.test(String(node.props.error))),
+    'server rejection remains visible without leaving review');
+  assert.deepEqual(h.io.navigations, []);
+  h.io.approveReply = null;
+  action(tree, 'Approve & backfill').props.onPress();
+  await new Promise(setImmediate);
+  await h.render();
+  assert.equal(h.io.approve.length, 2);
+  assert.deepEqual(h.io.navigations, ['/attendance/reviews']);
+  h.engine.unmount();
+});
+
+test('R: old-account approval completion cannot navigate the new account', async () => {
+  const h = screenHarness();
+  approvedReview(h);
+  const pending = deferred();
+  h.io.approveReply = pending;
+  let tree = await reviewTree(h);
+  action(tree, 'Approve & backfill').props.onPress();
+  assert.equal(h.io.approve.length, 1, 'old receipt must actually be pending');
+  // Simulate React removing the old keyed child at the account boundary.
+  h.engine.unmount();
+  h.env.user = { id: 88, role: 'OTHER_STAFF', memberships: [] };
+  h.env.pharmacy = 12;
+  tree = await h.render();
+  assert.ok(tree.some(node => node.type === 'InfoNote' &&
+    node.props.title === 'No attendance management access'));
+  pending.resolve({ status: 'APPROVED' });
+  await new Promise(setImmediate);
+  tree = await h.render();
+  assert.deepEqual(h.io.navigations, [], 'previous account must not navigate the current shell');
+  h.engine.unmount();
 });
