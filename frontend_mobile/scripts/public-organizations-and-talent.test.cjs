@@ -15,7 +15,7 @@ const {talentHarness,datum,collect} = require('./m4-discovery-behaviour.cjs');
 test('C native public talent browsing consumes all public pages, preserves QR scope and gates contact',async()=>{
   const app=talentHarness('REF-22');
   app.queue.push({count:2,next:'/api/v1/explorer-posts/public-feed/?page=2',results:[datum(11)]});
-  app.queue.push({count:2,next:null,results:[datum(22,{role_title:'Pharmacist'})]});
+  app.queue.push({count:2,next:null,results:[datum(22,{role_title:'Pharmacist',phone_number:'Personal phone 0412345678',date_of_birth:'Private date of birth 1990-01-01'})]});
   const tree=await app.render();
   assert.deepEqual(app.calls.map(x=>x.page),[1,2],
     'the public list fetches every page using the real shared-core loader');

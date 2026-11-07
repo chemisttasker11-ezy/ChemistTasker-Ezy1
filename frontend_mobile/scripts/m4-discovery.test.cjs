@@ -287,7 +287,7 @@ test('R #1 actual native role/state/work/skill/date/travel/placement filters fin
     assert.ok(input,label);input.onChangeText(value);tree=await h.render();
   }
   assert.equal(collect(tree,'Card').length,1,'only the second-page matching candidate remains');
-  const count=collect(tree,'Text').map(p=>String(p.children)).join(' ');
+  const count=collect(tree,'Text').map(p=>Array.isArray(p.children) ? p.children.join('') : String(p.children)).join(' ');
   assert.match(count,/1 public candidates/);
   collect(tree,'Button').find(p=>p.children==='Clear filters').onPress();
   tree=await h.render();
@@ -296,7 +296,7 @@ test('R #1 actual native role/state/work/skill/date/travel/placement filters fin
   h.host.unmount();
 });
 
-test('C #3 stale account response cannot overwrite new account, even on success', async()=>{
+test('R #3 stale account response cannot overwrite new account, even on success', async()=>{
   const h=boardHarness(), old=deferred();
   h.pages.push(old);
   let tree=await h.render();
@@ -312,7 +312,7 @@ test('C #3 stale account response cannot overwrite new account, even on success'
   h.host.unmount();
 });
 
-test('C #3 same-render retry has one pending request and invalid next URL is never fetched',async()=>{
+test('R #3 same-render retry has one pending request and invalid next URL is never fetched',async()=>{
   const h=boardHarness();
   h.pages.push(Error('Initial public outage'));
   let tree=await h.render();

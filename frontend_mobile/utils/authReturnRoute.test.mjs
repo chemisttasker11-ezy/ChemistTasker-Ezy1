@@ -169,7 +169,7 @@ test('R #2 QR reference survives native login return while unsafe query values a
   assert.equal(sanitizeReturnTo(qr),
     '/explore/talent-board?reference_code=BEN.PUBLIC-77&source=qr');
   assert.equal(sanitizeReturnTo('/explore/talent-board?reference_code=//evil.com'),
-    '/explore/talent-board');
+    null);
   assert.equal(sanitizeReturnTo('/explore/talent-board?reference_code=FOO%0Abar'),
     '/explore/talent-board');
   for(const bad of ['https://evil.test/explore/talent-board?reference_code=BEN.PUBLIC-77',

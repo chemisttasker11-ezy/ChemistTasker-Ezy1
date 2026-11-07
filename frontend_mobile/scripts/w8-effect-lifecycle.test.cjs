@@ -45,7 +45,7 @@ test('C W8 unaffected public hosts retain the original deferred effect cancellat
     "app/explore/organization/[slug].tsx",
   ]){
     const src=read(file);
-    assert.match(src,/Promise\\.resolve\\(\\)\\.then\\(\\(\\) => \\{ if \\(active\\) void load\\(\\); \\}\\)/);
+    assert.match(src,/Promise\.resolve\(\)\.then\(\(\) => \{ if \(active\) void load\(\); \}\)/);
     assert.match(src,/active = false/);
   }
 });

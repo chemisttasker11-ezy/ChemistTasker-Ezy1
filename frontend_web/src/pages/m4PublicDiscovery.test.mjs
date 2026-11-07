@@ -7,13 +7,13 @@ import ts from 'typescript';
 const repo = new URL('../../../', import.meta.url);
 const jsx = (type,props,key)=>({type,props:props||{},key});
 function load(file,mocks,window={}) {
-  const source=fs.readFileSync(new URL(file,repo),'utf8');
+  const source=fs.readFileSync(new URL(file.startsWith('shared-core/') ? file : 'frontend_web/'+file,repo),'utf8');
   const code=ts.transpileModule(source,{fileName:file,compilerOptions:{
     module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,
     jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true,
   }}).outputText;
   const module={exports:{}};
-  vm.runInNewContext(code,{module,exports:module.exports,window,URL,URLSearchParams,Date,
+  vm.runInNewContext(code,{module,exports:module.exports,window,URL,URLSearchParams,Date,AbortController,
     console,localStorage:window.localStorage||{},sessionStorage:window.sessionStorage||{},
     CustomEvent:class{constructor(type,init){this.type=type;this.detail=init.detail;}},
     setTimeout:fn=>{fn();return 1;},clearTimeout(){},
@@ -35,6 +35,7 @@ function hooks() {
   const values=[], effects=[];let index=0;
   const equal=(a,b)=>!!a&&!!b&&a.length===b.length&&a.every((x,i)=>x===b[i]);
   const react={
+    lazy:()=> 'LazyComponent',
     useState(init){const i=index++;if(!(i in values))values[i]={value:typeof init==='function'?init():init};
       return [values[i].value,next=>{values[i].value=typeof next==='function'?next(values[i].value):next;}];},
     useRef(init){const i=index++;return values[i]||={current:init};},
@@ -97,7 +98,7 @@ test('C #2/#7 Vite public TalentBoard entry loads all authorized pages before QR
   const h=mount(false),tree=await h.render(),board=nodes(tree,'TalentBoard')[0];
   assert.ok(board,'real Vite entry mounts the talent board');
   assert.deepEqual(h.requests,[1,2]);
-  assert.deepEqual(board.externalPosts.map(p=>p.id),[22]);
+  assert.deepEqual(Array.from(board.externalPosts,p=>p.id),[22]);
   assert.equal(board.externalPosts[0].referenceCode,'REF-22');
   assert.equal(board.publicMode,true);
   assert.equal(typeof board.onRequireLogin,'function');
@@ -108,7 +109,7 @@ test('C #2/#7 migrated Next public TalentBoard entry preserves QR and safe login
   const h=mount(true),tree=await h.render(),board=nodes(tree,'TalentBoard')[0];
   assert.ok(board,'real migrated entry mounts the talent board');
   assert.deepEqual(h.requests,[1,2]);
-  assert.deepEqual(board.externalPosts.map(p=>p.id),[22]);
+  assert.deepEqual(Array.from(board.externalPosts,p=>p.id),[22]);
   const login=nodes(tree,'Button').find(p=>String(p.to).includes('/login?next='));
   assert.ok(login);
   assert.match(decodeURIComponent(login.to),/reference_code=REF-22/);
@@ -135,7 +136,7 @@ function mountedTalentBoard(next) {
   const material=Object.fromEntries(['Alert','Box','Button','Chip','Divider','Drawer',
     'IconButton','Paper','Stack','Pagination','Typography','Dialog',
     'InputAdornment','TextField'].map(x=>[x,x]));
-  const core={...presentation,...talent, normalizeVerification:()=>null,
+  const core={...presentation,...talent, getApiConfig:()=>({}), normalizeVerification:()=>null,
     newcomerTypeLabel:()=>null,getRatingsSummary:async()=>({average:0,count:0}),
     canPublishTalent:()=>false};
   const mocks={
@@ -247,14 +248,14 @@ function realLogin(next, rawNext, verified=true) {
   const component=load(next?'landing_next/migrated/pages/login.tsx':
     'src/pages/login.tsx',mocks,window).default;
   return {
-    navigations,ui,
+    navigations,ui,window,sessionStore,storage,
     async submit(){
       let tree=await ui.render(component);
       for(const [label,value] of [['Email','worker@example.test'],['Password','secret']]){
         const input=nodes(tree,'TextField').find(p=>p.label===label);
         assert.ok(input,label);
         input.onChange({target:{value}});
-        tree=ui.render(component);
+        tree=await ui.render(component);
       }
       const form=nodes(tree,'form')[0];
       assert.ok(form,'real login form is mounted');
@@ -286,3 +287,31 @@ test('R #5 Next pending mobile verification wins over a public QR next redirect'
   await app.submit();
   assert.deepEqual(app.navigations,['/mobile-verify']);
 });
+
+test('R #2 Vite QR next survives mobile verification and resumes after success',async()=>{
+  const destination='/talent/public-board?reference_code=REF-22';
+  const app=realLogin(false,destination,false);
+  await app.submit();
+  assert.deepEqual(app.navigations,['/mobile-verify']);
+  app.window.location.search='';
+  const browser=load('landing_next/shared/browser-session.ts',{},app.window);
+  const ui=hooks();
+  const verify=load('src/pages/MobileOTPVerify.tsx',{
+    react:ui.react,'react/jsx-runtime':{jsx,jsxs:jsx},
+    '@chemisttasker/shared-core':{canSkipOverseasMobileCheck:()=>false},
+    'react-router-dom':{Link:'Link'},
+    '@mui/material':Object.fromEntries(['TextField','Button','Box','CircularProgress','Alert','Link','Typography','Stack'].map(x=>[x,x])),
+    '../layouts/AuthLayout':{default:'AuthLayout'},'../components/PublicLogoTopBar':{default:'PublicLogoTopBar'},
+    '../utils/browserMobileOtp':{verifyBrowserMobileOtp:async()=>({user:{role:'EXPLORER'}})},
+    '../contexts/AuthContext':{useAuth:()=>({user:{role:'EXPLORER'},setUser(){},login(){}})},
+    '../utils/dashboardPath':{resolveDashboardPath:()=>'/dashboard/explorer/overview'},
+    '../../landing_next/shared/browser-session':browser,
+  },app.window).default;
+  const tree=await ui.render(verify);
+  const form=nodes(tree,'form').find(p=>typeof p.onSubmit==='function');
+  assert.ok(form,'verification form');
+  await form.onSubmit({preventDefault(){}});
+  assert.deepEqual(app.navigations,['/mobile-verify',destination]);
+  assert.equal(app.sessionStore.getItem('ct:return-to'),null,'consumed destination is cleared');
+});
+
