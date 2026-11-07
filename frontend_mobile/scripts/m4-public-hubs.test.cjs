@@ -50,7 +50,7 @@ function env(overrides={}) {
   react.default=react;
   const mocks={
     react, 'react/jsx-runtime':{jsx:element,jsxs:element},
-    'expo-document-picker':{getDocumentAsync:async()=>({canceled:true})},
+    'expo-document-picker':{getDocumentAsync:overrides.pickDocument|| (async()=>({canceled:true}))},
     'react-native':{ScrollView:'ScrollView',Share:{share:async()=>{}},StyleSheet:{create:v=>v},View:'View'},
     'expo-router':{useLocalSearchParams:()=>({hub}),useRouter:()=>({push(){},replace(){},canGoBack:()=>false})},
     'react-native-paper':{Button:'Button',Card:Object.assign('Card',{Content:'CardContent'}),
@@ -65,7 +65,8 @@ function env(overrides={}) {
       radius:{card:2},space:{lg:4,md:3,sm:2,'3xl':12},touch:{min:44}},
   };
   const mod={exports:{}};
-  vm.runInNewContext(output,{exports:mod.exports,module:mod,URL,URLSearchParams,FormData,
+  class TestFormData { constructor(){this.entries=[];} append(name,value){this.entries.push([name,value]);} }
+  vm.runInNewContext(output,{exports:mod.exports,module:mod,URL,URLSearchParams,FormData:TestFormData,
     Promise,console,require(name) {
       if(!(name in mocks)) throw Error('Unmocked '+name);
       const m=mocks[name];
@@ -337,5 +338,43 @@ for (const outcome of ['succeeds', 'rejects']) {
     newChoice.props.onPress();await h.tick();
     assert.deepEqual(votes,[[1,10],[77,770]],'new hub vote sends its own poll and option');
     assert.equal(h.find(h.render(),n=>n.type==='Text'&&n.props.children==='Poll 77').length,1);
+  });
+}
+
+for (const outcome of ['succeeds', 'rejects']) {
+  test(`R: pending post ${outcome} after hub switch isolates drafts and submissions`,async()=>{
+    const oldPost=deferred(), newPost=deferred(), requests=[];
+    const h=env({pickDocument:async()=>({canceled:false,assets:[{uri:'file://a',name:'a.txt',size:1}]}),api:{
+      createCommunityPost:request=>{requests.push(request.entries);return requests.length===1?oldPost.promise:newPost.promise;},
+    }});
+    const composer=()=>h.find(h.render(),n=>n.type==='TextInput'&&n.props.label==='Post to this community')[0];
+    h.render();await h.tick();
+    composer().props.onChangeText('Hub A draft');
+    h.button('Attach files').props.onPress();await h.tick();
+    assert.ok(h.button('a.txt'));
+    h.button('Post').props.onPress();
+    assert.equal(requests.length,1);
+    assert.equal(requests[0].find(([key])=>key==='platform_hub')[1],'public');
+    assert.equal(requests[0].find(([key])=>key==='body')[1],'Hub A draft');
+    assert.equal(requests[0].filter(([key])=>key==='attachments').length,1);
+    h.changeHub('explorer');h.render();await h.tick();
+    assert.equal(composer().props.value,'','former hub draft must not appear');
+    assert.equal(h.button('a.txt'),undefined,'former hub attachment must not appear');
+    composer().props.onChangeText('Hub B draft');
+    const postB=h.button('Post');
+    assert.equal(postB.props.disabled,false,'new draft can be posted immediately');
+    postB.props.onPress();
+    assert.equal(requests.length,2,'new hub submission starts while old request is pending');
+    assert.equal(requests[1].find(([key])=>key==='platform_hub')[1],'explorer');
+    assert.equal(requests[1].find(([key])=>key==='body')[1],'Hub B draft');
+    assert.equal(requests[1].filter(([key])=>key==='attachments').length,0);
+    if(outcome==='succeeds') oldPost.resolve({}); else oldPost.reject(Error('old post failed'));
+    await h.tick();
+    assert.equal(composer().props.value,'Hub B draft');
+    assert.equal(h.find(h.render(),n=>n.props?.accessibilityRole==='alert').length,0);
+    postB.props.onPress();
+    assert.equal(requests.length,2,'stale completion cannot unlock the pending new submission');
+    newPost.resolve({});await h.tick();
+    assert.equal(composer().props.value,'');
   });
 }
