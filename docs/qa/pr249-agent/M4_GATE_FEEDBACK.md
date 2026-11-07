@@ -217,3 +217,31 @@ Red at base for overnight, recurrence, rollover and DST. Head: web post-shift 8/
 3. m4CalendarPreview.test.mjs:342 owner/admin cases assert the corrected overnight preview, so they are R (fail on base),
    not C: label them R and add separate base-passing C controls for payload and state. The diff also removed the earlier
    daytime-slot edit assertions: restore that coverage (never drop an assertion, rule 13).
+
+## M4-06 verdict: FIX FIRST (Claude B, head a85a81ce; RED 4397869d)
+R3 (blog topic+kind page 2) and R5 (TECHNICIAN pathway from role_code) go red to green correctly. Blockers:
+1. R1 still FAILS at head: `missing filter control: Role`. In frontend_mobile/app/explore/talent-board.tsx the
+   Role/State/Work type/Skill/Availability headings are plain Text and chips/date inputs have no accessibilityLabel:
+   give each filter group an accessibilityLabel so R1 passes WITHOUT changing the test.
+2. Head breaks 2 mobile tests that pass on 4397869d: public-organizations-and-talent.test.cjs:13 and
+   w8-effect-lifecycle.test.cjs:6 (source-regex tests pinned to the old loader). Convert them to behaviour tests in the
+   tests-only commit (rule 12); never just delete them.
+3. Test matrix mostly missing (rule 5): #1 page-2-only match, applied filters, duplicate/clear controls; #2 QR
+   reference_code survives login; #3 retry / stale response / double load / invalid next; #4 q, page reset on topic
+   change, clearing topic; #5 Mia/Jack/STUDENT and Tom/Omar/Zoe, 403/error retry, account change; #6 anonymous never
+   POSTs; #7 new frontend_web/src/pages/m4PublicDiscovery.test.mjs; #8 new backend talent/test_m4_public_discovery.py and
+   public_hub/test_m4_articles.py. The C "page one kept after page 2 fails" passes only via the error button reloading
+   page 1: make it assert page-1 rows stay visible without any retry.
+4. utils/authReturnRoute.ts:3-11 SAFE_QUERY_PARAMS drops reference_code: QR reference lost after native login. Add it.
+5. a85a81ce adds ?next= to both web Public Talent Board pages, but neither frontend_web/src/pages/login.tsx:70-90 nor
+   the Next login.tsx:100-115 reads next: make both honour a sanitised next (same-origin relative path only).
+6. Native uses new projectPublicTalentCandidate; both web TalentBoard/index.tsx:100-233 keep their own projector and
+   differ (formatRoleLabel, formatWorkType, past dates dropped >= todayIso). Put ONE projector in shared-core and use it
+   from all three, so native filters/results equal web (pack #7).
+7. talent-board.tsx error block: Retry button labelled "Load more talent" reloads everything: label it "Retry". Skill
+   chips show raw registry codes where web shows labels: use the same label lookup.
+Trap: mobile tsc via the shared link points at ct-int dist; new shared-core exports show TS2305 there (environment only).
+
+## Escalations (orchestrator session 5, 2026-11-07)
+- M4-03 failed round 3 -> Codex A round 4 (local/m4-03-r4): 1465fb50 tests, cacf426d fix, pushed to agent/m4-03.
+- M4-04 failed round 2 with a real server P1 (blank slug on API create) -> Codex A round 3 (local/m4-04-r3).
