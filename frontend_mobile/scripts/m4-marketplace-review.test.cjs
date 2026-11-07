@@ -172,3 +172,59 @@ test('R retained Photos removes a previously uploaded image before retrying subm
   assert.equal(h.nav.filter(row => row[0] === 'replace').length, 1);
   h.unmount();
 });
+
+test('R retained Photos waits for pending upload metadata before deleting and retrying', async () => {
+  const h = createMarketplace();
+  await h.setDraft(1001, {});
+  h.env.stack = ['photos'];
+  await h.render();
+  h.click('Continue');
+  h.env.stack.push('audience');
+  await h.render();
+  h.click('Review');
+  h.env.stack.push('review');
+  await h.render();
+
+  const uploading = deferred();
+  h.queue('upload', uploading);
+  h.queue('submit', Error('Submission unavailable'));
+  h.click('Submit for review');
+  await settle(h);
+  assert.equal(h.callsOf('upload').length, 1);
+  const pendingMetadataWrite = h.pauseNextWrite();
+  uploading.resolve({ id: 17, moderation_status: 'PENDING' });
+  await settle(h);
+  assert.equal(h.callsOf('submit').length, 0, 'review is waiting for the durable upload receipt');
+
+  // Native stack back navigation retains the original Photos screen instance.
+  // Its in-memory draft does not know the uploaded server image id yet.
+  h.env.stack.pop();
+  await h.render();
+  h.env.stack.pop();
+  await h.render();
+  h.click('Remove');
+  await settle(h);
+  assert.equal(h.callsOf('delete').length, 0, 'delete must wait for the draft write to settle');
+
+  pendingMetadataWrite.resolve();
+  await settle(h);
+  assert.deepEqual(h.callsOf('delete').map(call => call.id), [17],
+    'Photos must reload the authoritative upload id after the pending write');
+  const saved = await h.getDraft(1001);
+  assert.deepEqual(Array.from(saved.image_uris), []);
+  assert.deepEqual(Array.from(saved.uploaded_image_uris), []);
+  assert.equal(saved.uploaded_image_ids['file:///photo-1'], undefined);
+
+  h.click('Continue');
+  h.env.stack.push('audience');
+  await h.render();
+  h.click('Review');
+  h.env.stack.push('review');
+  await h.render();
+  h.click('Submit for review');
+  await settle(h);
+  assert.equal(h.callsOf('create').length, 1, 'retry uses the existing listing receipt');
+  assert.equal(h.callsOf('upload').length, 1, 'removed photo is not uploaded again');
+  assert.deepEqual(h.callsOf('submit').at(-1).images, [], 'removed image is never submitted');
+  h.unmount();
+});
