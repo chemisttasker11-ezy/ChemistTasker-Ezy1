@@ -196,3 +196,90 @@ test('C #7 real Vite and Next TalentBoard/index render consistent public Candida
   }
   assert.deepEqual(JSON.parse(JSON.stringify(results[0])),JSON.parse(JSON.stringify(results[1])));
 });
+
+function realLogin(next, rawNext, verified=true) {
+  const ui=hooks(), navigations=[], announcements=[], storage=new Map();
+  const search='?next='+encodeURIComponent(rawNext);
+  const localStore={getItem:k=>storage.get('l:'+k)||null,
+    setItem:(k,v)=>storage.set('l:'+k,String(v)),
+    removeItem:k=>storage.delete('l:'+k)};
+  const sessionStore={getItem:k=>storage.get('s:'+k)||null,
+    setItem:(k,v)=>storage.set('s:'+k,String(v)),
+    removeItem:k=>storage.delete('s:'+k)};
+  const window={location:{pathname:'/login',search,
+    replace:to=>navigations.push(to),assign:to=>navigations.push(to)},
+    localStorage:localStore,sessionStorage:sessionStore,
+    dispatchEvent:event=>announcements.push(event.type)};
+  const browser=load('landing_next/shared/browser-session.ts',{},window);
+  const dashboard=load(next?'landing_next/migrated/utils/dashboardPath.ts':
+    'src/utils/dashboardPath.ts',{},window);
+  const user={id:44,role:'EXPLORER',is_mobile_verified:verified};
+  const auth={login(){} ,user:null};
+  const route={useNavigate:()=>where=>navigations.push(where),
+    Link:'Link',useLocation:()=>({pathname:'/login',search,state:{}})};
+  const icons={Visibility:'Visibility',VisibilityOff:'VisibilityOff'};
+  const material=Object.fromEntries(['Typography','TextField','Button','Box','CircularProgress',
+    'Alert','Link','InputAdornment','IconButton','Checkbox','FormControlLabel']
+    .map(x=>[x,x]));
+  const core={browserLoginSession:async()=>({access:'session-token',refresh:'',user}),
+    hasOrganizationAccess:()=>false};
+  const mocks={
+    react:ui.react,'react/jsx-runtime':{jsx,jsxs:jsx},
+    'react-router-dom':route,'@/public/navigation':route,
+    '@mui/material':material,'@mui/icons-material':icons,
+    '../constants/api':{API_BASE_URL:'/api/v1'},
+    '@chemisttasker/shared-core':core,
+    '../contexts/AuthContext':{useAuth:()=>auth},
+    '../layouts/AuthLayout':{default:'AuthLayout'},
+    '../components/PublicLogoTopBar':{default:'PublicLogoTopBar'},
+    '../utils/dashboardPath':{resolveDashboardPath:dashboard.resolveDashboardPath,
+      resolveUserHomePath:dashboard.resolveUserHomePath},
+    '../utils/ownerSetup':{getOwnerSetupStatus:async()=>({nextPath:null})},
+    '../utils/seo':{setRobotsMeta(){}},
+    '../../shared/session-provider':{useSession:()=>({status:'anonymous'})},
+    '../../shared/browser-session':browser,
+    '../../landing_next/shared/browser-session':browser,
+    '../constants/roles':{ORG_ROLES:['ORGANIZATION','ORG_ADMIN','REGION_ADMIN']},
+  };
+  const component=load(next?'landing_next/migrated/pages/login.tsx':
+    'src/pages/login.tsx',mocks,window).default;
+  return {
+    navigations,ui,
+    async submit(){
+      let tree=await ui.render(component);
+      for(const [label,value] of [['Email','worker@example.test'],['Password','secret']]){
+        const input=nodes(tree,'TextField').find(p=>p.label===label);
+        assert.ok(input,label);
+        input.onChange({target:{value}});
+        tree=ui.render(component);
+      }
+      const form=nodes(tree,'form')[0];
+      assert.ok(form,'real login form is mounted');
+      await form.onSubmit({preventDefault(){}});
+      await ui.render(component);
+    },
+  };
+}
+test('R #2/#5 Vite login resumes a sanitized QR return, not its generic overview',async()=>{
+  const app=realLogin(false,'/talent/public-board?reference_code=REF-22');
+  await app.submit();
+  assert.deepEqual(app.navigations,['/talent/public-board?reference_code=REF-22']);
+});
+test('C #5 Vite and Next reject external login next destinations',async()=>{
+  for(const next of [false,true]){
+    const app=realLogin(next,'https://untrusted.example/private');
+    await app.submit();
+    assert.equal(app.navigations.some(where=>String(where).includes('untrusted.example')),false);
+    assert.ok(app.navigations.some(where=>String(where).includes('/dashboard/explorer')));
+  }
+});
+test('C #5 Next login respects the existing safe browser return destination',async()=>{
+  const app=realLogin(true,'/talent/public-board?reference_code=REF-22');
+  await app.submit();
+  assert.deepEqual(app.navigations,['/talent/public-board?reference_code=REF-22']);
+});
+test('R #5 Next pending mobile verification wins over a public QR next redirect',async()=>{
+  const app=realLogin(true,'/talent/public-board?reference_code=REF-22',false);
+  await app.submit();
+  assert.deepEqual(app.navigations,['/mobile-verify']);
+});
