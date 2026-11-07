@@ -38,7 +38,8 @@ function PublicHubFeedView() {
   const [polls, setPolls] = useState<PublicHubPoll[]>([]);
   const [next, setNext] = useState<number | null>(null);
   const [pollNext, setPollNext] = useState<number | null>(null);
-  const [pollPages, setPollPages] = useState(1);
+  // Synchronous current page count for vote refreshes racing with pagination.
+  const pollPagesRef = useRef(1);
   const [searchDraft, setSearchDraft] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchBusy, setSearchBusy] = useState(false);
@@ -61,7 +62,7 @@ function PublicHubFeedView() {
     setLoading(true); setError(''); setActionError(''); setMoreError('');
     setPollMoreError(''); setSearchError(''); setSearchDraft(''); setSearchTerm('');
     setPosts([]); setPolls([]); setInfo(null); setNext(null); setPollNext(null);
-    setPollPages(1); setMoreBusy(false); setPollMoreBusy(false); setSearchBusy(false);
+    pollPagesRef.current = 1; setMoreBusy(false); setPollMoreBusy(false); setSearchBusy(false);
     try {
       const [hubs, result, pollResult] = await Promise.all([
         chemistTaskerApi.publicContent.listHubs(),
@@ -148,7 +149,7 @@ function PublicHubFeedView() {
         return Array.from(merged.values());
       });
       setPollNext(nextPage(result.next));
-      setPollPages(requested);
+      pollPagesRef.current = requested;
     } catch (failure: any) {
       if (ticket === generation.current) setPollMoreError(failure?.message || 'More polls could not load.');
     } finally {
@@ -197,9 +198,11 @@ function PublicHubFeedView() {
       await chemistTaskerApi.publicContent.voteCommunityPoll(poll.id, optionId);
       // Refresh every visible page after a vote, preserving the loaded discussion and
       // previously paginated polls rather than dropping page 2+ to page 1.
-      const pages = await Promise.all(Array.from({ length: pollPages }, (_, index) =>
+      const pagesAtRefresh = pollPagesRef.current;
+      const pages = await Promise.all(Array.from({ length: pagesAtRefresh }, (_, index) =>
         chemistTaskerApi.publicContent.listCommunityPolls(hub, { page: index + 1 })));
-      if (ticket === generation.current) {
+      // If page 2+ arrived while the refresh ran, its newer feed wins.
+      if (ticket === generation.current && pollPagesRef.current === pagesAtRefresh) {
         const merged = new Map<number, PublicHubPoll>();
         for (const response of pages) {
           for (const item of response.results || []) merged.set(item.id, item);
