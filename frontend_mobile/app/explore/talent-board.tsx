@@ -6,7 +6,7 @@ import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/Bra
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   filterTalentCandidates, getPublicTalentFeed, loadAllTalentPages,
-  projectPublicTalentCandidate,
+  projectPublicTalentCandidate, skillLabel,
   type TalentFilters, type PublicTalentCandidate,
 } from '@chemisttasker/shared-core';
 import registry from '@chemisttasker/shared-core/skills_registry.json';
@@ -96,12 +96,14 @@ export default function PublicTalentBoard() {
   const shown = filtered.filtered.slice((page - 1) * 10, page * 10);
   const options = (key: 'roles'|'states'|'workTypes'|'skills', values: string[]) => {
     const current = filters[key];
+    const label = {roles:'Role',states:'State',workTypes:'Work type',skills:'Skill'}[key];
     return values.map(value => <Chip key={key + value}
+      accessibilityLabel={label + ' ' + value}
       selected={current.includes(value)}
       onPress={() => setFilters(previous => ({
         ...previous, [key]: previous[key].includes(value)
           ? previous[key].filter(item => item !== value) : [...previous[key], value],
-      }))}>{value}</Chip>);
+      }))}>{key === 'skills' ? skillLabel(registry as any, value) : value}</Chip>);
   };
   const workTypes = [...new Set(rows.flatMap(row => row.workTypes))].sort();
   const skillOptions = [...new Set(rows.flatMap(row => [
@@ -122,37 +124,42 @@ export default function PublicTalentBoard() {
       <TextInput mode="outlined" label="Search" accessibilityLabel="Search talent"
         value={filters.search}
         onChangeText={search => setFilters(previous => ({ ...previous, search }))} />
-      <Text style={styles.title}>Role</Text>
-      <View style={styles.filters}>{options('roles', filtered.roleOptions)}</View>
-      <Text style={styles.title}>State</Text>
-      <View style={styles.filters}>{options('states', filtered.stateOptions)}</View>
-      <Text style={styles.title}>Work type</Text>
-      <View style={styles.filters}>{options('workTypes', workTypes)}</View>
-      <Text style={styles.title}>Skill</Text>
-      <View style={styles.filters}>{options('skills', skillOptions)}</View>
+      <Text accessibilityRole="header" style={styles.title}>Role</Text>
+      <View style={styles.filters} accessibilityLabel="Role filters">{options('roles', filtered.roleOptions)}</View>
+      <Text accessibilityRole="header" style={styles.title}>State</Text>
+      <View style={styles.filters} accessibilityLabel="State filters">{options('states', filtered.stateOptions)}</View>
+      <Text accessibilityRole="header" style={styles.title}>Work type</Text>
+      <View style={styles.filters} accessibilityLabel="Work type filters">{options('workTypes', workTypes)}</View>
+      <Text accessibilityRole="header" style={styles.title}>Skill</Text>
+      <View style={styles.filters} accessibilityLabel="Skill filters">
+        {skillOptions.length ? options('skills', skillOptions)
+          : <Chip accessibilityLabel="Skill filters unavailable" disabled>No skills to filter</Chip>}
+      </View>
       <View style={styles.filters}>
         <Chip selected={filters.willingToTravel} onPress={() =>
           setFilters(previous => ({ ...previous, willingToTravel: !previous.willingToTravel }))}>Travel</Chip>
         <Chip selected={filters.placementSeeker} onPress={() =>
           setFilters(previous => ({ ...previous, placementSeeker: !previous.placementSeeker }))}>Placement</Chip>
       </View>
-      <Text style={styles.title}>Availability</Text>
-      <View style={styles.filters}>
+      <Text accessibilityRole="header" style={styles.title}>Availability</Text>
+      <View style={styles.filters} accessibilityLabel="Availability filters">
         <TextInput mode="outlined" label="Availability start (YYYY-MM-DD)"
+          accessibilityLabel="Availability start"
           value={filters.availabilityStart ?? ''}
           onChangeText={value => setDate('availabilityStart',value)} />
         <TextInput mode="outlined" label="Availability end (YYYY-MM-DD)"
+          accessibilityLabel="Availability end"
           value={filters.availabilityEnd ?? ''}
           onChangeText={value => setDate('availabilityEnd',value)} />
       </View>
       <Button mode="outlined" onPress={() => {setFilters(clear);setPage(1);}}>Clear filters</Button>
       {loading && !rows.length ? <ActivityIndicator /> : null}
       {error ? <View style={styles.status}><Text accessibilityRole="alert" style={styles.error}>{error}</Text>
-        <Button onPress={() => void load()}>Load more talent</Button></View> : null}
+        <Button onPress={() => void load()}>Retry</Button></View> : null}
       {complete ? <Text style={styles.muted}>{filtered.filtered.length} public candidates</Text> : null}
       {shown.map(item => <Card key={item.id} mode="outlined" style={styles.card}>
         <Card.Content style={styles.cardBody}>
-          <Text variant="titleMedium" style={styles.title}>{item.roleTitle}</Text>
+          <Text variant="titleMedium" style={styles.title}>{item.role}</Text>
           {item.city || item.state ? <Text style={styles.muted}>{[item.city,item.state].filter(Boolean).join(', ')}</Text> : null}
           {item.availabilitySummary ? <Text style={styles.muted}>{item.availabilitySummary}</Text> : null}
           {item.workTypes.length ? <Text style={styles.muted}>{item.workTypes.join(' · ')}</Text> : null}
