@@ -159,7 +159,7 @@ test('C: explicit 404 allows exactly one legacy lookup without managed write', a
   const nodes = await ui.settle();
   assert.equal(ui.calls.filter(([source]) => source === 'legacy').length, 1);
   assert.ok(nodes.some(node => node.type === 'PageHeader' &&
-    /invoice/i.test(String(node.props.title || node.props.heading || ''))));
+    /invoice/i.test(JSON.stringify(node.props.title || ''))));
   assert.deepEqual(ui.destinations, []);
 });
 
@@ -185,5 +185,17 @@ test('R: old account or route completion cannot navigate or show legacy data in 
   await ui.flush();
   assert.deepEqual(ui.destinations, []);
   assert.equal(ui.calls.filter(([source]) => source === 'legacy').length, 0);
+  ui.unmount();
+});
+
+
+test('C: web missing managed and legacy invoices exposes failure without navigation', async () => {
+  const ui = invoiceUi({ managed: async () => { throw refusal(404); },
+    legacy: async () => { throw refusal(404); } });
+  const nodes = await ui.settle();
+  assert.equal(ui.calls.filter(([source]) => source === 'legacy').length, 1);
+  assert.deepEqual(ui.destinations, []);
+  assert.ok(nodes.some(node => node.type === 'DashboardContentState' ||
+    (node.type === 'Alert' && /invoice/i.test(String(node.props.children)))));
   ui.unmount();
 });

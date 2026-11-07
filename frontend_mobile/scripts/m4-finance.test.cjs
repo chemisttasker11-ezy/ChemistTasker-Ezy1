@@ -279,7 +279,7 @@ function financeWorkspace() {
   const finance = {
     customers: async () => [customer()], items: async () => [],
     invoices: async () => list, expenses: async () => [expense(1), expense(51)],
-    receivedInvoices: async () => [],
+    receivedInvoices: async () => [invoice(999, 'NADIA-RECEIVED')],
     lookupAbn: async id => { calls.push(['lookup', id]); return customer(); },
     worksheet: async () => ({ start: '2026-07-01', end: '2026-09-30', basis: 'cash',
       G1: '1000.00', '1A': '100.00', '1B': '20.00', estimated_gst_net: '80.00',
@@ -360,13 +360,14 @@ test('R: native finance provides CSV exports for filtered issued invoices and al
   const written = new TextDecoder('utf-8', { ignoreBOM: true }).decode(app.files[0].bytes);
   assert.ok(written.startsWith('\ufeff"Number"'));
   assert.ok(written.includes('"INV-51"'), 'page two invoice is exported');
+  await awaitAsyncWork(app, () => app.files[0].deleted);
   assert.ok(app.files[0].deleted, 'temporary file is removed after share');
   await navigateTab(app, 'Expenses');
   await click(app, 'Export expenses CSV');
   const expenses = new TextDecoder('utf-8', { ignoreBOM: true }).decode(app.files[1].bytes);
   assert.ok(expenses.includes('"\'=SUM(1,2)"'), 'spreadsheet injection is escaped');
   assert.ok(expenses.includes('"Travel ""A"", room 2"'));
-  assert.ok(app.files[1].deleted);
+  await awaitAsyncWork(app, () => app.files[1].deleted);
 });
 
 test('R: native BAS worksheet export is explicitly draft and never represented as a lodgement', async () => {
@@ -408,7 +409,7 @@ test('C: CSV share cancellation/failure cleans private file and leaves a retry a
 
 test('R: parity native customer editor renders ABN evidence, then hides it when ABN is edited', async () => {
   const engine = createHooks();
-  const state = { id: '14' }, existing = customer(), calls = [];
+  const state = { id: '14', status: 503 }, existing = customer(), calls = [];
   const widgets = Object.fromEntries([
     'ActionButtons', 'ChoiceChips', 'DataRow', 'EmptyState', 'Field',
     'InfoNote', 'MetricGrid', 'ParityPage', 'Section',
@@ -425,7 +426,7 @@ test('R: parity native customer editor renders ABN evidence, then hides it when 
     './nativeFileBytes': { nativeFileBytes: async () => new Uint8Array() },
     '@chemisttasker/shared-core': {
       finance: { customers: async () => [existing],
-        lookupAbn: async id => { calls.push(['lookup', id]); throw Error('ABR unavailable: retry later'); },
+        lookupAbn: async id => { calls.push(['lookup', id]); throw new ApiError('ABR unavailable: retry later', state.status, {}); },
         saveCustomer: async data => ({ ...existing, ...data }) },
       financeStatus: row => row.status, financeToday: () => '2026-11-07',
     },
@@ -455,4 +456,131 @@ test('R: parity native customer editor renders ABN evidence, then hides it when 
   assert.match(String(nodes.find(n => n.type === 'ParityPage').props.error), /ABR unavailable/);
   assert.equal(nodes.find(n => n.type === 'Field' && n.props.label === 'ABN').props.value, '53004085616');
   assert.deepEqual(calls, [['lookup', 14]]);
+  for (const status of [422, 429]) {
+    state.status = status;
+    await button(nodes, 'Verify ABN').props.onPress();
+    await engine.flush();
+    nodes = await render();
+    assert.match(String(nodes.find(n => n.type === 'ParityPage').props.error), /ABR unavailable/);
+    assert.equal(nodes.find(n => n.type === 'Field' && n.props.label === 'ABN').props.value, '53004085616');
+  }
+  assert.equal(calls.length, 3);
+});
+
+
+test('C: issued export uses exact header and current search, excluding received rows', async () => {
+  const app = financeWorkspace();
+  let nodes = await app.render();
+  const search = nodes.find(n => n.type === 'Searchbar');
+  assert.ok(search);
+  search.props.onChangeText('INV-51');
+  await app.render();
+  await click(app, 'Export invoices CSV');
+  const csv = new TextDecoder('utf-8', { ignoreBOM: true }).decode(app.files[0].bytes);
+  assert.equal(csv.split('\r\n')[0], '\ufeff"Number","Kind","Customer","Date","Due","Worker or fund payable AUD","GST AUD","Paid AUD","Balance AUD","Status"');
+  assert.match(csv, /INV-51/);
+  assert.doesNotMatch(csv, /INV-1"|NADIA-RECEIVED/);
+});
+
+test('C: unavailable share reports an error and permits retry', async () => {
+  const app = financeWorkspace();
+  app.sharing.isAvailableAsync = async () => false;
+  await click(app, 'Export invoices CSV');
+  await awaitAsyncWork(app, () => true);
+  let nodes = await app.render();
+  assert.ok(nodes.some(n => n.type === 'Text' && /sharing is unavailable/i.test(text(n))));
+  assert.equal(app.files.length, 0);
+  app.sharing.isAvailableAsync = async () => true;
+  await click(app, 'Export invoices CSV');
+  await awaitAsyncWork(app, () => app.shares.length === 1);
+});
+
+test('C: double export from same render starts one share', async () => {
+  const app = financeWorkspace(), pending = later();
+  app.sharing.isAvailableAsync = () => pending.promise;
+  const nodes = await app.render(), action = button(nodes, 'Export invoices CSV');
+  action.props.onPress(); action.props.onPress();
+  pending.resolve(true);
+  await awaitAsyncWork(app, () => app.shares.length === 1 && app.files[0].deleted);
+  assert.equal(app.files.length, 1);
+  assert.equal(app.shares.length, 1);
+});
+
+test('C: account switch while sharing availability is pending discards old export', async () => {
+  const app = financeWorkspace(), pending = later();
+  let checks = 0;
+  app.sharing.isAvailableAsync = () => { checks++; return pending.promise; };
+  const action = button(await app.render(), 'Export invoices CSV');
+  action.props.onPress();
+  assert.equal(checks, 1);
+  app.state.userId = 702;
+  await app.render();
+  pending.resolve(true);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  await app.h.flush();
+  assert.equal(app.files.length, 0);
+  assert.equal(app.shares.length, 0);
+});
+
+
+test('C: parity BAS summary displays excluded legacy count and warnings', async () => {
+  const engine = createHooks();
+  const state = { id: '14', status: 503 }, existing = customer(), calls = [];
+  const widgets = Object.fromEntries([
+    'ActionButtons', 'ChoiceChips', 'DataRow', 'EmptyState', 'Field',
+    'InfoNote', 'MetricGrid', 'ParityPage', 'Section',
+  ].map(name => [name, name]));
+  const module = compile('frontend_mobile/features/parity/finance.tsx', {
+    react: engine.react, 'react/jsx-runtime': { jsx, jsxs: jsx },
+    '@/context/AuthContext': { useAuth: () => ({ user: { id: 701 } }) },
+    './receiptShare': { ReceiptShareSession: class {} },
+    'react-native-paper': { Button: 'Button', Chip: 'Chip', IconButton: 'IconButton' },
+    'expo-router': { useLocalSearchParams: () => state,
+      useRouter: () => ({ push() {}, replace() {}, back() {} }) },
+    'expo-image-picker': {}, 'expo-sharing': {},
+    'expo-file-system': { File: class {}, Paths: { cache: '' } },
+    './nativeFileBytes': { nativeFileBytes: async () => new Uint8Array() },
+    '@chemisttasker/shared-core': {
+      finance: { customers: async () => [existing],
+        worksheet: async () => ({ G1: '1', '1A': '2', '1B': '3', estimated_gst_net: '4', excluded_legacy_invoice_count: 7, warnings: ['Review'] }),
+        saveCustomer: async data => ({ ...existing, ...data }) },
+      financeStatus: row => row.status, financeToday: () => '2026-11-07',
+    },
+    '@/roles/shared/invoices/FinanceWorkspace': { default: 'FinanceWorkspace' },
+    './ParityUI': widgets,
+    './utils': { dateLabel: value => String(value), errorMessage: err => err.message,
+      idempotencyKey: () => 'fixture-key', money: value => String(value),
+      replaceUnderscore: value => String(value), toNumber: value => Number(value || 0) },
+  });
+  const render = () => engine.settled(module.FinanceParityScreen, { screen: 'bas' });
+  let nodes = await render();
+  button(nodes, 'Calculate worksheet').props.onPress();
+  await engine.flush();
+  nodes = await render();
+  const note = nodes.find(n => n.type === 'InfoNote' && n.props.title === 'Excluded legacy invoices');
+  assert.ok(note);
+  assert.match(text(note), /7\s+legacy invoice/);
+  assert.ok(nodes.some(n => n.type === 'DataRow' && n.props.title === 'Review'));
+});
+
+
+test('C: customer ABN 422, 503 and 429 leave the workspace usable for retry', async () => {
+  for (const status of [422, 503, 429]) {
+    const app = financeWorkspace();
+    let attempts = 0;
+    app.finance.lookupAbn = async () => {
+      attempts++;
+      if (attempts === 1) throw new ApiError('Lookup unavailable ' + status, status, {});
+      return customer();
+    };
+    await navigateTab(app, 'Customers');
+    await click(app, 'Check ABN');
+    let nodes = await app.render();
+    assert.ok(nodes.some(n => n.type === 'Text' && text(n).includes('Lookup unavailable ' + status)));
+    assert.ok(nodes.some(n => n.type === 'Text' && text(n).includes('Customer A')));
+    await click(app, 'Check ABN');
+    assert.equal(attempts, 2);
+    nodes = await app.render();
+    assert.ok(nodes.some(n => n.type === 'Text' && text(n).includes('ACME Group')));
+  }
 });

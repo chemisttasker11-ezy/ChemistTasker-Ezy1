@@ -90,7 +90,7 @@ test('R: actual web worksheet button emits byte-identical native/shared CSV and 
     '@chemisttasker/shared-core': {
       finance: { worksheet: async () => worksheet },
       financeStatus: row => row.status,
-      invoiceCsvRows: csv.invoiceCsvRows, expenseCsvRows: csv.expenseCsvRows,
+      invoiceCsvRows: csv.invoiceCsvRows, expenseCsvRows: csv.expenseCsvRows, worksheetCsvRows: csv.worksheetCsvRows,
     },
     'react-router-dom': { useSearchParams: () => [
       new URLSearchParams('tool=bas'), () => {},
@@ -137,7 +137,7 @@ test('R: actual web worksheet button emits byte-identical native/shared CSV and 
   assert.equal(created.length, 1);
   assert.deepEqual(clicks, [['blob:worksheet', 'gst-worksheet-DRAFT.csv']]);
   assert.equal(removed.length, 1);
-  const bytes = await created[0].text();
+  const bytes = new TextDecoder('utf-8', { ignoreBOM: true }).decode(await created[0].arrayBuffer());
   assert.equal(bytes, csv.renderFinanceCsv(csv.worksheetCsvRows(worksheet)),
     'web download and native share must use identical cross-platform worksheet rows');
   assert.equal(timers.length, 1);

@@ -10,6 +10,7 @@ from uuid import uuid4
 from django.test import TestCase
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from invoicing.models import Invoice
+from organizations.models import PharmacyAdmin
 from worker_finance.models import Customer, Expense
 
 ROOT = '/api/v1/finance/'
@@ -126,7 +127,6 @@ class FinancePresentationContractTests(TestCase):
             ('received-invoices/', self.owner),
             ('customers/', self.worker),
             ('expenses/', self.worker),
-            ('bas-worksheet/?start=2026-07-01&end=2026-09-30&basis=cash', self.worker),
         )
         for uri, actor in targets:
             with self.subTest(uri=uri):
@@ -135,6 +135,64 @@ class FinancePresentationContractTests(TestCase):
                 self.assertIn('no-store', response['Cache-Control'])
                 self.assertEqual(response['X-Content-Type-Options'], 'nosniff')
                 self.assertIn('Authorization', response.get('Vary', ''))
+
+    def test_r_bas_worksheet_varies_by_authorization_and_cookie(self):
+        response = client_for(self.worker).get(
+            ROOT + 'bas-worksheet/?start=2026-07-01&end=2026-09-30&basis=cash')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn('no-store', response['Cache-Control'])
+        self.assertEqual(response['X-Content-Type-Options'], 'nosniff')
+        self.assertIn('Authorization', response.get('Vary', ''))
+        self.assertIn('Cookie', response.get('Vary', ''))
+
+    def test_scoped_owner_received_list_includes_own_excludes_foreign_pharmacy(self):
+        foreign = Invoice.objects.create(
+            user=self.other, pharmacy=self.other_pharmacy, request_key=uuid4(),
+            status='sent', source='internal',
+            payload={'customer': {'name': 'Nadia private'}, 'invoice_date': '2026-07-10',
+                     'due_date': '2026-07-31'},
+            calculation={'subtotal': '100.00', 'gst': '10.00', 'payable': '110.00', 'sales_gross': '110.00'},
+        )
+        response = client_for(self.owner).get(ROOT + 'received-invoices/')
+        self.assertEqual(response.status_code, 200, response.data)
+        rows = response.data.get('results', []) if isinstance(response.data, dict) else response.data
+        ids = {row['id'] for row in rows}
+        self.assertIn(self.invoice.pk, ids)
+        self.assertNotIn(foreign.pk, ids)
+        self.assertEqual(client_for(self.owner).get(ROOT + f'received-invoices/{foreign.pk}/').status_code, 404)
+
+    def test_c_delegated_manager_received_scope_and_bas_issuer_scope(self):
+        manager = make_user('PHARMACY_MANAGER')
+        PharmacyAdmin.objects.create(
+            user=manager, pharmacy=self.pharmacy,
+            admin_level=PharmacyAdmin.AdminLevel.MANAGER, is_active=True,
+        )
+        self.invoice.invoice_date = date(2026, 7, 10)
+        self.invoice.save(update_fields=['invoice_date'])
+        foreign = Invoice.objects.create(
+            user=self.other, pharmacy=self.other_pharmacy, request_key=uuid4(),
+            status='sent', source='internal', invoice_date=date(2026, 7, 10),
+            payload={'customer': {'name': 'Nadia private'}, 'invoice_date': '2026-07-10',
+                     'due_date': '2026-07-31'},
+            calculation={'subtotal': '200.00', 'gst': '20.00', 'payable': '220.00', 'sales_gross': '220.00'},
+        )
+        Invoice.objects.create(
+            user=manager, request_key=uuid4(), status='sent', invoice_date=date(2026, 7, 10),
+            calculation={'sales_gross': '33.00', 'gst': '3.00'},
+        )
+        client = client_for(manager)
+        response = client.get(ROOT + 'received-invoices/')
+        self.assertEqual(response.status_code, 200, response.data)
+        ids = {row['id'] for row in response.data['results']}
+        self.assertIn(self.invoice.pk, ids)
+        self.assertNotIn(foreign.pk, ids)
+        self.assertEqual(client.get(ROOT + f'received-invoices/{foreign.pk}/').status_code, 404)
+        worksheet = client.get(ROOT + 'bas-worksheet/', {
+            'start': '2026-07-01', 'end': '2026-09-30', 'basis': 'accrual',
+        })
+        self.assertEqual(worksheet.status_code, 200, worksheet.data)
+        self.assertEqual(worksheet.data['G1'], '33.00')
+        self.assertEqual(worksheet.data['1A'], '3.00')
 
     def test_abr_result_strips_unknown_sensitive_fields(self):
         parsed = {
