@@ -84,7 +84,7 @@ class AvailabilityBoundaryContractTests(TestCase):
             row = UserAvailability.objects.get(pk=response.data["id"])
             url = f"{PRIVATE_URL}{row.pk}/"
             self.assertEqual(client.patch(url, {"recurring_days": [1]}, format="json").status_code, 200)
-            for value in (True, False, 1.0):
+            for value in (True, False, 1.0, '1', 'Mon'):
                 with self.subTest(role=user.role, value=value):
                     row.recurring_days = [0 if value is False else 1]
                     row.save(update_fields=["recurring_days"])
