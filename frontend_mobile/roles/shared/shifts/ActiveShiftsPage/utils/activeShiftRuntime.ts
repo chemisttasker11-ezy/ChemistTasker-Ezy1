@@ -362,3 +362,8 @@ export const getLinkedShiftScrollY = (
     if (shiftId == null || !measurement || measurement.shiftId !== shiftId || measurement.scopeKey !== scopeKey) return null;
     return Number.isFinite(measurement.y) ? Math.max(0, measurement.y - 16) : null;
 };
+
+/** Preserve state identity when a recomputation produces the same values. */
+export function unchangedSlotState<T>(previous: T, next: T): T {
+    return JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
+}

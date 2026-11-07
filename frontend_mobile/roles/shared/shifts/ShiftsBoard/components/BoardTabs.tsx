@@ -12,5 +12,5 @@ export function BoardTabs({ value, onChange, savedCount }: { value: BoardTab; on
     { value: 'rejected', label: 'Rejected' },
     { value: 'accepted', label: 'Offers' },
   ];
-  return <SegmentTabs tabs={tabs} value={value} onChange={onChange} label="Board views" idPrefix="board-views" style={{ marginHorizontal: space.lg, marginBottom: space.sm }} />;
+  return <SegmentTabs tabs={tabs} value={value} onChange={onChange} label="Board views" secondary idPrefix="board-views" style={{ marginHorizontal: space.lg }} />;
 }

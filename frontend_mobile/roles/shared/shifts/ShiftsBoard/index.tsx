@@ -67,6 +67,7 @@ const ScopedShiftsBoard: React.FC<BoardPresentationProps & { scopeKey: string }>
     onFiltersChange,
     filters,
     totalCount,
+    pageExclusions = 0,
     page,
     pageSize,
     onPageChange,
@@ -559,18 +560,19 @@ const ScopedShiftsBoard: React.FC<BoardPresentationProps & { scopeKey: string }>
         />
     );
 
-    const headerSubtitle =
-        activeTab === 'saved'
-            ? `${displayShifts.length} saved`
-            : plural(
-                useServerFiltering && typeof totalCount === 'number' && effectiveSlotFilterMode === 'all' ? totalCount : displayShifts.length,
-                'shift',
-            );
-
     const pageCount =
         useServerFiltering && typeof totalCount === 'number' && pageSize
             ? Math.max(1, Math.ceil(totalCount / pageSize))
             : null;
+    const showTotal = useServerFiltering && effectiveSlotFilterMode === 'all' && typeof totalCount === 'number';
+    const visibleTotal = showTotal
+        ? displayShifts.length === 0 && pageCount !== null && (page ?? 1) >= pageCount
+            ? 0
+            : Math.max(displayShifts.length, totalCount - pageExclusions - (shifts.length - displayShifts.length))
+        : displayShifts.length;
+    const headerSubtitle = activeTab === 'saved'
+        ? `${displayShifts.length} saved`
+        : `${plural(visibleTotal, 'shift')}${!showTotal && useServerFiltering && (pageCount === null || pageCount > 1) ? ' on this page' : ''}`;
     const currentPage = page ?? 1;
     const goToPage = (next: number) => {
         onPageChange?.(next);

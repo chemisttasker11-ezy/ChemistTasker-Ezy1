@@ -444,7 +444,7 @@ const ShiftList: React.FC<ShiftListProps> = ({
 };
 
 const styles = StyleSheet.create({
-    state: { marginHorizontal: space.lg },
+    state: { width: undefined, marginHorizontal: space.lg },
     container: { paddingHorizontal: space.lg, gap: space.md },
     saveButton: {
         width: touch.min,

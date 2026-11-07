@@ -4,7 +4,6 @@ import type { Dispatch, SetStateAction } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import {
   Button,
-  Chip,
   Menu,
   Surface,
   Text,
@@ -20,6 +19,7 @@ import {
 import { ChevronDown } from 'lucide-react-native';
 import { colors, touch, space } from '@/constants/tokens';
 import { styles } from './PostShiftScreen.styles';
+import { ResponsiveSegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
@@ -57,13 +57,6 @@ const ROLE_LABELS: Record<string, string> = {
   PHARMACIST: 'Pharmacist', INTERN: 'Intern pharmacist', TECHNICIAN: 'Dispensary technician', ASSISTANT: 'Assistant', STUDENT: 'Pharmacy student',
 };
 
-const chipStyle = (selected: boolean) => [
-  styles.chip,
-  selected ? styles.chipSelected : styles.chipUnselected,
-];
-const chipTextStyle = (selected: boolean) =>
-  selected ? styles.chipTextSelected : styles.chipText;
-
 export default function PostShiftDetailsStep({
   hasTravel, setHasTravel, hasAccommodation, setHasAccommodation, isUrgent, setIsUrgent,
   pharmacyMenuVisible,
@@ -95,30 +88,10 @@ export default function PostShiftDetailsStep({
   return (
     <Surface style={styles.card} elevation={1}>
       <Text style={styles.label}>Who do you need?</Text>
-      <View style={styles.pills} accessibilityRole="radiogroup">
-        {ROLE_OPTIONS.map((role) => {
-          const selected = roleNeeded === role;
-          return (
-            <Chip key={role} selected={selected} onPress={() => { if (role !== roleNeeded) setRoleNeeded(role); }} accessibilityRole="radio"
-              accessibilityState={{ checked: selected }} style={chipStyle(selected)} textStyle={chipTextStyle(selected)}>
-              {ROLE_LABELS[role] ?? role}
-            </Chip>
-          );
-        })}
-      </View>
+      <ResponsiveSegmentedButtons accessibilityLabel="Who do you need?" value={roleNeeded} onValueChange={setRoleNeeded} buttons={ROLE_OPTIONS.map(role => ({ value: role, label: ROLE_LABELS[role] ?? role }))} />
 
       <Text style={styles.label}>Type of work</Text>
-      <View style={styles.pills}>
-        {EMPLOYMENT_TYPES.map((employment) => {
-          const selected = employmentType === employment || (employment === 'LOCUM' && employmentType === 'CASUAL');
-          return (
-            <Chip key={employment} selected={selected} onPress={() => { if (employment !== employmentType) setEmploymentType(employment); }}
-              style={chipStyle(selected)} textStyle={chipTextStyle(selected)}>
-              {getEmploymentLabel(employment)}
-            </Chip>
-          );
-        })}
-      </View>
+      <ResponsiveSegmentedButtons accessibilityLabel="Type of work" value={employmentType === 'CASUAL' ? 'LOCUM' : employmentType} onValueChange={setEmploymentType} buttons={EMPLOYMENT_TYPES.map(employment => ({ value: employment, label: getEmploymentLabel(employment) }))} />
 
       {pharmacies.length > 1 ? (
         <>

@@ -67,6 +67,7 @@ import {
     buildActiveShiftsScopeKey,
     isCandidateLevelVisible,
     mergeSlotSignatures,
+    unchangedSlotState,
     getLinkedShiftScrollY,
 } from './utils/activeShiftRuntime';
 
@@ -905,8 +906,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
 
         latestSlotSignaturesRef.current = nextSignatures;
         const { mergedSeen, updatesByShift } = mergeSlotSignatures(seenSlotSignatures, signaturesForMerge);
-        setSlotHasUpdatesByShift(updatesByShift);
-        setSeenSlotSignatures(mergedSeen);
+        setSlotHasUpdatesByShift(prev => unchangedSlotState(prev, updatesByShift));
+        setSeenSlotSignatures(prev => unchangedSlotState(prev, mergedSeen));
     }, [
         shifts,
         tabData,
