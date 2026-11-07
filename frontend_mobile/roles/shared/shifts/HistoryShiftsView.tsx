@@ -68,6 +68,7 @@ export default function HistoryShiftsView() {
     const profileGenRef = useRef(0);
     const ratingGenRef = useRef(0);
     const saveGenRef = useRef(0);
+    const savingRef = useRef(false);
 
     const closeSnackbar = () => setSnackbar('');
 
@@ -184,7 +185,8 @@ export default function HistoryShiftsView() {
 
     const saveRating = async () => {
         const targetId = ratingTargetIdRef.current;
-        if (!targetId || isRatingSaveDisabled({ loading: ratingState.loading, saving: ratingState.saving, stars: ratingState.stars, hasError: Boolean(ratingState.error) })) return;
+        if (!targetId || savingRef.current || isRatingSaveDisabled({ loading: ratingState.loading, saving: ratingState.saving, stars: ratingState.stars, hasError: Boolean(ratingState.error) })) return;
+        savingRef.current = true;
         const gen = ++saveGenRef.current;
         setRatingState((prev) => ({ ...prev, saving: true }));
         try {
@@ -201,6 +203,7 @@ export default function HistoryShiftsView() {
             if (saveGenRef.current !== gen || ratingTargetIdRef.current !== targetId) return;
             setSnackbar(err?.response?.data?.detail || err?.message || 'Failed to save rating');
         } finally {
+            savingRef.current = false;
             if (saveGenRef.current === gen) {
                 setRatingState((prev) => ({ ...prev, saving: false }));
             }
