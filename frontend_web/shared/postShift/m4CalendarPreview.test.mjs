@@ -104,38 +104,135 @@ test('R: real hook projects overnight 22:00–06:00 into next calendar day, keep
       state.expandedSlots.map(() => ({ rate: 67 }))), x=>[x.date,x.start_time,x.end_time]),
       [['2026-07-10','22:00','06:00'],['2026-07-10','09:00','17:00']]);
   }));
-test('R: recurrence projects each individual overnight event and editing retains source identity', () =>
+// Mount the production timetable step, including the real Calendar.onSelectEvent
+// and rendered edit/add controls. The hook and domain expansion are never mocked.
+const calendarStep = (() => {
+  const mui = Object.fromEntries(
+    'Alert Box Button Checkbox Chip FormControlLabel Grid IconButton Paper Stack Switch TextField Tooltip Typography'
+      .split(' ').map(name => [name, name]));
+  const icon = name => ({ __esModule: true, default: name });
+  return execute('./PostShiftTimetableStep.tsx', {
+    'react/jsx-runtime': { jsx: (type, props) => ({ type, props: props || {} }),
+      jsxs: (type, props) => ({ type, props: props || {} }), Fragment: 'Fragment' },
+    '@mui/material': mui,
+    '@mui/icons-material/Add': icon('AddIcon'),
+    '@mui/icons-material/Edit': icon('EditIcon'),
+    '@mui/icons-material/Delete': icon('DeleteIcon'),
+    '@mui/icons-material/Block': icon('BlockIcon'),
+    'react-big-calendar': { Calendar: 'Calendar' },
+    'react-big-calendar/lib/css/react-big-calendar.css': {},
+    '@mui/x-date-pickers/LocalizationProvider': { LocalizationProvider: 'LocalizationProvider' },
+    '@mui/x-date-pickers/AdapterDayjs': { AdapterDayjs: 'AdapterDayjs' },
+    '@mui/x-date-pickers/DatePicker': { DatePicker: 'DatePicker' },
+    dayjs, './helpers': helpers,
+  }).default;
+})();
+function uiTreeNodes(node, predicate, out = []) {
+  if (Array.isArray(node)) { node.forEach(x => uiTreeNodes(x, predicate, out)); return out; }
+  if (!node || typeof node !== 'object') return out;
+  if (predicate(node)) out.push(node);
+  uiTreeNodes(node.props?.children, predicate, out);
+  return out;
+}
+function drawCalendar(host) {
+  return calendarStep({
+    ...host.render(), isDarkMode: false, isEmbedded: false,
+    flexibleTiming: false, setFlexibleTiming() {},
+    singleUserOnly: false, setSingleUserOnly() {},
+    error: '', showError() {},
+  });
+}
+function clickCalendarEdit(host, index) {
+  const controls = uiTreeNodes(drawCalendar(host),
+    node => node.type === 'IconButton' && node.props['aria-label'] === 'Edit date');
+  assert.ok(controls[index], 'real Edit date control for source slot ' + index);
+  controls[index].props.onClick();
+}
+function clickCalendarSave(host) {
+  const save = uiTreeNodes(drawCalendar(host), node =>
+    node.type === 'Button' && node.props.children === 'Add date')[0];
+  assert.ok(save, 'real Add date control must save the selected source');
+  assert.equal(save.props.onClick(), true, 'future selected date must be accepted for saving');
+}
+
+test('R: recurrence projects each overnight occurrence; calendar selection edits and saves its source without losing daytime', () =>
   inTimezone('Australia/Brisbane', () => {
     const host = harness();
     host.render().setSlots([
-      slot('2026-07-10', '22:00', '06:00', { isRecurring:true, recurringDays:[5,6],
-        recurringEndDate:'2026-07-11' }),
-      slot('2026-07-12', '09:00', '17:00'),
+      slot('2027-01-08', '22:00', '06:00', { isRecurring:true, recurringDays:[5,6],
+        recurringEndDate:'2027-01-09' }),
+      slot('2027-01-10', '09:00', '17:00'),
     ]);
     const state = host.render();
     assert.equal(state.calendarEvents.length, 3);
-    assert.deepEqual(Array.from(state.calendarEvents, x => local(x).end),
-      ['2026-07-11T06:00', '2026-07-12T06:00', '2026-07-12T17:00']);
-    assert.deepEqual(Array.from(state.calendarEvents, x=>({ ...x.resource })),
+    assert.deepEqual(Array.from(state.calendarEvents, event => local(event).end),
+      ['2027-01-09T06:00', '2027-01-10T06:00', '2027-01-10T17:00']);
+    assert.deepEqual(Array.from(state.calendarEvents, event => ({...event.resource})),
       [{slotIndex:0,occurrenceIndex:0},{slotIndex:0,occurrenceIndex:1},
        {slotIndex:1,occurrenceIndex:0}]);
-    assert.equal(new Set(state.calendarEvents.map(x=>x.id)).size,3);
-    // Selection must be routed through the clicked occurrence's actual source mapping.
-    const chosen = state.calendarEvents[1];
-    assert.deepEqual({ ...chosen.resource }, { slotIndex: 0, occurrenceIndex: 1 });
-    state.handleEditSlot(chosen.resource.slotIndex);
+    assert.equal(new Set(state.calendarEvents.map(event => event.id)).size, 3);
+    const tree = drawCalendar(host);
+    const calendar = uiTreeNodes(tree, node => node.type === 'Calendar')[0];
+    assert.ok(calendar, 'the actual calendar must render its public selection callback');
+    const chosen = calendar.props.events[1];
+    assert.deepEqual({...chosen.resource}, {slotIndex:0,occurrenceIndex:1});
+    calendar.props.onSelectEvent(chosen);
+    const selected = host.render();
+    assert.equal(selected.slotDate, '2027-01-08');
+    assert.equal(selected.slotStartTime, '22:00');
+    assert.equal(selected.slotEndTime, '06:00');
+    assert.equal(selected.isRecurring, true);
+    assert.deepEqual(Array.from(selected.recurringDays), [5,6]);
+    assert.equal(selected.recurringEndDate, '2027-01-09');
+    assert.equal(selected.slots.length, 2, 'selection must not discard the recurring source');
+
+    clickCalendarEdit(host, chosen.resource.slotIndex);
     const edited = host.render();
     assert.equal(edited.slots.length, 1);
-    assert.equal(edited.slotDate, '2026-07-10');
+    assert.equal(edited.slotDate, '2027-01-08');
     assert.equal(edited.slotStartTime, '22:00');
     assert.equal(edited.slotEndTime, '06:00');
     assert.deepEqual(Array.from(edited.slots, x=>[x.date,x.startTime,x.endTime]),
-      [['2026-07-12','09:00','17:00']], 'other source slot is untouched');
-    // Posting an earlier date is now invalid by policy; selecting a historical
-    // fixture must not bypass posting validation just to assert a save.
+      [['2027-01-10','09:00','17:00']], 'other source slot is untouched');
     assert.equal(edited.isRecurring, true);
     assert.deepEqual(Array.from(edited.recurringDays), [5, 6]);
-    assert.equal(edited.recurringEndDate, '2026-07-11');
+    assert.equal(edited.recurringEndDate, '2027-01-09');
+    clickCalendarSave(host);
+    let saved = host.render();
+    assert.equal(saved.slots.length, 2);
+    assert.deepEqual(Array.from(saved.expandedSlots, x=>[x.date,x.startTime,x.endTime]),
+      [['2027-01-10','09:00','17:00'],['2027-01-08','22:00','06:00'],
+       ['2027-01-09','22:00','06:00']], 'both recurring dates and the untouched daytime entry survive save');
+    const payload = slotDomain.buildShiftDraftSlotPayload(saved.slots, saved.expandedSlots,
+      saved.expandedSlots.map(() => ({rate:67})));
+    assert.deepEqual(Array.from(payload, x=>[x.date,x.start_time,x.end_time,x.is_recurring,x.recurring_end_date]),
+      [['2027-01-10','09:00','17:00',false,null],
+       ['2027-01-08','22:00','06:00',true,'2027-01-09']],
+      'posting payload stores original wall clocks and recurrence, not shifted preview end dates');
+
+    // Restore the earlier explicit daytime-slot Edit date coverage, but
+    // exercise the production control rather than calling handleEditSlot directly.
+    const secondCalendar = uiTreeNodes(drawCalendar(host), node => node.type === 'Calendar')[0];
+    const daytimeEvent = secondCalendar.props.events.find(e=>e.resource.slotIndex === 0);
+    assert.ok(daytimeEvent);
+    secondCalendar.props.onSelectEvent(daytimeEvent);
+    const daytimeSelected = host.render();
+    assert.equal(daytimeSelected.slotDate, '2027-01-10');
+    assert.equal(daytimeSelected.slotStartTime, '09:00');
+    assert.equal(daytimeSelected.slotEndTime, '17:00');
+    clickCalendarEdit(host, daytimeEvent.resource.slotIndex);
+    const daytimeEdited = host.render();
+    assert.equal(daytimeEdited.slots.length, 1);
+    assert.equal(daytimeEdited.slotDate, '2027-01-10');
+    assert.equal(daytimeEdited.slotStartTime, '09:00');
+    assert.equal(daytimeEdited.slotEndTime, '17:00');
+    assert.deepEqual(Array.from(daytimeEdited.slots, x=>[x.date,x.startTime,x.endTime]),
+      [['2027-01-08','22:00','06:00']], 'editing daytime does not remove the recurring source');
+    clickCalendarSave(host);
+    saved = host.render();
+    assert.deepEqual(Array.from(saved.expandedSlots, x=>[x.date,x.startTime,x.endTime]),
+      [['2027-01-08','22:00','06:00'],['2027-01-09','22:00','06:00'],
+       ['2027-01-10','09:00','17:00']], 'both saved sources remain in the final calendar');
   }));
 test('C: posting validator rejects equal times and invalid clock/date entries do not crash the calendar', () => {
   assert.equal(posting.isValidShiftPostingTimeRange('22:00','22:00'), false);
