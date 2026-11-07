@@ -98,4 +98,28 @@ function talentHarness(reference='', role=null) {
     assert.ok(btn,'Missing button '+label);btn.onPress();};
   return {ui,session,calls,queue,routes,render,press,collect,deferred,datum,registry};
 }
-module.exports={load,renderer,collect,jsx,deferred,talentHarness,datum};
+
+function articleHarness(section='blog') {
+  const ui=renderer(), queue=[], calls=[], routes=[];
+  const module=load('features/explore/ArticleFeed.tsx', {
+    react:ui.react,'react/jsx-runtime':{jsx,jsxs:jsx},
+    'react-native':{ScrollView:'ScrollView',Image:'Image',StyleSheet:{create:x=>x},View:'View'},
+    'react-native-paper':{Button:'Button',Card:{Content:'CardContent'},Chip:'Chip',Text:'Text',Searchbar:'Searchbar'},
+    'expo-router':{useRouter:()=>({push:x=>routes.push(x),replace:x=>routes.push(x),back(){},canGoBack:()=>false})},
+    '@/components/ui/BrandActivityIndicator':{BrandActivityIndicator:'Spinner'},
+    'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
+    '@/config/api':{chemistTaskerApi:{publicContent:{listArticles:async opts=>{
+      calls.push(opts);const item=queue.shift();
+      if(!item)throw Error('Unqueued article page');
+      if(item.promise)return item.promise;
+      if(item instanceof Error)throw item;
+      return item;
+    }}}},
+    '@/constants/tokens':{colors:{pageBg:'',textPrimary:'',textSecondary:'',border:'',surfaceBg:'',
+      primary:'',status:{red:{fg:''}}},radius:{card:4},space:{lg:1,md:1,sm:1,'3xl':1,'2xl':1},touch:{min:44}},
+    './webLinks':{safePublicUrl:value=>value},
+  });
+  return {ui,queue,calls,routes,render:()=>ui.render(module.default,{section}),collect,deferred};
+}
+
+module.exports={load,renderer,collect,jsx,deferred,talentHarness,articleHarness,datum};
