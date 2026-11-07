@@ -46,7 +46,7 @@ test('R actual keyed unmount invalidates attempt while blob conversion is pendin
   assert.equal(h.callsOf('submit').length, 0);
 });
 
-test('C durable receipt-store await may complete for old account but may not launch later side effects', async () => {
+test('R durable receipt-store await may complete for old account but may not launch later side effects', async () => {
   const h = await ready({ seller_context: 'PHARMACY', pharmacy: 11 });
   const saving = h.pauseNextWrite();
   h.click('Submit for review');
@@ -64,7 +64,7 @@ test('C durable receipt-store await may complete for old account but may not lau
   h.unmount();
 });
 
-test('C old upload completion cannot clear or unlock the next account attempt', async () => {
+test('R old upload completion cannot clear or unlock the next account attempt', async () => {
   const h = await ready();
   const uploading = deferred();
   h.queue('upload', uploading);
@@ -91,7 +91,7 @@ test('C old upload completion cannot clear or unlock the next account attempt', 
   h.unmount();
 });
 
-test('C failed submit retains durable ID/version and retry can finish using same listing', async () => {
+test('R failed submit retains durable ID/version and retry can finish using same listing', async () => {
   const h = await ready({ image_uris: [] });
   h.queue('submit', Error('Submission unavailable'));
   h.click('Submit for review');
