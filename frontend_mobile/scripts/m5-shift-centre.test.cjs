@@ -130,3 +130,47 @@ test('R platform_rows: anonymous and pending/awaiting candidates have distinct a
  assert.ok(actions.some(x=>String(x).startsWith('View Ada')));
  assert.ok(actions.some(x=>String(x).startsWith('View Ben')));
 });
+
+test('C platform callbacks pass the selected shift, offer and slot without crossing dates',()=>{
+ const multi={...shift,singleUserOnly:false,slots:[{id:34},{id:99}]};
+ const offer={id:701,user:61,slots:[{slot_id:34}]};
+ const interest={id:101,userId:61,slotId:34,revealed:false};
+ const calls=[];
+ const mounted=mountPlatform({shift:multi,slotId:34,counterOffers:[offer],
+  interestsAll:[interest],onReviewOffer:(...args)=>calls.push(args)});
+ const action=mounted.find(n=>n.type==='TouchableOpacity' &&
+  String(n.props.accessibilityLabel).startsWith('Reveal offer from'));
+ assert.ok(action,'counter offer action must be mounted for selected slot');
+ action.props.onPress();
+ assert.equal(calls.length,1);
+ assert.equal(calls[0][0],multi);
+ assert.equal(calls[0][1],offer);
+ assert.equal(calls[0][2],34);
+ assert.equal(mounted.filter(n=>n.type==='SlotSelector')[0].props.selectedSlotId,34);
+});
+test('C platform reveal and Buzz use the selected candidate and exact numeric offer ID',()=>{
+ const anonymous={id:101,userId:61,slotId:34,revealed:false};
+ const pending={id:102,userId:62,slotId:34,revealed:true,pendingConfirmation:true,pendingOfferId:'310'};
+ const paid={id:103,userId:63,slotId:34,revealed:true,awaitingPayment:true,pendingOfferId:311};
+ const foreign={id:104,userId:64,slotId:99,revealed:false};
+ const reveals=[],buzzes=[];
+ const mounted=mountPlatform({slotId:34,interestsAll:[anonymous,pending,paid,foreign],
+  onReveal:(...args)=>reveals.push(args),onBuzzWorker:id=>buzzes.push(id)});
+ const buttons=mounted.filter(n=>n.type==='TouchableOpacity');
+ const reveal=buttons.find(n=>String(n.props.accessibilityLabel)==='Reveal Anonymous applicant');
+ const buzz=buttons.find(n=>String(n.props.accessibilityLabel)==='Buzz candidate for offer 310');
+ assert.ok(reveal);
+ assert.ok(buzz);
+ assert.ok(!buttons.some(n=>String(n.props.accessibilityLabel).includes('offer 311')),
+  'awaiting-payment rows must not offer Buzz');
+ assert.equal(buttons.filter(n=>String(n.props.accessibilityLabel)==='Reveal Anonymous applicant').length,1,
+  'the foreign slot candidate must not leak into the selected slot');
+ reveal.props.onPress();
+ buzz.props.onPress();
+ assert.deepEqual(reveals[0],[shift,anonymous]);
+ assert.deepEqual(buzzes,[310]);
+ const busy=mountPlatform({slotId:34,interestsAll:[pending],onBuzzWorker:()=>{},
+  buzzLoadingOfferId:310});
+ const disabled=busy.find(n=>n.props.accessibilityLabel==='Buzz candidate for offer 310');
+ assert.equal(disabled.props.disabled,true,'in-flight Buzz remains disabled');
+});
