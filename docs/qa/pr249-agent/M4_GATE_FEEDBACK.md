@@ -16,6 +16,27 @@ Local gates run every test you write. You cannot run them, so these rules come f
    `require('../node_modules/typescript')`), never an absolute path.
 Exact working diff for M4-05: M4-05_HARNESS_FIX.patch (same folder).
 
+## More harness rules (M4-01 gate Claude B, M4-03 gate Codex A, 2026-11-07)
+7. Time-zone tests: set `process.env.TZ` (e.g. 'UTC') BEFORE requiring any module; never depend on the machine zone.
+8. Node ESM cannot load shared-core `dist` (its import paths have no file extensions). A web `.test.mjs` whose
+   production file imports `@chemisttasker/shared-core` must mock that module (add EVERY export the file uses, e.g.
+   `correctionTimestamp`) or transpile shared-core source. When a production file gains a new shared-core import,
+   update EVERY existing test that mocks shared-core for that file (grep the mock factories), in the tests-only commit.
+9. vm realms: arrays/objects created inside a vm context fail `assert.deepStrictEqual` against outer-realm literals.
+   Compare `JSON.parse(JSON.stringify(x))` or `Array.from(x)`.
+10. Shared-core async transport tests: await every pending call (e.g. `await vi.waitFor(() => expect(calls).toHaveLength(2))`)
+    before inspecting the transport mock; keep the token/account-scope assertion.
+11. Never re-create a production policy inside a test (e.g. a copy of hasAdminCapability). Import/inject the real
+    shared-core function so the positive controls prove the real check.
+12. Before the fix commit, list every EXISTING test file that imports or source-reads the files you change
+    (grep the file name and its exported symbols across frontend_mobile, frontend_web, shared-core, .github/workflows);
+    the head must not break any test that passes on base. A source-regex test that pins old code must be converted to a
+    behaviour test in the tests-only commit (record it in the J5 mapping).
+13. Put ALL test changes in tests-only commits BEFORE the fix commits. If you must repair a test after a fix, say so in
+    the delivery; never change an assertion after the fix.
+14. A C (control) test must pass on base. Check fixtures against the code path the service really reads (e.g. the
+    pharmacy time zone, not only the period's).
+
 ## Appendix E (J5 conversions)
 Section E of M4_JOB_PACK.md is only a heading (no assignment table). Ignore it for now: J5 conversions are NOT part of
 the M4 jobs except where a job's own text names a test file. A separate J5 job will follow.
@@ -31,3 +52,46 @@ To do on agent/m4-05 (new tests-only commit first, then any fix commit):
    manager; #6 web notification/dashboard handoff waits while auth hydrates and never loops; #7 public board failure + retry.
 5. Fix commit: OverviewPageStaff.tsx:261 send Explorer to /shifts/public when isExplorer (avoids an extra redirect hop);
    update the stale comment at frontend_mobile ShiftsScreen.tsx:25.
+
+## M4-01 verdict: FIX FIRST (Claude B, head b78c5251; production direction sound, tests broken, head breaks 22 tests)
+Red after a local one-line patch: mobile R 1-4 fail correctly at m4-attendance.test.cjs:179/195/215/238, R5 :272 red.
+Gates: shared-core 484/484, backend attendance+workforce 508 (only the fixture test fails), tsc 0, lint 0 errors.
+To do on agent/m4-01 (new tests-only commit(s) first, then fix commits):
+1. m4-attendance.test.cjs:53 `this.useMemo` -> `react.useMemo` (rule 2); set process.env.TZ before loading (rule 7).
+2. frontend_web m4Correction.test.mjs:165 picks the reject dialog's Reason field (page :473), so Save stays disabled:
+   select the correction form's Reason field. The `click` helper at :148 asserts disabled===true (inverted; fix or drop).
+3. backend workforce test_m4_correction_requests.py:25-28 sets only the period time zone; the service reads the
+   pharmacy's (attendance_edits.py:45): set the pharmacy time zone to Australia/Brisbane in setUp (rule 14).
+4. Head breaks 22 existing tests that pass on base (rule 12):
+   - frontend_web attendanceLocum.test.mjs (14): its auth mock needs `hasCapability`.
+   - frontend_mobile workforce-request-isolation.test.cjs:290: source-regex on `scopeKey`; convert to a behaviour test
+     (the new key still includes account, pharmacy, screen, route + manager flag) and record it in the J5 mapping.
+   - frontend_web KioskEvidenceReview.test.mjs:218,245 (runs in CI shared_core_consolidation_ci.yml:124): add
+     `correctionTimestamp` to its shared-core mock.
+   - frontend_web TimesheetAdjustTimesDialog.test.mjs (5) and correctionTimestamp.test.mjs: the wrapper now loads
+     shared-core dist (rule 8): mock the import or point at shared-core source.
+5. Missing pack matrix tests: #3 live site switch while A's timeline request is still pending (not unmount);
+   #6 the other personas (Ali, Mia, Jack, Sara, Zoe); #8 approve/reject succeeding for Lina, Grace and the roster
+   delegate, plus a true staff-only delegate (comms_delegate is not one); #9 blank reject reason, invalid date,
+   double-tap, retry, and an old account's completion not navigating.
+6. m4-attendance.test.cjs:107-113 re-creates the capability policy: inject the real shared-core hasAdminCapability (rule 11).
+7. Fix: move attendanceWallTime and isValidAttendanceLocal from mobile attendance.tsx into
+   shared-core/src/utils/correctionTimestamp.ts and import them.
+8. Fix: TimesheetAdjustTimesDialog.tsx:182-197 calls the throwing shared converter inside a render-time useMemo:
+   try/catch and return a validation message.
+
+## M4-03 verdict: FIX FIRST (Codex A, head cb69a550; product gaps + failing tests)
+Head: mobile targeted 11/16, full mobile 738/743, shared targeted 3/4 (full 482/483), web node 195/199. The harness at
+c0e0be88 uses `this.useMemo` (rule 2), so it gave no red evidence.
+To do on agent/m4-03 (tests-only commit(s) first, then fix commits):
+1. GAP frontend_mobile components/shell/useShellChrome.ts:89: entering the inbox clears the badge before a successful
+   receipt, even on failure. Refresh/clear the count only after a current, successful receipt. Add an R test.
+2. GAP frontend_web src/layouts/TopBarActions.tsx:245: an old account's list or mark-all response can update the
+   current web bell. Capture account + request generation and guard every completion (success, error, finally);
+   add account-switch negative AND positive controls (current account's response still updates).
+3. Tests: notificationsInboxPaging.test.mjs:23 and scripts/m4-notifications.test.cjs:119: fix cross-realm array
+   comparisons (rule 9) and assert on the rendered error body/footer text, not internals. All 5 mobile failures must pass.
+4. shared-core src/domains/notifications/m4Inbox.test.ts:63: wait for both async transport calls (rule 10); keep the
+   token-scope assertion.
+5. Keep: server list/detail/preferences scoped to request.user (backend/notifications/views.py:32) and mark-read
+   queryset scope (services.py:166): no backend change needed.
