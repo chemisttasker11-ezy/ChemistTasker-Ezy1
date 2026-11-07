@@ -122,7 +122,7 @@ function createMarketplace() {
   const storage = new Map(), calls = [], nav = [], fetchQueue = new Map(), responses = new Map();
   const writeBarriers = [], readBarriers = [], photoQueue = [];
   const store = {
-    async getItem(key) { const gate = readBarriers.shift(); if (gate) await gate.promise; return storage.get(key) ?? null; },
+    async getItem(key) { const value = storage.get(key) ?? null; const gate = readBarriers.shift(); if (gate) await gate.promise; return value; },
     async setItem(key, value) { const gate = writeBarriers.shift(); if (gate) await gate.promise; storage.set(key, value); },
     async removeItem(key) { storage.delete(key); },
   };

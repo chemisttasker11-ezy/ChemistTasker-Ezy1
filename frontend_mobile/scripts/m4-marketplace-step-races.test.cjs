@@ -59,3 +59,16 @@ test('R concurrent same-scope draft patches preserve both fields despite first r
   assert.equal(actual.description, 'Updated description');
   h.unmount();
 });
+
+test('R clear waits for a queued patch and does not resurrect the draft', async () => {
+  const h = await ready('details');
+  const gate = h.pauseNextRead();
+  const patch = h.draftModule.patchMarketplaceDraft('1001', { created_listing_id: 'old-listing' });
+  await flush(h);
+  const clear = h.draftModule.clearMarketplaceDraft('1001');
+  await flush(h);
+  gate.resolve();
+  await Promise.all([patch, clear]);
+  assert.equal((await h.getDraft(1001)).created_listing_id, null);
+  h.unmount();
+});

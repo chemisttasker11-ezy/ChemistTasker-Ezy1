@@ -15,7 +15,7 @@ async function settled(h) {
   for (let i = 0; i < 5; i++) await h.flush();
 }
 
-test('R same-account double-tap cannot issue duplicate creates, images or review submission', async () => {
+test('C same-account double-tap cannot issue duplicate creates, images or review submission', async () => {
   const h = await ready();
   h.clickSameRender('Submit for review', 2); // same mounted callback, no intermediate render
   await settled(h);
@@ -44,7 +44,7 @@ test('C pharmacy audience uses server-returned version; images do not increment 
   const h = await ready({ seller_context: 'PHARMACY', pharmacy: 11,
     maximum_circle: 'BAD' });
   h.click('Submit for review');
-  await settled(h);
+  for (let i = 0; i < 30 && !h.callsOf('submit').length; i++) { await h.flush(); await new Promise(resolve => setImmediate(resolve)); }
   assert.equal(h.callsOf('create').length, 1);
   assert.equal(h.callsOf('audience').length, 1);
   assert.equal(h.callsOf('audience')[0].body.current_circle, 'OWNED_CHAIN');

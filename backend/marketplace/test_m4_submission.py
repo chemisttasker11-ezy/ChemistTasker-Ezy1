@@ -4,17 +4,20 @@ These controls already enforce the intended server authority on the integration
 base. The failing regression anchor is the native account-switch await chain.
 """
 from datetime import date
+import io
+import tempfile
+from PIL import Image
 from uuid import uuid4
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
-from users.models import User
+from users.models import User, OrganizationMembership
 from onboarding.models import (
     OwnerOnboarding, PharmacistOnboarding, OtherStaffOnboarding, ExplorerOnboarding,
 )
-from organizations.models import Pharmacy
+from organizations.models import Pharmacy, PharmacyAdmin, Organization
 from marketplace.models import (
     IdentityVerification, MarketplaceCategory, MarketplaceListing,
     MarketplaceRequestReceipt, MarketplaceTermsAcceptance, MarketplaceImage,
@@ -152,9 +155,11 @@ class M4MarketplaceSubmissionContracts(TestCase):
         self.assertEqual(anon.get(API + 'listings/').status_code, 200)
         self.assertEqual(anon.get(API + 'categories/').status_code, 200)
 
-    def test_version_and_publication_changes_come_only_from_the_creator(self):
+    def test_R_version_and_publication_changes_come_only_from_the_creator(self):
         made = self.create_listing()
         listing_id = made.data['id']
+        self.assertTrue(made.data['slug'])
+        self.assertTrue(MarketplaceListing.objects.get(pk=listing_id).slug)
         owner = self.api_client(self.tom)
         foreign = self.api_client(self.nadia)
         url = API + f'listings/{listing_id}/'
@@ -210,3 +215,75 @@ class M4MarketplaceSubmissionContracts(TestCase):
         self.assertEqual(refused.status_code, 413, refused.data)
         self.assertEqual(MarketplaceImage.objects.count(), 0)
         self.assertEqual(self.api_client().post(image_url, {}, format='multipart').status_code, 401)
+
+    def test_R_legacy_blank_slug_is_repaired_on_owner_patch(self):
+        made = self.create_listing()
+        MarketplaceListing.objects.filter(pk=made.data['id']).update(slug='')
+        response = self.api_client(self.tom).patch(
+            API + f"listings/{made.data['id']}/",
+            {'title': 'Restored title', 'expected_version': 1}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(MarketplaceListing.objects.get(pk=made.data['id']).slug)
+
+    def test_C_personal_sellers_and_delegated_admins(self):
+        self.personal.field_schema = {'allowed_seller_roles': [
+            'OWNER', 'PHARMACIST', 'TECHNICIAN', 'ASSISTANT', 'INTERN', 'EXPLORER']}
+        self.personal.save()
+        sara, _ = self.verified('sara', 'PHARMACIST')
+        ben, _ = self.verified('ben', 'PHARMACIST')
+        mia, _ = self.verified('mia', 'OTHER_STAFF', 'ASSISTANT')
+        jack, _ = self.verified('jack', 'OTHER_STAFF', 'INTERN')
+        for actor in (self.omar, sara, ben, self.ali, mia, jack, self.zoe):
+            with self.subTest(actor=actor.email):
+                response = self.api_client(actor).post(API + 'listings/', self.payload(
+                    seller_context='PERSONAL', pharmacy=None, category=self.personal.pk), format='json')
+                self.assertEqual(response.status_code, 201, response.data)
+                self.assertEqual(MarketplaceListing.objects.get(pk=response.data['id']).creator, actor)
+        lina, _ = self.verified('lina', 'PHARMACIST')
+        grace, _ = self.verified('grace', 'PHARMACIST')
+        PharmacyAdmin.objects.create(user=lina, pharmacy=self.site_a, admin_level='MANAGER', is_active=True)
+        org = Organization.objects.create(name='M4 network', slug='m4-network')
+        self.site_a.organization = org
+        self.site_a.save()
+        membership = OrganizationMembership.objects.create(user=grace, organization=org, role='REGION_ADMIN', region='North')
+        membership.pharmacies.add(self.site_a)
+        for actor in (lina, grace):
+            response = self.api_client(actor).post(API + 'listings/', self.payload(), format='json')
+            self.assertEqual(response.status_code, 403, response.data)
+
+    def test_C_blockers_and_disabled_writes(self):
+        user, profile = self.verified('blocked', 'PHARMACIST')
+        payload = self.payload(seller_context='PERSONAL', pharmacy=None, category=self.personal.pk)
+        user.is_otp_verified = False
+        user.save()
+        self.assertEqual(self.api_client(user).post(API + 'listings/', payload, format='json').status_code, 403)
+        user.is_otp_verified = True
+        user.save()
+        profile.date_of_birth = date(2020, 1, 1)
+        profile.save()
+        self.assertEqual(self.api_client(user).post(API + 'listings/', payload, format='json').status_code, 403)
+        profile.date_of_birth = date(1990, 1, 1)
+        profile.save()
+        MarketplaceTermsAcceptance.objects.filter(user=user).delete()
+        self.assertEqual(self.api_client(user).post(API + 'listings/', payload, format='json').status_code, 403)
+        for setting in ('MARKETPLACE_ALL_WRITES_ENABLED', 'MARKETPLACE_NEW_LISTINGS_ENABLED'):
+            with self.subTest(setting=setting), override_settings(**{setting: False}):
+                self.assertEqual(self.api_client(self.tom).post(API + 'listings/', self.payload(), format='json').status_code, 503)
+
+    def test_C_six_images_then_limit_after_invalid_retry(self):
+        with tempfile.TemporaryDirectory() as directory, override_settings(MEDIA_ROOT=directory):
+            made = self.create_listing()
+            url = API + f"listings/{made.data['id']}/images/"
+            client = self.api_client(self.tom)
+            bad = SimpleUploadedFile('bad.jpg', b'bad', content_type='image/jpeg')
+            self.assertEqual(client.post(url, {'image': bad}, format='multipart').status_code, 400)
+            for i in range(6):
+                image = io.BytesIO()
+                Image.new('RGB', (2, 2), 'red').save(image, format='JPEG')
+                upload = SimpleUploadedFile(f'{i}.jpg', image.getvalue(), content_type='image/jpeg')
+                response = client.post(url, {'image': upload}, format='multipart')
+                self.assertEqual(response.status_code, 201, response.data)
+                self.assertEqual(MarketplaceImage.objects.filter(listing_id=made.data['id']).count(), i + 1)
+            upload = SimpleUploadedFile('extra.jpg', image.getvalue(), content_type='image/jpeg')
+            self.assertEqual(client.post(url, {'image': upload}, format='multipart').status_code, 400)
+            self.assertEqual(MarketplaceImage.objects.filter(listing_id=made.data['id']).count(), 6)

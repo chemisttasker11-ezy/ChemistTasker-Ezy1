@@ -98,7 +98,7 @@ test('R late audience response cannot start previous-account image upload', asyn
   h.unmount();
 });
 
-test('R late update response after account switch leaves personal draft intact', async () => {
+test('C late update response after account switch leaves personal draft intact', async () => {
   const h = await setup({ created_listing_id: 'a1111111-1111-4111-8111-111111111111',
     created_listing_version: 2 });
   const update = deferred();
