@@ -302,3 +302,6 @@ import '../../../scripts/m5-active-shifts.test.cjs';
 
 // M5-02 mounted network/platform workspace parity tests.
 import '../../../scripts/m5-shift-centre.test.cjs';
+
+// Combine M5-04 native Post Shift mounted regression acceptance.
+import '../../../scripts/m5-post-shift-components.test.cjs';
