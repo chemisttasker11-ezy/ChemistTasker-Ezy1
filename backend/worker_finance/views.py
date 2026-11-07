@@ -655,7 +655,7 @@ def bas_worksheet(request):
         if expense.tax_code == 'GST' and expense.amount > Decimal('82.50') and not expense.evidence_confirmed:
             review.append(expense.pk)
     legacy = Invoice.objects.filter(user=request.user, request_key__isnull=True).count()
-    return Response({'start': start, 'end': end, 'basis': basis, 'G1': str(sales), '1A': str(gst), '1B': str(credit),
+    response = Response({'start': start, 'end': end, 'basis': basis, 'G1': str(sales), '1A': str(gst), '1B': str(credit),
                      'estimated_gst_net': str(gst - credit), 'expenses_needing_evidence': review,
                      'excluded_legacy_invoice_count': legacy, 'lodgement_ready': False,
                      'warnings': ['GST worksheet only, not a complete BAS or tax advice.',
@@ -663,3 +663,5 @@ def bas_worksheet(request):
                                   'Legacy invoices, bank feeds, credit notes, prepayments, PAYG, WET, LCT and adjustments are not included.',
                                   'Review GST registration dates, tax coding, evidence and business-use allocation with your adviser.',
                                   'Cash-basis expenses currently require one full-payment date; partial supplier payments need manual review.']})
+    patch_vary_headers(response, ('Authorization', 'Cookie'))
+    return response
