@@ -1,4 +1,5 @@
 import { findSkill, isMatchableSkill, skillId, SOFTWARE_GROUP, type SkillsRegistry } from '../../skills';
+import { newcomerTypeLabel } from '../onboarding/newcomer';
 
 export function resolveTalentBookingRole(category?: string | null, subtype?: string | null, title?: string | null): string {
   const normalize = (value?: string | null) => String(value || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
@@ -63,15 +64,48 @@ export function filterTalentCandidates<T extends TalentFilterCandidate>(registry
 }
 
 
-/** Public-feed-only projection: omit all private contact and authenticated profile fields. */
+/**
+ * One public talent presentation contract for Expo, Vite and Next. Map only
+ * public/authorized feed fields; never project private email, contact, birth,
+ * payment or onboarding details into a public card.
+ */
 export interface PublicTalentCandidate extends TalentFilterCandidate {
   id: number;
   roleTitle: string;
   referenceCode: string | null;
+  headline: string;
+  body: string;
+  coverageRadius: string;
+  travelStates: string[];
+  experienceBadge: string | null;
+  software: string[];
+  experience: number | null;
+  availabilityText: string;
+  availabilityMode: string | null;
+  postKind: string | null;
+  isFullTimeApplication: boolean;
+  showCalendar: boolean;
+  availableSlots: Array<{date: string; startTime: string | null; endTime: string | null; isAllDay: boolean}>;
   availabilitySummary: string;
   ratingAverage: number | null;
   ratingCount: number | null;
+  likeCount: number;
+  isLikedByMe: boolean;
+  authorUserId: number | null;
+  explorerUserId: number | null;
+  isExplorer: boolean;
+  rawRoleCategory: string | null;
+  explorerRoleType: string | null;
+  explorerProfileId: number | null;
 }
+
+const titleCaseTalent = (value: string) => value.toLowerCase()
+  .replace(/_/g, ' ').replace(/(^|\s)\S/g, letter => letter.toUpperCase());
+const localTalentDate = (date = new Date()) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const isoTalentDay = (day: string) => /^\d{4}-\d{2}-\d{2}$/.test(day);
+
+/** Normalize a server-visible post once; host UIs retain control of presentation. */
 export function projectPublicTalentCandidate(
   raw: Record<string, unknown>,
   registry: SkillsRegistry,
@@ -83,49 +117,96 @@ export function projectPublicTalentCandidate(
   const string = (...keys: string[]) => String(take(...keys) ?? '').trim();
   const strings = (...keys: string[]) => {
     const value = take(...keys);
-    return Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : [];
+    return Array.isArray(value) ? value.filter(item => typeof item === 'string' && item.trim()).map(String) : [];
   };
-  const roleTitle = string('role_title', 'roleTitle', 'explorer_role_type',
-    'explorerRoleType', 'role_category', 'roleCategory') || 'Pharmacy talent';
-  const referenceCode = string('reference_code', 'referenceCode') || null;
-  const rawDates = take('availability_days', 'availabilityDays');
-  const availableDates = (Array.isArray(rawDates) ? rawDates : [])
-    .map(item => typeof item === 'string' ? item : item && typeof item === 'object'
-      ? String((item as Record<string, unknown>).date ?? '') : '')
-    .filter(value => /^\d{4}-\d{2}-\d{2}$/.test(value));
-  const projected = projectTalentSkills(registry, [
-    ...strings('skills'), ...strings('software'),
-  ]);
-  const workTypes = strings('work_types', 'workTypes');
-  const rawAverage = take('rating_average','ratingAverage');
-  const rawCount = take('rating_count','ratingCount');
-  const valueOrNull = (value: unknown) =>
+  const numberOrNull = (value: unknown) =>
     value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
-  const role = roleTitle.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  const idOrNull = (value: unknown) => {
+    const id = numberOrNull(value);
+    return id != null && Number.isSafeInteger(id) && id > 0 ? id : null;
+  };
+
+  const roleTitle = string('role_title', 'roleTitle', 'explorer_role_type',
+    'explorerRoleType', 'role_category', 'roleCategory') || 'New to pharmacy';
+  const code = roleTitle.toUpperCase();
+  const role = code === 'EXPLORER' ? 'New to pharmacy'
+    : code === 'OTHER_STAFF' ? 'Pharmacy team'
+    : newcomerTypeLabel(roleTitle) ?? titleCaseTalent(roleTitle);
+  const workTypes = strings('work_types', 'workTypes').map(titleCaseTalent);
+  const referenceCode = string('reference_code', 'referenceCode') || null;
+  const availabilityMode = string('availability_mode', 'availabilityMode') || null;
+  const postKind = string('post_kind', 'postKind') ||
+    (availabilityMode === 'FULL_TIME_NOTICE' ? 'FULL_TIME_APPLICATION' : 'AVAILABILITY');
+  const isFullTimeApplication = postKind === 'FULL_TIME_APPLICATION';
+  const now = localTalentDate();
+  const rawSlots = take('availability_days', 'availabilityDays');
+  const availableSlots = (Array.isArray(rawSlots) ? rawSlots : [])
+    .map((item): {date: string;startTime: string|null;endTime: string|null;isAllDay: boolean}|null => {
+      if (typeof item === 'string') {
+        return {date:item, startTime:null, endTime:null, isAllDay:false};
+      }
+      if (!item || typeof item !== 'object') return null;
+      const row = item as Record<string, unknown>;
+      return {date:String(row.date ?? ''), startTime:String(row.start_time ?? row.startTime ?? row.start ?? '') || null,
+        endTime:String(row.end_time ?? row.endTime ?? row.end ?? '') || null,
+        isAllDay:Boolean(row.is_all_day ?? row.isAllDay)};
+    })
+    .filter((entry): entry is {date:string;startTime:string|null;endTime:string|null;isAllDay:boolean} =>
+      entry != null && isoTalentDay(entry.date) && entry.date >= now);
+  const availableDates = availableSlots.map(entry => entry.date);
+
+  const projected = projectTalentSkills(registry, [...strings('skills'), ...strings('software')]);
+  const radius = take('coverage_radius_km', 'coverageRadiusKm');
+  const yearsSinceRegistration = take('ahpra_years_since_first_registration', 'ahpraYearsSinceFirstRegistration');
+  const yearsExperience = take('years_experience', 'yearsExperience');
+  const experienceBadge = role.includes('Pharmacist') && yearsSinceRegistration != null
+    ? `${yearsSinceRegistration} yrs AHPRA`
+    : role.includes('Pharmacy') || role.includes('Assistant') || role.includes('Technician')
+      ? yearsExperience ? `${yearsExperience} yrs exp` : null
+      : null;
+  const nestedRating = take('rating');
+  const rating = nestedRating && typeof nestedRating === 'object'
+    ? nestedRating as Record<string, unknown> : {};
+  const roleCategory = string('role_category', 'roleCategory') || null;
+  const explorerProfileId = idOrNull(take('explorer_profile', 'explorerProfileId', 'explorerProfile'));
   return {
     id: Number(take('id')),
-    roleTitle,
-    role,
-    state: string('location_state','locationState'),
-    city: string('location_suburb','locationSuburb','location_state','locationState'),
-    pitch: string('body','short_bio','shortBio','headline'),
-    refId: referenceCode ? (referenceCode.startsWith('REF-') ? referenceCode : 'REF-' + referenceCode) : '',
-    referenceCode,
+    roleTitle, role, referenceCode,
+    refId: referenceCode ? referenceCode.startsWith('REF-') ? referenceCode : 'REF-' + referenceCode : 'REF-0000',
+    headline: string('headline'), body: string('body'),
+    state: string('location_state', 'locationState'),
+    city: string('location_suburb', 'locationSuburb', 'location_state', 'locationState'),
+    pitch: string('body', 'short_bio', 'shortBio', 'headline'),
     workTypes,
-    clinicalServices: projected.clinicalServices,
-    expandedScope: projected.expandedScope,
+    coverageRadius: radius ? `+${radius}km` : 'Local',
+    willingToTravel: Boolean(take('open_to_travel', 'openToTravel')),
+    travelStates: strings('travel_states', 'travelStates'),
+    experienceBadge,
     skills: projected.skills,
+    clinicalServices: projected.clinicalServices,
     dispenseSoftware: projected.dispenseSoftware,
-    willingToTravel: Boolean(take('open_to_travel','openToTravel')),
-    isInternshipSeeker: /intern|student/i.test(roleTitle) ||
-      workTypes.some(value => /placement|volunteer/i.test(value)),
-    availableDates,
-    availabilitySummary: string('availability_summary','availabilitySummary'),
-    ratingAverage: valueOrNull(rawAverage),
-    ratingCount: valueOrNull(rawCount),
+    expandedScope: projected.expandedScope,
+    software: projected.dispenseSoftware,
+    experience: null,
+    availabilityText: isFullTimeApplication ? 'Open anytime' : '',
+    availabilityMode, postKind, isFullTimeApplication,
+    showCalendar: !isFullTimeApplication && availableDates.length > 0,
+    availableDates, availableSlots,
+    availabilitySummary: string('availability_summary', 'availabilitySummary'),
+    isInternshipSeeker: role.includes('Student') || role.includes('Intern') ||
+      workTypes.some(type => type === 'Placement' || type === 'Volunteering'),
+    ratingAverage: numberOrNull(take('rating_average', 'ratingAverage') ?? rating.average),
+    ratingCount: numberOrNull(take('rating_count', 'ratingCount') ?? rating.count),
+    likeCount: numberOrNull(take('like_count', 'likeCount')) ?? 0,
+    isLikedByMe: Boolean(take('is_liked_by_me', 'isLikedByMe')),
+    authorUserId: idOrNull(take('author_user_id', 'authorUserId')),
+    explorerUserId: idOrNull(take('explorer_user_id', 'explorerUserId')),
+    isExplorer: String(roleCategory || '').toUpperCase() === 'EXPLORER' || explorerProfileId != null,
+    rawRoleCategory: roleCategory,
+    explorerRoleType: string('explorer_role_type', 'explorerRoleType') || null,
+    explorerProfileId,
   };
 }
-
 
 /**
  * Common public-board wire aliases. Keep the same presentation contract in
