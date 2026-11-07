@@ -949,10 +949,8 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         try {
           const pending = await pendingStore.read();
           if (!isCurrent()) return;
-          if (pending) {
-            const rejected = await pendingStore.reject(pending.key);
-            if (!isCurrent()) return;
-            setPendingPitch(rejected);
+          if (pending?.rejected) {
+            setPendingPitch(pending);
             setPitchNeedsRecovery(true);
           }
         } catch {
@@ -964,10 +962,8 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
         try {
           const pending = await pendingStore.read();
           if (!isCurrent()) return;
-          if (pending) {
-            const reconciled = await pendingStore.reconcile(pending.key, detail.code, detail.post_id);
-            if (!isCurrent()) return;
-            setPendingPitch(reconciled);
+          if (pending?.terminalCode) {
+            setPendingPitch(pending);
             setPitchNeedsRecovery(true);
           }
         } catch {
