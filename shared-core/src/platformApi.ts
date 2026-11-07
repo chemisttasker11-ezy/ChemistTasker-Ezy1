@@ -1,5 +1,5 @@
 import type { ApiClient, ApiClientConfig, ApiQuery, ApiRequestOptions } from './transport/client';
-import { createApiClient } from './transport/client';
+import { ApiError, createApiClient } from './transport/client';
 import { PLATFORM_ENDPOINTS } from './constants/platformEndpoints';
 import { API_ENDPOINTS } from './constants/endpoints';
 import type {
@@ -57,6 +57,17 @@ const domain = (client: ApiClient): DomainApi => ({ request: client.request });
 
 export function createChemistTaskerApi(config: ApiClientConfig) {
   const client = createApiClient(config);
+  const publicGet = async <T>(path: string, query?: ApiQuery): Promise<T> => {
+    const token = await config.getAuthToken?.();
+    if (!token) return client.get<T>(path, query, { retryAuth: false });
+    const optionalClient = createApiClient({ ...config, getAuthToken: () => token, onAuthFailure: undefined });
+    try {
+      return await optionalClient.get<T>(path, query, { retryAuth: false });
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401) throw error;
+      return optionalClient.get<T>(path, query, { auth: false, retryAuth: false });
+    }
+  };
 
   return {
     client,
@@ -69,12 +80,12 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
     },
 
     publicContent: {
-      listHubs: () => client.get<PublicHubSummary[]>(PLATFORM_ENDPOINTS.publicHub.community, undefined, { auth: false }),
+      listHubs: () => publicGet<PublicHubSummary[]>(PLATFORM_ENDPOINTS.publicHub.community),
       getSitemap: <T = Array<{ loc: string; lastmod?: string }>>() => client.get<T>(PLATFORM_ENDPOINTS.publicHub.sitemap, undefined, { auth: false }),
-      listCommunityPosts: (hub: string, query?: ApiQuery) => client.get<ApiPage<PublicHubPost>>(PLATFORM_ENDPOINTS.publicHub.communityPosts(hub), query, { auth: false }),
-      listCommunityPolls: (hub: string, query?: ApiQuery) => client.get<ApiPage<PublicHubPoll>>(PLATFORM_ENDPOINTS.publicHub.communityPolls(hub), query, { auth: false }),
-      getPost: (id: number) => client.get<PublicHubPost>(PLATFORM_ENDPOINTS.publicHub.post(id), undefined, { auth: false }),
-      listPostComments: (id: number, query?: ApiQuery) => client.get<ApiPage<PublicHubComment>>(PLATFORM_ENDPOINTS.publicHub.postComments(id), query, { auth: false }),
+      listCommunityPosts: (hub: string, query?: ApiQuery) => publicGet<ApiPage<PublicHubPost>>(PLATFORM_ENDPOINTS.publicHub.communityPosts(hub), query),
+      listCommunityPolls: (hub: string, query?: ApiQuery) => publicGet<ApiPage<PublicHubPoll>>(PLATFORM_ENDPOINTS.publicHub.communityPolls(hub), query),
+      getPost: (id: number) => publicGet<PublicHubPost>(PLATFORM_ENDPOINTS.publicHub.post(id)),
+      listPostComments: (id: number, query?: ApiQuery) => publicGet<ApiPage<PublicHubComment>>(PLATFORM_ENDPOINTS.publicHub.postComments(id), query),
       reportPost: (id: number, body: { reason: string; comment_id?: number }) => client.post<DetailResponse>(PLATFORM_ENDPOINTS.publicHub.postReport(id), body),
       reportBoardItem: (kind: 'talent' | 'jobs', id: number, reason: string) => client.post<DetailResponse>(PLATFORM_ENDPOINTS.publicHub.boardReport(kind, id), { reason }),
       listArticles: (query?: ApiQuery) => client.get<ApiPage<PublicArticle>>(PLATFORM_ENDPOINTS.publicHub.articles, query, { auth: false }),

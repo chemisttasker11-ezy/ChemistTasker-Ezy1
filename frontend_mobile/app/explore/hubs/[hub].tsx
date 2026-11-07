@@ -28,36 +28,62 @@ function PublicHubFeedView() {
   const accountKey = String(user?.id ?? 'anonymous');
   const { hub: routeHub } = useLocalSearchParams<{ hub: string }>();
   const hub = String(routeHub || '');
+  const loadedHub = useRef(hub);
   const generation = useRef(0);
+  const postGeneration = useRef(0);
+  const postPaging = useRef(false);
+  const searching = useRef(false);
+  const currentQuery = useRef('');
+  const pollPaging = useRef(false);
   const submitting = useRef(false);
   const [info, setInfo] = useState<PublicHubSummary | null>(null);
   const [posts, setPosts] = useState<PublicHubPost[]>([]);
   const [polls, setPolls] = useState<PublicHubPoll[]>([]);
   const [next, setNext] = useState<number | null>(null);
+  const [pollNext, setPollNext] = useState<number | null>(null);
+  // Synchronous current page count for vote refreshes racing with pagination.
+  const pollPagesRef = useRef(1);
+  const [searchDraft, setSearchDraft] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchBusy, setSearchBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [moreBusy, setMoreBusy] = useState(false);
+  const [pollMoreBusy, setPollMoreBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [moreError, setMoreError] = useState('');
+  const [pollMoreError, setPollMoreError] = useState('');
+  const [searchError, setSearchError] = useState('');
   const [actionError, setActionError] = useState('');
   const [body, setBody] = useState('');
   const [attachments, setAttachments] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
 
   const load = useCallback(async () => {
     const ticket = ++generation.current;
-    setLoading(true); setError(''); setActionError(''); setMoreError('');
-    setPosts([]); setPolls([]); setInfo(null); setNext(null); setMoreBusy(false);
+    const postTicket = ++postGeneration.current;
+    if (loadedHub.current !== hub) {
+      loadedHub.current = hub;
+      submitting.current = false; setBody(''); setAttachments([]);
+    }
+    postPaging.current = false; pollPaging.current = false; searching.current = false; currentQuery.current = '';
+    setLoading(true); setBusy(false); setError(''); setActionError(''); setMoreError('');
+    setPollMoreError(''); setSearchError(''); setSearchDraft(''); setSearchTerm('');
+    setPosts([]); setPolls([]); setInfo(null); setNext(null); setPollNext(null);
+    pollPagesRef.current = 1; setMoreBusy(false); setPollMoreBusy(false); setSearchBusy(false);
     try {
       const [hubs, result, pollResult] = await Promise.all([
         chemistTaskerApi.publicContent.listHubs(),
         chemistTaskerApi.publicContent.listCommunityPosts(hub, { page: 1 }),
-        chemistTaskerApi.publicContent.listCommunityPolls(hub),
+        chemistTaskerApi.publicContent.listCommunityPolls(hub, { page: 1 }),
       ]);
       if (ticket !== generation.current) return;
       setInfo(hubs.find(h => h.key === hub) || null);
-      setPosts(result.results || []);
-      setNext(nextPage(result.next));
+      if (postTicket === postGeneration.current) {
+        setPosts(result.results || []);
+        setNext(nextPage(result.next));
+      }
       setPolls(pollResult.results || []);
+      setPollNext(nextPage(pollResult.next));
     } catch (failure: any) {
       if (ticket === generation.current) setError(failure?.message || 'Public community could not load.');
     } finally { if (ticket === generation.current) setLoading(false); }
@@ -66,16 +92,42 @@ function PublicHubFeedView() {
     let active = true;
     // Defer initial load until after effects subscribe; stale generations cannot overwrite state.
     void Promise.resolve().then(() => { if (active) void load(); });
-    return () => { active = false; generation.current += 1; };
+    return () => { active = false; generation.current += 1; postGeneration.current += 1; };
   }, [load]);
 
-  const loadMore = async () => {
-    if (next === null || moreBusy) return;
+  // Search is posts-only; changing the query must not reset the independent poll feed.
+  const searchPosts = async (raw: string) => {
+    const q = raw.trim().slice(0, 200);
     const ticket = generation.current;
+    const postTicket = ++postGeneration.current;
+    searching.current = true;
+    postPaging.current = false;
+    setMoreBusy(false);
+    setSearchBusy(true); setSearchError(''); setMoreError('');
+    try {
+      const result = await chemistTaskerApi.publicContent.listCommunityPosts(hub, { page: 1, ...(q ? { q } : {}) });
+      if (ticket !== generation.current || postTicket !== postGeneration.current) return;
+      currentQuery.current = q;
+      setSearchTerm(q);
+      setPosts(result.results || []);
+      setNext(nextPage(result.next));
+    } catch (failure: any) {
+      if (ticket === generation.current && postTicket === postGeneration.current)
+        setSearchError(failure?.message || 'Search could not load. Try again.');
+    } finally {
+      if (ticket === generation.current && postTicket === postGeneration.current) { searching.current = false; setSearchBusy(false); }
+    }
+  };
+  const loadMore = async () => {
+    if (next === null || postPaging.current || searching.current || searchTerm !== currentQuery.current) return;
+    const ticket = generation.current;
+    const postTicket = postGeneration.current;
+    const query = currentQuery.current;
+    postPaging.current = true;
     setMoreBusy(true); setMoreError('');
     try {
-      const page = await chemistTaskerApi.publicContent.listCommunityPosts(hub, { page: next });
-      if (ticket !== generation.current) return;
+      const page = await chemistTaskerApi.publicContent.listCommunityPosts(hub, { page: next, ...(query ? { q: query } : {}) });
+      if (ticket !== generation.current || postTicket !== postGeneration.current || query !== currentQuery.current) return;
       setPosts(existing => {
         const ids = new Map(existing.map(post => [post.id, post]));
         for (const item of page.results || []) ids.set(item.id, item);
@@ -83,8 +135,39 @@ function PublicHubFeedView() {
       });
       setNext(nextPage(page.next));
     } catch (failure: any) {
-      if (ticket === generation.current) setMoreError(failure?.message || 'More posts could not load.');
-    } finally { if (ticket === generation.current) setMoreBusy(false); }
+      if (ticket === generation.current && postTicket === postGeneration.current)
+        setMoreError(failure?.message || 'More posts could not load.');
+    } finally {
+      if (ticket === generation.current && postTicket === postGeneration.current) {
+        postPaging.current = false;
+        setMoreBusy(false);
+      }
+    }
+  };
+  const loadMorePolls = async () => {
+    if (pollNext === null || pollPaging.current) return;
+    const ticket = generation.current;
+    const requested = pollNext;
+    pollPaging.current = true;
+    setPollMoreBusy(true); setPollMoreError('');
+    try {
+      const result = await chemistTaskerApi.publicContent.listCommunityPolls(hub, { page: requested });
+      if (ticket !== generation.current) return;
+      setPolls(existing => {
+        const merged = new Map(existing.map(p => [p.id, p]));
+        for (const item of result.results || []) merged.set(item.id, item);
+        return Array.from(merged.values());
+      });
+      setPollNext(nextPage(result.next));
+      pollPagesRef.current = requested;
+    } catch (failure: any) {
+      if (ticket === generation.current) setPollMoreError(failure?.message || 'More polls could not load.');
+    } finally {
+      if (ticket === generation.current) {
+        pollPaging.current = false;
+        setPollMoreBusy(false);
+      }
+    }
   };
 
   const chooseAttachments = async () => {
@@ -114,7 +197,7 @@ function PublicHubFeedView() {
       if (ticket === generation.current) { setBody(''); setAttachments([]); setBusy(false); submitting.current = false; await load(); }
     } catch (failure: any) {
       if (ticket === generation.current) setActionError(failure?.message || 'Post could not be published. Your draft is retained.');
-    } finally { submitting.current = false; if (ticket === generation.current) setBusy(false); }
+    } finally { if (ticket === generation.current) { submitting.current = false; setBusy(false); } }
   };
   const vote = async (poll: PublicHubPoll, optionId: number) => {
     if (!user) return router.push({ pathname: '/login', params: { returnTo: '/explore/hubs/' + encodeURIComponent(hub) } } as any);
@@ -123,8 +206,20 @@ function PublicHubFeedView() {
     setBusy(true); setActionError('');
     try {
       await chemistTaskerApi.publicContent.voteCommunityPoll(poll.id, optionId);
-      const response = await chemistTaskerApi.publicContent.listCommunityPolls(hub);
-      if (ticket === generation.current) setPolls(response.results || []);
+      // Refresh every visible page after a vote, preserving the loaded discussion and
+      // previously paginated polls rather than dropping page 2+ to page 1.
+      const pagesAtRefresh = pollPagesRef.current;
+      const pages = await Promise.all(Array.from({ length: pagesAtRefresh }, (_, index) =>
+        chemistTaskerApi.publicContent.listCommunityPolls(hub, { page: index + 1 })));
+      // If page 2+ arrived while the refresh ran, its newer feed wins.
+      if (ticket === generation.current && pollPagesRef.current === pagesAtRefresh) {
+        const merged = new Map<number, PublicHubPoll>();
+        for (const response of pages) {
+          for (const item of response.results || []) merged.set(item.id, item);
+        }
+        setPolls(Array.from(merged.values()));
+        setPollNext(nextPage(pages.at(-1)?.next ?? null));
+      }
     } catch (failure: any) {
       if (ticket === generation.current) setActionError(failure?.message || 'Vote failed.');
     } finally { if (ticket === generation.current) setBusy(false); }
@@ -144,6 +239,16 @@ function PublicHubFeedView() {
             {attachments.map((file, index) => <Button key={file.uri + '-' + index} mode="text" disabled={busy} onPress={() => setAttachments(existing => existing.filter((_, i) => i !== index))}>{file.name} · remove</Button>)}
             <Button mode="contained" disabled={busy || !body.trim()} loading={busy} onPress={() => void create()}>Post</Button>
           </Card.Content></Card> : <Text style={styles.muted}>This community is readable publicly. Posting is available to eligible members.</Text>}
+          <View style={styles.search}>
+            <TextInput mode="outlined" label="Search community posts" value={searchDraft}
+              onChangeText={setSearchDraft} maxLength={200} disabled={searchBusy}
+              onSubmitEditing={() => void searchPosts(searchDraft)} />
+            <Button mode="outlined" disabled={searchBusy} onPress={() => void searchPosts(searchDraft)}>Search</Button>
+            {searchTerm || searchDraft ? <Button mode="text" disabled={searchBusy}
+              onPress={() => { setSearchDraft(''); void searchPosts(''); }}>Clear search</Button> : null}
+            {searchError ? <Text accessibilityRole="alert" style={styles.error}>{searchError}</Text> : null}
+            {searchTerm ? <Text style={styles.muted}>Posts matching “{searchTerm}”</Text> : null}
+          </View>
           {polls.map(poll => <Card key={poll.id} mode="outlined" style={styles.card}><Card.Content style={styles.inner}>
             <Text variant="titleMedium">{poll.question}</Text>
             {poll.options.map(option => <Button key={option.id} mode="outlined"
@@ -151,6 +256,12 @@ function PublicHubFeedView() {
               onPress={() => void vote(poll, option.id)}>{option.text} · {option.votes} votes</Button>)}
             {poll.is_closed ? <Text style={styles.muted}>Voting closed</Text> : null}
           </Card.Content></Card>)}
+          {pollNext !== null ? <Button mode="outlined" contentStyle={styles.button}
+            disabled={pollMoreBusy} loading={pollMoreBusy} onPress={() => void loadMorePolls()}>Load more polls</Button> : null}
+          {pollMoreError ? <View style={styles.status}>
+            <Text accessibilityRole="alert" style={styles.error}>{pollMoreError}</Text>
+            <Button onPress={() => void loadMorePolls()}>Retry polls</Button>
+          </View> : null}
           {posts.length === 0 ? <Text style={styles.muted}>No community posts yet.</Text> : posts.map(post => <Card key={post.id} mode="outlined" style={styles.card}
             onPress={() => router.push({ pathname: '/explore/hubs/post/[id]', params: { id: String(post.id) } } as any)}>
             <Card.Content style={styles.inner}>
@@ -162,7 +273,7 @@ function PublicHubFeedView() {
               <Button mode="text" onPress={() => router.push({ pathname: '/explore/hubs/post/[id]', params: { id: String(post.id) } } as any)}>Read conversation</Button>
             </Card.Content>
           </Card>)}
-          {next !== null ? <Button mode="outlined" contentStyle={styles.button} disabled={moreBusy} loading={moreBusy} onPress={() => void loadMore()}>Load more posts</Button> : null}
+          {next !== null ? <Button mode="outlined" contentStyle={styles.button} disabled={moreBusy || searchBusy} loading={moreBusy} onPress={() => void loadMore()}>Load more posts</Button> : null}
           {moreError ? <Text accessibilityRole="alert" style={styles.error}>{moreError}</Text> : null}
           {actionError ? <Text accessibilityRole="alert" style={styles.error}>{actionError}</Text> : null}
           <Button mode="text" icon="share-variant" onPress={() => void Share.share({ message: publicWebUrl('/hubs/' + encodeURIComponent(hub)) }).catch(() => setActionError('Sharing unavailable.'))}>Share community</Button>
@@ -180,5 +291,6 @@ const styles = StyleSheet.create({
   pinned: { color: colors.primary, fontWeight: '700', fontSize: 12 },
   error: { color: colors.status.red.fg },
   status: { gap: space.md },
+  search: { gap: space.sm },
   button: { minHeight: touch.min },
 });
