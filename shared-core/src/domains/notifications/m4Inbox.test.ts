@@ -63,8 +63,8 @@ describe('M4-03 real notifications transport contracts', () => {
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const [, first] = fetchMock.mock.calls[0];
     const [, second] = fetchMock.mock.calls[1];
-    expect(first.headers.Authorization).toContain('omar-token');
-    expect(second.headers.Authorization).toContain('zoe-token');
+    expect(new Headers(first.headers).get('Authorization')).toContain('omar-token');
+    expect(new Headers(second.headers).get('Authorization')).toContain('zoe-token');
     resolveFirst(json({ count: 1, next: null, results: [{ id: 3 }] }));
     await Promise.all([a, b]);
   });

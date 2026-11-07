@@ -13,7 +13,8 @@ function mountBell() {
   engine.react.Fragment = 'Fragment';
   const scope = { user: { id: 101, role: 'PHARMACIST' } };
   const queues = { list: [], read: [] };
-  const calls = [];
+  const calls = [], sockets = [];
+  const refreshUnreadCount = () => {};
   const list = () => {
     calls.push(['GET', scope.user?.id]);
     const next = queues.list.shift();
@@ -46,13 +47,14 @@ function mountBell() {
     '@mui/material/Autocomplete': { __esModule: true, default: 'Autocomplete',
       createFilterOptions: () => () => [] },
     '@mui/material/styles': { alpha: () => '#eee', useTheme: () => ({
-      breakpoints: { down: () => '' }, palette: { primary: { main: '#000' } },
+      breakpoints: { down: () => '' }, palette: { primary: { main: '#000' }, common: { white: '#fff' }, divider: '#ccc' },
+      transitions: { create: () => '' }, shadows: ['', '', ''],
     }) },
     '@mui/material/useMediaQuery': component(() => true),
     'react-router-dom': { useNavigate: () => () => {}, useLocation: () => ({ pathname: '/dashboard/pharmacist/overview' }) },
     '../theme/sleekTheme': { useColorMode: () => ({ mode: 'light', toggleColorMode() {} }) },
     '../contexts/AuthContext': { useAuth: () => ({
-      user: scope.user, logout: async () => true, refreshUnreadCount() {},
+      user: scope.user, logout: async () => true, refreshUnreadCount,
       adminAssignments: [], activePersona: 'staff', activeAdminAssignment: null,
       selectRolePersona() {}, selectAdminPersona() {}, setActivePersona() {}, isAdminUser: false,
     }) },
@@ -64,7 +66,7 @@ function mountBell() {
       fetchRooms: async () => [], getOnboarding: async () => null, hasOrganizationAccess: () => false,
     },
     '../constants/api': { API_BASE_URL: 'https://test.example' },
-    '../utils/tokenService': { fetchWsTicket: async () => null },
+    '../utils/tokenService': { fetchWsTicket: async () => 'ticket' },
     '../utils/displayName': { dashboardGreetingName: () => 'Current user' },
     '../utils/roleLabels': { otherStaffRoleLabel: () => 'Staff', userRoleLabel: () => 'Pharmacist' },
     dayjs: component(Object.assign(() => ({ local() { return this; }, toDate: () => new Date() }), {
@@ -79,7 +81,7 @@ function mountBell() {
     },
   };
   vm.runInNewContext(outputText, {
-    exports, module: { exports }, console, window, WebSocket: class {},
+    exports, module: { exports }, console, window, WebSocket: class { constructor() { sockets.push(this); } close() {} },
     CustomEvent: class {}, URL, URLSearchParams, Date,
     require(id) {
       if (id in modules) return modules[id];
@@ -96,7 +98,7 @@ function mountBell() {
     const badge = nodes.find(n => n.type === 'Badge' && n.props.badgeContent != null);
     return { value: badge?.props.badgeContent, click: notification.props.onClick };
   };
-  return { scope, queues, calls, engine, render, unread, deferred };
+  return { scope, queues, calls, sockets, engine, render, unread, deferred };
 }
 const note = (id, unread = true) => ({ id, title: 'Notice ' + id, body: 'Body',
   type: 'task', createdAt: '2026-11-07T02:00:00Z', readAt: unread ? null : '2026-11-07T02:03:00Z' });
@@ -142,5 +144,72 @@ test('R old web mark-all response cannot clear a new account badge; current rece
   await h.engine.flush();
   nodes = await h.render();
   assert.equal(h.unread(nodes).value, 0, 'current receipt marks current bell');
+  h.engine.unmount();
+});
+
+
+test('R pending list cannot restore unread after a successful receipt', async () => {
+  const h = mountBell(), pending = h.deferred(), receipt = h.deferred();
+  h.queues.list.push({ results: [note(1)] });
+  let nodes = await h.render();
+  h.queues.list.push(pending);
+  h.sockets.at(-1).onmessage({ data: JSON.stringify({ type: 'notification.counter' }) });
+  h.queues.read.push(receipt);
+  h.unread(nodes).click({ currentTarget: {} });
+  receipt.resolve({ marked: 1, unread: 0 });
+  await h.engine.flush();
+  nodes = await h.render();
+  assert.equal(h.unread(nodes).value, 0, 'receipt clears unread before stale list resolves');
+  pending.resolve({ results: [note(1)] });
+  await h.engine.flush();
+  nodes = await h.render();
+  assert.equal(h.unread(nodes).value, 0, 'stale list must not restore unread after receipt');
+  assert.equal(nodes.find(n => n.type === 'ListItemText' && n.props.primary === 'Notice 1')?.props.primaryTypographyProps.fontWeight, 500);
+  h.engine.unmount();
+});
+
+test('C current list updates unread after a receipt', async () => {
+  const h = mountBell();
+  h.queues.list.push({ results: [note(1)] });
+  let nodes = await h.render();
+  h.queues.read.push({ marked: 1, unread: 0 });
+  h.unread(nodes).click({ currentTarget: {} });
+  await h.engine.flush();
+  h.queues.list.push({ results: [note(1, false), note(2)] });
+  h.sockets.at(-1).onmessage({ data: JSON.stringify({ type: 'notification.counter' }) });
+  await h.engine.flush();
+  nodes = await h.render();
+  assert.equal(h.unread(nodes).value, 1, 'new list still updates the current badge');
+  h.engine.unmount();
+});
+
+test('R silent reload superseding visible load settles spinner', async () => {
+  const h = mountBell(), visible = h.deferred(), silent = h.deferred();
+  h.queues.list.push(visible);
+  let nodes = await h.render();
+  assert.ok(nodes.some(n => n.type === 'CircularProgress'), 'visible request starts spinner');
+  h.queues.list.push(silent);
+  h.sockets.at(-1).onmessage({ data: JSON.stringify({ type: 'notification.counter' }) });
+  silent.resolve({ results: [note(2)] });
+  await h.engine.flush();
+  nodes = await h.render();
+  assert.equal(h.unread(nodes).value, 1);
+  assert.ok(!nodes.some(n => n.type === 'CircularProgress'), 'current silent request settles spinner');
+  visible.resolve({ results: [note(1)] });
+  await h.engine.flush();
+  h.engine.unmount();
+});
+
+test('C visible load settles spinner and displays current rows', async () => {
+  const h = mountBell(), visible = h.deferred();
+  h.queues.list.push(visible);
+  let nodes = await h.render();
+  assert.ok(nodes.some(n => n.type === 'CircularProgress'));
+  visible.resolve({ results: [note(3)] });
+  await h.engine.flush();
+  nodes = await h.render();
+  assert.ok(!nodes.some(n => n.type === 'CircularProgress'));
+  assert.equal(h.unread(nodes).value, 1);
+  assert.ok(nodes.some(n => n.type === 'ListItemText' && n.props.primary === 'Notice 3'));
   h.engine.unmount();
 });
