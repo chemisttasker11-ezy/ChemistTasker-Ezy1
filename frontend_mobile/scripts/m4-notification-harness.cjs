@@ -247,14 +247,16 @@ function createInbox() {
       node.type === 'IconButton' && node.props.accessibilityLabel === 'Mark notification as read' :
       node.type === 'Pressable');
     assert.ok(target, 'notification action not rendered');
-    await target.props.onPress();
+    // Intentionally do not await an in-flight network mutation. Tests control
+    // its deferred resolution across blur/account transitions.
+    target.props.onPress();
     await engine.flush();
     return settle();
   }
   async function refresh() {
     const control = list()?.props.refreshControl;
     assert.ok(control?.props.onRefresh, 'refresh control missing');
-    await control.props.onRefresh(); await engine.flush();
+    control.props.onRefresh(); await engine.flush();
     return settle();
   }
   async function loadOlder() {
