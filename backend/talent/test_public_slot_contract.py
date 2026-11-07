@@ -1,6 +1,7 @@
 """API regressions for legacy private schedules and the public slot boundary."""
 import json
 from datetime import timedelta, time
+from uuid import uuid4
 
 from django.test import TestCase
 from django.utils import timezone
@@ -134,7 +135,8 @@ class AvailabilityBoundaryContractTests(TestCase):
                       "internal": {"notes": "Secret"}, "notify_new_shifts": True}
         for user in self.workers:
             client = client_for(user)
-            response = client.post(PUBLIC_URL, self.payload([dirty_slot]), format="json")
+            response = client.post(PUBLIC_URL, self.payload([dirty_slot]), format="json",
+                                   HTTP_IDEMPOTENCY_KEY=str(uuid4()))
             with self.subTest(role=user.role, method="POST"):
                 self.assertEqual(response.status_code, 201, response.data)
                 self.assertEqual(response.data["availability_days"], [self.slot])
@@ -157,7 +159,8 @@ class AvailabilityBoundaryContractTests(TestCase):
         for user in self.workers:
             for slots in bad_values:
                 with self.subTest(role=user.role, slots=slots):
-                    response = client_for(user).post(PUBLIC_URL, self.payload(slots), format="json")
+                    response = client_for(user).post(PUBLIC_URL, self.payload(slots), format="json",
+                                                     HTTP_IDEMPOTENCY_KEY=str(uuid4()))
                     self.assertEqual(response.status_code, 400, response.data)
                     self.assertIn("availability_days", response.data)
 
@@ -168,7 +171,8 @@ class AvailabilityBoundaryContractTests(TestCase):
             for format in ("json", "multipart"):
                 with self.subTest(role=user.role, format=format):
                     payload = self.payload(slots if format == "json" else json.dumps(slots))
-                    response = client_for(user).post(PUBLIC_URL, payload, format=format)
+                    response = client_for(user).post(PUBLIC_URL, payload, format=format,
+                                                     HTTP_IDEMPOTENCY_KEY=str(uuid4()))
                     self.assertEqual(response.status_code, 201, response.data)
                     self.assertEqual(response.data["availability_days"], slots)
 
