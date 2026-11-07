@@ -308,3 +308,34 @@ test('C: stale poll and post completions from the former account cannot replace 
   assert.equal(h.find(tree,n=>n.type==='Text'&&n.props.children==='Poll 77').length,1);
   assert.equal(h.find(tree,n=>n.type==='Text'&&['Post 1','Poll 1'].includes(n.props.children)).length,0);
 });
+
+for (const outcome of ['succeeds', 'rejects']) {
+  test(`R: pending vote ${outcome} after hub switch; new hub remains votable`,async()=>{
+    const oldVote=deferred(), votes=[];
+    const h=env({api:{
+      listCommunityPolls:async hub=>page([poll(hub==='public'?1:77)]),
+      voteCommunityPoll:(id,option)=>{
+        votes.push([id,option]);
+        return id===1?oldVote.promise:Promise.resolve({});
+      },
+    }});
+    h.render();await h.tick();
+    const oldChoice=h.find(h.render(),n=>n.type==='Button'&&String(n.props?.children).includes('Yes'))[0];
+    assert.ok(oldChoice&&!oldChoice.props.disabled);
+    oldChoice.props.onPress();
+    assert.deepEqual(votes,[[1,10]]);
+    h.changeHub('explorer');h.render();await h.tick();
+    if(outcome==='succeeds') oldVote.resolve({});
+    else oldVote.reject(Error('old vote failed'));
+    await h.tick();
+    const tree=h.render();
+    assert.equal(h.find(tree,n=>n.type==='Text'&&n.props.children==='Poll 77').length,1);
+    assert.equal(h.find(tree,n=>n.type==='Text'&&n.props.children==='Poll 1').length,0);
+    assert.equal(h.find(tree,n=>n.props?.accessibilityRole==='alert').length,0);
+    const newChoice=h.find(tree,n=>n.type==='Button'&&String(n.props?.children).includes('Yes'))[0];
+    assert.ok(newChoice&&!newChoice.props.disabled,'new hub option must be enabled after stale vote settles');
+    newChoice.props.onPress();await h.tick();
+    assert.deepEqual(votes,[[1,10],[77,770]],'new hub vote sends its own poll and option');
+    assert.equal(h.find(h.render(),n=>n.type==='Text'&&n.props.children==='Poll 77').length,1);
+  });
+}
