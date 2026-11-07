@@ -272,7 +272,10 @@ test('R #1 actual native role/state/work/skill/date/travel/placement filters fin
     chip.onPress(); tree=await h.render();
   };
   await choose('Intern'); await choose('QLD'); await choose('Placement');
-  await choose('WEBSTER_PACKING_DAA'); await choose('Travel'); await choose('Placement');
+  await choose('WEBSTER_PACKING_DAA'); await choose('Travel');
+  const placementSwitch=collect(tree,'Chip').find(p=>p.children==='Placement' && !p.selected);
+  assert.ok(placementSwitch,'placement seeker toggle must remain separately selectable');
+  placementSwitch.onPress();tree=await h.render();
   let search=collect(tree,'TextInput').find(p=>p.accessibilityLabel==='Search talent');
   assert.ok(search);
   search.onChangeText('REF-2');tree=await h.render();
