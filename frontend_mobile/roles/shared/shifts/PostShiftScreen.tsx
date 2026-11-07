@@ -5,7 +5,7 @@ import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults,
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 import { normalizeShiftRequirements, canNotifyShiftChainMembers, isPrivateShiftBooking, automaticShiftEscalationDates, type ShiftEscalationPlan } from '@chemisttasker/shared-core';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, View, ScrollView, TouchableOpacity } from 'react-native';
+import { Alert, View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import {
     Text,
     Button,
@@ -1518,6 +1518,7 @@ export default function PostShiftScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['left', 'right']}>
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={[styles.content, isEmbedded && styles.contentEmbedded]} style={{ flex: 1 }} pointerEvents={hydrating ? 'none' : 'auto'}>
                 {!isEmbedded ? (
                     <>
@@ -1537,7 +1538,9 @@ export default function PostShiftScreen() {
 
                 {error ? <HelperText type="error" accessibilityLiveRegion="polite" style={{ fontSize: 14, fontWeight: '600' }}>{error}</HelperText> : null}
 
-                <View style={styles.navRow}>
+            </ScrollView>
+
+                <View style={[styles.navRow, styles.stickyFooter]}>
                     <Button
                         mode="outlined"
                         onPress={goBack}
@@ -1577,7 +1580,7 @@ export default function PostShiftScreen() {
                         </Button>
                     )}
                 </View>
-            </ScrollView>
+            </KeyboardAvoidingView>
 
             <Snackbar
                 visible={!!toast}
