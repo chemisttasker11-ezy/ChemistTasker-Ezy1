@@ -103,6 +103,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
     // Do not start duplicate fulfilment attempts from rapid taps. The backend
     // remains responsible for durable payment/booking idempotency.
     const paymentBusyRef = useRef(false);
+    // Buzz sends must lock synchronously, before a React state update can render.
+    const buzzBusyRef = useRef(false);
     const paymentContextRef = useRef(`${user?.id ?? 'anonymous'}:${surface.scopeKey}`);
     const paymentContext = `${user?.id ?? 'anonymous'}:${surface.scopeKey}`;
     paymentContextRef.current = paymentContext;
@@ -763,16 +765,20 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
 
     const handleBuzzWorker = useCallback(
         async (offerId: number) => {
-            if (!offerId) return;
+            if (!offerId || buzzBusyRef.current) return;
+            buzzBusyRef.current = true;
+            const context = paymentContextRef.current;
             setBuzzLoadingOfferId(offerId);
             try {
                 const result = await buzzShiftOffer(offerId);
+                if (context !== paymentContextRef.current) return;
                 Alert.alert(
                     'Buzz reminder',
                     result?.detail || "Reminder sent. We've gently nudged the candidate to confirm this shift.",
                     [{ text: 'Close' }]
                 );
             } catch (error) {
+                if (context !== paymentContextRef.current) return;
                 console.error('Failed to send confirmation reminder', error);
                 const message =
                     (error as any)?.response?.data?.detail ||
@@ -783,7 +789,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                 Alert.alert('Buzz reminder', message, [{ text: 'Close' }]);
                 await loadShifts();
             } finally {
-                setBuzzLoadingOfferId(null);
+                buzzBusyRef.current = false;
+                if (context === paymentContextRef.current) setBuzzLoadingOfferId(null);
             }
         },
         [loadShifts]
