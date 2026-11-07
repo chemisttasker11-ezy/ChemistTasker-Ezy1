@@ -17,8 +17,8 @@ class M4WorkerCorrectionContracts(TestCase):
     def setUp(self):
         self.tom, self.pharmacy = make_owner_with_pharmacy("M4 Timesheet A")
         self.nadia, self.other = make_owner_with_pharmacy("M4 Timesheet B")
-        self.pharmacy.time_zone = TZ.key
-        self.pharmacy.save(update_fields=["time_zone"])
+        self.pharmacy.timezone = TZ.key
+        self.pharmacy.save(update_fields=["timezone"])
         self.worker, membership = make_staff_member(self.pharmacy, role="ASSISTANT")
         self.membership = membership
         day = timezone.localtime(timezone.now(), TZ).date() - timedelta(days=8)
