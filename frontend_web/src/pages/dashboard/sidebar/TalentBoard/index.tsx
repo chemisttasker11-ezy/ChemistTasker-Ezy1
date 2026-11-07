@@ -1,4 +1,4 @@
-import { normalizeVerification, projectTalentSkills, resolveTalentBookingRole } from '@chemisttasker/shared-core';
+import { normalizeVerification, projectPublicTalentCandidate, resolveTalentBookingRole } from '@chemisttasker/shared-core';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 ﻿import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -18,7 +18,7 @@ import DashboardContentState from "../../../../components/dashboard/DashboardCon
 import FiltersSidebar, { TalentFilterState } from "./components/FiltersSidebar";
 const PostShiftPage = lazy(() => import("../PostShiftPage"));
 import { Candidate } from "./types";
-import { formatRoleLabel, formatWorkType, mapAvailabilityToPitchSlots, allWorkTypes, resolveTalentSkillLabel, isIsoDate, todayIso } from "./talentModel";
+import { mapAvailabilityToPitchSlots, allWorkTypes, resolveTalentSkillLabel, todayIso } from "./talentModel";
 import { useAuth } from "../../../../contexts/AuthContext";
 import {
   canPublishTalent,
@@ -98,139 +98,18 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
   const ratingFetchRef = useRef<Set<number>>(new Set());
 
 
-  const candidates = useMemo<Candidate[]>(() => {
-    return posts.map((post) => {
-      const roleLabel = formatRoleLabel(post.roleTitle || post.explorerRoleType || post.roleCategory);
-      const workTypes =
-        Array.isArray((post as any).workTypes) && (post as any).workTypes.length
-          ? (post as any).workTypes.map((w: string) => formatWorkType(w))
-          : [];
-      const city = post.locationSuburb || post.locationState || "";
-      const state = post.locationState || "";
-      const coverageRadius = post.coverageRadiusKm ? `+${post.coverageRadiusKm}km` : "Local";
-      const willingToTravel = Boolean(post.openToTravel);
-      const travelStates = Array.isArray((post as any).travelStates)
-        ? (post as any).travelStates
-        : Array.isArray((post as any).travel_states)
-          ? (post as any).travel_states
-          : [];
-      const ahpraYears =
-        (post as any).ahpraYearsSinceFirstRegistration ??
-        (post as any).ahpra_years_since_first_registration ??
-        null;
-      const yearsExperience =
-        (post as any).yearsExperience ?? (post as any).years_experience ?? null;
-      const experienceBadge =
-        roleLabel.includes("Pharmacist") && ahpraYears != null
-          ? `${ahpraYears} yrs AHPRA`
-          : roleLabel.includes("Pharmacy") || roleLabel.includes("Assistant") || roleLabel.includes("Technician")
-            ? (yearsExperience ? `${yearsExperience} yrs exp` : null)
-            : null;
-      const pitchText = post.body || (post as any).shortBio || "";
-      const availabilityMode = post.availabilityMode || null;
-      const postKind =
-        post.postKind ||
-        (availabilityMode === "FULL_TIME_NOTICE" ? "FULL_TIME_APPLICATION" : "AVAILABILITY");
-      const isFullTimeApplication = postKind === "FULL_TIME_APPLICATION";
-
-      const availabilityRaw = Array.isArray(post.availabilityDays) ? post.availabilityDays : [];
-      const availableSlots = availabilityRaw
-        .map((entry: any) => {
-          if (typeof entry === "string") {
-            return { date: entry, startTime: null, endTime: null, isAllDay: false };
-          }
-          if (entry && typeof entry === "object") {
-            return {
-              date: String(entry.date || ""),
-              startTime: entry.start_time || entry.startTime || entry.start || null,
-              endTime: entry.end_time || entry.endTime || entry.end || null,
-              isAllDay: Boolean(entry.is_all_day ?? entry.isAllDay),
-            };
-          }
-          return null;
-        })
-        .filter(
-          (entry: any): entry is { date: string; startTime?: string | null; endTime?: string | null; isAllDay?: boolean } =>
-            Boolean(entry && isIsoDate(entry.date) && entry.date >= todayIso())
-        ) as Array<{ date: string; startTime?: string | null; endTime?: string | null; isAllDay?: boolean }>;
-      const availableDates = availableSlots.map((slot: any) => slot.date);
-
-      const showCalendar = !isFullTimeApplication && availableDates.length > 0;
-
-      const rawSkills = Array.from(new Set([...(post.software ?? []), ...(post.skills ?? [])])).filter(Boolean) as string[];
-      const { clinicalServices, dispenseSoftware, expandedScope, skills } = projectTalentSkills(skillsRegistry as any, rawSkills);
-      const ratingFromPostAverageRaw =
-        (post as any).ratingAverage ??
-        (post as any).rating_average ??
-        (post as any).rating?.average ??
-        null;
-      const ratingFromPostCountRaw =
-        (post as any).ratingCount ??
-        (post as any).rating_count ??
-        (post as any).rating?.count ??
-        null;
-      const ratingFromPostAverage = Number.isFinite(Number(ratingFromPostAverageRaw))
-        ? Number(ratingFromPostAverageRaw)
-        : null;
-      const ratingFromPostCount = Number.isFinite(Number(ratingFromPostCountRaw))
-        ? Number(ratingFromPostCountRaw)
-        : null;
-
-      const rating = post.authorUserId != null ? ratingSummary[post.authorUserId] : undefined;
-      const ratingAverage = rating?.average ?? ratingFromPostAverage ?? 0;
-      const ratingCount = rating?.count ?? ratingFromPostCount ?? 0;
-
-      return {
-        id: post.id,
-        refId: post.referenceCode
-          ? post.referenceCode.startsWith("REF-")
-            ? post.referenceCode
-            : `REF-${post.referenceCode}`
-          : "REF-0000",
-        role: roleLabel,
-        headline: post.headline || "",
-        body: post.body || "",
-        city,
-        state,
-        coverageRadius,
-        workTypes,
-        willingToTravel,
-        pitch: pitchText,
-        travelStates,
-        experienceBadge,
-        skills,
-        software: dispenseSoftware,
-        clinicalServices,
-        dispenseSoftware,
-        expandedScope,
-        experience: null,
-        availabilityText: isFullTimeApplication ? "Open anytime" : "",
-        availabilityMode,
-        postKind,
-        isFullTimeApplication,
-        showCalendar,
-        availableDates,
-        availableSlots,
-        isInternshipSeeker:
-          roleLabel.includes("Student") ||
-          roleLabel.includes("Intern") ||
-          workTypes.some((type: string) => ["Placement", "Volunteering"].includes(type)),
-        ratingAverage,
-        ratingCount,
-        likeCount: typeof post.like_count === "number" ? post.like_count : 0,
-        isLikedByMe: Boolean(post.is_liked_by_me),
-        authorUserId: post.authorUserId ?? null,
-        explorerUserId: post.explorerUserId ?? null,
-        isExplorer:
-          (post.roleCategory || "").toUpperCase() === "EXPLORER" ||
-          post.explorerProfileId != null,
-        rawRoleCategory: post.roleCategory ?? null,
-        explorerRoleType: post.explorerRoleType ?? null,
-        explorerProfileId: post.explorerProfileId ?? null,
-        verification: normalizeVerification((post as any).verification, (post as any).ahpra),
-      };
-    });
-  }, [posts, ratingSummary]);
+  const candidates = useMemo<Candidate[]>(() => posts.map(post => {
+    // Shared with Expo and migrated Next: one public-domain projection for role,
+    // work type, skill registry, future dates, badges and anonymous identities.
+    const candidate = projectPublicTalentCandidate(post, skillsRegistry as any);
+    const rating = candidate.authorUserId != null ? ratingSummary[candidate.authorUserId] : undefined;
+    return {
+      ...candidate,
+      ratingAverage: rating?.average ?? candidate.ratingAverage ?? 0,
+      ratingCount: rating?.count ?? candidate.ratingCount ?? 0,
+      verification: normalizeVerification((post as any).verification, (post as any).ahpra),
+    };
+  }), [posts, ratingSummary]);
 
   const {
     filtered: processedCandidates,

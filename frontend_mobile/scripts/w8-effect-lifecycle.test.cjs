@@ -3,12 +3,51 @@ const assert=require('node:assert/strict');
 const {readFileSync}=require('node:fs');
 const {resolve}=require('node:path');
 const read=p=>readFileSync(resolve(__dirname,'..',p),'utf8');
-test('W8 native public loaders defer initial dispatch until effect subscription and ignore stale generations',()=>{
- for(const file of ["features/explore/ArticleFeed.tsx","features/explore/ArticleDetail.tsx","app/explore/hubs/index.tsx","app/explore/hubs/[hub].tsx","app/explore/hubs/post/[id].tsx","app/explore/organization/[slug].tsx","app/explore/talent-board.tsx"]){
-   const src=read(file);
-   assert.match(src,/Promise\.resolve\(\)\.then\(\(\) => \{ if \(active\) void load\(\); \}\)/);
-   assert.match(src,/active = false/);
- }
+const {talentHarness,articleHarness,datum,collect,deferred} =
+  require('./m4-discovery-behaviour.cjs');
+const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
+
+test('C W8 native public talent effect unmount invalidates a late fetch without private side effects',async()=>{
+  const h=talentHarness(), pending=deferred();
+  h.queue.push(pending);
+  let tree=await h.render(); // real screen mounts and subscribes effects
+  assert.equal(h.calls.length,1);
+  assert.equal(collect(tree,'Card').length,0);
+  h.ui.unmount();
+  const stateBefore=h.ui.snapshot();
+  pending.resolve({count:1,results:[datum(3)],next:null});
+  await settle();
+  assert.equal(h.ui.snapshot(),stateBefore,'late public result cannot mutate unmounted hook state');
+  assert.equal(h.calls.length,1,'no new network request on unmount');
+  assert.equal(h.routes.length,0);
+});
+
+test('C W8 native blog feed unmount ignores a late article reply',async()=>{
+  const h=articleHarness('news'),pending=deferred();
+  h.queue.push(pending);
+  let tree=await h.render();
+  assert.equal(h.calls.length,1);
+  h.ui.unmount();
+  const stateBefore=h.ui.snapshot();
+  pending.resolve({results:[{id:17,kind:'news',title:'Late news',
+    slug:'late-news',read_minutes:3,cover_url:null}],next:null});
+  await settle();
+  assert.equal(h.ui.snapshot(),stateBefore,'late article result cannot mutate unmounted hook state');
+  assert.equal(h.calls.length,1,'no extra page call after unmount');
+  assert.equal(h.routes.length,0);
+});
+test('C W8 unaffected public hosts retain the original deferred effect cancellation controls',()=>{
+  for(const file of [
+    "features/explore/ArticleDetail.tsx",
+    "app/explore/hubs/index.tsx",
+    "app/explore/hubs/[hub].tsx",
+    "app/explore/hubs/post/[id].tsx",
+    "app/explore/organization/[slug].tsx",
+  ]){
+    const src=read(file);
+    assert.match(src,/Promise\.resolve\(\)\.then\(\(\) => \{ if \(active\) void load\(\); \}\)/);
+    assert.match(src,/active = false/);
+  }
 });
 test('publisher link cannot leak across account transitions',()=>{
  const src=read('components/shell/MoreScreen.tsx');

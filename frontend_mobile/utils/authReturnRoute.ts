@@ -4,6 +4,7 @@ const SAFE_QUERY_PARAMS = new Set([
   'referral_code',
   'referral_event_id',
   'referral_shift_id',
+  'reference_code',
   'source',
   'category',
   'role',

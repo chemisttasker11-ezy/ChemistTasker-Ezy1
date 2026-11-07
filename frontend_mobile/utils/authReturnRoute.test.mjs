@@ -163,3 +163,16 @@ test('VerifyOTPScreen actual handler: web success routes login, native success r
     }
   }
 });
+
+test('R #2 QR reference survives native login return while unsafe query values are stripped',()=>{
+  const qr='/explore/talent-board?reference_code=BEN.PUBLIC-77&source=qr#ignore-me';
+  assert.equal(sanitizeReturnTo(qr),
+    '/explore/talent-board?reference_code=BEN.PUBLIC-77&source=qr');
+  assert.equal(sanitizeReturnTo('/explore/talent-board?reference_code=//evil.com'),
+    null);
+  assert.equal(sanitizeReturnTo('/explore/talent-board?reference_code=FOO%0Abar'),
+    '/explore/talent-board');
+  for(const bad of ['https://evil.test/explore/talent-board?reference_code=BEN.PUBLIC-77',
+    '//evil.test/explore/talent-board', '/explore/%2e%2e/talent-board'])
+    assert.equal(sanitizeReturnTo(bad),null,bad);
+});

@@ -20,6 +20,7 @@ const rolePath: Record<string, string> = {
   TECHNICIAN: 'Dispensary workflow and workplace development',
   ASSISTANT: 'Customer service and workplace development',
   EXPLORER: 'Career discovery and pharmacy pathways',
+  CAREER_SWITCHER: 'Career transition and pharmacy pathways',
 };
 
 function getNextPage(next: string | null): number | null {
@@ -37,7 +38,36 @@ function articleHref(item: PublicArticle): string {
 
 export default function LearningScreen() {
   const { user } = useAuth();
+  const accountId = String(user?.id ?? 'anonymous');
   const generation = useRef(0);
+  const roleGeneration = useRef(0);
+  const roleScopeRef = useRef(accountId);
+  roleScopeRef.current = accountId;
+  const [serverRole, setServerRole] = useState<{ account: string; code: string | null } | null>(null);
+  const [roleError, setRoleError] = useState(false);
+  const [roleRetry, setRoleRetry] = useState(0);
+  useEffect(() => {
+    const ticket = ++roleGeneration.current;
+    setServerRole(null);
+    setRoleError(false);
+    if (user?.id == null) return;
+    // role_code is the server authority even when a marketplace trader is blocked.
+    // This read does not grant trading or any write capability.
+    void chemistTaskerApi.marketplace.getListingOptions()
+      .then(options => {
+        if (ticket === roleGeneration.current && roleScopeRef.current === accountId) {
+          setServerRole({ account: accountId,
+            code: typeof options?.role_code === 'string' ? options.role_code.toUpperCase() : null });
+        }
+      })
+      .catch(() => {
+        if (ticket === roleGeneration.current && roleScopeRef.current === accountId) {
+          setRoleError(true);
+          setServerRole({ account: accountId, code: null });
+        }
+      });
+    return () => { roleGeneration.current += 1; };
+  }, [accountId, user?.id, roleRetry]);
   const [articles, setArticles] = useState<PublicArticle[]>([]);
   const [nextPage, setNextPage] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,8 +135,11 @@ export default function LearningScreen() {
 
   // Results already reflect server-side query/kind across every page.
   const visible = articles;
-  const roleCode = String(user?.role || '').toUpperCase();
-  const pathway = rolePath[roleCode];
+  const knownAccountRole = String(user?.role || '').toUpperCase();
+  const subtype = serverRole?.account === accountId ? serverRole.code : null;
+  // Generic OTHER_STAFF is never treated as one of its distinct subtypes.
+  const roleCode = subtype || (knownAccountRole === 'OTHER_STAFF' ? '' : knownAccountRole);
+  const pathway = rolePath[roleCode] || (knownAccountRole === 'EXPLORER' ? rolePath.EXPLORER : 'Explore professional learning and pharmacy career resources.');
 
   const openArticle = useCallback(async (article: PublicArticle) => {
     setOpenError(null);
@@ -120,7 +153,14 @@ export default function LearningScreen() {
         <Text variant="headlineMedium" style={styles.title}>Learning materials</Text>
         <Text style={styles.subtitle}>Discover pharmacy learning, industry news and career development resources.</Text>
       </View>
-      {pathway ? <Card mode="outlined" style={styles.pathway}><Card.Content><Text style={styles.eyebrow}>YOUR PATHWAY</Text><Text style={styles.pathwayText}>{pathway}</Text></Card.Content></Card> : null}
+      <Card mode="outlined" style={styles.pathway}><Card.Content>
+        <Text style={styles.eyebrow}>YOUR PATHWAY</Text>
+        <Text style={styles.pathwayText}>{pathway}</Text>
+        {roleError ? <>
+          <Text accessibilityRole="alert" style={styles.error}>Your role pathway could not be checked.</Text>
+          <Button onPress={() => setRoleRetry(retry => retry + 1)}>Retry pathway</Button>
+        </> : null}
+      </Card.Content></Card>
       <TextInput mode="outlined" placeholder="Search all resources" value={query} onChangeText={setQuery} left={<TextInput.Icon icon="magnify" />} accessibilityLabel="Search learning resources" />
       <View style={styles.filters}>
         {(['all', 'blog', 'news'] as const).map(value => <Chip key={value} selected={kind === value} onPress={() => setKind(value)} style={kind === value ? styles.selectedChip : undefined}>{value === 'all' ? 'All' : value === 'blog' ? 'Articles' : 'News'}</Chip>)}
