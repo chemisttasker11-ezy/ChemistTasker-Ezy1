@@ -23,6 +23,7 @@ import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import { resolveDashboardPath } from '../utils/dashboardPath';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
 import { setRobotsMeta } from '../utils/seo';
+import { safeNext } from '../../landing_next/shared/browser-session';
 
 const PERSONA_KEY_PREFIX = 'ct-active-persona';
 
@@ -74,8 +75,11 @@ export default function Login() {
         return;
       }
 
+      // Keep existing verification and owner-onboarding gates before
+      // honoring a public QR return path supplied via ?next=.
+      const requestedNext = safeNext(new URLSearchParams(location.search).get('next'));
       if (hasOrganizationAccess(userInfo) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(userInfo.role)) {
-        navigate('/dashboard/organization/overview');
+        navigate(requestedNext || '/dashboard/organization/overview');
         return;
       }
 
@@ -87,7 +91,7 @@ export default function Login() {
         }
       }
 
-      navigate(resolveDashboardPath(userInfo.role));
+      navigate(requestedNext || resolveDashboardPath(userInfo.role));
     } catch (err) {
       if (err && typeof err === 'object' && 'status' in err) {
         const status = Number((err as any).status);
