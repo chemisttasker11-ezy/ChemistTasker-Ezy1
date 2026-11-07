@@ -31,6 +31,20 @@ export async function saveMarketplaceDraft(scope:string,value:MarketplaceMobileD
 // Serialize read/modify/write operations by account so concurrent field edits and
 // server receipt progress cannot erase one another. A failed write releases its queue.
 const writes=new Map<string,Promise<unknown>>();
+/**
+ * Read after any pending per-account draft mutations, including server upload
+ * receipts. Register the read in the same queue so a concurrent patch cannot
+ * overtake it and make a retained Photos screen observe an older receipt.
+ * Failed writes still release the queue; removing an unknown remote image
+ * remains blocked rather than guessing its id.
+ */
+export function loadSettledMarketplaceDraft(scope:string):Promise<MarketplaceMobileDraft>{
+ const previous=writes.get(scope)??Promise.resolve();
+ const read=previous.catch(()=>undefined).then(()=>loadMarketplaceDraft(scope));
+ writes.set(scope,read);
+ void read.finally(()=>{if(writes.get(scope)===read)writes.delete(scope);}).catch(()=>undefined);
+ return read;
+}
 export function patchMarketplaceDraft(
  scope:string,patch:Partial<MarketplaceMobileDraft>,isCurrent:()=>boolean=()=>true,
 ):Promise<MarketplaceMobileDraft>{
