@@ -198,7 +198,7 @@ test('R: Vite direct Explorer Confirmed/History routes redirect without mounting
     'R: direct-route redirect preserves the original fragment');
 });
 
-test('C: REAL Next public board -> dashboard gate -> Vite protected Explorer board waits for auth', () => {
+test('R: real Next public entry -> Explorer overview -> real opportunity action -> allowed Vite board without personal calls', async () => {
   const redirects = [];
   let status = 'loading', user = null, personalCalls = 0;
   const deferredEffects = [];
@@ -250,12 +250,14 @@ test('C: REAL Next public board -> dashboard gate -> Vite protected Explorer boa
   assert.deepEqual(redirects, ['/dashboard/explorer/overview']);
   assert.equal(dashboardPath.resolveUserHomePath(user), '/dashboard/explorer/overview');
 
-  // Follow the Next handoff into the real Vite ProtectedRoute with the real
-  // permission predicate and the real public host; no personal panel loads.
+  // The Next gate actually lands on /dashboard/explorer/overview, not on a
+  // public shifts URL. Preserve that real destination throughout the handoff.
   let pending = true;
-  const location = { pathname: '/dashboard/explorer/shifts/public',
-    search: '?ref=notice', hash: '#saved' };
+  const location = { pathname: redirects.at(-1), search: '', hash: '' };
+  assert.equal(location.pathname, '/dashboard/explorer/overview');
   const access = execute('../../../components/routeAccess.ts', {});
+  assert.equal(access.canAccessRoute({ userRole: user.role, requiredRole: 'EXPLORER' }), true);
+  assert.equal(access.canAccessRoute({ userRole: user.role, requiredRole: 'PHARMACIST' }), false);
   const guard = execute('../../../components/ProtectedRoute.tsx', {
     react, 'react/jsx-runtime': { jsx, jsxs: jsx },
     '../contexts/AhpraContext': { useAhpra: () => ({ loading: false, summary: null, refusal: null }) },
@@ -268,24 +270,103 @@ test('C: REAL Next public board -> dashboard gate -> Vite protected Explorer boa
       user, isLoading: pending, isAdminUser: false, hasCapability: () => false,
     }) },
     '@chemisttasker/shared-core': { hasOrganizationAccess: () => false },
-    '../utils/dashboardPath': { resolveDashboardPath: () => '/dashboard/explorer/overview' },
+    '../utils/dashboardPath': { resolveDashboardPath: dashboardPath.resolveDashboardPath },
     './routeAccess': access,
   }, display);
-  const actual = createHost({
-    fetchPersonalConfirmedShifts: async () => { personalCalls++; throw Error('personal forbidden'); },
-    fetchPersonalHistoryShifts: async () => { personalCalls++; throw Error('personal forbidden'); },
-  });
-  const child = jsx(actual.publicBoard.default);
-  const waiting = guard.default({ requiredRole: 'EXPLORER', children: child });
+
+  // Execute the actual Vite Explorer overview host and its read effect.
+  // No synthetic AllowedBoard, direct jump to the board, or test-local
+  // permission predicate is involved.
+  const overviewEffects = [], overviewState = [], effectDeps = [];
+  const overviewNavigations = [];
+  let cursor = 0, publicDashboardCalls = 0;
+  const same = (a, b) => a && b && a.length === b.length &&
+    a.every((value, i) => Object.is(value, b[i]));
+  const overviewReact = {
+    useState(initial) {
+      const at = cursor++;
+      if (!(at in overviewState)) overviewState[at] = typeof initial === 'function' ? initial() : initial;
+      return [overviewState[at], next => {
+        overviewState[at] = typeof next === 'function' ? next(overviewState[at]) : next;
+      }];
+    },
+    useMemo(fn) { cursor++; return fn(); },
+    useEffect(fn, deps) {
+      const at = cursor++;
+      if (!same(effectDeps[at], deps)) {
+        effectDeps[at] = deps;
+        overviewEffects.push(fn);
+      }
+    },
+  };
+  overviewReact.default = overviewReact;
+  const overview = execute('../sidebar/OverviewPageStaff.tsx', {
+    react: overviewReact, 'react/jsx-runtime': { jsx, jsxs: jsx },
+    'lucide-react': new Proxy({}, { get: (_obj, symbol) => String(symbol) }),
+    '@mui/material': { Alert: 'Alert', Box: 'Box', Grid: 'Grid', Skeleton: 'Skeleton' },
+    'react-router-dom': {
+      useNavigate: () => target => {
+        overviewNavigations.push(target);
+        location.pathname = target;
+      },
+      useSearchParams: () => [new URLSearchParams()],
+    },
+    '../../../contexts/AuthContext': { useAuth: () => ({ user, activePersona: 'staff' }) },
+    '../../../contexts/WorkspaceContext': { useWorkspace: () => ({
+      selectedPharmacyId: null, workspace: 'platform',
+    }) },
+    '@chemisttasker/shared-core': {
+      getExplorerDashboard: async () => { publicDashboardCalls++; return { message: 'Public opportunities' }; },
+      getPharmacistDashboard: async () => { personalCalls++; throw Error('forbidden pharmacist dashboard'); },
+      getOtherStaffDashboard: async () => { personalCalls++; throw Error('forbidden staff dashboard'); },
+      getOnboardingDetail: async () => { personalCalls++; throw Error('forbidden staff onboarding'); },
+    },
+    '../../../utils/displayName': { dashboardGreetingName: () => 'Explorer' },
+    '../../../utils/roleLabels': { dashboardTitleForRole: () => 'Explorer overview' },
+    '../../../components/dashboard/DashboardOverviewTemplate': { __esModule: true, default: 'DashboardOverviewTemplate' },
+  }, display);
+  const overviewChild = jsx(overview.default);
+  const waiting = guard.default({ requiredRole: 'EXPLORER', children: overviewChild });
   assert.equal(waiting.type, 'div');
   assert.match(String(waiting.props.children), /Loading authentication/);
+  assert.equal(personalCalls, 0, 'auth hydration must not start a personal request');
+
   pending = false;
-  const admitted = guard.default({ requiredRole: 'EXPLORER', children: child });
-  assert.equal(admitted.type, actual.publicBoard.default);
+  const admitted = guard.default({ requiredRole: 'EXPLORER', children: overviewChild });
+  assert.equal(admitted.type, overview.default);
+  const renderOverview = () => { cursor = 0; return overview.default(); };
+  assert.equal(renderOverview().type, 'Box', 'overview loads before it exposes public actions');
+  overviewEffects.splice(0).forEach(fn => fn());
+  await new Promise(resolve => setImmediate(resolve));
+  const overviewTree = renderOverview();
+  assert.equal(overviewTree.type, 'DashboardOverviewTemplate');
+  assert.equal(publicDashboardCalls, 1, 'the actual Explorer overview loads its public dashboard');
+  assert.equal(personalCalls, 0, 'overview effect must never request personal staff data');
+  assert.equal(overviewTree.props.primaryAction.label, 'Browse opportunities');
+  overviewTree.props.primaryAction.onClick();
+  assert.deepEqual(overviewNavigations, ['/dashboard/explorer/shifts/public']);
+  assert.equal(location.pathname, overviewNavigations[0], 'useNavigate must supply the actual public board path');
+
+  let publicReads = 0;
+  const actual = createHost({
+    fetchPublicShifts: async () => { publicReads++; return { results: [], count: 0 }; },
+    fetchPersonalConfirmedShifts: async () => { personalCalls++; throw Error('personal confirmed forbidden'); },
+    fetchPersonalHistoryShifts: async () => { personalCalls++; throw Error('personal history forbidden'); },
+  });
+  actual.session.pathname = location.pathname;
+  const publicChild = jsx(actual.publicBoard.default);
+  const publicGate = guard.default({ requiredRole: 'EXPLORER', children: publicChild });
+  assert.equal(publicGate.type, actual.publicBoard.default, 'the destination is authorized by real canAccessRoute');
   assert.deepEqual(Array.from(actual.mount(actual.publicBoard).tabs.map(t => t.value)),
     ['public', 'community']);
-  assert.equal(personalCalls, 0);
-  assert.deepEqual(redirects, ['/dashboard/explorer/overview'], 'no navigation loop after Vite handoff');
+  const publicView = actual.render(actual.publicBoard);
+  const boardHost = nodes(publicView, n => n.type === 'ShiftsBoard');
+  assert.equal(boardHost.length, 1, 'the real public board mounts at the navigated URL');
+  await boardHost[0].props.onRefresh();
+  assert.equal(publicReads, 1, 'allowed public feed remains usable after navigation');
+  assert.equal(personalCalls, 0, 'no personal confirmed/history/worker API call at either destination');
+  assert.deepEqual(redirects, ['/dashboard/explorer/overview'], 'no Next/Vite redirect loop');
+
 });
 
 test('C: Explorer public board failure retains a working refresh; no personal API calls', async () => {
