@@ -145,21 +145,23 @@ test('R public board exposes role/state/work type/skill/availability/travel/plac
   }
   h.host.unmount();
 });
-test('C public board retains page-one candidates after page-two network failure', async () => {
+test('C page-two failure keeps page-one rows WITHOUT clicking retry or refetching page one', async () => {
   const h=boardHarness();
-  h.pages.push({ count: 3, next:'/api/v1/explorer-posts/public-feed/?page=2',
-    results: [fixture(1)] });
-  let tree=await h.render();
-  assert.equal(collect(tree,'Card').length,1);
+  h.pages.push({count:2,next:'/api/v1/explorer-posts/public-feed/?page=2',results:[fixture(1)]});
   h.pages.push(Error('Page 2 offline'));
-  const next=collect(tree,'Button').find(x=>x.children==='Load more talent');
-  assert.ok(next,'page 2 control must be present');
-  next.onPress();
-  tree=await h.render();
-  assert.equal(collect(tree,'Card').length,1,'successful page must survive later page failure');
+  let tree=await h.render();
+  // Older caller requested page 2 on demand; newer complete loader requests it automatically.
+  if(h.calls.length === 1) {
+    const pageTwo=collect(tree,'Button').find(x=>x.children==='Load more talent');
+    assert.ok(pageTwo,'the original page-two action must be available');
+    pageTwo.onPress();
+    tree=await h.render();
+  }
+  assert.equal(h.calls.length,2,'page-two failure must not automatically refetch page one');
+  assert.equal(collect(tree,'Card').length,1,'successful first page remains visible');
+  assert.ok(collect(tree,'Text').some(p=>String(p.children).includes('Page 2 offline')));
   h.host.unmount();
 });
-
 
 function articleHarness(section='blog') {
   const host=hooks(), calls=[], pages=[], routes=[];
@@ -232,7 +234,9 @@ function learningHarness() {
       }},
       marketplace:{getListingOptions:async()=>{
         calls.push(['role',user.current?.id]);
-        return options.shift() || {role_code:null};
+        const result=options.shift();
+       if(result instanceof Error)throw result;
+       return result?.promise ? result.promise : result || {role_code:null};
       }},
     }},
     '@/context/AuthContext':{useAuth:()=>({user:user.current})},
