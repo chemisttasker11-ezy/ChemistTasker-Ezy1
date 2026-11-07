@@ -291,7 +291,7 @@ test('R success_destination: actual mounted Post Shift keeps confirmation visibl
     'success navigation must wait until the visible confirmation has been acknowledged or dismissed');
   tree = render();
   const snackbar = tree.find(n => n.type === 'Snackbar' && n.props.visible);
-  assert.ok(snackbar, 'success feedback remains mounted on the posting screen');
+  assert.ok(snackbar, 'success feedback remains mounted on the posting screen: ' + JSON.stringify({ rendered: tree.map(n => ({ type: n.type, visible: n.props?.visible })).filter(n => n.type === 'Snackbar' || n.type === 'ContentState'), toastState: slots[43], loaded: slots[3], pharmacies: slots[1]?.length }));
   assert.equal(snackbar.props.children, 'Shift posted successfully!');
   snackbar.props.onDismiss();
   assert.deepEqual(destinations, ['/owner/shifts?section=active']);
