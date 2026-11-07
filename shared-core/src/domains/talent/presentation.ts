@@ -70,6 +70,7 @@ export function filterTalentCandidates<T extends TalentFilterCandidate>(registry
  * payment or onboarding details into a public card.
  */
 export interface PublicTalentCandidate extends TalentFilterCandidate {
+  skills: string[]; clinicalServices: string[]; expandedScope: string[]; availableDates: string[];
   id: number;
   roleTitle: string;
   referenceCode: string | null;

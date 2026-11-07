@@ -23,7 +23,7 @@ import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import { resolveDashboardPath } from '../utils/dashboardPath';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
 import { setRobotsMeta } from '../utils/seo';
-import { safeNext } from '../../landing_next/shared/browser-session';
+import { safeNext, rememberDestination } from '../../landing_next/shared/browser-session';
 
 const PERSONA_KEY_PREFIX = 'ct-active-persona';
 
@@ -71,6 +71,7 @@ export default function Login() {
       login(access, refresh || '', userInfo, rememberMe);
 
       if (!userInfo?.is_mobile_verified && !userInfo?.mobile_check_skipped) {
+        rememberDestination(new URLSearchParams(location.search).get('next'));
         navigate('/mobile-verify');
         return;
       }
