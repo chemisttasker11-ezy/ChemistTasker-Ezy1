@@ -67,7 +67,7 @@ test('R account_switch_while_blob_pending_blocks_upload on a retired ReviewStep'
   h.unmount();
 });
 
-test('C late create response after account unmount cannot start audience/upload/submit', async () => {
+test('R late create response after account unmount cannot start audience/upload/submit', async () => {
   const h = await setup({ seller_context: 'PHARMACY', pharmacy: 11 });
   const created = deferred();
   h.queue('create', created);
@@ -83,7 +83,7 @@ test('C late create response after account unmount cannot start audience/upload/
   h.unmount();
 });
 
-test('C late audience response cannot start previous-account image upload', async () => {
+test('R late audience response cannot start previous-account image upload', async () => {
   const h = await setup({ seller_context: 'PHARMACY', pharmacy: 11 });
   const audience = deferred();
   h.queue('audience', audience);
@@ -98,7 +98,7 @@ test('C late audience response cannot start previous-account image upload', asyn
   h.unmount();
 });
 
-test('C late update response after account switch leaves personal draft intact', async () => {
+test('R late update response after account switch leaves personal draft intact', async () => {
   const h = await setup({ created_listing_id: 'a1111111-1111-4111-8111-111111111111',
     created_listing_version: 2 });
   const update = deferred();
