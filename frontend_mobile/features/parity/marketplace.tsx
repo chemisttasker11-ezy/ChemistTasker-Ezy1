@@ -9,7 +9,7 @@ import{useAuth}from'@/context/AuthContext';
 import{categoriesForSellerContext,clampMaximumAudience,nextMarketplaceAudience,permittedBuyerRolesForCategory,permittedModesForCategory,type MarketplaceCategory,type MarketplaceDashboardListing,type MarketplaceExchange,type MarketplaceListingOptions,type MarketplacePublicListing}from'@chemisttasker/shared-core';
 import{ActionButtons,ChoiceChips,DataRow,EmptyState,Field,InfoNote,MetricGrid,ParityPage,Section,palette}from'./ParityUI';
 import{asArray,dateLabel,errorMessage,idempotencyKey,money,replaceUnderscore,toNumber}from'./utils';
-import{clearMarketplaceDraft,emptyMarketplaceDraft,loadMarketplaceDraft,patchMarketplaceDraft,type MarketplaceMobileDraft}from'./marketplaceDraft';
+import{clearMarketplaceDraft,emptyMarketplaceDraft,loadMarketplaceDraft,loadSettledMarketplaceDraft,patchMarketplaceDraft,type MarketplaceMobileDraft}from'./marketplaceDraft';
 import{browseModes,browseQuery,categorySlug,normalizeBrowseMode,enquiryValidation,appendBrowsePage,nextBrowsePage,type BrowseMode}from'./marketplaceBrowseModel';
 import { MarketplaceAccessResolution } from './MarketplaceAccessResolution';
 
@@ -233,7 +233,7 @@ function PhotosStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
  const router=useRouter();const{value,patch,scope,current}=useDraftStep(draft);const[removing,setRemoving]=useState(false),[removeError,setRemoveError]=useState('');const removingRef=useRef(false);
  const add=async()=>{const stillCurrent=current();const r=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsMultipleSelection:true,quality:.85});if(stillCurrent()&&!r.canceled)await patch({image_uris:[...value.image_uris,...r.assets.map(a=>a.uri)].slice(0,6)},stillCurrent);};
  const remove=async(uri:string,i:number)=>{if(removingRef.current)return;const stillCurrent=current();removingRef.current=true;setRemoving(true);setRemoveError('');try{
-  const saved=await loadMarketplaceDraft(scope);if(!stillCurrent())return;
+  const saved=await loadSettledMarketplaceDraft(scope);if(!stillCurrent())return;
   if(saved.uploaded_image_uris.includes(uri)){const id=saved.uploaded_image_ids?.[uri];if(id==null)throw new Error('This uploaded photo cannot be removed here.');await api.deleteImage(id);if(!stillCurrent())return;}
   const ids={...saved.uploaded_image_ids};delete ids[uri];await patch({image_uris:value.image_uris.filter((_,x)=>x!==i),uploaded_image_uris:saved.uploaded_image_uris.filter(x=>x!==uri),uploaded_image_ids:ids},stillCurrent);
  }catch(e){if(stillCurrent())setRemoveError(errorMessage(e,'Unable to remove photo.'));}finally{removingRef.current=false;if(stillCurrent())setRemoving(false);}};
