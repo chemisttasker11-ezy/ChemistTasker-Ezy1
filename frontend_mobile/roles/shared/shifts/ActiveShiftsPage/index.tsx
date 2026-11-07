@@ -137,6 +137,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
         shiftId: null,
     });
     const [buzzLoadingOfferId, setBuzzLoadingOfferId] = useState<number | null>(null);
+    // A state update is asynchronous: guard Buzz synchronously against double taps.
+    const buzzBusyRef = useRef(false);
     const [reviewOfferDialog, setReviewOfferDialog] = useState<ReviewOfferDialogState>({
         open: false,
         shiftId: null,
@@ -763,16 +765,21 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
 
     const handleBuzzWorker = useCallback(
         async (offerId: number) => {
-            if (!offerId) return;
+            if (!offerId || buzzBusyRef.current) return;
+            const requestedContext = paymentContextRef.current;
+            const stillCurrent = () => paymentContextRef.current === requestedContext;
+            buzzBusyRef.current = true;
             setBuzzLoadingOfferId(offerId);
             try {
                 const result = await buzzShiftOffer(offerId);
+                if (!stillCurrent()) return;
                 Alert.alert(
                     'Buzz reminder',
                     result?.detail || "Reminder sent. We've gently nudged the candidate to confirm this shift.",
                     [{ text: 'Close' }]
                 );
             } catch (error) {
+                if (!stillCurrent()) return;
                 console.error('Failed to send confirmation reminder', error);
                 const message =
                     (error as any)?.response?.data?.detail ||
@@ -783,7 +790,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                 Alert.alert('Buzz reminder', message, [{ text: 'Close' }]);
                 await loadShifts();
             } finally {
-                setBuzzLoadingOfferId(null);
+                buzzBusyRef.current = false;
+                if (stillCurrent()) setBuzzLoadingOfferId(null);
             }
         },
         [loadShifts]

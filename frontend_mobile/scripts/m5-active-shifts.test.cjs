@@ -255,9 +255,10 @@ function mountedActive(overrides = {}) {
     persona: 'owner', scopedPharmacyId: 7, ...overrides.surface };
   const params = { ...overrides.params };
   const user = { id: 91, role: 'OWNER' };
-  const calls = { posts: [], share: [], checkout: [], reload: 0 };
-  let settledCheckout;
+  const calls = { posts: [], share: [], checkout: [], buzz: [], reload: 0 };
+  let settledCheckout, settledBuzz;
   const waitCheckout = new Promise(resolve => { settledCheckout = resolve; });
+  const waitBuzz = new Promise(resolve => { settledBuzz = resolve; });
   const stateSlots = [], refSlots = [];
   let stateIndex = 0, refIndex = 0;
   const react = {
@@ -291,7 +292,7 @@ function mountedActive(overrides = {}) {
     },
     resumeFulfillmentCheckout: async () => ({}),
     expireFulfillmentCheckout: async () => ({}),
-    buzzShiftOffer: async () => ({}),
+    buzzShiftOffer: async offerId => { calls.buzz.push(offerId); await waitBuzz; return { detail: 'Reminder sent' }; },
   };
   const page = load('roles/shared/shifts/ActiveShiftsPage/index.tsx', {
     react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
@@ -381,7 +382,7 @@ function mountedActive(overrides = {}) {
     stateIndex = 0; refIndex = 0;
     return expanded(page({ title: 'Active Shifts' }));
   }
-  return { render, calls, surface, params, finishCheckout: () => settledCheckout(), card };
+  return { render, calls, surface, params, finishCheckout: () => settledCheckout(), finishBuzz: () => settledBuzz(), card };
 }
 
 test('C mounted ActiveShiftsPage renders the real cards with audience, metrics and review attention', () => {
@@ -435,12 +436,32 @@ test('C mounted ActiveShiftsPage keeps rapid payment taps single-flight', async 
   const open = tree.find(n => n.type === 'Button' && n.props.children === 'Manage candidates');
   open.props.onPress();
   tree = h.render();
-  const checkout = tree.find(n => n.type === 'Button' && /Stripe/.test(String(n.props.children)));
-  if (checkout) {
-    const action = checkout.props.onPress;
-    action(); action();
-    assert.equal(h.calls.checkout.length, 1, 'rapid taps create one checkout attempt');
-    h.finishCheckout();
-    await Promise.resolve();
-  }
+  const checkout = tree.find(n => n.type === 'TouchableOpacity' &&
+    JSON.stringify(n.props.children).includes('Pay selected with Stripe'));
+  assert.ok(checkout, 'the expanded payment box must expose the real Stripe action');
+  const action = checkout.props.onPress;
+  const first = action(), second = action();
+  assert.equal(h.calls.checkout.length, 1, 'rapid taps create one checkout attempt');
+  assert.equal(h.calls.checkout[0][0], 12, 'checkout uses the selected shift');
+  assert.equal(JSON.stringify(h.calls.checkout[0][1]), JSON.stringify({ offerIds: [81], platform: 'mobile' }),
+    'checkout uses the payable offer ID selected for this date');
+  h.finishCheckout();
+  await Promise.all([first, second]);
+});
+
+test('R mounted candidate Buzz is single-flight for rapid presses on the same render',async()=>{
+  const h=mountedActive();
+  let tree=h.render();
+  const toggle=tree.find(n=>n.type==='Button'&&n.props.children==='Manage candidates');
+  assert.ok(toggle);
+  toggle.props.onPress();
+  tree=h.render();
+  const workspace=tree.find(n=>n.type==='CommunityLevelView');
+  assert.ok(workspace,'the expanded real card must expose its community workspace');
+  assert.equal(typeof workspace.props.onBuzzWorker,'function');
+  const first=workspace.props.onBuzzWorker(310);
+  const second=workspace.props.onBuzzWorker(310);
+  assert.deepEqual(h.calls.buzz,[310],'two presses must invoke one shared-core Buzz request');
+  h.finishBuzz();
+  await Promise.all([first,second]);
 });
