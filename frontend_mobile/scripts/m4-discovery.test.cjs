@@ -110,6 +110,8 @@ function boardHarness() {
     const reply=pages.shift();
     return reply.promise || (reply instanceof Error ? Promise.reject(reply) : reply);
   };
+  const registry=JSON.parse(fs.readFileSync(path.join(root,'../shared-core/skills_registry.json'),'utf8'));
+  const realSkills=load('../shared-core/src/skills.ts',{});
   const sharedTalent=load('../shared-core/src/talent.ts', {
     './domains/talent/api': {}, './utils/serialization': {},
   });
@@ -127,8 +129,8 @@ function boardHarness() {
       useLocalSearchParams:()=>({})},
     '@/components/ui/BrandActivityIndicator':{BrandActivityIndicator:'Spinner'},
     'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
-    '@chemisttasker/shared-core':{getPublicTalentFeed,...sharedTalent,...presentation},
-    '@chemisttasker/shared-core/skills_registry.json':{skills:[]},
+    '@chemisttasker/shared-core':{getPublicTalentFeed,...realSkills,...sharedTalent,...presentation},
+    '@chemisttasker/shared-core/skills_registry.json':registry,
     '@/context/AuthContext':{useAuth:()=>({user:user.current})},
     '@/constants/tokens':{colors:{pageBg:'white',textPrimary:'black',textSecondary:'gray',border:'gray',surfaceBg:'white',status:{red:{fg:'red'}}},radius:{card:4},space:{lg:16,md:8,sm:4,'3xl':32},touch:{min:40}},
   });
@@ -267,7 +269,7 @@ test('R #1 actual native role/state/work/skill/date/travel/placement filters fin
   let tree=await h.render();
   assert.equal(collect(tree,'Card').length,2,'all complete pages deduped before filtering');
   const choose=async label=>{
-    const chip=collect(tree,'Chip').find(p=>p.children===label);
+    const chip=collect(tree,'Chip').find(p=>p.children===label || p.accessibilityLabel==='Skill '+label);
     assert.ok(chip,'missing rendered filter chip '+label);
     chip.onPress(); tree=await h.render();
   };
@@ -418,5 +420,29 @@ test('R #5 switching OTHER_STAFF account ignores delayed old role-code response'
   tree=await h.render();
   assert.ok(collect(tree,'Text').some(p=>p.children==='Internship, registration and workplace development'));
   assert.equal(collect(tree,'Text').some(p=>p.children==='Dispensary workflow and workplace development'),false);
+  h.host.unmount();
+});
+
+test('R #7 public talent skill chips display the canonical registry label while filtering by stable code',async()=>{
+  const h=boardHarness();
+  h.pages.push({count:1,results:[{...fixture(1),skills:['WEBSTER_PACKING_DAA']}]});
+  const tree=await h.render();
+  const chips=collect(tree,'Chip');
+  const skill=chips.find(p=>p.accessibilityLabel==='Skill WEBSTER_PACKING_DAA');
+  assert.ok(skill,'skill filter retains the stable registry code as its accessibility label');
+  assert.equal(skill.children,'Webster / DAA packing',
+    'ordinary readers must see the same human label as the web Skill filter');
+  skill.onPress();
+  const filtered=await h.render();
+  assert.equal(collect(filtered,'Card').length,1);
+  h.host.unmount();
+});
+test('R #7 failed public talent collection offers Retry, not a misleading Load more action',async()=>{
+  const h=boardHarness();
+  h.pages.push(Error('Temporary discovery outage'));
+  const tree=await h.render();
+  assert.ok(collect(tree,'Button').some(p=>p.children==='Retry'));
+  assert.equal(collect(tree,'Button').some(p=>p.children==='Load more talent'),false);
+  assert.ok(collect(tree,'Text').some(p=>String(p.children).includes('Temporary discovery outage')));
   h.host.unmount();
 });
