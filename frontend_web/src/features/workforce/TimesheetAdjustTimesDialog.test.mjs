@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 
@@ -64,7 +64,9 @@ async function dialog({ zone = 'Australia/Brisbane', events } = {}) {
       timeline.find((event) => event.event_id === id).effective_timestamp = timestamp;
     },
   };
-  const { correctionTimestamp } = loadComponent('../../../../shared-core/src/utils/correctionTimestamp.ts', {});
+  const shared = '../../../../shared-core/src/utils/correctionTimestamp.ts';
+  const { correctionTimestamp } = loadComponent(existsSync(new URL(shared, import.meta.url))
+    ? shared : '../../pages/attendance/correctionTimestamp.ts', {});
   const { default: Component } = loadComponent('./TimesheetAdjustTimesDialog.tsx', {
     react: hooks, 'react/jsx-runtime': runtime, '@mui/material': mui,
     '@chemisttasker/shared-core': { attendance },

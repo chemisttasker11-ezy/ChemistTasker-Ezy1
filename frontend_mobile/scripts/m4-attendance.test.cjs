@@ -10,7 +10,8 @@ const root = path.resolve(__dirname, '..');
 const jsx = (type, props, key) => ({ type, props: { ...(props || {}), key } });
 
 function load(relative, modules) {
-  const file = path.join(root, relative);
+  const file = (relative === 'features/parity/attendance.tsx' && process.env.M4_ATTENDANCE_SOURCE) ||
+    (relative === 'app/admin/_layout.tsx' && process.env.M4_LAYOUT_SOURCE) || path.join(root, relative);
   const compiled = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     fileName: file, compilerOptions: { module: ts.ModuleKind.CommonJS,
       target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
@@ -64,12 +65,15 @@ function hooks() {
     },
   };
   react.default = react;
+  let visited;
   function walk(node, location = 'root', output = []) {
+    if (location === 'root') visited = new Set();
     if (Array.isArray(node)) {
       node.forEach((child, i) => walk(child, location + '.' + i, output));
     } else if (node && typeof node === 'object') {
       if (typeof node.type === 'function') {
         const id = location + ':' + String(node.props.key ?? '') + ':' + node.type.name;
+        visited.add(id);
         if (!fibers.has(id)) fibers.set(id, { slots: [], effects: new Map() });
         const previous = active, previousCursor = cursor;
         active = fibers.get(id);
@@ -82,6 +86,12 @@ function hooks() {
         walk(node.props?.children, location + '.children', output);
       }
     }
+    if (location === 'root') {
+      for (const [id, fiber] of fibers) if (!visited.has(id)) {
+        for (const value of fiber.effects.values()) value.cleanup?.();
+        fibers.delete(id);
+      }
+    }
     return output;
   }
   async function settle() {
@@ -89,10 +99,12 @@ function hooks() {
     for (let i = 0; i < 5; i++) await Promise.resolve();
   }
   function unmount() {
+    const disposed = [...fibers.values()];
     for (const fiber of fibers.values()) for (const value of fiber.effects.values()) {
       value.cleanup?.();
     }
     fibers.clear(); effects.length = 0;
+    return disposed;
   }
   return { react, walk, settle, unmount };
 }
@@ -212,7 +224,7 @@ test('R Grace region coverage is scoped to A, and account changes cannot retain 
   }] };
   await h.render(); await h.render();
   assert.ok(h.io.pending.includes(11));
-  h.engine.unmount(); h.env.pharmacy = 12; h.io.pending.length = 0;
+  h.env.pharmacy = 12; h.io.pending.length = 0;
   await h.render(); await h.render();
   assert.deepEqual(h.io.pending, []);
   h.engine.unmount(); h.env.user = { id: 77, role: 'OWNER', memberships: [{ pharmacy_id: 19, role: 'OWNER' }] };
@@ -221,10 +233,11 @@ test('R Grace region coverage is scoped to A, and account changes cannot retain 
   assert.deepEqual(h.io.pending, []);
 });
 
-test('R worker correction sends a readable own-timesheet comment, never an event write', async () => {
+for (const [name, role] of [['Omar', 'PHARMACIST'], ['Ali', 'OTHER_STAFF'], ['Mia', 'OTHER_STAFF'], ['Jack', 'OTHER_STAFF'], ['Sara', 'PHARMACIST']]) {
+test('R ' + name + ' correction sends a readable own-timesheet comment, never an event write', async () => {
   const h = screenHarness();
   h.env.screen = 'correction';
-  h.env.user = { id: 91, role: 'OTHER_STAFF', admin_assignments: [] };
+  h.env.user = { id: 91, role, admin_assignments: [] };
   h.env.params = { timesheetId: '31', sessionId: '78' };
   let tree = await h.render(); tree = await h.render();
   h.find(tree, 'Field', 'Corrected date/time').props.onChangeText('2026-07-10T09:00');
@@ -241,6 +254,22 @@ test('R worker correction sends a readable own-timesheet comment, never an event
   assert.match(h.io.comments[0][1], /CLOCK_IN|clock in/i);
   assert.match(h.io.comments[0][1], /2026-07-10/);
   assert.match(h.io.comments[0][1], /Kiosk lost the clock in/);
+  tree = await h.render();
+  assert.ok(tree.some(n => n.type === 'InfoNote' && n.props.title === 'Request sent'));
+});
+}
+
+test('C Zoe cannot request correction for a timesheet she does not own', async () => {
+  const h = screenHarness();
+  h.env.screen = 'correction'; h.env.user = { id: 99, role: 'EXPLORER' };
+  h.api.workforce.getMyHours = async () => [];
+  h.env.params = { timesheetId: '31' };
+  let tree = await h.render(); tree = await h.render();
+  h.find(tree, 'Field', 'Corrected date/time').props.onChangeText('2026-07-10T09:00');
+  h.find(tree, 'Field', 'Reason').props.onChangeText('Missing punch');
+  tree = await h.render(); action(tree, 'Request correction').props.onPress();
+  await h.engine.settle();
+  assert.deepEqual(h.io.comments, []);
 });
 
 test('R manager correction refuses a freehand unknown event rather than using device timezone', async () => {
@@ -354,6 +383,11 @@ test('R: live pharmacy switch while A timeline is pending cannot load or reveal 
   assert.ok(!tree.some(node => node.type === 'DataRow' &&
     String(node.props.title).includes('CLOCK_IN')), 'late A event must not appear in B');
   assert.deepEqual(h.io.pending, [11]);
+  h.env.pharmacy = 11; h.env.adminPharmacy = 11;
+  h.env.screen = 'review-decision'; h.env.params = { id: '7', sessionId: '78' };
+  await h.render(); tree = await h.render();
+  assert.deepEqual(h.io.pending, [11, 11], 'switching back reloads A');
+  action(tree, 'Approve & backfill'); action(tree, 'Reject');
   h.engine.unmount();
 });
 
@@ -363,7 +397,7 @@ for (const [name, role, memberships, assignments] of [
   ['Jack', 'OTHER_STAFF', [{ pharmacy_id: 11, role: 'INTERN' }], []],
   ['Zoe', 'EXPLORER', [], []],
 ]) {
-  test('C: ' + name + ' does not acquire manager pending or timeline authority', async () => {
+  test('R: ' + name + ' does not acquire manager pending or timeline authority', async () => {
     const h = screenHarness();
     h.env.user = { id: 100 + name.length, role,
       memberships, admin_assignments: assignments };
@@ -373,6 +407,13 @@ for (const [name, role, memberships, assignments] of [
     const tree = await h.render();
     assert.deepEqual(h.io.pending, []);
     assert.deepEqual(h.io.timeline, []);
+    h.engine.unmount();
+  });
+  test('C: ' + name + ' has no manager decision buttons', async () => {
+    const h = screenHarness();
+    h.env.user = { id: 100 + name.length, role, memberships, admin_assignments: assignments };
+    h.env.screen = 'review-detail'; h.env.params = { id: '7', sessionId: '78' };
+    await h.render(); const tree = await h.render();
     assert.equal(tree.some(node => node.type === 'Button' &&
       /Approve & backfill|Reject/.test(String(node.props.children))), false,
       'worker and Explorer personas cannot render actionable manager decisions');
@@ -412,7 +453,7 @@ test('R: blank rejection is refused by real decision handler without a server ca
   h.engine.unmount();
 });
 
-test('R: invalid pharmacy-local calendar date never reaches correction event API', async () => {
+test('R: invalid date shows recoverable feedback', async () => {
   const h = screenHarness();
   h.env.user = { id: 11, role: 'OWNER',
     memberships: [{ pharmacy_id: 11, role: 'OWNER' }] };
@@ -485,12 +526,12 @@ test('R: old-account approval completion cannot navigate the new account', async
   h.env.user = { id: 88, role: 'OTHER_STAFF', memberships: [] };
   h.env.pharmacy = 12;
   tree = await h.render();
-  assert.ok(tree.some(node => node.type === 'InfoNote' &&
-    node.props.title === 'No attendance management access'));
   pending.resolve({ status: 'APPROVED' });
   await new Promise(setImmediate);
   tree = await h.render();
   assert.deepEqual(h.io.navigations, [], 'previous account must not navigate the current shell');
+  assert.ok(tree.some(node => node.type === 'InfoNote' &&
+    node.props.title === 'No attendance management access'));
   h.engine.unmount();
 });
 
@@ -501,14 +542,21 @@ test('C: unmount invalidates an unresolved attendance timeline before a new scop
   h.env.screen = 'review-detail';
   h.env.params = { sessionId: '78' };
   const old = deferred();
+  const oldPending = deferred();
+  h.io.pendingReplies.push(oldPending);
   h.io.timelineReplies.push(old);
   await h.render();
   assert.deepEqual(h.io.timeline, [78], 'original timeline must really be in flight');
-  h.engine.unmount();
+  const disposed = h.engine.unmount();
+  const content = disposed.find(fiber => fiber.slots[6]?.value === null && Array.isArray(fiber.slots[7]?.value));
+  assert.ok(content, 'retain the disposed attendance content fiber');
+  oldPending.resolve([{ provisional_id: 9002 }]);
   old.resolve({ session_id: 78, pharmacy_id: 11, pharmacy_timezone: 'Australia/Perth',
     timeline: [{ event_id: 9001, event_type: 'CLOCK_IN',
       effective_timestamp: '2026-07-10T00:00:00Z' }] });
   await h.engine.settle();
+  assert.equal(content.slots[6].value, null, 'late response must not write to the disposed timeline');
+  assert.equal(content.slots[3].value.length, 0, 'late pending response must not write to disposed state');
   // Remount as a distinct session of the same account: no callback from the
   // disposed fiber can paint its private rows onto the fresh mount.
   h.env.params = { sessionId: '79' };
