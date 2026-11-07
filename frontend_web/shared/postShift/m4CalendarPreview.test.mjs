@@ -157,16 +157,19 @@ function clickCalendarSave(host) {
 
 test('R: recurrence projects each overnight occurrence; calendar selection edits and saves its source without losing daytime', () =>
   inTimezone('Australia/Brisbane', () => {
+    const first = dayjs().startOf('day').add(1, 'day');
+    const dates = [0, 1, 2].map(n => first.add(n, 'day').format('YYYY-MM-DD'));
+    const days = [first.day(), first.add(1, 'day').day()];
     const host = harness();
     host.render().setSlots([
-      slot('2027-01-08', '22:00', '06:00', { isRecurring:true, recurringDays:[5,6],
-        recurringEndDate:'2027-01-09' }),
-      slot('2027-01-10', '09:00', '17:00'),
+      slot(dates[0], '22:00', '06:00', { isRecurring:true, recurringDays:days,
+        recurringEndDate:dates[1] }),
+      slot(dates[2], '09:00', '17:00'),
     ]);
     const state = host.render();
     assert.equal(state.calendarEvents.length, 3);
     assert.deepEqual(Array.from(state.calendarEvents, event => local(event).end),
-      ['2027-01-09T06:00', '2027-01-10T06:00', '2027-01-10T17:00']);
+      [dates[1]+'T06:00', dates[2]+'T06:00', dates[2]+'T17:00']);
     assert.deepEqual(Array.from(state.calendarEvents, event => ({...event.resource})),
       [{slotIndex:0,occurrenceIndex:0},{slotIndex:0,occurrenceIndex:1},
        {slotIndex:1,occurrenceIndex:0}]);
@@ -178,36 +181,36 @@ test('R: recurrence projects each overnight occurrence; calendar selection edits
     assert.deepEqual({...chosen.resource}, {slotIndex:0,occurrenceIndex:1});
     calendar.props.onSelectEvent(chosen);
     const selected = host.render();
-    assert.equal(selected.slotDate, '2027-01-08');
+    assert.equal(selected.slotDate, dates[0]);
     assert.equal(selected.slotStartTime, '22:00');
     assert.equal(selected.slotEndTime, '06:00');
     assert.equal(selected.isRecurring, true);
-    assert.deepEqual(Array.from(selected.recurringDays), [5,6]);
-    assert.equal(selected.recurringEndDate, '2027-01-09');
+    assert.deepEqual(Array.from(selected.recurringDays), days);
+    assert.equal(selected.recurringEndDate, dates[1]);
     assert.equal(selected.slots.length, 2, 'selection must not discard the recurring source');
 
     clickCalendarEdit(host, chosen.resource.slotIndex);
     const edited = host.render();
     assert.equal(edited.slots.length, 1);
-    assert.equal(edited.slotDate, '2027-01-08');
+    assert.equal(edited.slotDate, dates[0]);
     assert.equal(edited.slotStartTime, '22:00');
     assert.equal(edited.slotEndTime, '06:00');
     assert.deepEqual(Array.from(edited.slots, x=>[x.date,x.startTime,x.endTime]),
-      [['2027-01-10','09:00','17:00']], 'other source slot is untouched');
+      [[dates[2],'09:00','17:00']], 'other source slot is untouched');
     assert.equal(edited.isRecurring, true);
-    assert.deepEqual(Array.from(edited.recurringDays), [5, 6]);
-    assert.equal(edited.recurringEndDate, '2027-01-09');
+    assert.deepEqual(Array.from(edited.recurringDays), days);
+    assert.equal(edited.recurringEndDate, dates[1]);
     clickCalendarSave(host);
     let saved = host.render();
     assert.equal(saved.slots.length, 2);
     assert.deepEqual(Array.from(saved.expandedSlots, x=>[x.date,x.startTime,x.endTime]),
-      [['2027-01-08','22:00','06:00'],['2027-01-09','22:00','06:00'],
-       ['2027-01-10','09:00','17:00']], 'sorted calendar dates include both recurring dates and untouched daytime entry');
+      [[dates[0],'22:00','06:00'],[dates[1],'22:00','06:00'],
+       [dates[2],'09:00','17:00']], 'sorted calendar dates include both recurring dates and untouched daytime entry');
     const payload = slotDomain.buildShiftDraftSlotPayload(saved.slots, saved.expandedSlots,
       saved.expandedSlots.map(() => ({rate:67})));
     assert.deepEqual(Array.from(payload, x=>[x.date,x.start_time,x.end_time,x.is_recurring,x.recurring_end_date]),
-      [['2027-01-10','09:00','17:00',false,null],
-       ['2027-01-08','22:00','06:00',true,'2027-01-09']],
+      [[dates[2],'09:00','17:00',false,null],
+       [dates[0],'22:00','06:00',true,dates[1]]],
       'posting payload stores original wall clocks and recurrence, not shifted preview end dates');
 
     // Restore the earlier explicit daytime-slot Edit date coverage, but
@@ -217,22 +220,22 @@ test('R: recurrence projects each overnight occurrence; calendar selection edits
     assert.ok(daytimeEvent);
     secondCalendar.props.onSelectEvent(daytimeEvent);
     const daytimeSelected = host.render();
-    assert.equal(daytimeSelected.slotDate, '2027-01-10');
+    assert.equal(daytimeSelected.slotDate, dates[2]);
     assert.equal(daytimeSelected.slotStartTime, '09:00');
     assert.equal(daytimeSelected.slotEndTime, '17:00');
     clickCalendarEdit(host, daytimeEvent.resource.slotIndex);
     const daytimeEdited = host.render();
     assert.equal(daytimeEdited.slots.length, 1);
-    assert.equal(daytimeEdited.slotDate, '2027-01-10');
+    assert.equal(daytimeEdited.slotDate, dates[2]);
     assert.equal(daytimeEdited.slotStartTime, '09:00');
     assert.equal(daytimeEdited.slotEndTime, '17:00');
     assert.deepEqual(Array.from(daytimeEdited.slots, x=>[x.date,x.startTime,x.endTime]),
-      [['2027-01-08','22:00','06:00']], 'editing daytime does not remove the recurring source');
+      [[dates[0],'22:00','06:00']], 'editing daytime does not remove the recurring source');
     clickCalendarSave(host);
     saved = host.render();
     assert.deepEqual(Array.from(saved.expandedSlots, x=>[x.date,x.startTime,x.endTime]),
-      [['2027-01-08','22:00','06:00'],['2027-01-09','22:00','06:00'],
-       ['2027-01-10','09:00','17:00']], 'both saved sources remain in the final calendar');
+      [[dates[0],'22:00','06:00'],[dates[1],'22:00','06:00'],
+       [dates[2],'09:00','17:00']], 'both saved sources remain in the final calendar');
   }));
 test('C: posting validator rejects equal times and accepts overnight times', () => {
   assert.equal(posting.isValidShiftPostingTimeRange('22:00','22:00'), false);
@@ -447,6 +450,8 @@ function realPostShiftHost(persona) {
 
 for (const persona of ['owner','admin']) {
   test('R: real '+persona+' PostShiftForm displays overnight events and submits unchanged draft clocks', async () => {
+    const date = dayjs().startOf('day').add(2, 'day').format('YYYY-MM-DD');
+    const nextDate = dayjs(date).add(1, 'day').format('YYYY-MM-DD');
     const host = realPostShiftHost(persona);
     let nodes = await host.settle();
     const details = nodes.find(n => n.type === 'PostShiftDetailsStep');
@@ -462,12 +467,12 @@ for (const persona of ['owner','admin']) {
     nodes = await host.settle();
     let dateStep = nodes.find(n => n.type === 'PostShiftTimetableStep');
     assert.ok(dateStep, 'actual timetable props must be rendered');
-    dateStep.props.setSlots([slot('2027-01-10')]);
+    dateStep.props.setSlots([slot(date)]);
     nodes = await host.settle();
     dateStep = nodes.find(n => n.type === 'PostShiftTimetableStep');
     assert.equal(dateStep.props.calendarEvents.length, 1);
     assert.deepEqual(local(dateStep.props.calendarEvents[0]), {
-      start:'2027-01-10T22:00', end:'2027-01-11T06:00',
+      start:date+'T22:00', end:nextDate+'T06:00',
     });
     // Change callbacks and time-context search without replacing the mounted form.
     host.changeCallback(() => host.completed.push('new callback'));
@@ -481,7 +486,7 @@ for (const persona of ['owner','admin']) {
     assert.equal(host.submitted.length, 1);
     assert.deepEqual(JSON.parse(JSON.stringify(host.submitted[0].slots.map(s =>
       [s.date,s.start_time,s.end_time]))),
-      [['2027-01-10','22:00','06:00']]);
+      [[date,'22:00','06:00']]);
     assert.equal(host.submitted[0].pharmacy, 4);
     if(persona === 'owner') assert.deepEqual(host.completed, ['new callback']);
   });
@@ -489,6 +494,7 @@ for (const persona of ['owner','admin']) {
 
 for (const persona of ['owner', 'admin']) {
   test('C: real '+persona+' PostShiftForm preserves daytime clocks and callback/state across host rerenders', async () => {
+    const date = dayjs().startOf('day').add(2, 'day').format('YYYY-MM-DD');
     const host = realPostShiftHost(persona);
     let elements = await host.settle();
     const details = elements.find(node => node.type === 'PostShiftDetailsStep');
@@ -504,29 +510,29 @@ for (const persona of ['owner', 'admin']) {
     elements = await host.settle();
     let timetable = elements.find(node => node.type === 'PostShiftTimetableStep');
     assert.ok(timetable);
-    timetable.props.setSlots([slot('2027-01-10', '09:00', '17:00')]);
+    timetable.props.setSlots([slot(date, '09:00', '17:00')]);
     elements = await host.settle();
     timetable = elements.find(node => node.type === 'PostShiftTimetableStep');
     assert.equal(timetable.props.calendarEvents.length, 1);
     assert.deepEqual(local(timetable.props.calendarEvents[0]), {
-      start:'2027-01-10T09:00', end:'2027-01-10T17:00',
+      start:date+'T09:00', end:date+'T17:00',
     }, 'base-passing ordinary same-day times display without midnight rollover');
     assert.deepEqual(Array.from(timetable.props.slots, value =>
       [value.date, value.startTime, value.endTime]),
-      [['2027-01-10','09:00','17:00']]);
+      [[date,'09:00','17:00']]);
     host.changeCallback(() => host.completed.push('new daytime callback'));
     host.changeContext('?context=daytime-rerender');
     elements = await host.settle();
     timetable = elements.find(node => node.type === 'PostShiftTimetableStep');
     assert.deepEqual(Array.from(timetable.props.slots, value =>
       [value.date, value.startTime, value.endTime]),
-      [['2027-01-10','09:00','17:00']], 'host callback/context changes preserve the accepted daytime draft');
+      [[date,'09:00','17:00']], 'host callback/context changes preserve the accepted daytime draft');
     shell = elements.find(node => node.type === 'PostShiftWizardShell');
     await shell.props.onSubmit();
     assert.equal(host.submitted.length, 1);
     assert.deepEqual(JSON.parse(JSON.stringify(host.submitted[0].slots.map(value =>
       [value.date,value.start_time,value.end_time]))),
-      [['2027-01-10','09:00','17:00']], 'same-day posting clocks remain unchanged');
+      [[date,'09:00','17:00']], 'same-day posting clocks remain unchanged');
     assert.equal(host.submitted[0].pharmacy, 4);
     if (persona === 'owner') assert.deepEqual(host.completed, ['new daytime callback']);
   });
