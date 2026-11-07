@@ -164,7 +164,7 @@ test('C: clicking Vite event correction sends an ISO instant for the pharmacy ti
   await button('Correct clock_in time').props.onClick({ type: 'click' });
   tree = await h.stable();
   const date = tree.find(n => n.type === 'TextField' && n.props.label === 'Correct date and time');
-  const reason = tree.find(n => n.type === 'TextField' && n.props.label === 'Reason' && n.props.placeholder === 'Explain why the time is being corrected');
+  const reason = tree.find(n => n.type === 'TextField' && n.props.label === 'Reason' && n.props.placeholder === 'e.g. CCTV shows arrival at 8:55 AM');
   assert.ok(date && reason);
   date.props.onChange({ target: { value: '2026-07-10T09:00' } });
   reason.props.onChange({ target: { value: 'Verified after kiosk outage' } });
