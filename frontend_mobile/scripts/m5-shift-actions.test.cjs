@@ -73,3 +73,19 @@ test('R candidate acceptance cannot create duplicate offers on rapid taps',async
   await h.actions.handleAccept(12,87,201);
   assert.equal(h.counts.accept.length,2,'explicit later retry is allowed once settled');
 });
+
+test('R candidate offers to separate dates remain independent while one request is pending',async()=>{
+  const h=harness();
+  const first=h.actions.handleAccept(12,87,201);
+  const repeated=h.actions.handleAccept(12,87,201);
+  const second=h.actions.handleAccept(12,87,202);
+  assert.equal(h.counts.accept.length,2,
+    'distinct slots must not share the same single-flight key');
+  assert.deepEqual(JSON.parse(JSON.stringify(h.counts.accept.map(([,payload])=>payload.slotId))),[201,202]);
+  h.deferred.accept.complete({id:910});
+  const results=await Promise.all([first,repeated,second]);
+  assert.equal(results[1],false,'repeated tap on the first slot is ignored');
+  assert.equal(results[0].id,910);
+  assert.equal(results[2].id,910);
+  assert.equal(h.notices.filter(x=>x.includes('Offer sent')).length,2);
+});
