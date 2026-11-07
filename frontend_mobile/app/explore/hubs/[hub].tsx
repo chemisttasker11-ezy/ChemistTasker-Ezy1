@@ -61,7 +61,7 @@ function PublicHubFeedView() {
     const ticket = ++generation.current;
     const postTicket = ++postGeneration.current;
     postPaging.current = false; pollPaging.current = false; searching.current = false; currentQuery.current = '';
-    setLoading(true); setError(''); setActionError(''); setMoreError('');
+    setLoading(true); setBusy(false); setError(''); setActionError(''); setMoreError('');
     setPollMoreError(''); setSearchError(''); setSearchDraft(''); setSearchTerm('');
     setPosts([]); setPolls([]); setInfo(null); setNext(null); setPollNext(null);
     pollPagesRef.current = 1; setMoreBusy(false); setPollMoreBusy(false); setSearchBusy(false);
