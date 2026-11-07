@@ -89,7 +89,7 @@ test('R: Explorer deep link redirects synchronously, without mounting personal l
   assert.equal(app.entry.props.href, '/explorer/shifts?section=public');
 });
 
-test('R: while identity hydrates /next-shifts cannot start a personal request', async () => {
+test('C: while identity hydrates /next-shifts cannot start a personal request', async () => {
   const app = mount(null, true);
   app.runEffects();
   await settle();

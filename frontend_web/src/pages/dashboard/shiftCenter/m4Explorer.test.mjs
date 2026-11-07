@@ -39,6 +39,7 @@ function createHost(apiOverrides = {}) {
   const nav = [];
   let stateIndex = 0;
   const state = [];
+  const effects = [];
   const react = {
     useState(initial) {
       const index = stateIndex++;
@@ -49,7 +50,7 @@ function createHost(apiOverrides = {}) {
     },
     useMemo(fn) { stateIndex++; return fn(); },
     useCallback(fn) { stateIndex++; return fn; },
-    useEffect() { stateIndex++; },
+    useEffect(fn) { stateIndex++; effects.push(fn); },
   };
   react.default = react;
   const router = {
@@ -105,7 +106,11 @@ function createHost(apiOverrides = {}) {
     assert.equal(actual.type, 'SegmentTabs');
     return actual.props;
   }
-  return { session, nav, mount, render, publicBoard, communityBoard };
+  async function settleEffects() {
+    effects.splice(0).forEach(fn => fn());
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  return { session, nav, mount, render, settleEffects, publicBoard, communityBoard };
 }
 
 test('R: both Vite Explorer board mounts hide worker Confirmed/History routes', () => {
@@ -350,6 +355,10 @@ test('R: real Next public entry -> Explorer overview -> real opportunity action 
   let publicReads = 0;
   const actual = createHost({
     fetchPublicShifts: async () => { publicReads++; return { results: [], count: 0 }; },
+    getOnboardingDetail: async role => {
+      if (role !== 'explorer') personalCalls++;
+      return { verified: true };
+    },
     fetchPersonalConfirmedShifts: async () => { personalCalls++; throw Error('personal confirmed forbidden'); },
     fetchPersonalHistoryShifts: async () => { personalCalls++; throw Error('personal history forbidden'); },
   });
@@ -359,11 +368,14 @@ test('R: real Next public entry -> Explorer overview -> real opportunity action 
   assert.equal(publicGate.type, actual.publicBoard.default, 'the destination is authorized by real canAccessRoute');
   assert.deepEqual(Array.from(actual.mount(actual.publicBoard).tabs.map(t => t.value)),
     ['public', 'community']);
+  await actual.settleEffects();
+  assert.equal(publicReads, 1, 'mount effects load the public feed');
+  assert.equal(personalCalls, 0, 'mount effects do not request worker-only data');
   const publicView = actual.render(actual.publicBoard);
   const boardHost = nodes(publicView, n => n.type === 'ShiftsBoard');
   assert.equal(boardHost.length, 1, 'the real public board mounts at the navigated URL');
   await boardHost[0].props.onRefresh();
-  assert.equal(publicReads, 1, 'allowed public feed remains usable after navigation');
+  assert.equal(publicReads, 2, 'allowed public feed remains usable after navigation');
   assert.equal(personalCalls, 0, 'no personal confirmed/history/worker API call at either destination');
   assert.deepEqual(redirects, ['/dashboard/explorer/overview'], 'no Next/Vite redirect loop');
 
