@@ -1,4 +1,4 @@
-// M4-05: executable Shift Centre route/panel tests (no source-text assertions).
+﻿// M4-05: executable Shift Centre route/panel tests (no source-text assertions).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -9,7 +9,8 @@ const ts = require('../node_modules/typescript');
 const root = path.resolve(__dirname, '..');
 const jsx = (type, props) => ({ type, props: props || {} });
 function load(relative, imports) {
-  const source = fs.readFileSync(path.join(root, relative), 'utf8');
+  const baseFile = process.env.M5_BASE && path.join(process.env.M5_BASE, relative);
+  const source = fs.readFileSync(baseFile && fs.existsSync(baseFile) ? baseFile : path.join(root, relative), 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
       jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
@@ -156,4 +157,94 @@ test('C worker screen retains its existing sections without manager header', () 
   const shown = texts(app.render().tree);
   assert.equal(shown.includes('Shift Centre'), false);
   assert.deepEqual(app.render().mounted, ['personal-confirmed-api']);
+});
+
+
+function cardFixture() {
+  const noop = () => {};
+  const tokens = { colors: {}, font: {}, radius: {}, space: {}, touch: {} };
+  const card = 'Card';
+  const PaperCard = Object.assign(function Card(props) { return jsx(card, props); }, { Content: 'Card.Content' });
+  const helpers = load('roles/shared/shifts/ActiveShiftsPage/utils/shiftHelpers.ts', {});
+  const runtime = load('roles/shared/shifts/ActiveShiftsPage/utils/activeShiftRuntime.ts', {});
+  const candidate = load('roles/shared/shifts/ActiveShiftsPage/utils/candidateHelpers.ts', {});
+  const audiencePath = path.resolve(root, '../shared-core/src/domains/shifts/audience.ts');
+  const audienceSource = fs.readFileSync(audiencePath, 'utf8');
+  const audienceModule = { exports: {} };
+  vm.runInNewContext(ts.transpileModule(audienceSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText,
+    { module: audienceModule, exports: audienceModule.exports });
+  const icons = Object.fromEntries(['Store','Share2','Pencil','Trash2','MapPin','Calendar','Users','Heart','ChevronUp','CreditCard'].map(x => [x,x]));
+  const imports = {
+    react: { default: { Fragment: 'Fragment' } }, 'react/jsx-runtime': { jsx, jsxs: jsx },
+    'react-native': { View: 'View', TouchableOpacity: 'TouchableOpacity', StyleSheet: { create: x => x } },
+    'react-native-paper': { Button: 'Button', Card: PaperCard, Checkbox: 'Checkbox', Divider: 'Divider', Text: 'Text' },
+    '@/components/ui/BrandActivityIndicator': { BrandActivityIndicator: 'ActivityIndicator' },
+    'lucide-react-native': icons, '@/components/ui/Pill': { Pill: 'Pill' }, '@/constants/tokens': tokens,
+    '../ShiftTermsSummary': { ShiftTermsSummary: 'ShiftTermsSummary' }, '@chemisttasker/shared-core': audienceModule.exports,
+    './components/Escalation/EscalationStepper': { default: 'EscalationStepper' },
+    './components/Candidates/PublicLevelView': { default: 'PublicLevelView' },
+    './components/Candidates/CommunityLevelView': { default: 'CommunityLevelView' },
+    './components/CandidatesSkeleton': { default: 'CandidatesSkeleton' },
+    './utils/shiftHelpers': helpers, './utils/candidateHelpers': candidate,
+    './utils/displayHelpers': { getCardBorderColor: () => '' }, './utils/activeShiftRuntime': runtime,
+    './theme': { customTheme: { colors: {}, spacing: {} } }, './styles': { styles: {} },
+  };
+  const component = load('roles/shared/shifts/ActiveShiftsPage/ActiveShiftCards.tsx', imports).default;
+  const shift = { id: 12, visibility: 'FULL_PART_TIME', roleNeeded: 'PHARMACIST', employmentType: 'LOCUM', isUrgent: true,
+    slots: [{ id: 34, date: '2026-11-07' }], paymentOptions: [{ offerId: 81, slotId: 34 }] };
+  const state = { expandedShifts: new Set(), selectedLevelByShift: {}, selectedSlotByShift: {}, paymentSlotSelection: {},
+    setPaymentSlotSelection: noop, pillPayingShiftId: null, sharingShiftId: null, actionLoading: {},
+    slotHasUpdatesByShift: { 12: { 34: true } }, revealingInterestId: null, buzzLoadingOfferId: null, reviewLoadingId: null,
+    setDeleteConfirmDialog: x => { state.dialog = x; }, setSelectedLevelByShift: noop };
+  const actions = { getTabKey: (id, level) => `${id}:${level}`, resolveSlotId: runtime.resolveSlotIdAny,
+    isDedicatedShift: () => false, toggleShiftExpansion: id => state.expandedShifts.has(id) ? state.expandedShifts.delete(id) : state.expandedShifts.add(id),
+    handleShare: s => { state.shared = s.id; }, handleEditShift: s => { state.edited = s.id; } };
+  const data = { orderedShifts: [shift], tabData: { '12:FULL_PART_TIME': { membersBySlot: { 34: [
+    { userId: 1, status: 'interested' }, { userId: 2, status: 'interested' }, { userId: 1, status: 'interested' },
+  ] } } }, counterOffersByShift: {}, counterOffersLoadingByShift: {} };
+  return { shift, state, actions, render: () => component({ data, state, actions }) };
+}
+const findNodes = (tree, predicate) => collect(tree, predicate);
+const labels = tree => findNodes(tree, n => n.type === 'Pill').map(n => n.props.label);
+const button = (tree, label) => findNodes(tree, n => n.props && (n.props.accessibilityLabel === label || (n.type === 'Button' && n.props.children === label)))[0];
+test('R audience_pill: internal and platform labels and reach hints', () => {
+  const f = cardFixture(); let tree = f.render();
+  assert.ok(labels(tree).includes('Internal \u00b7 My Pharmacy'));
+  assert.ok(findNodes(tree, n => n.props?.accessibilityHint === 'Visible now to your full-time and part-time team. Escalate inside the card to reach more people.').length);
+  f.shift.visibility = 'PLATFORM'; tree = f.render();
+  assert.ok(labels(tree).includes('Platform \u00b7 ChemistTasker'));
+  assert.ok(findNodes(tree, n => n.props?.accessibilityHint === 'Visible now to verified professionals across ChemistTasker.').length);
+});
+test('R status_pills_collapsed: unique interested, payment and new activity', () => {
+  const shown = labels(cardFixture().render());
+  for (const label of ['2 waiting for review', 'Payment required', 'New activity']) assert.ok(shown.includes(label), label);
+});
+test('R metrics_and_hints: metric names and accessible explanations', () => {
+  const tree = cardFixture().render(); const shown = texts(tree);
+  for (const label of ['Slots', 'Candidates', 'Interested']) assert.ok(shown.includes(label), label);
+  for (const hint of ['Dates in this shift. Each date is filled separately.', 'Everyone who responded or was invited, across all dates and audiences.', 'Said yes or sent an offer, and are waiting for your review.']) assert.ok(findNodes(tree, n => n.props?.accessibilityHint === hint).length, hint);
+});
+test('R humanized_pills: role, employment and urgency', () => {
+  const shown = labels(cardFixture().render());
+  for (const label of ['Pharmacist', 'Locum', 'Urgent']) assert.ok(shown.includes(label), label);
+});
+test('R manage_candidates_toggle: expanded state and candidate workspace', () => {
+  const f = cardFixture(); let tree = f.render();
+  assert.equal(button(tree, 'Manage candidates').props.accessibilityState.expanded, false);
+  button(tree, 'Manage candidates').props.onPress(); tree = f.render();
+  assert.equal(button(tree, 'Hide candidates').props.accessibilityState.expanded, true);
+  assert.ok(findNodes(tree, n => n.type === 'EscalationStepper').length);
+  button(tree, 'Hide candidates').props.onPress();
+  assert.equal(button(f.render(), 'Manage candidates').props.accessibilityState.expanded, false);
+});
+test('C card body and edit/delete actions retain their handlers', () => {
+  const f = cardFixture(); const tree = f.render();
+  button(tree, 'Edit shift').props.onPress({ stopPropagation() {} }); assert.equal(f.state.edited, 12);
+  button(tree, 'Delete shift').props.onPress({ stopPropagation() {} }); assert.equal(f.state.dialog.shiftId, 12);
+  findNodes(tree, n => n.type === 'TouchableOpacity' && !n.props.accessibilityLabel)[0].props.onPress();
+  assert.equal(f.state.expandedShifts.has(12), true);
+});
+test('R share_label: share action retains its handler', () => {
+  const f = cardFixture(); const share = button(f.render(), 'Share shift link');
+  assert.ok(share); share.props.onPress({ stopPropagation() {} }); assert.equal(f.state.shared, 12);
 });
