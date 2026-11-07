@@ -265,7 +265,7 @@ export default function TopBarActions({
       setUnreadNotifications(0);
       setNotificationOwner(accountKey);
     } finally {
-      if (isCurrent() && options?.showLoading !== false) setNotificationsLoading(false);
+      if (isCurrent()) setNotificationsLoading(false);
     }
   }, [accountKey, user?.id]);
 
@@ -713,6 +713,8 @@ export default function TopBarActions({
     try {
       const res = await markNotificationsRead(unreadIds);
       if (!isCurrent()) return;
+      listGeneration.current += 1;
+      setNotificationsLoading(false);
       const nowIso = new Date().toISOString();
       setUnreadNotifications(res.unread ?? 0);
       setNotifications((prev) =>
