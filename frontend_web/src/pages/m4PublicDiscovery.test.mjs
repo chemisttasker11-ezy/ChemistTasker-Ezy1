@@ -109,3 +109,88 @@ test('C #2/#7 migrated Next public TalentBoard entry preserves QR and safe login
   assert.match(decodeURIComponent(login.to),/reference_code=REF-22/);
   assert.equal(board.externalPosts.some(p=>p.contact_email),false);
 });
+
+const registry=JSON.parse(fs.readFileSync(new URL('shared-core/skills_registry.json',repo),'utf8'));
+function mountedTalentBoard(next) {
+  const ui=hooks(), navigated=[];
+  const router={useNavigate:()=>dest=>navigated.push(dest),
+    useLocation:()=>({pathname:'/talent/public-board',search:'?reference_code=REF-22'})};
+  const filterFile=next?
+    'landing_next/migrated/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFilters.ts':
+    'src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFilters.ts';
+  const realFilter=load(filterFile,{react:ui.react,
+    '@chemisttasker/shared-core':{filterTalentCandidates:presentation.filterTalentCandidates},
+    '@chemisttasker/shared-core/skills_registry.json':registry});
+  const model=load('src/pages/dashboard/sidebar/TalentBoard/talentModel.ts',{
+    './constants':{ENGAGEMENT_LABELS:{}},
+    '../../../../../../shared-core/skills_registry.json':registry,
+    '@chemisttasker/shared-core':{skillId:skill.skillId,skillLabel:skill.skillLabel,
+      newcomerTypeLabel:()=>null},
+  });
+  const material=Object.fromEntries(['Alert','Box','Button','Chip','Divider','Drawer',
+    'IconButton','Paper','Stack','Pagination','Typography','Dialog',
+    'InputAdornment','TextField'].map(x=>[x,x]));
+  const core={...presentation,...talent, normalizeVerification:()=>null,
+    newcomerTypeLabel:()=>null,getRatingsSummary:async()=>({average:0,count:0}),
+    canPublishTalent:()=>false};
+  const mocks={
+    react:ui.react,'react/jsx-runtime':{jsx,jsxs:jsx},
+    'react-router-dom':router,'@/public/navigation':router,
+    '@mui/material':material,
+    '@mui/icons-material':new Proxy({}, {get:(_,name)=>String(name)}),
+    'lucide-react':{Megaphone:'Megaphone',SlidersHorizontal:'SlidersHorizontal'},
+    '@chemisttasker/shared-core':core,
+    '@chemisttasker/shared-core/skills_registry.json':registry,
+    '@chemisttasker/shared-ui/VerificationBadges':{BadgeGuideLink:'BadgeGuideLink'},
+    '@/public/skill-icon':{default:'SkillIcon'},
+    '../../../../components/ui/PageHeader':{default:'PageHeader'},
+    './hooks/useTalentFeed':{useTalentFeed:()=>({posts:[],loading:false,error:null,reload(){}})},
+    './hooks/useTalentFilters':realFilter,
+    './components/PitchDialog':{default:'PitchDialog'},
+    './components/AvailabilitySidebar':{default:'AvailabilitySidebar'},
+    './components/TalentCardV2':{default:'TalentCardV2'},
+    './components/PublicTalentCard':{default:'PublicTalentCard'},
+    '../../../../components/dashboard/DashboardContentState':{default:'DashboardContentState'},
+    './components/FiltersSidebar':{default:'FiltersSidebar'},
+    '../../../../contexts/AuthContext':{useAuth:()=>({user:null,isAdminUser:false})},
+    '../../../../utils/dashboardPath':{resolveUserHomePath:()=>'/dashboard'},
+    '../../../../utils/roleLabels':{otherStaffRoleLabel:()=>''},
+    './constants':{ENGAGEMENT_LABELS:{}},
+    './talentModel':model,
+  };
+  const src=next?'landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx':
+    'src/pages/dashboard/sidebar/TalentBoard/index.tsx';
+  const board=load(src,mocks,{location:{pathname:'/talent/public-board',search:''},
+    addEventListener(){},removeEventListener(){}});
+  const post=presentation.normalizePublicTalentPost({
+    id:22,reference_code:'REF-22',role_title:'Intern',
+    work_types:['CASUAL'],location_state:'QLD',location_suburb:'Brisbane',
+    availability_days:[{date:'2999-02-01'}],skills:['WEBSTER_PACKING_DAA'],
+    rating_average:4.5,rating_count:2,is_anonymous:true,
+    author_user_id:null,explorer_user_id:null,
+  });
+  return {render:()=>{const index=board.default({publicMode:true,
+    publicPresentation:next,externalPosts:[post],externalLoading:false});
+    return index;},navigated};
+}
+test('C #7 real Vite and Next TalentBoard/index render consistent public Candidate cards',()=>{
+  const results=[];
+  for(const next of [false,true]){
+    const view=mountedTalentBoard(next);
+    const tree=view.render();
+    const card=nodes(tree,next?'PublicTalentCard':'TalentCardV2')[0];
+    assert.ok(card,'real board must hand its projected candidate to the card');
+    assert.equal(card.canViewAvailability,false,'anonymous public board cannot open private availability');
+    assert.equal(card.candidate.id,22);
+    assert.equal(card.candidate.refId,'REF-22');
+    assert.equal(card.candidate.role,'Intern');
+    assert.deepEqual(Array.from(card.candidate.availableDates),['2999-02-01']);
+    assert.equal(card.candidate.ratingAverage,4.5);
+    assert.equal(card.candidate.ratingCount,2);
+    assert.equal(card.candidate.authorUserId,null);
+    results.push({ref:card.candidate.refId,role:card.candidate.role,
+      work:card.candidate.workTypes,dates:card.candidate.availableDates,
+      rating:card.candidate.ratingAverage});
+  }
+  assert.deepEqual(JSON.parse(JSON.stringify(results[0])),JSON.parse(JSON.stringify(results[1])));
+});
