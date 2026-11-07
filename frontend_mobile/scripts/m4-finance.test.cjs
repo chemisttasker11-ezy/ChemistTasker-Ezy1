@@ -394,6 +394,34 @@ test('account and mode switches clear finance and review while ignoring old load
   }
 });
 
+test('C: rejected new-account load leaves no previous finance rows', async () => {
+  for (const received of [false, true]) {
+    const app = financeWorkspace();
+    app.state.receivedMode = received;
+    let nodes = await app.render();
+    assert.ok(nodes.some(n => text(n) === (received ? 'NADIA-RECEIVED' : 'INV-1')));
+    if (!received) {
+      nodes = await navigateTab(app, 'Customers');
+      assert.ok(nodes.some(n => text(n).includes('Customer A')));
+    }
+    const rejected = later();
+    app.finance.invoices = () => rejected.promise;
+    app.finance.receivedInvoices = () => rejected.promise;
+    app.state.userId = 702;
+    await app.render();
+    rejected.reject(new Error('New account load failed'));
+    nodes = await app.render();
+    assert.ok(nodes.some(n => text(n).includes('New account load failed')));
+    for (const [tab, old] of received
+      ? [['Received', 'NADIA-RECEIVED']]
+      : [['Invoices', 'INV-1'], ['Customers', 'Customer A']]) {
+      nodes = await navigateTab(app, tab);
+      assert.ok(!nodes.some(n => text(n).includes(old)), `${tab} must not show old account rows`);
+    }
+    app.h.unmount();
+  }
+});
+
 test('account switch closes finance forms and invoice editor while authorization loads', async () => {
   for (const view of ['form', 'editor']) {
     const app = financeWorkspace(), next = later();

@@ -46,7 +46,13 @@ function nodes(tree, result = []) {
   }
   return result;
 }
-async function worksheetUi(raceField) {
+const invoices = [{ number: 'INV-51', kind: 'invoice', status: 'sent', voided: false,
+  payload: { customer: { name: 'ACME "Shop"' }, invoice_date: '2026-07-10', due_date: '2026-07-31' },
+  calculation: { payable: '110.00', gst: '10.00' }, paid: '30.00', balance: '80.00' }];
+const expenses = [{ supplier: '=SUM(1,2)', description: 'Travel "A", room 2', incurred_on: '2026-07-10',
+  paid_on: null, amount: '150.00', gst_amount: '13.64', business_use_percent: '75.00',
+  gst_credit: '10.23', reference: 'M4', receipts: [] }];
+async function worksheetUi(raceField, exportTool) {
   let resolvePending; let calls = 0;
   const pending = new Promise(resolve => { resolvePending = resolve; });
   const created = [], revoked = [], clicks = [], removed = [], timers = [];
@@ -95,7 +101,7 @@ async function worksheetUi(raceField) {
       invoiceCsvRows: csv.invoiceCsvRows, expenseCsvRows: csv.expenseCsvRows, worksheetCsvRows: csv.worksheetCsvRows,
     },
     'react-router-dom': { useSearchParams: () => [
-      new URLSearchParams('tool=bas'), () => {},
+      new URLSearchParams('tool=' + (exportTool || 'bas')), () => {},
     ] },
     '../../components/dashboard/DashboardContentState': { default: placeholders.DashboardContentState },
     '../../components/ui/ConfirmDialog': { ConfirmDialog: 'ConfirmDialog' },
@@ -120,7 +126,7 @@ async function worksheetUi(raceField) {
     './InvoiceReviewDrawer': { default: placeholders.InvoiceReviewDrawer },
     './InvoiceRows': { ...parts, rowTitle: {}, rowMeta: {}, amountSx: {} },
     './useFinanceData': { useFinanceData: () => ({
-      customers: [], items: [], invoices: [], receivedInvoices: [], expenses: [],
+      customers: [], items: [], invoices, receivedInvoices: [], expenses,
       loading: false, loadFailed: null, reload: async () => {}, retry: () => {},
     }) },
   };
@@ -129,6 +135,23 @@ async function worksheetUi(raceField) {
   const control = (label) => render().find(node => node.type === 'Button'
     && nodes(node.props.children).length === 0
     && String(node.props.children) === label);
+  if (exportTool) {
+    const exportButton = control('Export CSV');
+    assert.ok(exportButton, 'real export button must be rendered');
+    assert.notEqual(exportButton.props.disabled, true);
+    exportButton.props.onClick();
+    assert.equal(created.length, 1);
+    assert.deepEqual(clicks, [['blob:worksheet', `workspace-${exportTool}.csv`]]);
+    assert.equal(removed.length, 1);
+    const bytes = new TextDecoder('utf-8', { ignoreBOM: true }).decode(await created[0].arrayBuffer());
+    const rows = exportTool === 'invoices' ? csv.invoiceCsvRows(invoices) : csv.expenseCsvRows(expenses);
+    assert.equal(bytes, csv.renderFinanceCsv(rows));
+    assert.equal(timers.length, 1);
+    assert.equal(timers[0][1], 1000);
+    timers[0][0]();
+    assert.deepEqual(revoked, ['blob:worksheet']);
+    return;
+  }
   if (raceField) {
     control('Calculate').props.onClick();
     const labels = { start: 'Period start', end: 'Period end', basis: 'GST basis' };
@@ -159,4 +182,8 @@ async function worksheetUi(raceField) {
 test('C: actual web worksheet download matches shared CSV and revokes its URL', async () => worksheetUi());
 for (const field of ['start', 'end', 'basis']) {
   test(`R: web rejects worksheet after ${field} changes and recalculates`, async () => worksheetUi(field));
+}
+
+for (const tool of ['invoices', 'expenses']) {
+  test(`C: actual web ${tool} CSV export matches shared rows and revokes its URL`, async () => worksheetUi(undefined, tool));
 }
