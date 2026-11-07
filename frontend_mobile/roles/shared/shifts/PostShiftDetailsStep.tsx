@@ -116,7 +116,8 @@ export default function PostShiftDetailsStep({
         <Text style={styles.templateStatus}>Pharmacy: {pharmacyName || 'Loading…'}</Text>
       )}
 
-      <Text style={styles.label}>About the shift</Text>
+      <Text style={styles.label} accessibilityRole="header">About the shift</Text>
+      <Text style={styles.helper}>What should the person know before they apply?</Text>
       <TextInput
         mode="outlined"
         value={description}
@@ -151,7 +152,7 @@ export default function PostShiftDetailsStep({
           style={styles.templateButton}
           contentStyle={{ minHeight: touch.min }}
         >
-          Save for future shifts
+          {descriptionTemplateSaving ? 'Saving…' : 'Save for future shifts'}
         </Button>
         {descriptionTemplate?.id ? (
           <Button
@@ -169,7 +170,8 @@ export default function PostShiftDetailsStep({
         ) : null}
       </View>
 
-      <Text style={styles.label}>On the day</Text>
+      <Text style={styles.label} accessibilityRole="header">On the day</Text>
+      <Text style={styles.helper}>Optional. Helps people judge the workload before they apply.</Text>
       <ShiftContextFields workload={workloadTags} support={supportOnShift}
         onWorkloadChange={setWorkloadTags} onSupportChange={setSupportOnShift} />
       <Text style={styles.label}>Extras</Text>
