@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const fallbackRoot = path.resolve(__dirname, '../../../pr249-m1-integration-20261105/frontend_mobile');
+const fallbackRoot = path.resolve(__dirname, '..');
 const harnessRoot = fs.existsSync(path.join(__dirname, 'invoice-generation.test.cjs')) ? path.resolve(__dirname, '..') : fallbackRoot;
 const baseRequire = require('node:module').createRequire(path.join(harnessRoot, 'package.json'));
 const dependency = id => { try { return require(id); } catch (error) { if (error.code !== 'MODULE_NOT_FOUND') throw error; return baseRequire(id); } };

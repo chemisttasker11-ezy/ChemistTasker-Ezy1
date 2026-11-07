@@ -7,8 +7,8 @@ const vm = require('node:vm');
 function getTs() {
   const probePaths = [
     path.resolve(__dirname, '../node_modules/typescript'),
-    path.resolve(__dirname, '../../pr249-m1-integration-20261105/frontend_mobile/node_modules/typescript'),
-    path.resolve(__dirname, '../../../pr249-m1-integration-20261105/frontend_mobile/node_modules/typescript'),
+    path.resolve(__dirname, '../node_modules/typescript'),
+    path.resolve(__dirname, '../node_modules/typescript'),
   ];
   for (const p of probePaths) {
     if (fs.existsSync(p)) return require(p);

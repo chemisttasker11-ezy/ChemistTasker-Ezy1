@@ -25,7 +25,7 @@ function getTs() {
   try {
     return require('typescript');
   } catch {
-    const candidatePath = path.resolve(__dirname, '../../../pr249-m1-integration-20261105/frontend_mobile/node_modules/typescript');
+    const candidatePath = path.resolve(__dirname, '../node_modules/typescript');
     return require(candidatePath);
   }
 }

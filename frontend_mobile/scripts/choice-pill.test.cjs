@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const ts = require(fs.existsSync(path.resolve(__dirname, '../node_modules/typescript')) ? path.resolve(__dirname, '../node_modules/typescript') : path.resolve(__dirname, '../../pr249-m1-integration-20261105/frontend_mobile/node_modules/typescript'));
+const ts = require(fs.existsSync(path.resolve(__dirname, '../node_modules/typescript')) ? path.resolve(__dirname, '../node_modules/typescript') : path.resolve(__dirname, '../node_modules/typescript'));
 const deep = new Proxy(function () {}, { get: (_, key) => key === Symbol.toPrimitive ? () => 1 : deep, apply: () => deep });
 const jsx = (type, props) => typeof type === 'function' ? type(props) : { type, props };
 const react = { memo: x => x, createContext: () => ({}), useContext: () => ({}) };
