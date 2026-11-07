@@ -268,8 +268,16 @@ test('R blank public title remains selectable as Pharmacist on native', async()=
   h.host.unmount();
 });
 
-test('R real newcomer subtype responses retain Explorer learning',async()=>{
-  for(const code of ['CAREER_SWITCHER','JUNIOR','OVERSEAS']){
+test('R career switcher uses the web learning pathway',async()=>{
+  const h=learningHarness(); h.user.current={id:51,role:'EXPLORER'};
+  h.options.push({role_code:'CAREER_SWITCHER',can_trade_personally:false,blockers:[]});
+  const tree=await h.render();
+  assert.ok(collect(tree,'Text').some(p=>p.children==='Career transition and pharmacy pathways'));
+  h.host.unmount();
+});
+
+test('C unmapped newcomer subtype responses retain Explorer learning',async()=>{
+  for(const code of ['JUNIOR','OVERSEAS']){
     const h=learningHarness(); h.user.current={id:51,role:'EXPLORER'};
     h.options.push({role_code:code,can_trade_personally:false,blockers:[]});
     const tree=await h.render();
