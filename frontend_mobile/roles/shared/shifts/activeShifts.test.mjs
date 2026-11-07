@@ -296,3 +296,6 @@ test('slot signature recomputation preserves state identity until values change'
   const result = mergeSlotSignatures(seen, {});
   assert.equal(runtime.unchangedSlotState(seen, result.mergedSeen), seen);
 });
+
+// Include the mounted native Post Shift picker regressions in the standard mobile gate.
+import '../../../scripts/m5-post-shift-components.test.cjs';

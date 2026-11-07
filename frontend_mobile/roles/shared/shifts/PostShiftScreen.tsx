@@ -1,4 +1,4 @@
-import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, getShiftPostingOwnerAdjustedRate, type ShiftPostingDraft } from '@chemisttasker/shared-core';
+import { ApiError, buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, getShiftPostingOwnerAdjustedRate, shiftPostingDateWindow, splitPostableDates, type ShiftPostingDraft } from '@chemisttasker/shared-core';
 import NativeShiftBoardPreview from './NativeShiftBoardPreview';
 import { expandShiftDraftSlots, reconcileShiftDraftRateRows } from '@chemisttasker/shared-core';
 import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults, type SupportEntry } from '@chemisttasker/shared-core';
@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { ContentState } from '@/components/ui';
 import { useShiftSurface } from './useShiftSurface';
+import { shiftRoute } from './shiftSurface';
 import {
     fetchPharmaciesService,
     fetchWorkerShiftDetailService,
@@ -100,6 +101,8 @@ export default function PostShiftScreen() {
     const parsedParams = useMemo(() => parsePostShiftSearchParams(params), [paramsKey]);
     const { editingId, routePharmacyId, isEmbedded } = parsedParams;
     const hasAccess = canAccessPostShift(surface, routePharmacyId, hasCapability);
+    // Recompute on render so a wizard open through midnight never accepts yesterday.
+    const postingWindow = shiftPostingDateWindow(new Date());
 
     const loadedVisibilityRef = React.useRef<string | null>(null);
     const loadGenRef = React.useRef(0);
@@ -164,6 +167,9 @@ export default function PostShiftScreen() {
     }, []);
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
+    // The route change waits for visible native success feedback. This ref is
+    // read only inside event handlers, never during React rendering.
+    const postSuccessDestinationRef = React.useRef<string | null>(null);
     const [pharmacyMenuVisible, setPharmacyMenuVisible] = useState(false);
     const [activeStep, setActiveStep] = useState<StepKey>('details');
     const [calendarMonthAnchor, setCalendarMonthAnchor] = useState<Date>(new Date());
@@ -437,6 +443,16 @@ export default function PostShiftScreen() {
             data.pharmacy ??
             data.pharmacy_id ??
             '';
+        const hydratedPharmacyId = typeof pharmacyValue === 'object' && pharmacyValue !== null
+            ? Number((pharmacyValue as any).id)
+            : Number(pharmacyValue);
+        if (surface.persona === 'admin' && surface.scopedPharmacyId != null &&
+            hydratedPharmacyId !== surface.scopedPharmacyId) {
+            setLoadError({ kind: 'shift', message: 'You do not have access to this shift.' });
+            setError('You do not have access to this shift.');
+            router.back();
+            return;
+        }
         const pharmacyDefaults = currentPharmacies.find((item: any) => Number(item.id) === Number(pharmacyValue));
         if (data.pharmacy_detail || data.pharmacyDetail) {
             const detail = data.pharmacy_detail ?? data.pharmacyDetail;
@@ -539,7 +555,7 @@ export default function PostShiftScreen() {
             ownerBonus: initOwnerBonus,
             slotRates: initialSlotRateRows.map((r) => r.rate),
         });
-    }, []);
+    }, [router, surface.persona, surface.scopedPharmacyId]);
 
     const applyBookingPrefillFromParams = useCallback(() => {
         const plan = computePrefillPlan(appliedPrefillsRef.current, parsedParams, Boolean(editingId));
@@ -882,9 +898,12 @@ export default function PostShiftScreen() {
     ]);
 
     const mergeSelectedDates = useCallback((incomingDates: string[]) => {
-        const todayIso = toLocalIsoDate(new Date());
-        const valid = incomingDates.filter((d) => d && d >= todayIso);
-        if (!valid.length) return;
+        const { valid, past, late } = splitPostableDates(incomingDates, postingWindow.minIso);
+        if (!valid.length) {
+            if (past.length || late.length) setError('That date has passed. Pick today or later.');
+            return;
+        }
+        if (past.length || late.length) setToast('Past dates were left out.');
         setSelectedDates((prev) => Array.from(new Set([...prev, ...valid])).sort());
         setSelectedDateTimes((prev) => {
             const next = { ...prev };
@@ -903,7 +922,7 @@ export default function PostShiftScreen() {
             setSlotStart(latestHours.startTime);
             setSlotEnd(latestHours.endTime);
         }
-    }, [getDefaultTimesForDate]);
+    }, [getDefaultTimesForDate, postingWindow.minIso]);
 
     const selectedDateObjects = useMemo(
         () => selectedDates.map((d) => new Date(`${d}T00:00:00`)),
@@ -1106,8 +1125,13 @@ export default function PostShiftScreen() {
             setError('Select at least one date from the calendar.');
             return false;
         }
-        return addSlotEntries(
-            selectedDates.map((date) => ({
+        const { valid, past, late } = splitPostableDates(selectedDates, postingWindow.minIso);
+        if (!valid.length) {
+            setError('That date has passed. Pick today or later.');
+            return false;
+        }
+        const added = addSlotEntries(
+            valid.map((date) => ({
                 date,
                 ...(selectedDateTimes[date] || { startTime: slotStart, endTime: slotEnd }),
                 isRecurring: false,
@@ -1116,6 +1140,8 @@ export default function PostShiftScreen() {
             })),
             { clearAllSelected: true }
         );
+        if (added && (past.length || late.length)) setToast('Past dates were left out.');
+        return added;
     };
 
     const removeSlot = (index: number) => setSlots((prev) => prev.filter((_, i) => i !== index));
@@ -1210,11 +1236,15 @@ export default function PostShiftScreen() {
     const handleSubmit = async () => {
         // State alone cannot prevent two taps before React renders the loading flag.
         // A second create POST may publish a duplicate shift, so lock synchronously.
-        if (postingBusyRef.current || !hasAccess || hydrating) return;
+        if (postingBusyRef.current || postSuccessDestinationRef.current || !hasAccess || hydrating) return;
         setError('');
         const draft = postingDraft();
         const validation = validateShiftPostingDraft(draft);
         if (validation) { setError(validation); return; }
+        if (!editingId && draft.slots.some((slot) => !splitPostableDates([slot.date], postingWindow.minIso).valid.length)) {
+            setError('That date has passed. Pick today or later.');
+            return;
+        }
         const scope = postingScopeRef.current;
         const stillCurrent = () => scope === postingScopeRef.current;
         postingBusyRef.current = true;
@@ -1224,26 +1254,37 @@ export default function PostShiftScreen() {
             if (editingId) {
                 await updateOwnerShiftService(editingId, payload);
                 if (!stillCurrent()) return;
-                setToast('Shift updated');
+                setToast('Shift updated successfully!');
             } else {
                 await createOwnerShiftService(payload);
                 if (!stillCurrent()) return;
                 resetForm();
-                setToast('Shift posted');
+                setToast('Shift posted successfully!');
                 // A successful new post starts a fresh form without inventing a backend draft state.
                 touchedRef.current = false;
             }
             unsaved.markClean();
-            router.back();
+            postSuccessDestinationRef.current = surface.persona
+                ? shiftRoute(surface.persona, { section: 'active' })
+                : null;
+            // Do not replace here: it unmounts the Snackbar before it is visible.
         } catch (e: any) {
             if (stillCurrent()) {
-                setError(e?.response?.data?.detail || 'Unable to save shift');
+                setError(e instanceof ApiError ? e.message : (e?.response?.data?.detail || 'Unable to save shift'));
             }
         } finally {
             postingBusyRef.current = false;
             if (stillCurrent()) setLoading(false);
         }
     };
+
+    const dismissToast = () => {
+        const destination = postSuccessDestinationRef.current;
+        postSuccessDestinationRef.current = null;
+        setToast('');
+        if (destination) router.replace(destination as any);
+    };
+    const showingPostSuccess = toast === 'Shift posted successfully!' || toast === 'Shift updated successfully!';
 
     const chipStyle = (selected: boolean) => [styles.chip, selected ? styles.chipSelected : styles.chipUnselected];
     const chipTextStyle = (selected: boolean) => (selected ? styles.chipTextSelected : styles.chipText);
@@ -1332,6 +1373,7 @@ export default function PostShiftScreen() {
                         setSlotEnd={edited(setSlotEnd)}
                         setSlotDatePickerOpen={setSlotDatePickerOpen}
                         slotDateHours={slotDateHours}
+                        postingWindow={postingWindow}
                         calendarMonthAnchor={calendarMonthAnchor}
                         setCalendarMonthAnchor={setCalendarMonthAnchor}
                         monthLabel={monthLabel}
@@ -1517,7 +1559,7 @@ export default function PostShiftScreen() {
                         <Button
                             mode="contained"
                             onPress={handleSubmit}
-                            disabled={!canSubmit || loading}
+                            disabled={!canSubmit || loading || showingPostSuccess}
                             loading={loading}
                             style={[styles.primaryBtn, styles.navBtnPrimary]}
                             contentStyle={styles.navBtnContent}
@@ -1529,13 +1571,22 @@ export default function PostShiftScreen() {
                 </View>
             </ScrollView>
 
-            <Snackbar visible={!!toast} onDismiss={() => setToast('')} duration={2500}>
+            <Snackbar
+                visible={!!toast}
+                onDismiss={dismissToast}
+                action={showingPostSuccess ? { label: 'View shifts', onPress: dismissToast } : undefined}
+                duration={2500}
+            >
                 {toast}
             </Snackbar>
 
             <DatePickerModal
                 mode="multiple"
                 locale="en"
+                validRange={{
+                    startDate: new Date(`${postingWindow.minIso}T00:00:00`),
+                    endDate: new Date(`${postingWindow.maxIso}T23:59:59`),
+                }}
                 visible={slotDatePickerOpen}
                 onDismiss={() => setSlotDatePickerOpen(false)}
                 dates={selectedDateObjects}
@@ -1548,9 +1599,8 @@ export default function PostShiftScreen() {
                     const pickedIsos = pickedDates
                         .filter(Boolean)
                         .map((d) => toLocalIsoDate(d));
-                    // mergeSelectedDates only adds today-or-later dates, so the draft changes only for a new one.
-                    const todayIso = toLocalIsoDate(new Date());
-                    if (pickedIsos.some((d) => d >= todayIso && !selectedDateSet.has(d))) markTouched();
+                    const { valid } = splitPostableDates(pickedIsos, postingWindow.minIso);
+                    if (valid.some((d) => !selectedDateSet.has(d))) markTouched();
                     mergeSelectedDates(pickedIsos);
                     setSlotDatePickerOpen(false);
                 }}
@@ -1558,6 +1608,10 @@ export default function PostShiftScreen() {
             <DatePickerModal
                 mode="single"
                 locale="en"
+                validRange={{
+                    startDate: new Date(`${postingWindow.minIso}T00:00:00`),
+                    endDate: new Date(`${postingWindow.maxIso}T23:59:59`),
+                }}
                 visible={recurringEndPickerOpen}
                 onDismiss={() => setRecurringEndPickerOpen(false)}
                 date={toIsoDate(slotRecurringEnd) ?? new Date()}
