@@ -118,7 +118,16 @@ export default function AddItemWizard() {
   const generation = useRef(0);
   const account = String(session.user?.id ?? 'anonymous');
   const accountRef = useRef(account);
-  accountRef.current = account;
+  if (accountRef.current !== account) {
+    // Changing identity invalidates both the in-flight continuation and any
+    // durable listing receipt; a new user must never PATCH the previous user's ID.
+    generation.current++;
+    completing.current = false;
+    durable.current = null;
+    uploaded.current.clear();
+    createReceipt.current = crypto.randomUUID();
+    accountRef.current = account;
+  }
   const mounted = useRef(true);
 
   useEffect(() => {
