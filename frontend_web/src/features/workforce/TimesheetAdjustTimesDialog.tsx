@@ -196,8 +196,17 @@ export default function TimesheetAdjustTimesDialog({
       const instant = (local: string, event?: { effective_timestamp: string } | null) => (event
         ? dayjs(correctionTimestamp(local, event.effective_timestamp, pharmacyTimezone))
         : dayjs.tz(local, pharmacyTimezone));
-      const startDayjs = instant(startLocal, startEvent);
-      const finishDayjs = instant(finishLocal, finishEvent);
+      let startDayjs: dayjs.Dayjs;
+      let finishDayjs: dayjs.Dayjs;
+      try {
+        startDayjs = instant(startLocal, startEvent);
+        finishDayjs = instant(finishLocal, finishEvent);
+      } catch (failure) {
+        return errorText(failure, 'Enter a valid pharmacy-local date and time.');
+      }
+      if (!startDayjs.isValid() || !finishDayjs.isValid()) {
+        return 'Enter a valid pharmacy-local date and time.';
+      }
 
       if (!finishDayjs.isAfter(startDayjs)) {
         return 'Start time must be before finish time.';

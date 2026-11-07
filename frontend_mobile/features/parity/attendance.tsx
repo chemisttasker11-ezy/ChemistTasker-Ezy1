@@ -3,7 +3,7 @@ import { Alert, Linking, StyleSheet, View } from 'react-native';
 import { Button, Chip, Icon, Text } from 'react-native-paper';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { attendance, canManageKioskDevices, correctionTimestamp, workforce } from '@chemisttasker/shared-core';
+import { attendance, attendanceWallTime, canManageKioskDevices, correctionTimestamp, isValidAttendanceLocal, workforce } from '@chemisttasker/shared-core';
 import type { AttendanceClockOptions, ShiftOffer, WorkerCoverTerms } from '@chemisttasker/shared-core';
 import ShiftEngagementTermsDialog from '../../roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog';
 import { useWorkspace } from '@/context/WorkspaceContext';
@@ -530,23 +530,6 @@ function ReviewDetail({screen,row,timeline,loading,error,onReload}:{screen:Atten
       </>:<Button mode="contained" onPress={()=>router.push(`/attendance/reviews/${row.provisional_id}/decision` as any)}>Make decision</Button>}
     </>}
   </ParityPage>;
-}
-
-function attendanceWallTime(instant:string,timeZone:string):string {
-  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{
-    timeZone,year:'numeric',month:'2-digit',day:'2-digit',
-    hour:'2-digit',minute:'2-digit',hourCycle:'h23',
-  }).formatToParts(new Date(instant)).filter((p)=>p.type!=='literal').map((p)=>[p.type,p.value]));
-  return [parts.year,parts.month,parts.day].join('-')+'T'+[parts.hour,parts.minute].join(':');
-}
-
-function isValidAttendanceLocal(value:string):boolean {
-  const match=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value.trim());
-  if(!match)return false;
-  const [y,m,d,h,min]=match.slice(1).map(Number);
-  const stamp=new Date(Date.UTC(y,m-1,d,h,min));
-  return stamp.getUTCFullYear()===y&&stamp.getUTCMonth()===m-1&&
-    stamp.getUTCDate()===d&&stamp.getUTCHours()===h&&stamp.getUTCMinutes()===min;
 }
 
 function CorrectionScreen({manager,pharmacyId,rows,params,loading,error}:{

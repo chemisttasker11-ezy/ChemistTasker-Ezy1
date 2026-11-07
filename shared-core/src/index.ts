@@ -62,7 +62,7 @@ export * from './policy/rosterPolicy';
 // Re-export pricing utils
 export * from './utils/pricing';
 export * from './utils/attendanceDisplay';
-export { correctionTimestamp } from './utils/correctionTimestamp';
+export { correctionTimestamp, attendanceWallTime, isValidAttendanceLocal } from './utils/correctionTimestamp';
 
 // Shared mobile/desktop offline kiosk protocol.
 export * from './kioskProtocol';

@@ -70,3 +70,24 @@ export function correctionTimestamp(local: string, original: string, timeZone: s
   }
   return new Date(later[0].epoch).toISOString();
 }
+
+/** Render an event instant in the pharmacy's wall timezone, never the device's. */
+export function attendanceWallTime(instant: string, timeZone: string): string {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(instant)).filter(part => part.type !== 'literal')
+    .map(part => [part.type, part.value]));
+  return [parts.year, parts.month, parts.day].join('-') + 'T' + [parts.hour, parts.minute].join(':');
+}
+
+/** Date/calendar validation without applying the caller's local timezone. */
+export function isValidAttendanceLocal(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value.trim());
+  if (!match) return false;
+  const [year, month, day, hour, minute] = match.slice(1).map(Number);
+  const instant = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  return instant.getUTCFullYear() === year && instant.getUTCMonth() === month - 1 &&
+    instant.getUTCDate() === day && instant.getUTCHours() === hour &&
+    instant.getUTCMinutes() === minute;
+}
