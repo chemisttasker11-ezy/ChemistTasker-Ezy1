@@ -23,15 +23,17 @@ test('C: Next community uses public shared-core APIs for separate search and pol
     useState(initial){const i=index++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;
       return [slots[i],v=>{slots[i]=typeof v==='function'?v(slots[i]):v;}];},
     useRef(v){const i=index++;return slots[i]??(slots[i]={current:v});},
-    useMemo(fn){index++;return fn();},
-    useCallback(fn){index++;return fn;},
-    useEffect(fn){index++;effects.push(fn);},
+    useMemo(fn,deps){const i=index++,old=slots[i];if(!old||!deps||deps.some((d,j)=>d!==old.deps[j]))slots[i]={value:fn(),deps};return slots[i].value;},
+    useCallback(fn,deps){const i=index++,old=slots[i];if(!old||!deps||deps.some((d,j)=>d!==old.deps[j]))slots[i]={value:fn,deps};return slots[i].value;},
+    useEffect(fn,deps){const i=index++,old=slots[i];if(!old||!deps||deps.some((d,j)=>d!==old.deps[j])){slots[i]={deps};effects.push(fn);}},
   };
   react.default=react;
   const api={publicContent:{
     listHubs:async()=>[{key:'public',can_interact:false}],
     listCommunityPosts:async(hub,q)=>{queries.posts.push([hub,q]);return{results:[],next:null,count:0};},
-    listCommunityPolls:async(hub,q)=>{queries.polls.push([hub,q]);return{results:[],next:null,count:0};},
+    listCommunityPolls:async(hub,q)=>{queries.polls.push([hub,q]);return{results:[{id:q?.page===2?13:1,
+      question:'Poll '+(q?.page===2?13:1), options:[],can_interact:false,is_closed:false}],
+      next:q?.page===2?null:'?page=2',count:13};},
     voteCommunityPoll:async()=>({}),
   }};
   const mocks={
@@ -61,6 +63,31 @@ test('C: Next community uses public shared-core APIs for separate search and pol
   await new Promise(resolve=>setTimeout(resolve,0));
   assert.deepEqual(queries.posts.map(([hub,q])=>[hub,q.page,q.q]),[['public',1,'']]);
   assert.deepEqual(queries.polls.map(([hub,q])=>[hub,q.page]),[['public',1]]);
-  const buttons=traverse(tree,n=>n.type==='button');
-  assert.ok(buttons.some(n=>n.props.children==='Discover hubs')===false);
+  const render=()=>{index=0;return feed(tree.props);};
+  const flush=async()=>{for(const run of effects.splice(0))await run();
+    await new Promise(resolve=>setTimeout(resolve,0));};
+  // The real search opener and form drive Next's own search/page state.
+  const opener=traverse(tree,n=>n.type==='button'&&n.props['aria-label']==='Search this group')[0];
+  assert.ok(opener);
+  opener.props.onClick();
+  tree=render();
+  const searchForm=traverse(tree,n=>n.type==='form'&&n.props.role==='search')[0];
+  assert.ok(searchForm);
+  const input=traverse(searchForm,n=>n.type==='input')[0];
+  input.props.onChange({target:{value:'pharmacy roster'}});
+  tree=render();
+  traverse(tree,n=>n.type==='form'&&n.props.role==='search')[0].props.onSubmit({preventDefault(){}});
+  tree=render();
+  await flush();
+  assert.equal(queries.posts.at(-1)[1].q,'pharmacy roster');
+  assert.equal(queries.posts.at(-1)[1].page,1);
+  assert.equal(queries.polls.length,1,'Next post search must leave poll page unchanged');
+  const pollPager=traverse(tree,n=>typeof n.type==='function'&&n.type.name==='Paging'&&n.props.next)[0];
+  assert.ok(pollPager,'real Next poll pager required when API says next');
+  pollPager.props.onPage(2);
+  tree=render();
+  await flush();
+  assert.equal(queries.polls.at(-1)[1].page,2);
+  assert.equal(queries.posts.at(-1)[1].q,'pharmacy roster');
+  assert.equal(queries.posts.length,2,'poll page change must not reload discussions');
 });
