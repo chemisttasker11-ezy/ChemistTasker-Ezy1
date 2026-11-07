@@ -230,11 +230,12 @@ function DetailsStep({draft,options,loading,error}:{draft:MarketplaceMobileDraft
  </ParityPage>;
 }
 function PhotosStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:boolean;error:string}){
- const router=useRouter();const{value,patch,current}=useDraftStep(draft);const[removing,setRemoving]=useState(false),[removeError,setRemoveError]=useState('');const removingRef=useRef(false);
+ const router=useRouter();const{value,patch,scope,current}=useDraftStep(draft);const[removing,setRemoving]=useState(false),[removeError,setRemoveError]=useState('');const removingRef=useRef(false);
  const add=async()=>{const stillCurrent=current();const r=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsMultipleSelection:true,quality:.85});if(stillCurrent()&&!r.canceled)await patch({image_uris:[...value.image_uris,...r.assets.map(a=>a.uri)].slice(0,6)},stillCurrent);};
  const remove=async(uri:string,i:number)=>{if(removingRef.current)return;const stillCurrent=current();removingRef.current=true;setRemoving(true);setRemoveError('');try{
-  if(value.uploaded_image_uris.includes(uri)){const id=value.uploaded_image_ids?.[uri];if(id==null)throw new Error('This uploaded photo cannot be removed here.');await api.deleteImage(id);if(!stillCurrent())return;}
-  const ids={...value.uploaded_image_ids};delete ids[uri];await patch({image_uris:value.image_uris.filter((_,x)=>x!==i),uploaded_image_uris:value.uploaded_image_uris.filter(x=>x!==uri),uploaded_image_ids:ids},stillCurrent);
+  const saved=await loadMarketplaceDraft(scope);if(!stillCurrent())return;
+  if(saved.uploaded_image_uris.includes(uri)){const id=saved.uploaded_image_ids?.[uri];if(id==null)throw new Error('This uploaded photo cannot be removed here.');await api.deleteImage(id);if(!stillCurrent())return;}
+  const ids={...saved.uploaded_image_ids};delete ids[uri];await patch({image_uris:value.image_uris.filter((_,x)=>x!==i),uploaded_image_uris:saved.uploaded_image_uris.filter(x=>x!==uri),uploaded_image_ids:ids},stillCurrent);
  }catch(e){if(stillCurrent())setRemoveError(errorMessage(e,'Unable to remove photo.'));}finally{removingRef.current=false;if(stillCurrent())setRemoving(false);}};
  return <ParityPage title="Photos" subtitle="Add clear photos of the actual item." loading={loading} error={error||removeError}><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{value.image_uris.map((uri,i)=><Card key={uri+i} style={{width:'47%',overflow:'hidden'}}><Image source={{uri}} style={{width:'100%',height:130}}/><Card.Actions><Button disabled={removing} onPress={()=>void remove(uri,i)}>Remove</Button></Card.Actions></Card>)}</View><Button disabled={removing} mode="outlined" icon="image-plus" onPress={()=>void add()}>Add photos</Button><Button disabled={removing} mode="contained" onPress={()=>router.push('/marketplace/new/audience' as any)}>Continue</Button></ParityPage>;
 }
