@@ -670,11 +670,13 @@ for (const outcome of ['failure', 'success']) {
       pharmacies: [{ id: 102, name: 'Account B Pharmacy' }],
     };
     let currentUser = ownerA;
+    let logoutRequests = 0;
     let releaseB;
     const heldB = new Promise((resolve) => { releaseB = resolve; });
     await installApiFixture(page, ownerA, async (route, { path }) => {
       if (path.endsWith('/users/me/')) return json(route, currentUser ?? {}, currentUser ? 200 : 401);
       if (path.endsWith('/users/logout/')) {
+        logoutRequests += 1;
         currentUser = null;
         return json(route, {});
       }
@@ -742,7 +744,8 @@ for (const outcome of ['failure', 'success']) {
     await page.getByLabel('Email', { exact: true }).fill(ownerB.email);
     await page.getByLabel('Password', { exact: true }).fill('test-password');
     await page.getByRole('button', { name: 'Login', exact: true }).click();
-    await expect.poll(() => new URL(page.url()).pathname).toBe('/dashboard/owner/overview');
+    await expect.poll(() => new URL(page.url()).pathname, { message: 'Account B must land on the owner overview after signing in' }).toBe('/dashboard/owner/overview');
+    expect(logoutRequests, 'A single logout must not race the next account login').toBe(1);
     const requestB = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith('/pharmacies/'));
     await page.goto('/dashboard/owner/manage-pharmacies');
     await requestB;
