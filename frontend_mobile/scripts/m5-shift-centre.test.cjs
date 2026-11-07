@@ -41,7 +41,7 @@ function text(node){
  if(node==null||typeof node==='boolean')return '';
  if(typeof node==='string'||typeof node==='number')return String(node);
  if(typeof node.type==='function')return text(node.type(node.props));
- return text(node.props?.children);
+ return node.type==='Pill' ? String(node.props?.label ?? '') : text(node.props?.children);
 }
 const paper=Object.fromEntries(['View','Surface','Text','ScrollView','Divider','Image',
  'TouchableOpacity','ActivityIndicator','Button','Chip','Card'].map(n=>[n,n]));
@@ -80,7 +80,8 @@ function mountStatusCard(props){
 }
 function mountNetwork(config={}){
  const mod=load('roles/shared/shifts/ActiveShiftsPage/components/Candidates/CommunityLevelView.tsx',{
-  ...base,'./StatusCard':{default:mountStatusCard},
+  ...base,'@chemisttasker/shared-core':shared,
+  './StatusCard':{default:mountStatusCard},
   './SlotSelector':{default:'SlotSelector'},
   '../../utils/candidateHelpers':cand});
  return tree(mod.default({shift,members:[],selectedSlotId:null,offers:[],
