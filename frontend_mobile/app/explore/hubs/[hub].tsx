@@ -93,6 +93,7 @@ function PublicHubFeedView() {
     const ticket = generation.current;
     const postTicket = ++postGeneration.current;
     postPaging.current = false;
+    setMoreBusy(false);
     setSearchBusy(true); setSearchError(''); setMoreError('');
     try {
       const result = await chemistTaskerApi.publicContent.listCommunityPosts(hub, { page: 1, ...(q ? { q } : {}) });
