@@ -436,7 +436,7 @@ function realPostShiftHost(persona) {
 }
 
 for (const persona of ['owner','admin']) {
-  test('C: real '+persona+' PostShiftForm displays overnight events and submits unchanged draft clocks', async () => {
+  test('R: real '+persona+' PostShiftForm displays overnight events and submits unchanged draft clocks', async () => {
     const host = realPostShiftHost(persona);
     let nodes = await host.settle();
     const details = nodes.find(n => n.type === 'PostShiftDetailsStep');
@@ -474,5 +474,50 @@ for (const persona of ['owner','admin']) {
       [['2027-01-10','22:00','06:00']]);
     assert.equal(host.submitted[0].pharmacy, 4);
     if(persona === 'owner') assert.deepEqual(host.completed, ['new callback']);
+  });
+}
+
+for (const persona of ['owner', 'admin']) {
+  test('C: real '+persona+' PostShiftForm preserves daytime clocks and callback/state across host rerenders', async () => {
+    const host = realPostShiftHost(persona);
+    let elements = await host.settle();
+    const details = elements.find(node => node.type === 'PostShiftDetailsStep');
+    assert.ok(details, persona+' must mount the actual shared form');
+    details.props.setRoleNeeded('PHARMACIST');
+    details.props.setPharmacyId(4);
+    elements = await host.settle();
+    let shell = elements.find(node => node.type === 'PostShiftWizardShell');
+    assert.ok(shell);
+    const timetableStep = shell.props.steps.findIndex(step => step.key === 'timetable');
+    assert.ok(timetableStep >= 0);
+    shell.props.setActiveStep(timetableStep);
+    elements = await host.settle();
+    let timetable = elements.find(node => node.type === 'PostShiftTimetableStep');
+    assert.ok(timetable);
+    timetable.props.setSlots([slot('2027-01-10', '09:00', '17:00')]);
+    elements = await host.settle();
+    timetable = elements.find(node => node.type === 'PostShiftTimetableStep');
+    assert.equal(timetable.props.calendarEvents.length, 1);
+    assert.deepEqual(local(timetable.props.calendarEvents[0]), {
+      start:'2027-01-10T09:00', end:'2027-01-10T17:00',
+    }, 'base-passing ordinary same-day times display without midnight rollover');
+    assert.deepEqual(Array.from(timetable.props.slots, value =>
+      [value.date, value.startTime, value.endTime]),
+      [['2027-01-10','09:00','17:00']]);
+    host.changeCallback(() => host.completed.push('new daytime callback'));
+    host.changeContext('?context=daytime-rerender');
+    elements = await host.settle();
+    timetable = elements.find(node => node.type === 'PostShiftTimetableStep');
+    assert.deepEqual(Array.from(timetable.props.slots, value =>
+      [value.date, value.startTime, value.endTime]),
+      [['2027-01-10','09:00','17:00']], 'host callback/context changes preserve the accepted daytime draft');
+    shell = elements.find(node => node.type === 'PostShiftWizardShell');
+    await shell.props.onSubmit();
+    assert.equal(host.submitted.length, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(host.submitted[0].slots.map(value =>
+      [value.date,value.start_time,value.end_time]))),
+      [['2027-01-10','09:00','17:00']], 'same-day posting clocks remain unchanged');
+    assert.equal(host.submitted[0].pharmacy, 4);
+    if (persona === 'owner') assert.deepEqual(host.completed, ['new daytime callback']);
   });
 }
