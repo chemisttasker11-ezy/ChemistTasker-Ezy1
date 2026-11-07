@@ -308,3 +308,6 @@ import '../../../scripts/m5-post-shift-components.test.cjs';
 
 // Run M5-05 mounted native Post Shift visual assertions in the standard mobile gate.
 import '../../../scripts/m5-post-shift-look.test.cjs';
+
+// Mounted same-render business-action regressions for M5-02 candidate workspace.
+import '../../../scripts/m5-shift-actions.test.cjs';
