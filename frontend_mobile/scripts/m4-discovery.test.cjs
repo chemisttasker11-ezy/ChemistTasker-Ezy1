@@ -116,10 +116,8 @@ function boardHarness() {
     './domains/talent/api': {}, './utils/serialization': {},
   });
   const presentation=load('../shared-core/src/domains/talent/presentation.ts', {
-    '../../skills': {
-      skillId: (_registry, value) => value, isMatchableSkill: () => true,
-      findSkill: () => ({ group: 'Clinical Services' }), SOFTWARE_GROUP: 'Dispense Software',
-    },
+    '../../skills': realSkills,
+    '../onboarding/newcomer':load('../shared-core/src/domains/onboarding/newcomer.ts', {}),
   });
   const module=load('app/explore/talent-board.tsx', {
     react:host.react, 'react/jsx-runtime':{jsx,jsxs:jsx},
