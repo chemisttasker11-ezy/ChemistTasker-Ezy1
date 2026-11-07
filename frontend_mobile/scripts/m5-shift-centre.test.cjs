@@ -22,7 +22,9 @@ function load(relative,imports){
    if(name.endsWith('.png'))return 1;
    if(!Object.prototype.hasOwnProperty.call(imports,name))
     throw Error('Unmocked import '+name+' in '+relative);
-   return imports[name];
+   const imported=imports[name];
+   return imported&&typeof imported==='object'&&'default' in imported&&!imported.__esModule
+    ? {__esModule:true,...imported} : imported;
   }},{filename:relative});
  return module.exports;
 }
