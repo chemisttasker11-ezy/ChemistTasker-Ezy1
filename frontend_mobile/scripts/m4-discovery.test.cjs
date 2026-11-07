@@ -144,3 +144,95 @@ test('C public board retains page-one candidates after page-two network failure'
   assert.equal(collect(tree,'Card').length,1,'successful page must survive later page failure');
   h.host.unmount();
 });
+
+
+function articleHarness(section='blog') {
+  const host=hooks(), calls=[], pages=[], routes=[];
+  const module=load('features/explore/ArticleFeed.tsx', {
+    react:host.react,'react/jsx-runtime':{jsx,jsxs:jsx},
+    'react-native':{Image:'Image',ScrollView:'ScrollView',StyleSheet:{create:x=>x},View:'View'},
+    'react-native-paper':{Button:'Button',Card:{__esModule:true,default:'Card',Content:'CardContent'},
+      Searchbar:'Searchbar',Text:'Text',Chip:'Chip'},
+    'expo-router':{useRouter:()=>({push:x=>routes.push(x),replace(){},back(){},canGoBack:()=>false})},
+    '@/components/ui/BrandActivityIndicator':{BrandActivityIndicator:'Spinner'},
+    'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
+    '@/config/api':{chemistTaskerApi:{publicContent:{listArticles:async options=>{
+      calls.push(options);
+      const item=pages.shift();
+      if(!item)throw Error('No article page queued');
+      return item.promise || (item instanceof Error ? Promise.reject(item) : item);
+    }}}},
+    '@/constants/tokens':{colors:{pageBg:'white',textPrimary:'black',textSecondary:'gray',border:'gray',surfaceBg:'white',primary:'blue',status:{red:{fg:'red'}}},radius:{card:4},space:{lg:16,md:8,sm:4,'3xl':32,'2xl':20},touch:{min:40}},
+    './webLinks':{safePublicUrl:x=>x},
+  });
+  return {host,calls,pages,routes,render:()=>host.render(module.default,{section}),collect,deferred};
+}
+const article=(id,topic='practice')=>({
+  id,kind:'blog',title:'Article '+id,slug:'article-'+id,topic,
+  excerpt:'Public pharmacy guidance',read_minutes:3,cover_url:null,
+});
+test('R blog topic selector sends topic+kind and retains query on page two',async()=>{
+  const h=articleHarness('blog');
+  h.pages.push({results:[article(1)],next:'/api/v1/public-hub/articles/?page=2'});
+  let tree=await h.render();
+  const topic=collect(tree,'Chip').find(p=>/Career/i.test(String(p.children)));
+  assert.ok(topic,'rendered topic control for Career is required');
+  h.pages.push({results:[article(2,'career')],next:'/api/v1/public-hub/articles/?page=2'});
+  topic.onPress();
+  tree=await h.render();
+  assert.equal(h.calls.at(-1).kind,'blog');
+  assert.equal(h.calls.at(-1).topic,'career');
+  const more=collect(tree,'Button').find(p=>p.children==='Load more articles');
+  assert.ok(more);
+  h.pages.push({results:[article(3,'career')],next:null});
+  more.onPress(); await h.render();
+  assert.equal(h.calls.at(-1).page,2);
+  assert.equal(h.calls.at(-1).topic,'career');
+  h.host.unmount();
+});
+test('C failing article page two preserves first-page results and visible error',async()=>{
+  const h=articleHarness('news');
+  h.pages.push({results:[{...article(4),kind:'news'}],next:'/api/v1/public-hub/articles/?page=2'});
+  let tree=await h.render();
+  h.pages.push(Error('News page offline'));
+  collect(tree,'Button').find(p=>p.children==='Load more articles').onPress();
+  tree=await h.render();
+  assert.equal(collect(tree,'Card').length,1);
+  assert.ok(collect(tree,'Text').some(p=>String(p.children).includes('News page offline')));
+  h.host.unmount();
+});
+function learningHarness() {
+  const host=hooks(), calls=[], results=[], options=[], user={current:{id:11,role:'OTHER_STAFF'}};
+  const component=load('roles/pharmacist/learning.tsx',{
+    react:host.react,'react/jsx-runtime':{jsx,jsxs:jsx},
+    'react-native':{Linking:{openURL:async()=>{}},ScrollView:'ScrollView',StyleSheet:{create:x=>x},View:'View'},
+    'expo-router':{useFocusEffect:cb=>host.react.useEffect(cb,[cb])},
+    'react-native-paper':{Button:'Button',Card:{__esModule:true,default:'Card',Content:'CardContent',Cover:'CardCover'},
+      Chip:'Chip',Text:'Text',TextInput:{__esModule:true,default:'TextInput',Icon:'TextInputIcon'}},
+    '@/components/ui/BrandActivityIndicator':{BrandActivityIndicator:'Spinner'},
+    '@/config/api':{chemistTaskerApi:{
+      publicContent:{listArticles:async args=>{
+        calls.push(['articles',args]);
+        return results.shift() || {results:[],next:null};
+      }},
+      marketplace:{getListingOptions:async()=>{
+        calls.push(['role',user.current?.id]);
+        return options.shift() || {role_code:null};
+      }},
+    }},
+    '@/context/AuthContext':{useAuth:()=>({user:user.current})},
+    '@/components/ui/ContentState':{ContentState:'ContentState'},
+    '@/constants/tokens':{colors:{pageBg:'white',textPrimary:'black',textSecondary:'gray',textMuted:'gray',primary:'blue',primarySoft:'white',border:'gray',surfaceBg:'white',tone:{violet:{fg:'purple'}},status:{red:{fg:'red'}}},radius:{card:4},space:{lg:16,md:8,sm:4,xs:2,'3xl':32},font:{outfit:{semiBold:'bold'},inter:{semiBold:'bold'}},touch:{min:40}},
+  });
+  return {host,calls,results,options,user,render:()=>host.render(component.default)};
+}
+test('R OTHER_STAFF technician receives a pathway from server role_code, not generic account role',async()=>{
+  const h=learningHarness();
+  h.results.push({results:[],next:null});
+  h.options.push({role_code:'TECHNICIAN'});
+  const tree=await h.render();
+  const words=collect(tree,'Text').map(p=>String(p.children)).join(' ');
+  assert.match(words,/Dispensary workflow and workplace development/);
+  assert.ok(h.calls.some(c=>c[0]==='role'),'real listing-options context must be queried');
+  h.host.unmount();
+});
