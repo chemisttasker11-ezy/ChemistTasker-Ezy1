@@ -46,6 +46,19 @@ type TalentBoardProps = {
   onRequireLogin?: (reason?: "like" | "calendar" | "booking") => void;
 };
 
+const mapSavedPitchSlot = (entry: any) => {
+  if (typeof entry === 'string') {
+    return { date: entry, startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' };
+              }
+              return {
+                date: String(entry?.date || ''),
+                startTime: entry?.start_time || entry?.startTime || '09:00',
+                endTime: entry?.end_time || entry?.endTime || '17:00',
+                isAllDay: Boolean(entry?.is_all_day ?? entry?.isAllDay),
+                notes: entry?.notes || '',
+              };
+            };
+
 const TalentBoard: React.FC<TalentBoardProps> = ({
   publicMode = false,
   externalPosts,
@@ -537,9 +550,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           postKind: payload.post_kind || "AVAILABILITY", suburb: payload.location_suburb || "",
           state: payload.location_state || "", postcode: payload.location_postcode || "",
           openToTravel: Boolean(payload.open_to_travel), coverageRadiusKm: payload.coverage_radius_km || 30,
-          availabilitySlots: (payload.availability_days || []).map((entry: any) => typeof entry === "string"
-            ? { date: entry, startTime: "09:00", endTime: "17:00", isAllDay: false, notes: "" }
-            : { date: entry.date, startTime: entry.start_time || "09:00", endTime: entry.end_time || "17:00", isAllDay: Boolean(entry.is_all_day), notes: "" }),
+          availabilitySlots: (payload.availability_days || []).map(mapSavedPitchSlot),
         }));
         setPitchNeedsRecovery(Boolean(pending.terminalCode || pending.rejected));
         setPitchError(pending.rejected
@@ -638,18 +649,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             mine.coverageRadiusKm != null ? Number(mine.coverageRadiusKm) : prev.coverageRadiusKm,
           availabilitySlots: minePostKind === "FULL_TIME_APPLICATION"
             ? []
-            : Array.isArray(mine.availabilityDays) && mine.availabilityDays.length > 0 ? mine.availabilityDays.map((entry: any) => {
-              if (typeof entry === 'string') {
-                return { date: entry, startTime: '09:00', endTime: '17:00', isAllDay: false, notes: '' };
-              }
-              return {
-                date: String(entry?.date || ''),
-                startTime: entry?.start_time || entry?.startTime || '09:00',
-                endTime: entry?.end_time || entry?.endTime || '17:00',
-                isAllDay: Boolean(entry?.is_all_day ?? entry?.isAllDay),
-                notes: entry?.notes || '',
-              };
-            }).filter((slot: any) => slot.date >= todayIso()) : (prev.availabilitySlots.length ? prev.availabilitySlots : inheritedAvailabilitySlots),
+            : Array.isArray(mine.availabilityDays) && mine.availabilityDays.length > 0 ? mine.availabilityDays.map(mapSavedPitchSlot).filter((slot: any) => slot.date >= todayIso()) : (prev.availabilitySlots.length ? prev.availabilitySlots : inheritedAvailabilitySlots),
         }));
       } else if (inheritedAvailabilitySlots.length > 0) {
         setPitchForm((prev) => ({
