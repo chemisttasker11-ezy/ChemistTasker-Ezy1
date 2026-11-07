@@ -74,6 +74,8 @@ class PublicHubM4Tests(TestCase):
     def test_every_persona_reads_every_hub_with_personal_interaction_flags(self):
         from onboarding.models import OtherStaffOnboarding
 
+        self.owner.is_otp_verified = True
+        self.owner.save(update_fields=["is_otp_verified"])
         staff = make_user("OTHER_STAFF", is_otp_verified=True)
         intern = make_user("OTHER_STAFF", is_otp_verified=True)
         OtherStaffOnboarding.objects.create(user=staff, role_type="ASSISTANT")

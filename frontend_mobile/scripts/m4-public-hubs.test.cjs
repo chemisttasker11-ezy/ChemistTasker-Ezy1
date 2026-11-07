@@ -277,7 +277,7 @@ test('R: pending search blocks stale-query post pagination',async()=>{
   assert.equal(h.find(h.render(),n=>n.type==='Text'&&n.props.children==='Post 99').length,0);
 });
 
-test('C: double post load is guarded and failed vote retains feeds',async()=>{
+test('R: double post load is guarded and failed vote retains feeds',async()=>{
   const pending=deferred();let calls=0;
   const h=env({api:{listCommunityPosts:async(_hub,q)=>{if(q.page===2){calls++;return pending.promise;}return page([post(1)],'?page=2');},voteCommunityPoll:async()=>{throw Error('vote failed');}}});
   h.render();await h.tick();const tree=h.render();

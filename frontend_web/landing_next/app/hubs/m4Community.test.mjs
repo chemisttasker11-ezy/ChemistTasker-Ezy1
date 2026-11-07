@@ -13,7 +13,7 @@ function traverse(node,pred,results=[]) {
   }
   return results;
 }
-test('C: Next community uses public shared-core APIs for separate search and poll page',async()=>{
+test('R: Next community uses public shared-core APIs for separate search and poll page',async()=>{
   const path=new URL('./community-client.tsx',import.meta.url);
   const compiled=ts.transpileModule(readFileSync(path,'utf8'),{fileName:path.pathname,
     compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,

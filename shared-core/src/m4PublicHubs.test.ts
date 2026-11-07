@@ -3,7 +3,7 @@ import { it as test } from 'vitest';
 import assert from 'node:assert/strict';
 import { createChemistTaskerApi } from './platformApi';
 
-test('C: post search and page remain on public AllowAny URL, polls independently paginate',async()=>{
+test('R: post search and page remain on public AllowAny URL, polls independently paginate',async()=>{
   const requests: Array<{url:string;method:string;body:string|null;authorization:string|null}>=[];
   const fakeFetch:typeof fetch=async(input,init)=>{
     const url=new URL(String(input));
@@ -37,7 +37,7 @@ test('R: invalid bearer retries a public read once anonymously without refresh o
   assert.deepEqual(headers,['Bearer expired',null]);
   assert.equal(refreshes,0);assert.equal(logouts,0);
 });
-test('C: cookie public reads stay cookie-backed; a second 401 stops the bearer fallback',async()=>{
+test('R: cookie public reads stay cookie-backed; a second 401 stops the bearer fallback',async()=>{
   const calls:Array<{auth:string|null;credentials:RequestCredentials|undefined}>=[];let failures=0;
   const fetchImpl:typeof fetch=async(_input,init)=>{calls.push({auth:new Headers(init?.headers).get('Authorization'),credentials:init?.credentials});
     return new Response('{}',{status:401});};
