@@ -1260,7 +1260,7 @@ export default function PostShiftScreen() {
             if (surface.persona) router.replace(shiftRoute(surface.persona, { section: 'active' }) as any);
         } catch (e: any) {
             if (stillCurrent()) {
-                setError(e instanceof ApiError ? e.message : 'Unable to save shift');
+                setError(e instanceof ApiError ? e.message : (e?.response?.data?.detail || 'Unable to save shift'));
             }
         } finally {
             postingBusyRef.current = false;
