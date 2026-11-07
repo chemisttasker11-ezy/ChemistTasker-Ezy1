@@ -270,4 +270,4 @@ function createInbox() {
     settle, focus, refocus, blur: engine.blur, flush: engine.flush,
     press, refresh, loadOlder, readError, text, engine, deferred, unmount: engine.unmount };
 }
-module.exports = { createInbox, deferred };
+module.exports = { createInbox, deferred, createHookScheduler, load, jsx };
