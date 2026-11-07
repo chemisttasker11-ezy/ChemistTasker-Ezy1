@@ -133,8 +133,8 @@ function AdminLayoutInner() {
         title: 'This week',
         tone: 'violet',
         items: [
-          { label: 'Attendance approvals', icon: UserCheck, route: '/attendance/reviews', hidden: !(canManageStaff && canManageRoster) },
-          { label: 'Roster', icon: CalendarCheck, route: '/manager/roster', hidden: !(canManageStaff && canManageRoster) },
+          { label: 'Attendance approvals', icon: UserCheck, route: '/attendance/reviews', hidden: !canManageRoster },
+          { label: 'Roster', icon: CalendarCheck, route: '/manager/roster', hidden: !canManageRoster },
           { label: 'Timesheets', icon: ClipboardCheck, route: '/workforce-timesheets', hidden: !canManageRoster },
           { label: 'Calendar', icon: CalendarDays, route: '/admin/calendar', hidden: !canManageCommunications },
         ],

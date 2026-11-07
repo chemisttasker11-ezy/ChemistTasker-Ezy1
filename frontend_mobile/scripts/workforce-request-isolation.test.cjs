@@ -283,12 +283,78 @@ test('my-roster production: scope transition does not deadlock, ignores stale co
   harness.unmount();
 });
 
-// 3. Attendance: Keyed scope prevents painting stale private status during render
-test('attendance parity keys content by scopeKey and cleans up on unmount', () => {
+// 3. Attendance: execute the REAL scope owner instead of regexing its source.
+function attendanceKeyHarness() {
   const source = fs.readFileSync(path.resolve(__dirname, '../features/parity/attendance.tsx'), 'utf8');
-  assert.match(source, /key=\{scopeKey\}/, 'AttendanceParityScreen must key AttendanceParityContent by scopeKey');
-  assert.match(source, /const scopeKey = `\$\{accountKey\}:\$\{pharmacyId \?\? 'none'\}:\$\{screen\}:\$\{detailScope\}`/, 'scopeKey must bind account, pharmacy, screen and route details');
-  assert.match(source, /loadSequence\.current \+= 1;\s*timelineSequence\.current \+= 1/, 'unmount must invalidate load and timeline sequence');
+  const outputText = ts.transpileModule(source, {
+    compilerOptions: {module:ts.ModuleKind.CommonJS, target:ts.ScriptTarget.ES2020,
+      jsx:ts.JsxEmit.ReactJSX, esModuleInterop:true},
+  }).outputText;
+  const context = { id: 91, role: 'PHARMACIST', pharmacy: 11, manager: false,
+    params: {id:'7',sessionId:'80',eventId:'2',timesheetId:'3'} };
+  const jsx = (type, props, key) => ({type,props,key});
+  const module = {exports:{}};
+  const imports = {
+    react: {__esModule:true, default:{},useRef:()=>({current:0}),
+      useState:value=>[value,()=>{}],useMemo:fn=>fn(),useCallback:fn=>fn(),
+      useEffect:()=>{}},
+    'react/jsx-runtime': {jsx,jsxs:jsx},
+    'react-native': {Alert:{alert(){}},Linking:{},StyleSheet:{create:styles=>styles},View:'View'},
+    'react-native-paper': {Button:'Button',Chip:'Chip',Icon:'Icon',Text:'Text'},
+    'expo-camera': {CameraView:'CameraView',useCameraPermissions:()=>[null,()=>{}]},
+    'expo-router': {useRouter:()=>({push(){},replace(){}}),
+      useLocalSearchParams:()=>context.params},
+    '@chemisttasker/shared-core': {attendance:{},workforce:{}},
+    '../../roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog': {__esModule:true,default:'TermsDialog'},
+    '@/context/WorkspaceContext': {useWorkspace:()=>({selectedPharmacyId:context.pharmacy})},
+    '@/context/AuthContext': {useAuth:()=>({user:{id:context.id,role:context.role},
+      hasCapability:(capability,pharmacyId)=>capability==='MANAGE_ROSTER' &&
+        pharmacyId===context.pharmacy && context.manager})},
+    './ParityUI': {palette:{primary:'#00f',danger:'#f00'},
+      ActionButtons:'ActionButtons',DataRow:'DataRow',EmptyState:'EmptyState',
+      Field:'Field',InfoNote:'InfoNote',MetricGrid:'MetricGrid',
+      ParityPage:'ParityPage',PharmacyRequired:'PharmacyRequired',
+      ScreenLink:'ScreenLink',Section:'Section'},
+    './utils': {asArray:input=>Array.isArray(input)?input:[],
+      dateLabel:input=>String(input),errorMessage:e=>String(e),
+      replaceUnderscore:input=>String(input),toNumber:Number},
+  };
+  vm.runInNewContext(outputText, {module,exports:module.exports,Date,URL,
+    URLSearchParams,console,
+    require(name) {
+      if (!(name in imports)) throw Error('Unexpected attendance module '+name);
+      return imports[name];
+    },
+  });
+  const render = (screen='reviews') => {
+    const output=module.exports.AttendanceParityScreen({screen});
+    assert.equal(typeof output.key,'string','real JSX must key its scoped child');
+    return output;
+  };
+  return {context,render};
+}
+test('C: attendance scope content identity responds to account, pharmacy, screen and route changes', () => {
+  const h=attendanceKeyHarness();
+  const initial=h.render().key;
+  h.context.id=92;
+  const otherAccount=h.render().key;
+  assert.notEqual(otherAccount,initial,'new account must remount personal status');
+  h.context.id=91;h.context.pharmacy=12;
+  assert.notEqual(h.render().key,initial,'site change must remount private status');
+  h.context.pharmacy=11;
+  assert.notEqual(h.render('review-detail').key,initial,'screen change must remount');
+  h.context.params={...h.context.params,sessionId:'81'};
+  assert.notEqual(h.render().key,initial,'route/session change must remount');
+});
+test('R: attendance manager capability change remounts scoped content without a site or user change', () => {
+  const h=attendanceKeyHarness();
+  const worker=h.render();
+  h.context.manager=true;
+  const manager=h.render();
+  assert.notEqual(manager.key,worker.key,'new MANAGE_ROSTER role must not reuse a worker cache');
+  assert.equal(manager.props.manager,true,'real permission prop must reach the child');
+  h.context.manager=false;
+  assert.equal(h.render().key,worker.key,'worker context key is stable when authority is removed');
 });
 
 // 4. Leave Requests: Keyed scope and decision rules
