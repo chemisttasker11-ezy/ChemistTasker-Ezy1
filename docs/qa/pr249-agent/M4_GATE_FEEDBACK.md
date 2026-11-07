@@ -176,3 +176,23 @@ To do on agent/m4-04 (tests-only commit(s) first, then fix commits):
 8. GAP frontend_web/landing_next/features/marketplace/add-item-wizard.tsx:189 Next create -> audience -> uploads -> submit
    has no account/unmount guard and no create receipt key (client_request_id); failed uploads are swallowed at :232.
    Capture scope, guard each boundary, keep the key and progress for retries, surface upload failures. R tests first.
+
+## M4-07 verdict: FIX FIRST (Claude B, head 6786dafa; mobile fix looks correct)
+RED at base (+ head tests): mobile R search :90 and R 13th poll :110 fail correctly; shared-core and backend C pass.
+GREEN: mobile 5/5 and 738/738, tsc 0, lint 0 errors, shared-core 481/481, PG public_hub+pharmacy_hub 107 OK. No assertion
+weakened 687b8052..6786dafa. The Next test fails on base AND head (harness bug).
+To do on agent/m4-07 (tests-only commit first, then F7 as its own fix commit):
+F1 (blocker) frontend_web/landing_next/app/hubs/m4Community.test.mjs:66 `render=()=>feed(tree.props)` re-renders Feed with
+   the rendered root div's props, so hub becomes undefined and both feeds refetch: keep the Feed ELEMENT's props (before
+   :61) and render with those.
+F2 mobile m4-public-hubs.test.cjs:108 claims dedupe but fixtures never repeat an id: page 2 also returns poll 12; assert
+   13 unique polls.
+F3 :132 claims closed polls cannot be voted but no test has a closed or can_interact:false poll (pack item 5): add one of
+   each and assert zero vote calls.
+F4 :140 assert the exact call `deepEqual(calls.votes[0], [1, 10])`, not just Number.isInteger.
+F5 :144 only checks the key changes; pack item 3 also needs "no former-account vote call" and "double tap = one request
+   per feed": press "Load more polls" twice before resolving (same render, rule 21) and assert one call.
+F6 backend public_hub/test_m4_community.py:88 `assertIn(status,(401,403))` -> `assertEqual(status, 401)` (pack B canonical).
+F7 (P3, production) frontend_mobile/app/explore/hubs/[hub].tsx:200 a vote refresh landing after a poll page load can drop
+   the newly loaded page (it captured the old pollPages): read the page count from a ref or ignore a stale refresh. R test first.
+Also relabel the mobile "C" poll-page retry (:126) and "C" vote keeps feed (:134) as R (they fail on base: rule 14).
