@@ -582,7 +582,7 @@ class ConversationViewSet(mixins.ListModelMixin,
     @action(detail=True, methods=['get', 'post'])
     def messages(self, request, pk=None):
         conv = self.get_object()
-        my_part = Participant.objects.filter(conversation=conv, membership__user=request.user).first()
+        my_part = authorized_participant(conv.pk, request.user.pk)
         if not my_part:
             return Response({"detail": "Not a participant of this conversation."}, status=status.HTTP_403_FORBIDDEN)
         
@@ -590,7 +590,7 @@ class ConversationViewSet(mixins.ListModelMixin,
             qs = conv.messages.select_related('sender__user').order_by('-created_at')
             page = self.paginate_queryset(qs)
             ser = MessageSerializer(page if page is not None else qs, many=True, context={'request': request})
-            return self.get_paginated_response(ser.data) if page else Response(ser.data)
+            return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
 
         data = request.data or {}
         body = sanitize_chat_text(data.get('body') or '')
@@ -625,7 +625,7 @@ class ConversationViewSet(mixins.ListModelMixin,
     @action(detail=True, methods=['post'])
     def read(self, request, pk=None):
         conv = self.get_object()
-        part = Participant.objects.filter(conversation=conv, membership__user=request.user).first()
+        part = authorized_participant(conv.pk, request.user.pk)
         if not part:
             return Response({"detail": "Not a participant."}, status=status.HTTP_404_NOT_FOUND)
         part.last_read_at = timezone.now()
