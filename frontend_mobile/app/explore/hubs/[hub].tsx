@@ -28,6 +28,7 @@ function PublicHubFeedView() {
   const accountKey = String(user?.id ?? 'anonymous');
   const { hub: routeHub } = useLocalSearchParams<{ hub: string }>();
   const hub = String(routeHub || '');
+  const loadedHub = useRef(hub);
   const generation = useRef(0);
   const postGeneration = useRef(0);
   const postPaging = useRef(false);
@@ -60,6 +61,10 @@ function PublicHubFeedView() {
   const load = useCallback(async () => {
     const ticket = ++generation.current;
     const postTicket = ++postGeneration.current;
+    if (loadedHub.current !== hub) {
+      loadedHub.current = hub;
+      submitting.current = false; setBody(''); setAttachments([]);
+    }
     postPaging.current = false; pollPaging.current = false; searching.current = false; currentQuery.current = '';
     setLoading(true); setBusy(false); setError(''); setActionError(''); setMoreError('');
     setPollMoreError(''); setSearchError(''); setSearchDraft(''); setSearchTerm('');
@@ -192,7 +197,7 @@ function PublicHubFeedView() {
       if (ticket === generation.current) { setBody(''); setAttachments([]); setBusy(false); submitting.current = false; await load(); }
     } catch (failure: any) {
       if (ticket === generation.current) setActionError(failure?.message || 'Post could not be published. Your draft is retained.');
-    } finally { submitting.current = false; if (ticket === generation.current) setBusy(false); }
+    } finally { if (ticket === generation.current) { submitting.current = false; setBusy(false); } }
   };
   const vote = async (poll: PublicHubPoll, optionId: number) => {
     if (!user) return router.push({ pathname: '/login', params: { returnTo: '/explore/hubs/' + encodeURIComponent(hub) } } as any);
