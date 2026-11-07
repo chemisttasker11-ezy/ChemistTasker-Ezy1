@@ -245,3 +245,29 @@ Trap: mobile tsc via the shared link points at ct-int dist; new shared-core expo
 ## Escalations (orchestrator session 5, 2026-11-07)
 - M4-03 failed round 3 -> Codex A round 4 (local/m4-03-r4): 1465fb50 tests, cacf426d fix, pushed to agent/m4-03.
 - M4-04 failed round 2 with a real server P1 (blank slug on API create) -> Codex A round 3 (local/m4-04-r3).
+
+## M4-01 round 2 re-gate: FIX FIRST (Claude B, head 76459334; production fixes correct, PG attendance+workforce 508 OK)
+All blockers are tests (tests-only commit first; production change only if a new test exposes a real defect):
+F1 frontend_mobile/scripts/m4-attendance.test.cjs:138: the shared-core mock lacks attendanceWallTime and
+   isValidAttendanceLocal, which fix 6f55361f imports (rules 8/12): add both from the loaded shared source.
+F2 :228 and :198: owner_pharmacies is never read by the real policy; ownership comes from memberships[].pharmacy_id with
+   role OWNER (accessPolicy.ts:288-301): use memberships:[{pharmacy_id:11,role:'OWNER'}]. (F1+F2 -> R3 :204 and R4 :226
+   go red on base and green at head.)
+F3 TimesheetAdjustTimesDialog.test.mjs:13: the loader compiles shared-core to ES5 (no target), so [...set] becomes [] and
+   6 tests that pass on base throw "Unable to resolve": add target: ts.ScriptTarget.ES2020.
+F4 rules 12/13: 76459334 reshaped scopeKey (attendance.tsx:49-50) to fit a source regex instead of converting the test:
+   convert workforce-request-isolation.test.cjs:288-291 into a behaviour test and record it in the Appendix E (J5) mapping.
+F5 matrix #3, #6 and #9 missing. #8: test_m4_scope.py must also check approve/reject SUCCEED for Tom, Lina, Grace and the
+   delegate (only correct is checked, :120). A staff-only delegate cannot be made at pharmacy level
+   (pharmacy_roles.py:17-36): use an org membership with MANAGE_STAFF only, or prove it is N/A with file:line.
+F6 (optional, not blocking): timesheetAdjustmentPolicy.ts:30 keeps its own wall-time converter; reuse shared-core
+   correctionTimestamp (skipped DST time moves forward instead of null).
+Traps: mobile tsc via the junction resolves shared-core to another tree (use a paths mapping to ../shared-core/src);
+ts.transpileModule without target = ES5.
+
+## OWNER RULE for every ChatGPT round (2026-11-07)
+Test, verify and review your own work BEFORE replying, as you have done since the project started. Run the real tests in
+your own sandbox (if git clone fails, get the branch through the GitHub connector or an archive download). Paste the exact
+commands, pass/fail counts, and for every R its red line on the old code and green at your head; then self-review your
+diff against the fix list item by item. "Could not run tests" is not an acceptable final state: say exactly what you
+tried and try another way.
