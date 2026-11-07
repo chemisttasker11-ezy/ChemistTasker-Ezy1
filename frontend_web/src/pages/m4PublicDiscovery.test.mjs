@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
-const repo = new URL('../../', import.meta.url);
+const repo = new URL('../../../', import.meta.url);
 const jsx = (type,props,key)=>({type,props:props||{},key});
 function load(file,mocks,window={}) {
   const source=fs.readFileSync(new URL(file,repo),'utf8');
