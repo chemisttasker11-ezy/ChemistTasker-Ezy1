@@ -120,9 +120,10 @@ function createMarketplace() {
   const scheduler = createScheduler();
   const env = { user: { id: 1001, role: 'OWNER' }, params: {}, screen: 'review' };
   const storage = new Map(), calls = [], nav = [], fetchQueue = new Map(), responses = new Map();
+  const writeBarriers = [];
   const store = {
     async getItem(key) { return storage.get(key) ?? null; },
-    async setItem(key, value) { storage.set(key, value); },
+    async setItem(key, value) { const gate = writeBarriers.shift(); if (gate) await gate.promise; storage.set(key, value); },
     async removeItem(key) { storage.delete(key); },
   };
   const utils = load('frontend_mobile/features/parity/utils.ts', {});
@@ -238,7 +239,8 @@ function createMarketplace() {
   }
   async function getDraft(scope) { return draftModule.loadMarketplaceDraft(String(scope)); }
   const callsOf = step => calls.filter(call => call.step === step);
-  return { scheduler, env, storage, calls, nav, queue, queueLocal, api,
+  const pauseNextWrite = () => { const gate = deferred(); writeBarriers.push(gate); return gate; };
+  return { scheduler, env, storage, calls, nav, queue, queueLocal, pauseNextWrite, api,
     render, currentNodes, button, click, setDraft, getDraft, callsOf, deferred,
     unmount: scheduler.unmount, flush: scheduler.flush };
 }
