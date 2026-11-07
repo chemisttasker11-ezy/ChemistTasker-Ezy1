@@ -165,7 +165,7 @@ export function projectPublicTalentCandidate(
       ? yearsExperience ? `${yearsExperience} yrs exp` : null
       : null;
   const nestedRating = take('rating');
-  const rating = nestedRating && typeof nestedRating === 'object'
+  const rating: Record<string, unknown> = nestedRating && typeof nestedRating === 'object'
     ? nestedRating as Record<string, unknown> : {};
   const roleCategory = string('role_category', 'roleCategory') || null;
   const explorerProfileId = idOrNull(take('explorer_profile', 'explorerProfileId', 'explorerProfile'));
