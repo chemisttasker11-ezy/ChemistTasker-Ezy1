@@ -26,7 +26,9 @@ const tokens = {
   space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 20 },
 };
 function load(relative, imports) {
-  const compiled = ts.transpileModule(fs.readFileSync(path.join(root, relative), 'utf8'), {
+  const sourcePath = process.env.M5_BASE_DIR && fs.existsSync(path.join(process.env.M5_BASE_DIR, path.basename(relative)))
+    ? path.join(process.env.M5_BASE_DIR, path.basename(relative)) : path.join(root, relative);
+  const compiled = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
       jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
@@ -51,7 +53,7 @@ function find(node, predicate, list = []) {
   else if (node && typeof node === 'object') {
     if (predicate(node)) list.push(node);
     if (typeof node.type === 'function') find(node.type(node.props), predicate, list);
-    find(node.props && node.props.children, predicate, list);
+    else find(node.props && node.props.children, predicate, list);
   }
   return list;
 }
@@ -124,6 +126,12 @@ function openDates(harness, mode, options) {
   tree = harness.render(props(mode, options));
   return tree;
 }
+function openCard(harness, mode, options) {
+  const p = props(mode, options);
+  const tree = harness.render(p);
+  harness.find(tree, x => x.type === 'Card')[0].props.onPress();
+  return harness.render(p);
+}
 
 test('R status_pill: exact confirmed and partially booked history summaries before expanding', () => {
   const h = boardHarness();
@@ -145,10 +153,10 @@ test('R dates_toggle: labelled accessible control and collapsed until requested'
 });
 test('R date_rows: date status, unfilled explanation and profile button', () => {
   const confirmed = boardHarness();
-  assert.match(confirmed.textOf(openDates(confirmed, 'confirmed')), /Booked/);
+  assert.match(confirmed.textOf(openCard(confirmed, 'confirmed')), /Booked/);
   assert.ok(buttons(confirmed.render(props('confirmed')), 'Hide dates').length);
   const history = boardHarness();
-  const historyTree = openDates(history, 'history');
+  const historyTree = openCard(history, 'history');
   const txt = history.textOf(historyTree);
   assert.match(txt, /Worked/);
   assert.match(txt, /Not filled/);
@@ -159,12 +167,12 @@ test('R date_rows: date status, unfilled explanation and profile button', () => 
 test('R message_action: row Message only on Confirmed, not History', () => {
   const confirmed = boardHarness();
   const messageCalls = [];
-  const tree = openDates(confirmed, 'confirmed', { onMessageAssigned: id => messageCalls.push(id) });
+  const tree = openCard(confirmed, 'confirmed', { onMessageAssigned: id => messageCalls.push(id) });
   assert.equal(buttons(tree, 'Message').length, 2);
   buttons(tree, 'Message')[0].props.onPress();
   assert.deepEqual(messageCalls, [41]);
   const history = boardHarness();
-  assert.equal(buttons(openDates(history, 'history'), 'Message').length, 0);
+  assert.equal(buttons(openCard(history, 'history'), 'Message').length, 0);
 });
 test('R copy: display labels and true board empty states', () => {
   const h = boardHarness();
@@ -195,15 +203,143 @@ test('C board_press: existing card press still toggles and has the correct assig
 test('C profile_rate: existing callbacks keep the exact user and slot ids and rate only in history', () => {
   const viewed = [], rated = [];
   const confirmed = boardHarness();
-  const c = openDates(confirmed, 'confirmed', {
+  const cProps = props('confirmed', {
     onViewAssigned: (...args) => viewed.push(args),
   });
+  let c = confirmed.render(cProps);
+  confirmed.find(c, x => x.type === 'Card')[0].props.onPress();
+  c = confirmed.render(cProps);
   const profile = buttons(c, 'View Assigned')[0] || buttons(c, 'View profile')[0];
   assert.ok(profile);
   profile.props.onPress();
   assert.deepEqual(viewed, [[12, 34, 41]]);
   const history = boardHarness();
-  const t = openDates(history, 'history', { onRateAssigned: id => rated.push(id) });
+  const hProps = props('history', { onRateAssigned: id => rated.push(id) });
+  let t = history.render(hProps);
+  history.find(t, x => x.type === 'Card')[0].props.onPress();
+  t = history.render(hProps);
   buttons(t, 'Rate')[0].props.onPress();
   assert.deepEqual(rated, [41]);
+});
+
+// Exercise the complete containers, preserving hook state and effect cleanup across renders.
+function containerHarness(mode, overrides = {}) {
+  const state = { surface: { scopeKey: 'a', persona: 'owner', scopedPharmacyId: null }, user: { role: 'OWNER' } };
+  const slots = [], effects = [];
+  let cursor = 0;
+  const same = (a, b) => a && b && a.length === b.length && a.every((v, i) => v === b[i]);
+  const react = {
+    useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial;
+      return [slots[i], v => { slots[i] = typeof v === 'function' ? v(slots[i]) : v; }]; },
+    useRef(value) { const i = cursor++; return slots[i] ||= { current: value }; },
+    useMemo(fn, deps) { const i = cursor++; if (!slots[i] || !same(slots[i].deps, deps)) slots[i] = { deps, value: fn() }; return slots[i].value; },
+    useCallback(fn, deps) { return react.useMemo(() => fn, deps); },
+    useEffect(fn, deps) { const i = cursor++; if (!slots[i] || !same(slots[i].deps, deps)) {
+      const old = slots[i]; effects.push(() => { if (old?.cleanup) old.cleanup(); slots[i] = { deps, cleanup: fn() }; }); } },
+  }; react.default = react;
+  const calls = { chats: [], navigation: [], profile: [], rating: [], saved: [], activation: [], fetch: 0 };
+  const core = {
+    fetchAllConfirmedShifts: async () => { calls.fetch++; return [sample]; },
+    fetchHistoryShifts: async () => { calls.fetch++; return [sample]; },
+    fetchDeferredPayrollOffersService: async () => [],
+    activateShiftOfferPayrollService: async id => calls.activation.push(id),
+    viewAssignedShiftProfileService: async args => { calls.profile.push(args); return { id: args.userId }; },
+    fetchMyRatingForTargetService: async args => { calls.rating.push(args); return { stars: 4, comment: 'Great' }; },
+    createRatingService: async args => { calls.saved.push(args); }, ...overrides,
+  };
+  const payroll = load('roles/shared/shifts/confirmedPayroll.ts', {});
+  const policy = load('roles/shared/shifts/shiftSurface.ts', {});
+  const logic = load('roles/shared/shifts/shiftsScreenLogic.ts', { './shiftSurface': policy });
+  const paper = Object.fromEntries(['Button', 'Card', 'Snackbar', 'Text', 'Dialog', 'Portal', 'TextInput'].map(x => [x, x]));
+  paper.Card = Object.assign(function Card(p) { return jsx('Card', p); }, { Content: 'Card.Content' });
+  paper.Dialog = Object.assign(function Dialog(p) { return jsx('Dialog', p); }, { Title: 'Dialog.Title', Content: 'Dialog.Content', Actions: 'Dialog.Actions' });
+  const common = {
+    react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': { View: 'View', Pressable: 'Pressable', StyleSheet: { create: s => s } },
+    'react-native-paper': paper, '@chemisttasker/shared-core': core,
+    '@/components/ui': { ContentState: 'ContentState' }, '@/constants/tokens': tokens,
+    './OwnerAssignedShiftBoard': { default: 'Board' }, './useShiftSurface': { useShiftSurface: () => state.surface },
+    './WorkerProfileDialog': { WorkerProfileDialog: 'WorkerProfileDialog' },
+    './confirmedPayroll': payroll, '@/context/AuthContext': { useAuth: () => ({ user: state.user }) },
+    'expo-router': { useRouter: () => ({ push: x => calls.navigation.push(x) }) },
+    '@/utils/chatRoutes': load('utils/chatRoutes.ts', {}),
+    '../chat/hooks': { startDirectChat: args => { calls.chats.push(args); return overrides.chat(args); } },
+    '@/components/ui/BrandActivityIndicator': { BrandActivityIndicator: 'ActivityIndicator' },
+    'lucide-react-native': roleIcons, './shiftsScreenLogic': logic,
+  };
+  const confirmed = load('roles/shared/shifts/ConfirmedShiftsView.tsx', common);
+  common['./ConfirmedShiftsView'] = confirmed;
+  const component = mode === 'confirmed' ? confirmed : load('roles/shared/shifts/HistoryShiftsView.tsx', common);
+  function render() {
+    cursor = 0;
+    let tree = component.default();
+    if (mode === 'confirmed') tree = tree.type(tree.props);
+    while (effects.length) effects.shift()();
+    return tree;
+  }
+  function unmount() { for (const slot of slots) if (slot?.cleanup) slot.cleanup(); }
+  return { state, calls, render, unmount };
+}
+const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+const one = (tree, type) => find(tree, x => x.type === type)[0];
+const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
+
+test('R message navigation: same-render lock, separate users and persona routes; old account completion ignored', async () => {
+  const requests = [];
+  const h = containerHarness('confirmed', { chat: () => { const d = deferred(); requests.push(d); return d.promise; } });
+  let tree = h.render(); await flush(); tree = h.render();
+  const message = one(tree, 'Board').props.onMessageAssigned;
+  assert.equal(typeof message, 'function');
+  message(41); message(41); message(42);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.chats)), [{ userId: 41 }, { userId: 42 }]);
+  requests[1].resolve({ id: 102 }); await flush();
+  assert.equal(h.calls.navigation[0].pathname, '/owner/messages/102');
+  h.unmount();
+  const admin = containerHarness('confirmed', { chat: async () => ({ id: 77 }) });
+  admin.state.surface = { scopeKey: 'b', persona: 'admin', scopedPharmacyId: 7 };
+  tree = admin.render(); await flush(); tree = admin.render();
+  requests[0].resolve({ id: 101 }); await flush();
+  assert.equal(h.calls.navigation.length, 1);
+  one(tree, 'Board').props.onMessageAssigned(41); await flush();
+  assert.equal(admin.calls.navigation[0].pathname, '/admin/messages/77');
+});
+
+test('C confirmed scope, profile, payroll activation and load retry', async () => {
+  let attempts = 0;
+  const { ApiError } = load('../shared-core/src/transport/errors.ts', {
+    '../domains/onboarding/ahpra': { reportAhpraError: () => null },
+  });
+  const offer = id => ({ id, paymentPreferenceSnapshot: 'TFN', engagementKind: 'SHIFT_EMPLOYMENT', settlementChannel: 'TIMESHEET_ONLY', engagementTermsSnapshot: { payrollActivationRequired: true, pharmacyId: id, workerName: `Worker ${id}` } });
+  const h = containerHarness('confirmed', {
+    fetchAllConfirmedShifts: async () => { if (!attempts++) throw new ApiError('offline', 503, null); return [sample, { ...sample, id: 13, pharmacyDetail: { id: 8 } }]; },
+    fetchDeferredPayrollOffersService: async () => [offer(7), offer(8)],
+  });
+  h.state.surface = { scopeKey: 'admin-a', persona: 'admin', scopedPharmacyId: 7 };
+  h.render(); await flush(); let tree = h.render();
+  assert.equal(one(tree, 'ContentState').props.description, 'offline');
+  one(tree, 'ContentState').props.onAction(); await flush(); tree = h.render();
+  const board = one(tree, 'Board'); assert.deepEqual(Array.from(board.props.shifts, x => x.id), [12]);
+  assert.match(textOf(tree), /Worker 7/); assert.doesNotMatch(textOf(tree), /Worker 8/);
+  buttons(tree, 'Activate payroll')[0].props.onPress(); await flush();
+  assert.deepEqual(h.calls.activation, [7]);
+  board.props.onViewAssigned(12, 34, 41); await flush();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.profile)), [{ type: 'confirmed', shiftId: 12, slotId: 34, userId: 41 }]);
+});
+
+test('C history rating loads existing values and persists them', async () => {
+  const h = containerHarness('history'); h.render(); await flush(); let tree = h.render();
+  one(tree, 'Board').props.onRateAssigned(41); await flush(); tree = h.render();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.rating)), [{ targetType: 'worker', targetId: 41 }]);
+  assert.equal(one(tree, 'TextInput').props.value, 'Great');
+  assert.equal(find(tree, x => x.type === 'Pressable' && x.props.accessibilityLabel === '4 stars')[0].props.accessibilityState.checked, true);
+  buttons(tree, 'Save Rating')[0].props.onPress(); await flush();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.saved)), [{ direction: 'OWNER_TO_WORKER', ratee_user: 41, stars: 4, comment: 'Great' }]);
+});
+
+test('R rating double tap sends one save', async () => {
+  const h = containerHarness('history'); h.render(); await flush(); let tree = h.render();
+  one(tree, 'Board').props.onRateAssigned(41); await flush(); tree = h.render();
+  const save = buttons(tree, 'Save Rating')[0].props.onPress;
+  save(); save(); await flush();
+  assert.equal(h.calls.saved.length, 1);
 });
