@@ -107,6 +107,7 @@ function nextWizard(options = {}) {
   const module = { exports: {} };
   vm.runInNewContext(compiled, {
     module, exports: module.exports, URL, FormData, Blob, console,
+    crypto: { randomUUID: () => '5b3f8a60-bccb-4b66-988b-e8c36445b841' },
     require(id) {
       if (!(id in modules)) throw Error('Unknown Next wizard import ' + id);
       return modules[id];
@@ -149,7 +150,7 @@ function nextWizard(options = {}) {
     input.props.onChange({ target: { value } });
     await flush();
   }
-  async function toFinal() {
+  async function toFinal(withPhoto = false) {
     await click('Personal item');
     await click('Free');
     await click('Continue to Category');
@@ -158,6 +159,12 @@ function nextWizard(options = {}) {
     await fill('e.g. AMH 2024 Reference Guide', 'Used pharmacology textbook');
     await fill('Describe condition, edition, markings, or included accessories...',
       'Clean pages, no patient information');
+    if (withPhoto) {
+      const upload = (await stable()).find(n => n.type === 'input' && n.props.type === 'file');
+      assert.ok(upload);
+      upload.props.onChange({ target: { files: [new Blob(['photo'], { type: 'image/jpeg' })] } });
+      await stable();
+    }
     await click('Continue to Audience');
     await click('Continue to Delivery');
     await fill('e.g. Brisbane', 'Brisbane');
@@ -282,4 +289,26 @@ test('R: Next failed submit resumes same listing/version rather than creating an
   assert.equal(app.calls.filter(x => x.method === 'create').length, 1);
   assert.equal(app.calls.filter(x => x.method === 'update').length, 1);
   assert.equal(app.calls.filter(x => x.method === 'submit').length, 2);
+});
+
+test('R: Next upload failure is visible and no submit/created state is falsely reported', async () => {
+  let uploadAttempts = 0;
+  const app = nextWizard({ upload: async () => {
+    uploadAttempts++;
+    if (uploadAttempts === 1) throw Error('Image upload unavailable');
+    return { id: 88 };
+  } });
+  await app.toFinal(true);
+  await app.click('Submit for review');
+  const failed = await app.stable();
+  assert.equal(app.calls.filter(c => c.method === 'upload').length, 1);
+  assert.equal(app.calls.filter(c => c.method === 'submit').length, 0);
+  assert.equal(failed.some(n => n.type === 'h1' && text(n).includes('Listing submitted')), false);
+  assert.ok(failed.some(n => typeof n.props?.children === 'string' &&
+    String(n.props.children).includes('Image upload unavailable')));
+  await app.click('Submit for review');
+  await app.stable();
+  assert.equal(app.calls.filter(c => c.method === 'create').length, 1);
+  assert.equal(app.calls.filter(c => c.method === 'upload').length, 2);
+  assert.equal(app.calls.filter(c => c.method === 'submit').length, 1);
 });
