@@ -76,7 +76,9 @@ function boardHarness() {
   };
   react.default = react;
   const paper = Object.fromEntries(['Button','Card','Chip','Surface','Text'].map(x => [x,x]));
-  paper.Card = Object.assign('Card', { Content: 'Card.Content' });
+  function Card(props) { return jsx('Card', props); }
+  Card.Content = 'Card.Content';
+  paper.Card = Card;
   const actual = load('roles/shared/shifts/OwnerAssignedShiftBoard.tsx', {
     react, 'react/jsx-runtime': { jsx, jsxs: jsx },
     'react-native': {
@@ -125,11 +127,11 @@ function openDates(harness, mode, options) {
 
 test('R status_pill: exact confirmed and partially booked history summaries before expanding', () => {
   const h = boardHarness();
-  assert.match(h.textOf(h.render(props('confirmed'))), /Confirmed\\s*·\\s*2 dates booked/);
+  assert.match(h.textOf(h.render(props('confirmed'))), /Confirmed\s*·\s*2 dates booked/);
   const h2 = boardHarness();
   const lessBooked = { ...sample, slotAssignments: sample.slotAssignments.slice(0, 1) };
   assert.match(h2.textOf(h2.render(props('history', { shifts: [lessBooked] }))),
-    /Completed\\s*·\\s*1 of 3 dates booked/);
+    /Completed\s*·\s*1 of 3 dates booked/);
 });
 test('R dates_toggle: labelled accessible control and collapsed until requested', () => {
   for (const mode of ['confirmed', 'history']) {
@@ -150,7 +152,7 @@ test('R date_rows: date status, unfilled explanation and profile button', () => 
   const txt = history.textOf(historyTree);
   assert.match(txt, /Worked/);
   assert.match(txt, /Not filled/);
-  assert.match(txt, /No one was booked for this date\\./);
+  assert.match(txt, /No one was booked for this date\./);
   assert.equal(buttons(historyTree, 'View profile').length, 2);
   assert.equal(buttons(historyTree, 'View Assigned').length, 0);
 });
