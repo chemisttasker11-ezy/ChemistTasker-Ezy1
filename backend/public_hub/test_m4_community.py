@@ -85,7 +85,7 @@ class PublicHubM4Tests(TestCase):
         poll=self.public_polls[0]
         option=poll.options.first()
         target=BASE+f"hub/polls/{poll.pk}/vote/"
-        self.assertIn(client_for().post(target,{"option_id":option.pk},format="json").status_code,(401,403))
+        self.assertEqual(client_for().post(target,{"option_id":option.pk},format="json").status_code,401)
         self.assertEqual(client_for(self.member).post(target,{"option_id":option.pk},format="json").status_code,200)
         self.assertEqual(client_for(self.member).post(target,{"option_id":option.pk},format="json").status_code,200)
         self.assertEqual(PharmacyHubPollVote.objects.filter(poll=poll).count(),1)

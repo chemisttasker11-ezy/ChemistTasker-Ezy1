@@ -56,14 +56,16 @@ test('C: Next community uses public shared-core APIs for separate search and pol
   index=0;
   let tree=module.exports.default({hub:'public',label:'Public',initial:{results:[],next:null,count:0}});
   // Root wrapper returns Feed element; mount the real Feed component, not just its JSX.
-  const feed=tree.type;
+  const feedElement=tree;
+  const feed=feedElement.type;
+  const feedProps=feedElement.props;
   index=0;
-  tree=feed(tree.props);
+  tree=feed(feedProps);
   for(const run of effects.splice(0))await run();
   await new Promise(resolve=>setTimeout(resolve,0));
   assert.deepEqual(queries.posts.map(([hub,q])=>[hub,q.page,q.q]),[['public',1,'']]);
   assert.deepEqual(queries.polls.map(([hub,q])=>[hub,q.page]),[['public',1]]);
-  const render=()=>{index=0;return feed(tree.props);};
+  const render=()=>{index=0;return feed(feedProps);};
   const flush=async()=>{for(const run of effects.splice(0))await run();
     await new Promise(resolve=>setTimeout(resolve,0));};
   // The real search opener and form drive Next's own search/page state.

@@ -28,12 +28,12 @@ function deferred() { let resolve,reject;const promise=new Promise((r,j)=>{resol
   return {promise,resolve,reject};}
 function env(overrides={}) {
   const values=[], effects=[], cleanups={};
-  let cursor=0, hub=overrides.hub||'public', user=overrides.user===undefined?{id:7,role:'PHARMACIST'}:overrides.user;
+  let activeKey=null, cursor=0, hub=overrides.hub||'public', user=overrides.user===undefined?{id:7,role:'PHARMACIST'}:overrides.user;
   const calls={posts:[],polls:[],votes:[]};
   const api={
     listHubs: async()=>[{key:hub,label:'Demo Hub',can_interact:true}],
     listCommunityPosts:async(h,q)=>{calls.posts.push([h,q]);return page([post(q?.page===2?13:1)],q?.page===2?null:'?page=2');},
-    listCommunityPolls:async(h,q)=>{calls.polls.push([h,q]);return page(Array.from({length:q?.page===2?1:12},(_,i)=>poll((q?.page===2?13:1)+i)),q?.page===2?null:'?page=2');},
+    listCommunityPolls:async(h,q)=>{calls.polls.push([h,q]);return page(q?.page===2?[poll(12),poll(13)]:Array.from({length:12},(_,i)=>poll(i+1)),q?.page===2?null:'?page=2');},
     voteCommunityPoll:async(id,option)=>{calls.votes.push([id,option]);return{};},
     createCommunityPost:async()=>({}),
     ...overrides.api,
@@ -77,7 +77,17 @@ function env(overrides={}) {
     await new Promise(resolve=>setTimeout(resolve,0));
     await new Promise(resolve=>setTimeout(resolve,0));
   }
-  function render(){cursor=0;const shell=screen();return shell.type(shell.props);}
+  function render(){
+    const shell=screen();
+    if(activeKey!==null&&activeKey!==shell.props.key){
+      Object.values(cleanups).forEach(fn=>typeof fn==='function'&&fn());
+      values.length=0;effects.length=0;
+      for(const key of Object.keys(cleanups))delete cleanups[key];
+    }
+    activeKey=shell.props.key;
+    cursor=0;
+    return shell.type(shell.props);
+  }
   function button(label,tree=render()){const items=find(tree,n=>n.type==='Button');
     return items.find(n=>find(n.props?.children,x=>x===label).length||n.props?.children===label||String(n.props?.children).includes(label));}
   return {render,tick,button,calls,api,find,key:()=>screen().props.key,changeHub:newHub=>{hub=newHub;},changeUser:newUser=>{user=newUser;},
@@ -112,10 +122,13 @@ test('R: polls page 2 loads the thirteenth, merges and suppresses duplicate IDs'
   await h.tick();
   assert.equal(h.calls.polls.at(-1)[1].page,2);
   const names=h.find(h.render(),n=>n.type==='Text'&&typeof n.props.children==='string'&&n.props.children.startsWith('Poll '));
+  assert.equal(names.length,13,'duplicate poll id 12 from page 2 is collapsed');
   assert.equal(new Set(names.map(n=>n.props.children)).size,13);
+  assert.equal(names.filter(n=>n.props.children==='Poll 12').length,1);
+  assert.equal(names.filter(n=>n.props.children==='Poll 13').length,1);
   assert.equal(h.button('Load more polls'),undefined,'last page has no more link');
 });
-test('C: failed poll paging is retryable without clearing visible first-page polls',async()=>{
+test('R: failed poll paging is retryable without clearing visible first-page polls',async()=>{
   let failures=0;
   const h=env({api:{listCommunityPolls:async(_h,q)=>{
     if(q?.page===2 && failures++===0)throw Error('timeout');
@@ -129,7 +142,7 @@ test('C: failed poll paging is retryable without clearing visible first-page pol
   h.button('Retry polls').props.onPress();await h.tick();
   assert.equal(h.find(h.render(),n=>n.type==='Text'&&String(n.props.children).startsWith('Poll ')).length,13);
 });
-test('C: poll vote refreshes active poll page, not the post query; closed cannot be voted',async()=>{
+test('R: poll vote refreshes active poll page, not the post query',async()=>{
   const h=env();h.render();await h.tick();
   h.button('Load more polls').props.onPress();await h.tick();
   const before=h.calls.posts.length;
@@ -137,7 +150,7 @@ test('C: poll vote refreshes active poll page, not the post query; closed cannot
   assert.ok(choice&&!choice.props.disabled);
   choice.props.onPress();await h.tick();
   assert.equal(h.calls.votes.length,1);
-  assert.ok(Number.isInteger(h.calls.votes[0][1]),'option id is forwarded as a number');
+  assert.deepEqual(h.calls.votes[0],[1,10],'first eligible poll must submit its exact option');
   assert.equal(h.calls.posts.length,before,'vote must not reload or erase post discussion');
   assert.equal(h.calls.polls.at(-1)[1].page,2);
 });
@@ -152,4 +165,95 @@ test('C: changing hub drops stale responses and errors, distinct account key rem
   h.changeUser({id:88,role:'EXPLORER'});
   const other=h.key();
   assert.notEqual(key,other);
+});
+
+
+test('C: closed and server-ineligible poll options never call the voting facade',async()=>{
+  const h=env({api:{listCommunityPolls:async()=>page([
+    {...poll(41),is_closed:true},
+    {...poll(42),can_interact:false},
+  ])}});
+  h.render();await h.tick();
+  const tree=h.render();
+  for(const id of [41,42]){
+    const card=h.find(tree,n=>n.type==='Card').find(n=>
+      h.find(n,x=>x.type==='Text'&&x.props?.children==='Poll '+id).length===1);
+    assert.ok(card,'server poll '+id+' is rendered');
+    const action=h.find(card,n=>n.type==='Button'&&String(n.props?.children).includes('Yes'))[0];
+    assert.ok(action);
+    assert.equal(action.props.disabled,true,'server eligibility must disable voting for '+id);
+    action.props.onPress();
+  }
+  await h.tick();
+  assert.deepEqual(h.calls.votes,[],'no vote transport request is authorized');
+});
+
+test('C: account remount refreshes server interaction flags; former account cannot vote',async()=>{
+  let permitted=true;
+  const h=env({api:{listCommunityPolls:async()=>page([{...poll(1),can_interact:permitted}])}});
+  h.render();await h.tick();
+  const first=h.render();
+  const allowed=h.find(first,n=>n.type==='Button'&&String(n.props?.children).includes('Yes'))[0];
+  assert.ok(allowed&&!allowed.props.disabled);
+  const previousKey=h.key();
+  permitted=false;
+  h.changeUser({id:88,role:'EXPLORER'});
+  h.render();await h.tick();
+  const current=h.render();
+  assert.notEqual(h.key(),previousKey,'account switch remounts the real feed');
+  const forbidden=h.find(current,n=>n.type==='Button'&&String(n.props?.children).includes('Yes'))[0];
+  assert.ok(forbidden);
+  assert.equal(forbidden.props.disabled,true);
+  forbidden.props.onPress();
+  await h.tick();
+  assert.equal(h.calls.polls.length,2,'new account fetches its own eligibility');
+  assert.deepEqual(h.calls.votes,[],'former-account vote permission was not reused');
+});
+
+test('C: double-tapping Load more polls from one render sends exactly one page request',async()=>{
+  const second=deferred();
+  let pageTwoCalls=0;
+  const h=env({api:{listCommunityPolls:async(_hub,params)=>{
+    if(params?.page===2){pageTwoCalls++;return second.promise;}
+    return page(Array.from({length:12},(_,i)=>poll(i+1)),'?page=2');
+  }}});
+  h.render();await h.tick();
+  const sameTree=h.render();
+  const action=h.button('Load more polls',sameTree);
+  assert.ok(action);
+  action.props.onPress();
+  action.props.onPress(); // Same render: the pending ref must guard both presses.
+  await h.tick();
+  assert.equal(pageTwoCalls,1,'one in-flight request per poll feed');
+  second.resolve(page([poll(12),poll(13)]));
+  await h.tick();
+  const names=h.find(h.render(),n=>n.type==='Text'&&String(n.props?.children).startsWith('Poll '));
+  assert.equal(names.length,13);
+  assert.equal(h.button('Load more polls'),undefined);
+});
+
+test('R: vote response after page-2 fetch refreshes every visible poll, never truncates newer pages',async()=>{
+  const pendingVote=deferred(), votes=[];
+  const h=env({api:{voteCommunityPoll:(pollId,optionId)=>{
+    votes.push([pollId,optionId]);return pendingVote.promise;
+  }}});
+  h.render();await h.tick();
+  const sameTree=h.render();
+  const choice=h.find(sameTree,n=>n.type==='Button'&&String(n.props?.children).includes('Yes'))[0];
+  const nextPageButton=h.button('Load more polls',sameTree);
+  assert.ok(choice&&!choice.props.disabled&&nextPageButton);
+  choice.props.onPress(); // Vote transport remains unresolved while page 2 loads.
+  assert.deepEqual(votes,[[1,10]]);
+  nextPageButton.props.onPress();
+  await h.tick();
+  const loaded=h.find(h.render(),n=>n.type==='Text'&&String(n.props?.children).startsWith('Poll '));
+  assert.equal(loaded.length,13,'page 2 must finish while the vote is pending');
+  assert.equal(h.calls.polls.at(-1)[1].page,2);
+  pendingVote.resolve({});
+  await h.tick(); // The vote refresh must read the up-to-date page count.
+  const remaining=h.find(h.render(),n=>n.type==='Text'&&String(n.props?.children).startsWith('Poll '));
+  assert.equal(remaining.length,13,'late vote refresh cannot drop newly loaded page 2');
+  assert.equal(new Set(remaining.map(n=>n.props.children)).size,13);
+  assert.ok(remaining.some(n=>n.props.children==='Poll 13'));
+  assert.equal(h.calls.polls.at(-1)[1].page,2,'vote refresh re-fetches the current final poll page');
 });
