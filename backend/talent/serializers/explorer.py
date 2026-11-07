@@ -24,7 +24,7 @@ class PublicAvailabilityDaysField(serializers.JSONField):
         "notes": ((str,), serializers.CharField(allow_blank=True, trim_whitespace=False)),
     }
 
-    def public_slot(self, entry):
+    def public_slot(self, entry, *, sanitize=False):
         if isinstance(entry, str):
             self.slot_fields["date"][1].run_validation(entry)
             return entry
@@ -34,9 +34,14 @@ class PublicAvailabilityDaysField(serializers.JSONField):
         for name, (types, field) in self.slot_fields.items():
             if name in entry:
                 value = entry[name]
-                if type(value) not in types:
-                    raise serializers.ValidationError({name: "Invalid public slot value type."})
-                field.run_validation(value)
+                try:
+                    if type(value) not in types:
+                        raise serializers.ValidationError({name: "Invalid public slot value type."})
+                    field.run_validation(value)
+                except serializers.ValidationError:
+                    if not sanitize or name == "date":
+                        raise
+                    continue
                 result[name] = value
         return result
 
@@ -55,7 +60,7 @@ class PublicAvailabilityDaysField(serializers.JSONField):
         result = []
         for entry in value if isinstance(value, list) else []:
             try:
-                result.append(self.public_slot(entry))
+                result.append(self.public_slot(entry, sanitize=True))
             except serializers.ValidationError:
                 # Malformed legacy JSON must not escape through public projections.
                 continue

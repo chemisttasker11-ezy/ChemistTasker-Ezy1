@@ -73,6 +73,49 @@ class AvailabilityBoundaryContractTests(TestCase):
             self.assertEqual(client.post(PRIVATE_URL, {**payload, "recurring_end_date": str(self.day)},
                                          format="json").status_code, 201)
 
+    def test_weekday_types_on_create_put_and_unchanged_patch_for_both_roles(self):
+        for user in self.workers:
+            client = client_for(user)
+            payload = {"date": str(self.day), "start_time": "09:00", "end_time": "17:00",
+                       "is_recurring": True, "recurring_days": [1], "recurring_end_date": str(self.day)}
+            response = client.post(PRIVATE_URL, payload, format="json")
+            self.assertEqual(response.status_code, 201, response.data)
+            row = UserAvailability.objects.get(pk=response.data["id"])
+            url = f"{PRIVATE_URL}{row.pk}/"
+            self.assertEqual(client.patch(url, {"recurring_days": [1]}, format="json").status_code, 200)
+            for value in (True, False, 1.0):
+                with self.subTest(role=user.role, value=value):
+                    row.recurring_days = [0 if value is False else 1]
+                    row.save(update_fields=["recurring_days"])
+                    for method, target, body in (
+                        ("post", PRIVATE_URL, {**payload, "recurring_days": [value]}),
+                        ("put", url, {**payload, "recurring_days": [value]}),
+                        ("patch", url, {"recurring_days": [value]}),
+                    ):
+                        response = getattr(client, method)(target, body, format="json")
+                        self.assertEqual(response.status_code, 400, (method, response.data))
+                    row.refresh_from_db()
+                    self.assertEqual(row.recurring_days, [0 if value is False else 1])
+
+    def test_public_legacy_slots_survive_editor_round_trip_for_both_roles(self):
+        for user in self.workers:
+            second = {**self.slot, "date": str(self.day + timedelta(days=1)),
+                      "isAllDay": "invalid", "notes": "Keep this note"}
+            first = {**self.slot, "notes": None, "private_notes": "Secret"}
+            post = ExplorerPost.objects.create(author_user=user, role_category=user.role,
+                                               **self.payload([first, second]))
+            client = client_for(user)
+            response = client.get(f"{PUBLIC_URL}{post.pk}/")
+            self.assertEqual(response.status_code, 200, response.data)
+            expected_first = {k: v for k, v in first.items() if k not in ("notes", "private_notes")}
+            expected_second = {k: v for k, v in second.items() if k != "isAllDay"}
+            projected = [expected_first, expected_second]
+            self.assertEqual(response.data["availability_days"], projected)
+            response = client.patch(f"{PUBLIC_URL}{post.pk}/", {"availability_days": projected}, format="json")
+            self.assertEqual(response.status_code, 200, response.data)
+            post.refresh_from_db()
+            self.assertEqual(post.availability_days, projected)
+
     def test_private_foreign_legacy_rows_remain_inaccessible_for_both_roles(self):
         for user, other in (self.workers, self.workers[::-1]):
             row = UserAvailability.objects.create(user=other, date=self.day, start_time=time(9),
@@ -167,7 +210,8 @@ class AvailabilityBoundaryContractTests(TestCase):
                     response = client_for(user).get(f"{PUBLIC_URL}{post.pk}/")
                     self.assertEqual(response.status_code, 200, response.data)
                     self.assertEqual(response.data["availability_days"],
-                                     [self.slot, str(self.day)] if isinstance(stored, list) else [])
+                                     [{k: v for k, v in self.slot.items() if k != "notes"}, self.slot, str(self.day)]
+                                     if isinstance(stored, list) else [])
 
     def test_public_foreign_post_writes_remain_denied_for_both_roles(self):
         for user in self.workers:

@@ -677,6 +677,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             startTime: entry.startTime || entry.start_time || null,
             endTime: entry.endTime || entry.end_time || null,
             isAllDay: Boolean(entry.isAllDay ?? entry.is_all_day),
+            notes: entry.notes || '',
           }));
       if (isExplorer) {
         if (isFullTimeApplication && !pitchForm.headline.trim() && !pitchForm.body.trim()) {

@@ -19,6 +19,11 @@ class UserAvailabilitySerializer(serializers.ModelSerializer):
             'date', 'start_time', 'end_time', 'is_all_day',
             'is_recurring', 'recurring_days', 'recurring_end_date',
         )
+        supplied_days = attrs.get('recurring_days')
+        if supplied_days is not None and (
+            not isinstance(supplied_days, list) or any(type(d) is not int or d < 0 or d > 6 for d in supplied_days)
+        ):
+            raise serializers.ValidationError({'recurring_days': 'Recurring days must be integers 0..6.'})
         # Metadata PATCHes must keep supported legacy open-ended schedules editable.
         if self.partial and self.instance is not None and not any(
             field in attrs and attrs[field] != getattr(self.instance, field) for field in scheduling_fields
@@ -41,7 +46,7 @@ class UserAvailabilitySerializer(serializers.ModelSerializer):
 
         if recurring_days is not None:
             if not isinstance(recurring_days, list) or any(
-                isinstance(d, bool) or not isinstance(d, int) or d < 0 or d > 6 for d in recurring_days
+                type(d) is not int or d < 0 or d > 6 for d in recurring_days
             ):
                 raise serializers.ValidationError({'recurring_days': 'Recurring days must be integers 0..6.'})
 
