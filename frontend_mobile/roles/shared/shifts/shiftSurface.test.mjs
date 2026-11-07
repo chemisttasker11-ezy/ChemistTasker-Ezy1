@@ -147,7 +147,7 @@ test('sections per persona, and a stale ?section= falls back to the first', () =
   assert.deepEqual(Array.from(shiftSections({ persona: 'admin', workspace: null })), ['active', 'confirmed', 'history']);
   assert.deepEqual(Array.from(shiftSections({ persona: 'pharmacist', workspace: 'platform' })), ['public', 'confirmed', 'history']);
   assert.deepEqual(Array.from(shiftSections({ persona: 'otherstaff', workspace: 'internal' })), ['community', 'confirmed', 'history']);
-  assert.deepEqual(Array.from(shiftSections({ persona: 'explorer', workspace: 'platform' })), ['public', 'community', 'confirmed', 'history']);
+  assert.deepEqual(Array.from(shiftSections({ persona: 'explorer', workspace: 'platform' })), ['public', 'community']);
   assert.deepEqual(Array.from(shiftSections({ persona: null, workspace: null })), []);
   assert.equal(pickShiftSection(['active', 'confirmed'], 'Confirmed'), 'confirmed');
   assert.equal(pickShiftSection(['active', 'confirmed'], 'public'), 'active');
