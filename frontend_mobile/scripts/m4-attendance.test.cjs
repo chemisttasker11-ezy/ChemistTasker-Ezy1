@@ -493,3 +493,29 @@ test('R: old-account approval completion cannot navigate the new account', async
   assert.deepEqual(h.io.navigations, [], 'previous account must not navigate the current shell');
   h.engine.unmount();
 });
+
+
+test('C: unmount invalidates an unresolved attendance timeline before a new scope mounts', async () => {
+  const h = screenHarness();
+  approvedReview(h);
+  h.env.screen = 'review-detail';
+  h.env.params = { sessionId: '78' };
+  const old = deferred();
+  h.io.timelineReplies.push(old);
+  await h.render();
+  assert.deepEqual(h.io.timeline, [78], 'original timeline must really be in flight');
+  h.engine.unmount();
+  old.resolve({ session_id: 78, pharmacy_id: 11, pharmacy_timezone: 'Australia/Perth',
+    timeline: [{ event_id: 9001, event_type: 'CLOCK_IN',
+      effective_timestamp: '2026-07-10T00:00:00Z' }] });
+  await h.engine.settle();
+  // Remount as a distinct session of the same account: no callback from the
+  // disposed fiber can paint its private rows onto the fresh mount.
+  h.env.params = { sessionId: '79' };
+  const nodes = await h.render();
+  assert.equal(nodes.some(node => node.type === 'DataRow' &&
+    String(node.props.title).includes('9001')), false);
+  assert.deepEqual(h.io.timeline, [78, 79],
+    'the new session starts its own timeline and cannot inherit the former request');
+  h.engine.unmount();
+});
