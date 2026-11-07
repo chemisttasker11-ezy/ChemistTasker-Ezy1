@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Redirect } from 'expo-router';
 import { Button, Card, Text } from 'react-native-paper';
 import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { RootPageHeader } from '@/components/RootPageHeader';
 import { fetchMyConfirmedShifts } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
+import { isWorkerPersona, resolveShiftSurface } from '@/roles/shared/shifts/shiftSurface';
 import { colors, radius, space } from '@/constants/tokens';
 import { calendarEditorUrl, directionsUrl, offlineShiftKey, sanitizeConfirmedShifts, upcomingShifts, type OfflineShift } from '@/features/nextShift/nextShiftModel';
 import { readConfirmedShiftSnapshot, saveConfirmedShiftSnapshot } from '@/features/nextShift/offlineConfirmedShifts';
@@ -50,9 +52,16 @@ export async function loadNextShiftsSequence({
 }
 
 export default function NextShiftScreen() {
- const { user } = useAuth();
- // A persona switch must remount all state, not briefly display another account's cached shifts.
- return <ScopedNextShifts key={user?.id ?? 'signed-out'} userId={user?.id} />;
+ const { user, isLoading } = useAuth();
+ // Redirect effects are too late: guard against worker API calls before the
+ // child is mounted, using the same persona policy as the Shifts surface.
+ const surface = resolveShiftSurface({ pathname: '/next-shifts', role: user?.role, userId: user?.id });
+ if (isLoading) return <ActivityIndicator accessibilityLabel="Checking shift access" />;
+ if (!user || !isWorkerPersona(surface.persona) || surface.publicOnly) {
+  return <Redirect href={surface.persona === 'explorer' ? '/explorer/shifts?section=public' : '/'} />;
+ }
+ // A persona switch must remount all state, not show another account's cached shifts.
+ return <ScopedNextShifts key={user.id ?? 'signed-out'} userId={user.id} />;
 }
 
 function ScopedNextShifts({userId}:{userId?:number}) {
