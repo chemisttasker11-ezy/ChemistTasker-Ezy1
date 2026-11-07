@@ -69,17 +69,19 @@ function createHookScheduler() {
   react.default = react;
   function useFocusEffect(callback) {
     const fiber = active;
-    if (fiber.focusCallback !== callback) {
-      fiber.focusCleanup?.();
-      fiber.focusActive = false;
+    react.useEffect(() => {
       fiber.focusCallback = callback;
-      if (focused) afterRender.push(() => {
-        if (!fiber.focusActive && fiber.focusCallback === callback) {
-          fiber.focusCleanup = callback() || null;
-          fiber.focusActive = true;
-        }
-      });
-    }
+      if (focused) {
+        fiber.focusCleanup = callback() || null;
+        fiber.focusActive = true;
+      }
+      return () => {
+        fiber.focusCleanup?.();
+        fiber.focusCleanup = null;
+        fiber.focusActive = false;
+        fiber.focusCallback = null;
+      };
+    }, [callback]);
   }
   const free = fiber => {
     fiber.focusCleanup?.();

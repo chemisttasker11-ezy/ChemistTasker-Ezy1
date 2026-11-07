@@ -16,6 +16,63 @@ const page = (records, next = null) => ({
 });
 const twenty = (start = 1) => Array.from({ length: 20 }, (_, i) => notice(start + i));
 
+test('C malformed list results preserve rows and show retryable errors', async () => {
+  const h = createInbox();
+  h.waitFor(1, page(twenty(), 2)); await h.focus();
+  const badFirst = deferred(); h.waitFor(1, badFirst);
+  await h.refresh();
+  assert.equal(h.list().props.refreshControl.props.refreshing, true);
+  badFirst.resolve({ results: null, next: null }); await h.flush();
+  let nodes = await h.settle();
+  assert.deepEqual(Array.from(h.rows(nodes), r => r.id), twenty().map(r => r.id));
+  assert.match(h.readError(nodes), /Unexpected notifications response/);
+  assert.equal(h.list().props.refreshControl.props.refreshing, false);
+  h.waitFor(1, page(twenty(), 2)); nodes = await h.refresh();
+  assert.doesNotMatch(h.readError(nodes), /Unexpected notifications response/);
+  const badOlder = deferred(); h.waitFor(2, badOlder);
+  await h.loadOlder(); badOlder.resolve({ results: {}, next: null }); await h.flush();
+  nodes = await h.settle();
+  assert.equal(h.rows(nodes).length, 20);
+  assert.match(h.readError(nodes), /Unexpected notifications response/);
+  assert.match(h.readError(nodes), /Retry older notifications/);
+  h.waitFor(2, page([notice(21)])); nodes = await h.loadOlder();
+  assert.equal(h.rows(nodes).length, 21);
+  assert.doesNotMatch(h.readError(nodes), /Unexpected notifications response/);
+  h.unmount();
+});
+
+test('C denied admin capability falls back to the account role on notification tap', async () => {
+  const h = createInbox();
+  h.scope.pathname = '/admin/notifications';
+  const response = deferred(); h.waitFor(1, response);
+  await h.focus(); response.resolve(page([notice(1, { actionUrl: '/dashboard/calendar?date=2026-11-07' })]));
+  await h.flush(); let nodes = await h.settle();
+  assert.deepEqual(Array.from(h.rows(nodes), r => r.id), [1]);
+  nodes = await h.press(1);
+  assert.equal(h.routes.at(-1), '/pharmacist/calendar?date=2026-11-07');
+  assert.equal(h.rows(nodes)[0].id, 1);
+  h.unmount();
+});
+
+test('C old account refresh completion leaves new account refresh pending', async () => {
+  const h = createInbox();
+  h.waitFor(1, page([notice(1)])); await h.focus();
+  const oldRefresh = deferred(); h.waitFor(1, oldRefresh); await h.refresh();
+  h.waitFor(1, page([notice(200)]));
+  h.scope.user = { id: 2002, role: 'PHARMACIST' };
+  let nodes = await h.settle();
+  assert.deepEqual(Array.from(h.rows(nodes), r => r.id), [200]);
+  const newRefresh = deferred(); h.waitFor(1, newRefresh); await h.refresh();
+  assert.equal(h.list().props.refreshControl.props.refreshing, true);
+  oldRefresh.resolve(page([notice(50)])); await h.flush(); nodes = await h.settle();
+  assert.deepEqual(Array.from(h.rows(nodes), r => r.id), [200]);
+  assert.equal(h.list().props.refreshControl.props.refreshing, true);
+  newRefresh.resolve(page([notice(201)])); await h.flush(); nodes = await h.settle();
+  assert.deepEqual(Array.from(h.rows(nodes), r => r.id), [201]);
+  assert.equal(h.list().props.refreshControl.props.refreshing, false);
+  h.unmount();
+});
+
 test('R same_account_refocus_failure_keeps_rows and retry obtains updated same-account data', async () => {
   const h = createInbox();
   h.waitFor(1, page(twenty(), 2));
@@ -110,16 +167,17 @@ test('C failed current receipt stays unread, successful retry marks and emits on
 
 test('C full page2 de-duplication, failed page2 retry and retained read receipt', async () => {
   const h = createInbox();
-  h.waitFor(1, page(twenty(1), 2));
+  h.waitFor(1, page(twenty(1).map(n => ({ ...n, read_at: null })), 2));
   let nodes = await h.focus();
-  assert.equal(h.rows(nodes).length, 20);
+  assert.ok(h.rows(nodes)[19].readAt);
   h.waitFor(2, Error('Page 2 interrupted'));
   nodes = await h.loadOlder();
   assert.equal(h.rows(nodes).length, 20);
   assert.match(h.readError(nodes), /Page 2 interrupted/i);
-  h.waitFor(2, page([notice(20), notice(21)]));
+  h.waitFor(2, page([notice(20, { unread: true }), notice(21)]));
   nodes = await h.loadOlder();
   assert.equal(h.rows(nodes).length, 21);
+  assert.ok(h.rows(nodes).find(row => row.id === 20).readAt);
   assert.equal(new Set(Array.from(h.rows(nodes), row => row.id)).size, 21);
   assert.deepEqual(Array.from(h.rows(nodes)).slice(-2).map(row => row.id), [20, 21]);
   const olderCalls = h.calls.filter(([method, pageNum]) => method === 'GET' && pageNum === 2);
@@ -134,12 +192,17 @@ test('C stale pagination and refresh-finally do not clear a newer account loadin
   const oldPage2 = deferred();
   h.waitFor(2, oldPage2);
   await h.loadOlder();
+  const oldRefresh = deferred();
+  h.waitFor(1, oldRefresh);
+  await h.refresh();
+  assert.equal(h.list().props.refreshControl.props.refreshing, true);
   const newFirstPage = deferred();
   h.waitFor(1, newFirstPage);
   h.scope.user = { id: 2004, role: 'EXPLORER' };
   let nodes = await h.settle();
   assert.deepEqual(h.rows(nodes), []);
   oldPage2.resolve(page([notice(21)]));
+  oldRefresh.resolve(page([notice(50)]));
   await h.flush();
   nodes = await h.settle();
   assert.deepEqual(h.rows(nodes), []);
@@ -166,3 +229,80 @@ test('C authorized public shift and chat notification tap preserves persona-awar
   assert.ok(h.routes.at(-1).includes('/messages/200'));
   h.unmount();
 });
+
+
+test('R account switch invalidates receipt before passive cleanup', async () => {
+  const h = createInbox();
+  const receipt = deferred();
+  h.waitFor(1, page([notice(1, { unread: true })]));
+  h.waitForMark(receipt);
+  await h.focus();
+  h.scope.user = { id: 2002, role: 'PHARMACIST' };
+  h.list();
+  receipt.resolve({ marked: 1, unread: 0 });
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(h.events.length, 0, 'old receipt emitted before passive cleanup');
+  h.unmount();
+});
+
+test('R first render after account switch hides old errors and paging', async () => {
+  const h = createInbox();
+  h.waitFor(1, page(twenty(), 2));
+  await h.focus();
+  h.waitFor(2, Error('Old account page error'));
+  await h.loadOlder();
+  h.scope.user = { id: 2002, role: 'PHARMACIST' };
+  const list = h.list();
+  assert.ok(!list || !h.text(list.props.ListFooterComponent).includes('Old account page error'));
+  assert.ok(!list || !h.text(list.props.ListFooterComponent).includes('Load older notifications'));
+  h.unmount();
+});
+
+test('C double older load and overlapping refreshes honor pending requests', async () => {
+  const h = createInbox();
+  h.waitFor(1, page(twenty(), 2)); await h.focus();
+  const older = deferred(); h.waitFor(2, older);
+  const sameList = h.list(); sameList.props.onEndReached(); sameList.props.onEndReached();
+  assert.equal(h.calls.filter(c => c[0] === 'GET' && c[1] === 2).length, 1);
+  older.resolve(page([notice(21)])); await h.flush(); await h.settle();
+  const first = deferred(), second = deferred();
+  h.waitFor(1, first); h.waitFor(1, second);
+  await h.refresh(); await h.refresh();
+  assert.equal(h.list().props.refreshControl.props.refreshing, true);
+  first.resolve(page([notice(51)])); await h.flush(); await h.settle();
+  assert.equal(h.list().props.refreshControl.props.refreshing, true);
+  second.resolve(page([notice(52)])); await h.flush();
+  const nodes = await h.settle();
+  assert.deepEqual(Array.from(h.rows(nodes), r => r.id), [52]);
+  assert.equal(h.list().props.refreshControl.props.refreshing, false);
+  h.unmount();
+});
+
+test('C confirmed receipt remains read across refocus with stale server data', async () => {
+  const h = createInbox();
+  h.waitFor(1, page([notice(1, { unread: true })])); await h.focus();
+  assert.ok(h.rows(await h.settle())[0].readAt);
+  h.waitFor(1, page([notice(1, { unread: true })]));
+  const nodes = await h.refocus();
+  assert.ok(h.rows(nodes)[0].readAt);
+  assert.equal(h.calls.filter(c => c[0] === 'POST').length, 1);
+  h.unmount();
+});
+
+for (const [name, url, route] of [
+  ['calendar', '/dashboard/calendar?date=2026-11-07', '/pharmacist/calendar'],
+  ['hub', '/dashboard/pharmacy-hub?scope=platform', '/pharmacist/hub'],
+  ['membership', '/dashboard/memberships', '/pharmacist/memberships'],
+]) {
+  test('C ' + name + ' tap navigates when receipt fails', async () => {
+    const h = createInbox();
+    h.waitFor(1, page([notice(1, { unread: true, actionUrl: url })]));
+    h.waitForMark(Error('Offline')); await h.focus();
+    h.waitForMark(Error('Still offline')); const nodes = await h.press(1);
+    assert.equal(h.rows(nodes)[0].readAt, null);
+    assert.match(h.readError(nodes), /Still offline/);
+    assert.ok(h.routes.at(-1).startsWith(route));
+    assert.equal(h.events.length, 0);
+    h.unmount();
+  });
+}
