@@ -256,6 +256,36 @@ test('R OTHER_STAFF technician receives a pathway from server role_code, not gen
   h.host.unmount();
 });
 
+test('R blank public title remains selectable as Pharmacist on native', async()=>{
+  const h=boardHarness();
+  h.pages.push({count:1,next:null,results:[{...fixture(71,''),role_category:'PHARMACIST'}]});
+  let tree=await h.render();
+  const role=collect(tree,'Chip').find(p=>p.children==='Pharmacist');
+  assert.ok(role,'Pharmacist role filter must exist');
+  role.onPress(); tree=await h.render();
+  assert.equal(collect(tree,'Card').length,1);
+  assert.ok(collect(tree,'Text').some(p=>p.children==='Pharmacist'));
+  h.host.unmount();
+});
+
+test('R real newcomer subtype responses retain Explorer learning',async()=>{
+  for(const code of ['CAREER_SWITCHER','JUNIOR','OVERSEAS']){
+    const h=learningHarness(); h.user.current={id:51,role:'EXPLORER'};
+    h.options.push({role_code:code,can_trade_personally:false,blockers:[]});
+    const tree=await h.render();
+    assert.ok(collect(tree,'Text').some(p=>p.children==='Career discovery and pharmacy pathways'),code);
+    h.host.unmount();
+  }
+});
+
+test('qualification: real STUDENT newcomer subtype uses the supported student learning pathway',async()=>{
+  const h=learningHarness(); h.user.current={id:51,role:'EXPLORER'};
+  h.options.push({role_code:'STUDENT',can_trade_personally:false,blockers:[]});
+  const tree=await h.render();
+  assert.ok(collect(tree,'Text').some(p=>p.children==='Study, placement and transition to practice'));
+  h.host.unmount();
+});
+
 
 test('R #1 actual native role/state/work/skill/date/travel/placement filters find page-two-only candidate and clear',async()=>{
   const h=boardHarness();

@@ -46,7 +46,7 @@ function hooks() {
       const old=values[i];values[i]={deps};
       effects.push(()=>{old?.cleanup?.();values[i].cleanup=fn();});}},
   };react.default=react;
-  return {react,async render(component,props){
+  return {react, reset(){index=0;},async render(component,props){
     let tree;for(let n=0;n<7;n++){index=0;tree=component(props);
       while(effects.length)effects.shift()();
       for(let j=0;j<15;j++)await Promise.resolve();}
@@ -117,7 +117,7 @@ test('C #2/#7 migrated Next public TalentBoard entry preserves QR and safe login
 });
 
 const registry=JSON.parse(fs.readFileSync(new URL('shared-core/skills_registry.json',repo),'utf8'));
-function mountedTalentBoard(next) {
+function mountedTalentBoard(next, overrides={}) {
   const ui=hooks(), navigated=[];
   const router={useNavigate:()=>dest=>navigated.push(dest),
     useLocation:()=>({pathname:'/talent/public-board',search:'?reference_code=REF-22'})};
@@ -168,14 +168,14 @@ function mountedTalentBoard(next) {
     'src/pages/dashboard/sidebar/TalentBoard/index.tsx';
   const board=load(src,mocks,{location:{pathname:'/talent/public-board',search:''},
     addEventListener(){},removeEventListener(){}});
-  const post=presentation.normalizePublicTalentPost({
-    id:22,reference_code:'REF-22',role_title:'Intern',
-    work_types:['CASUAL'],location_state:'QLD',location_suburb:'Brisbane',
-    availability_days:[{date:'2999-02-01'}],skills:['WEBSTER_PACKING_DAA'],
-    rating_average:4.5,rating_count:2,is_anonymous:true,
-    author_user_id:null,explorer_user_id:null,
-  });
-  return {render:()=>{const index=board.default({publicMode:true,
+  const post={
+    id:22,referenceCode:'REF-22',roleTitle:'Intern',
+    workTypes:['CASUAL'],locationState:'QLD',locationSuburb:'Brisbane',
+    availabilityDays:[{date:'2999-02-01'}],skills:['WEBSTER_PACKING_DAA'],
+    ratingAverage:4.5,ratingCount:2,is_anonymous:true,
+    authorUserId:null,explorerUserId:null,...overrides,
+  };
+  return {render:()=>{ui.reset();const index=board.default({publicMode:true,
     publicPresentation:next,externalPosts:[post],externalLoading:false});
     return index;},navigated};
 }
@@ -199,6 +199,18 @@ test('C #7 real Vite and Next TalentBoard/index render consistent public Candida
       rating:card.candidate.ratingAverage});
   }
   assert.deepEqual(JSON.parse(JSON.stringify(results[0])),JSON.parse(JSON.stringify(results[1])));
+});
+
+for (const next of [false,true]) test(`R blank public title survives Pharmacist filter on ${next?'Next':'Vite'}`,()=>{
+  const view=mountedTalentBoard(next,{roleTitle:'',roleCategory:'PHARMACIST'});
+  let tree=view.render();
+  const filters=nodes(tree,'FiltersSidebar')[0];
+  assert.ok(filters.roleOptions.includes('Pharmacist'),'Pharmacist role filter must exist');
+  filters.onChange({...filters.filters,roles:['Pharmacist']});
+  tree=view.render();
+  const card=nodes(tree,next?'PublicTalentCard':'TalentCardV2')[0];
+  assert.ok(card,'filtered candidate remains visible');
+  assert.equal(card.candidate.role,'Pharmacist');
 });
 
 function realLogin(next, rawNext, verified=true) {
