@@ -8,3 +8,16 @@ for (const file of ['../src/pages/dashboard/sidebar/TalentBoard/index.tsx', '../
     assert.match(source, /existingPostId\s*\?\s*null\s*:\s*await pendingStore\.read\(\)/);
   });
 }
+
+for (const file of ['../src/pages/dashboard/sidebar/TalentBoard/index.tsx', '../landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx']) {
+  test(`${file}: create recovery is limited to creates`, () => {
+    const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+    assert.match(source, /if \(!existingPostId && !detail && !err\?\.status\)/);
+    assert.match(source, /if \(!existingPostId && err\?\.status === 400/);
+    assert.match(source, /if \(!existingPostId && \["IDEMPOTENCY_PAYLOAD_MISMATCH"/);
+  });
+  test(`${file}: deletion cleanup failure cannot prevent closing and reload`, () => {
+    const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+    assert.match(source, /await pendingStore\?\.resolve\(pending\.key\)\.catch\([\s\S]*?console\.(?:warn|error)[\s\S]*?setExistingPostId\(null\);[\s\S]*?setPitchOpen\(false\);[\s\S]*?await reload\(\)/);
+  });
+}

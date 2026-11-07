@@ -1317,3 +1317,38 @@ test('corrupt intent does not block deleting an existing pitch', async () => {
   await dialog.props.onConfirmDelete();
   assert.equal(h.deleteCalls.length, 1);
 });
+
+
+test('account switch during save resets saving state and loads the new account', async () => {
+  const h = createPitchHarness();
+  let release, started;
+  const waiting = new Promise(r => { release = r; });
+  const entered = new Promise(r => { started = r; });
+  h.setUpdatePostService(async () => { started(); await waiting; });
+  const dialog = h.findPitchDialog(await h.mountWithPitch());
+  const save = dialog.props.onSave();
+  await entered;
+  h.setCurrentUser({ id: 7002, role: 'PHARMACIST' });
+  h.setCurrentPost({ id: 2, headline: 'Account B' });
+  h.renderInner(); await h.runEffects();
+  let current = h.findPitchDialog(h.renderInner());
+  assert.equal(current.props.pitchSaving, false);
+  assert.equal(current.props.existingPostId, 2);
+  release(); await save;
+  current = h.findPitchDialog(h.renderInner());
+  assert.equal(current.props.pitchSaving, false);
+  let savedId;
+  h.setUpdatePostService(async id => { savedId = id; });
+  await current.props.onSave();
+  assert.equal(savedId, 2);
+  assert.equal(h.findPitchDialog(h.renderInner()).props.open, false);
+});
+
+test('storage corrupted after mount offers reviewed recovery on save', async () => {
+  const h = createPitchHarness({ id: 7001, role: 'PHARMACIST' }, null);
+  const dialog = h.findPitchDialog(await h.mountWithPitch());
+  h.corruptStorage();
+  await dialog.props.onSave();
+  const tree = h.renderInner();
+  assert.ok(h.walkTree(tree, n => n.props?.children === 'Review my pitches'));
+});

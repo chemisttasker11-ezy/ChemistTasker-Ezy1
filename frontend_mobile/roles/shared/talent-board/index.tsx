@@ -399,6 +399,9 @@ export function TalentBoardInner({
   if (pitchAccountRef.current !== pitchAccount) {
     pitchAbortRef.current.abort();
     pitchAbortRef.current = new AbortController();
+    saveGeneration.current += 1;
+    saveInFlightRef.current = false;
+    pitchLoadGeneration.current += 1;
   }
   pitchAccountRef.current = pitchAccount;
   useEffect(() => {
@@ -533,6 +536,12 @@ export function TalentBoardInner({
       accountKey: '',
     });
   }, []);
+
+  useEffect(() => {
+    setPitchSaving(false);
+    setPitchError(null);
+    pitchDefaultsReady.current = null;
+  }, [pitchAccount]);
 
   const loadPitchDefaults = useCallback(async () => {
     if (!user || deleteInFlightRef.current || saveInFlightRef.current) return;
@@ -680,7 +689,19 @@ export function TalentBoardInner({
     setPitchSaving(true);
     setPitchError(null);
     try {
-      const savedIntent = !existingPostId ? await pendingStore.read() : null;
+      let savedIntent: PendingPitch | null = null;
+      if (!existingPostId) {
+        try { savedIntent = await pendingStore.read(); }
+        catch {
+          if (isCurrentSave()) {
+            setPendingPitch(null);
+            setPendingReady(false);
+            setPendingError('Your saved pitch could not be read. Review your pitches to recover.');
+            setPitchOpen(false);
+          }
+          return;
+        }
+      }
       if (savedIntent) {
         if (isCurrentSave()) { setPendingPitch(savedIntent); setPitchError('Finish the saved pitch from the Talent Board before starting another.'); }
         return;
@@ -786,7 +807,8 @@ export function TalentBoardInner({
     if (!pendingStore || !pendingPitch || saveInFlightRef.current) return;
     const accountId = user?.id;
     const accountRole = normalizedRole;
-    const isCurrent = () => isMountedRef.current && activeUserRef.current.id === accountId && activeUserRef.current.role === accountRole;
+    const generation = ++saveGeneration.current;
+    const isCurrent = () => isMountedRef.current && saveGeneration.current === generation && activeUserRef.current.id === accountId && activeUserRef.current.role === accountRole;
     saveInFlightRef.current = true;
     setPitchSaving(true);
     setPendingError(null);
@@ -802,15 +824,18 @@ export function TalentBoardInner({
       try { setPendingPitch(await pendingStore.read()); } catch {}
       if (isCurrent()) setPendingError(err?.message || 'Unable to finish your pitch. Please try again.');
     } finally {
-      saveInFlightRef.current = false;
-      if (isCurrent()) setPitchSaving(false);
+      if (saveGeneration.current === generation) {
+        saveInFlightRef.current = false;
+        if (isCurrent()) setPitchSaving(false);
+      }
     }
   };
 
   const reviewCorruptPitch = async () => {
     if (!pendingStore || saveInFlightRef.current) return;
     const account = pitchAccount;
-    const isCurrent = () => isMountedRef.current && pitchAccountRef.current === account;
+    const generation = ++saveGeneration.current;
+    const isCurrent = () => isMountedRef.current && saveGeneration.current === generation && pitchAccountRef.current === account;
     saveInFlightRef.current = true;
     setPitchSaving(true);
     try {
@@ -833,8 +858,10 @@ export function TalentBoardInner({
     } catch (err: any) {
       if (isCurrent()) setPendingError(err?.message || 'Unable to review your pitches.');
     } finally {
-      saveInFlightRef.current = false;
-      if (isCurrent()) setPitchSaving(false);
+      if (saveGeneration.current === generation) {
+        saveInFlightRef.current = false;
+        if (isCurrent()) setPitchSaving(false);
+      }
     }
   };
 

@@ -891,12 +891,12 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
     } catch (err: any) {
       if (!isCurrent()) return;
       const detail = err?.payload || err?.response?.data || err?.data;
-      if (!detail && !err?.status) {
+      if (!existingPostId && !detail && !err?.status) {
         try { await pendingStore.read(); }
         catch { if (isCurrent()) setPitchNeedsRecovery(true); }
         if (!isCurrent()) return;
       }
-      if (err?.status === 400 && detail?.code !== "IDEMPOTENCY_KEY_REQUIRED") {
+      if (!existingPostId && err?.status === 400 && detail?.code !== "IDEMPOTENCY_KEY_REQUIRED") {
         try {
           const pending = await pendingStore.read();
           if (!isCurrent()) return;
@@ -909,7 +909,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
           return;
         }
       }
-      if (["IDEMPOTENCY_PAYLOAD_MISMATCH", "PITCH_DELETED", "IDEMPOTENCY_REPLAY_EXPIRED"].includes(detail?.code)) {
+      if (!existingPostId && ["IDEMPOTENCY_PAYLOAD_MISMATCH", "PITCH_DELETED", "IDEMPOTENCY_REPLAY_EXPIRED"].includes(detail?.code)) {
         try {
           const pending = await pendingStore.read();
           if (!isCurrent()) return;
@@ -1164,7 +1164,7 @@ const TalentBoard: React.FC<TalentBoardProps> = ({
             await deleteExplorerPost(existingPostId);
             if (pitchAccountRef.current !== account) return;
             const pending = await pendingStore?.read().catch(() => null);
-            if (pending?.acknowledged && pending.resultId === existingPostId) await pendingStore?.resolve(pending.key);
+            if (pending?.acknowledged && pending.resultId === existingPostId) await pendingStore?.resolve(pending.key).catch((error) => console.warn("Unable to clear deleted pitch intent", error));
             if (pitchAccountRef.current !== account) return;
             setExistingPostId(null);
             setPitchOpen(false);
