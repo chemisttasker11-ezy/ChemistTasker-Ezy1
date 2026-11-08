@@ -178,5 +178,18 @@ class ModuleImportGraphTests(unittest.TestCase):
         self.assertEqual(result["new_combined_components"], [])
 
 
+    def test_request_hashing_is_infrastructure_owned_without_app_import_cycles(self):
+        """Pharmacy and talent creation must not import the composition-facing core app."""
+        root = Path(__file__).resolve().parents[1]
+        self.assertTrue((root / "backend/infrastructure/request_fingerprint.py").is_file())
+        direct, _, evidence = extract_edges()
+        for source in ("organizations", "talent"):
+            with self.subTest(source=source):
+                self.assertNotIn((source, "core"), direct,
+                                 evidence.get((source, "core", "module"), []))
+        self.assertEqual(strongly_connected_components(direct), [])
+
+
+
 if __name__ == "__main__":
     unittest.main()

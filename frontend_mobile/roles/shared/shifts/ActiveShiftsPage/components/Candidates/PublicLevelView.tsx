@@ -38,6 +38,7 @@ function PublicCandidateCard({
     tone,
     emptyTitle,
     emptySubtitle,
+    description,
     children,
 }: {
     title: string;
@@ -46,6 +47,7 @@ function PublicCandidateCard({
     tone: 'violet' | 'cyan';
     emptyTitle: string;
     emptySubtitle: string;
+    description?: string;
     children: React.ReactNode;
 }) {
     return (
@@ -60,6 +62,7 @@ function PublicCandidateCard({
                 <Pill label={String(count)} tone={tone} />
             </View>
             <View style={styles.cardContent}>
+                {description ? <Text style={styles.emptySubText}>{description}</Text> : null}
                 {count > 0 ? (
                     <View style={styles.candidateList}>{children}</View>
                 ) : (
@@ -161,7 +164,7 @@ export default function PublicLevelView({
                 <Divider style={styles.dividerLine} />
                 <Surface style={styles.dividerChip} elevation={1}>
                     <Image source={chemisttaskerBadge} style={styles.publicDividerLogo} resizeMode="contain" />
-                    <Text style={styles.dividerChipText}>ChemistTasker Public Candidates</Text>
+                    <Text style={styles.dividerChipText}>ChemistTasker platform</Text>
                 </Surface>
                 <Divider style={styles.dividerLine} />
             </View>
@@ -173,7 +176,8 @@ export default function PublicLevelView({
                     icon={<Tag size={18} color="#6D28D9" />}
                     tone="violet"
                     emptyTitle="No counter offers yet."
-                    emptySubtitle="When candidates send counter offers, they'll appear here."
+                    emptySubtitle="Review proposed changes to rates or times."
+                    description="Asked for a different rate or time."
                 >
                     {slotOffers.map((offer) => {
                         const offerSlotId = slotId ?? getOfferSlotId(offer);
@@ -242,12 +246,13 @@ export default function PublicLevelView({
                 </PublicCandidateCard>
 
                 <PublicCandidateCard
-                    title="Interested matches"
+                    title="Interested"
                     count={slotInterestsFiltered.length}
                     icon={<UserCheck size={18} color="#008EA6" />}
                     tone="cyan"
-                    emptyTitle="No matches yet."
-                    emptySubtitle="When public candidates show interest, they'll appear here."
+                    emptyTitle="No platform applicants yet."
+                    emptySubtitle="When verified professionals apply, they will appear here."
+                    description="Applied at the posted rate."
                 >
                     {slotInterestsFiltered.map((interest) => {
                         const isRevealing = revealingInterestId === interest.id;
@@ -261,7 +266,7 @@ export default function PublicLevelView({
                             interest.pendingOfferId ?? interest.pending_offer_id ?? null;
                         const candidateName = interest.revealed
                             ? getInterestDisplayName(interest, interest.user)
-                            : 'Platform candidate';
+                            : 'Anonymous applicant';
                         const actionLabel = isPendingConfirmation || isAwaitingPayment
                             ? 'View'
                             : interest.revealed
@@ -276,14 +281,14 @@ export default function PublicLevelView({
                                             {candidateName}
                                         </Text>
                                         <Text style={styles.memberSubtitle}>
-                                            {interest.revealed ? 'Revealed candidate' : 'Public applicant'}
+                                            {interest.revealed ? 'Revealed candidate' : 'Reveal to see name and profile'}
                                         </Text>
                                     </View>
                                     <View style={styles.memberBadges}>
                                         {isAwaitingPayment ? (
                                             <Pill label="Awaiting payment" tone="red" />
                                         ) : isPendingConfirmation ? (
-                                            <Pill label="Pending" tone="amber" />
+                                            <Pill label="Offer sent · awaiting reply" tone="amber" />
                                         ) : !interest.revealed ? (
                                             <Pill label="Public" tone="cyan" />
                                         ) : null}

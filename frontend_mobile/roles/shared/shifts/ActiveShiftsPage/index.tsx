@@ -103,6 +103,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
     // Do not start duplicate fulfilment attempts from rapid taps. The backend
     // remains responsible for durable payment/booking idempotency.
     const paymentBusyRef = useRef(false);
+    // Buzz sends must lock synchronously, before a React state update can render.
+    const buzzBusyRef = useRef(false);
     const paymentContextRef = useRef(`${user?.id ?? 'anonymous'}:${surface.scopeKey}`);
     const paymentContext = `${user?.id ?? 'anonymous'}:${surface.scopeKey}`;
     paymentContextRef.current = paymentContext;
@@ -763,16 +765,20 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
 
     const handleBuzzWorker = useCallback(
         async (offerId: number) => {
-            if (!offerId) return;
+            if (!offerId || buzzBusyRef.current) return;
+            buzzBusyRef.current = true;
+            const context = paymentContextRef.current;
             setBuzzLoadingOfferId(offerId);
             try {
                 const result = await buzzShiftOffer(offerId);
+                if (context !== paymentContextRef.current) return;
                 Alert.alert(
                     'Buzz reminder',
                     result?.detail || "Reminder sent. We've gently nudged the candidate to confirm this shift.",
                     [{ text: 'Close' }]
                 );
             } catch (error) {
+                if (context !== paymentContextRef.current) return;
                 console.error('Failed to send confirmation reminder', error);
                 const message =
                     (error as any)?.response?.data?.detail ||
@@ -783,7 +789,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                 Alert.alert('Buzz reminder', message, [{ text: 'Close' }]);
                 await loadShifts();
             } finally {
-                setBuzzLoadingOfferId(null);
+                buzzBusyRef.current = false;
+                if (context === paymentContextRef.current) setBuzzLoadingOfferId(null);
             }
         },
         [loadShifts]
@@ -956,8 +963,8 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
             <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <ContentState
                     kind={isForbidden ? 'forbidden' : 'error'}
-                    title={isForbidden ? 'No shift management access' : 'Could not load active shifts'}
-                    description={shiftsError}
+                    title={isForbidden ? 'No shift management access' : 'Active shifts did not load'}
+                    description={isForbidden ? shiftsError : `${shiftsError.replace(/\.$/, '')}. Check your connection and try again.`}
                     actionLabel="Try again"
                     onAction={loadShifts}
                     style={styles.stateCard}
@@ -971,9 +978,9 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
             <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <ContentState
                     kind="empty"
-                    title="No active shifts found"
-                    description="When you post shifts or receive candidates, they will appear here."
-                    actionLabel={postShiftPath ? 'Post shift' : undefined}
+                    title="No active shifts"
+                    description="Shifts you post appear here while they are being filled."
+                    actionLabel={postShiftPath ? 'Post a shift' : undefined}
                     onAction={postShiftPath ? handlePostShift : undefined}
                     style={styles.stateCard}
                 />
@@ -1080,7 +1087,7 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                 assignLabel={reviewOfferDialog.slotId != null ? 'Assign to Slot' : 'Assign to Shift'}
                 assignLoading={
                     reviewOfferDialog.shiftId != null && reviewOfferDialog.candidate?.userId != null
-                        ? actionLoading[`accept_${reviewOfferDialog.shiftId}_${reviewOfferDialog.candidate.userId}`] ?? false
+                        ? actionLoading[`accept_${reviewOfferDialog.shiftId}_${reviewOfferDialog.candidate.userId}_${reviewOfferDialog.slotId ?? 'all'}`] ?? false
                         : false
                 }
                 workerRatingSummary={workerRatingSummary}

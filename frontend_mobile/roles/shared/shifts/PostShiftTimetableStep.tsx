@@ -40,6 +40,7 @@ type Props = {
   setSlotEnd: Setter<string>;
   setSlotDatePickerOpen: Setter<boolean>;
   slotDateHours: PharmacyHoursForDate | null;
+  postingWindow: { minIso: string; maxIso: string };
   calendarMonthAnchor: Date;
   setCalendarMonthAnchor: Setter<Date>;
   monthLabel: string;
@@ -86,6 +87,7 @@ export default function PostShiftTimetableStep({
   setSlotEnd,
   setSlotDatePickerOpen,
   slotDateHours,
+  postingWindow,
   calendarMonthAnchor,
   setCalendarMonthAnchor,
   monthLabel,
@@ -111,6 +113,13 @@ export default function PostShiftTimetableStep({
   editSlot,
   removeSlot,
 }: Props) {
+  const minMonth = postingWindow.minIso.slice(0, 7);
+  const maxMonth = postingWindow.maxIso.slice(0, 7);
+  const currentMonth = [calendarMonthAnchor.getFullYear(),
+    String(calendarMonthAnchor.getMonth() + 1).padStart(2, '0')].join('-');
+  const previousDisabled = currentMonth <= minMonth;
+  const nextDisabled = currentMonth >= maxMonth;
+
   return (
     <>
       <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',minHeight:touch.min,paddingVertical:space.xs}}>
@@ -181,6 +190,8 @@ export default function PostShiftTimetableStep({
         <View style={styles.calendarHeader}>
           <TouchableOpacity
             style={{ minWidth: touch.min, minHeight: touch.min, alignItems: 'center', justifyContent: 'center' }}
+            disabled={previousDisabled}
+            accessibilityState={{ disabled: previousDisabled }}
             onPress={() =>
               setCalendarMonthAnchor(
                 (previous) =>
@@ -194,6 +205,8 @@ export default function PostShiftTimetableStep({
           <Text style={styles.calendarTitle}>{monthLabel}</Text>
           <TouchableOpacity
             style={{ minWidth: touch.min, minHeight: touch.min, alignItems: 'center', justifyContent: 'center' }}
+            disabled={nextDisabled}
+            accessibilityState={{ disabled: nextDisabled }}
             onPress={() =>
               setCalendarMonthAnchor(
                 (previous) =>
@@ -225,6 +238,7 @@ export default function PostShiftTimetableStep({
               );
             }
 
+            const disabled = cell.iso < postingWindow.minIso || cell.iso > postingWindow.maxIso;
             const isSelected = selectedDateSet.has(cell.iso);
             const hasSlot = slotDateSet.has(cell.iso);
             const hours = getDefaultTimesForDate(cell.iso);
@@ -232,8 +246,11 @@ export default function PostShiftTimetableStep({
             return (
               <TouchableOpacity
                 key={`${cell.iso}-${index}`}
+                disabled={disabled}
+                accessibilityState={{ disabled, selected: isSelected }}
                 style={[
                   styles.calendarCell,
+                  disabled && { opacity: 0.35 },
                   hours.closed && styles.calendarCellClosed,
                   isSelected && styles.calendarCellSelected,
                   hours.closed &&

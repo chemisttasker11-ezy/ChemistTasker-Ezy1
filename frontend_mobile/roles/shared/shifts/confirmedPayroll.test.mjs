@@ -25,3 +25,6 @@ test('W3e only offers genuinely deferred payroll activation in matching pharmacy
   assert.equal(f([{...candidate, engagementTermsSnapshot:{...candidate.engagementTermsSnapshot, payrollActivationRequired:false}}],7).length,0);
   assert.equal(f([{...candidate, payrollActivatedAt:'2026-11-04T00:00:00Z'}],7).length,0);
 });
+
+// Run mounted Confirmed/History behavioural controls from the existing mobile CI entry.
+import '../../../scripts/m5-assigned-boards.test.cjs';

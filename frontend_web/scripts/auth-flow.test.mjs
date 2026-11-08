@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import vm from 'node:vm';
-import { bearerBelongsToDifferentUser, safeNext, refreshBrowserSession, logoutSession } from '../landing_next/shared/browser-session.ts';
+import { bearerBelongsToDifferentUser, safeNext, loginHref, refreshBrowserSession, logoutSession } from '../landing_next/shared/browser-session.ts';
 import { canAccessRoute } from '../src/components/routeAccess.ts';
 import { safeHubAttachmentUrl } from '../landing_next/lib/safe-hub-attachment.ts';
 import { resolveDashboardPath } from '../src/utils/dashboardPath.ts';
@@ -143,6 +143,12 @@ test('reported phone targets retain at least 44px and desktop shell targets stay
 test('return links preserve permitted destinations and reject external or login loops',()=>{
  for(const path of ['/content','/content/invite/example','/hubs/posts/12?reply=4#comments','/dashboard/pharmacist/overview'])assert.equal(safeNext(path),path);
  for(const path of ['https://example.com','//example.com','/\\example.com','/login?next=/login','javascript:alert(1)','/hubs/../../login','/dashboard/owner/logout?workspace=internal&pharmacy_id=2','/dashboard/admin/1/logout/','/dashboard/pharmacist/%6cogout',null])assert.equal(safeNext(path),null);
+});
+
+test('logout route cannot force generic dashboard return after a different user logs in',()=>{
+ assert.equal(loginHref('/dashboard/owner/logout'),'/login');
+ assert.equal(loginHref('/dashboard/admin/101/logout/?foo=bar'),'/login');
+ assert.equal(loginHref('/dashboard/owner/manage-pharmacies?view=detail'),'/login?next=%2Fdashboard%2Fowner%2Fmanage-pharmacies%3Fview%3Ddetail');
 });
 
 test('cookie authority only reconciles a known cross-user bearer identity',()=>{

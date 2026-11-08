@@ -119,6 +119,34 @@ class DirectMessageTests(ChatBase):
         self.assertEqual(sent.status_code, 201, sent.data)
         self.assertEqual(Message.objects.get(pk=sent.data["id"]).sender_id, valid.pk)
 
+    def test_room_shortcut_uses_current_participant_after_legacy_membership_revocation(self):
+        # A legacy revoked Participant row may precede a valid row for the same user.
+        # The room shortcut must use the same authorized identity as the direct
+        # message endpoint and the WebSocket consumer.
+        _, current_pharmacy = make_owner_with_pharmacy("Current membership for chat")
+        Membership.objects.filter(pk=self.alice_m.pk).update(is_active=False)
+        current = Membership.objects.create(
+            user=self.alice, pharmacy=current_pharmacy, role="PHARMACIST",
+            employment_type="FULL_TIME", status="ACCEPTED", is_active=True,
+        )
+        room = Conversation.objects.create(type="DM")
+        revoked_part = Participant.objects.create(conversation=room, membership=self.alice_m)
+        current_part = Participant.objects.create(conversation=room, membership=current)
+        Participant.objects.create(conversation=room, membership=self.bob_m)
+
+        sent = client_for(self.alice).post(
+            f"{ROOMS}{room.pk}/messages/", {"body": "Use my current membership"}, format="json",
+        )
+        self.assertEqual(sent.status_code, 201, sent.data)
+        self.assertEqual(Message.objects.get(pk=sent.data["id"]).sender_id, current.pk)
+
+        read = client_for(self.alice).post(f"{ROOMS}{room.pk}/read/")
+        self.assertEqual(read.status_code, 200, read.data)
+        current_part.refresh_from_db()
+        revoked_part.refresh_from_db()
+        self.assertIsNotNone(current_part.last_read_at)
+        self.assertIsNone(revoked_part.last_read_at)
+
     def test_room_visibility_is_limited_to_participants(self):
         room = self.dm(self.alice, self.bob).json()["id"]
         self.assertEqual([r["id"] for r in self.rows(client_for(self.alice).get(ROOMS))], [room])
@@ -164,6 +192,13 @@ class RoomMessageTests(ChatBase):
         listing = client_for(self.bob).get(f"{ROOMS}{self.room}/messages/")
         self.assertEqual(listing.status_code, 200)
         self.assertEqual([m["body"] for m in self.rows(listing)], ["hello"])
+
+    def test_empty_message_page_retains_pagination_envelope(self):
+        response = client_for(self.bob).get(f"{ROOMS}{self.room}/messages/")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["results"], [])
+        self.assertIsNone(response.data["next"])
 
     def test_empty_message_is_400(self):
         res = client_for(self.alice).post(f"{ROOMS}{self.room}/messages/", {"body": "   "}, format="json")

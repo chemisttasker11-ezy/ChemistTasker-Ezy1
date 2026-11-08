@@ -4,17 +4,23 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 
+class FixedDate extends Date {
+  constructor(...args) { super(...(args.length ? args : ['2026-11-07T12:00:00'])); }
+  static now() { return new Date('2026-11-07T12:00:00').getTime(); }
+}
+
 function load(file, extra = {}) {
   const { outputText } = ts.transpileModule(readFileSync(new URL(file, import.meta.url), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React },
   });
   const exports = {};
-  vm.runInNewContext(outputText, { exports, URL, URLSearchParams, require: (n) => extra[n] || {} });
+  vm.runInNewContext(outputText, { exports, URL, URLSearchParams, Date: FixedDate, require: (n) => extra[n] || {} });
   return exports;
 }
 
 const posting = load('../../../../shared-core/src/domains/shifts/postingDraft.ts');
-const helpers = load('./PostShiftScreen.helpers.ts', { '@chemisttasker/shared-core': posting });
+const windowPolicy = load('../../../../shared-core/src/domains/shifts/postingWindow.ts');
+const helpers = load('./PostShiftScreen.helpers.ts', { '@chemisttasker/shared-core': { ...posting, ...windowPolicy } });
 const { validateSlotEntry, validateSlotEntries } = helpers;
 
 const React = { createElement: (type, props, ...children) => ({ type, props: { ...props, children: children.flat() } }) };
@@ -56,6 +62,7 @@ function addSlot(path, times) {
   const exports = {};
   vm.runInNewContext(outputText, {
     exports, validateSlotEntries, toLocalIsoDate: helpers.toLocalIsoDate,
+    splitPostableDates: windowPolicy.splitPostableDates, postingWindow: { minIso: '2026-11-07' },
     slots: [], slotDate: date, slotStart: path === 'bulk' || path === 'per-date' ? '09:00' : times.startTime,
     slotEnd: path === 'bulk' || path === 'per-date' ? '09:00' : times.endTime,
     slotRecurring: path === 'recurring', slotRecurringDays: [5], slotRecurringEnd: '2026-12-04',

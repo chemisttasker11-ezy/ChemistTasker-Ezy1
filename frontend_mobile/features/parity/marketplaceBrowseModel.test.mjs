@@ -38,3 +38,6 @@ test('marketplace browse append preserves previous results, replaces overlapping
  assert.equal(nextBrowsePage({next:null},2),null);
  assert.equal(nextBrowsePage({next:'?page=2'},0),null);
 });
+
+// Execute mounted Marketplace regressions through the repository's existing mobile CI test entry.
+import '../../scripts/m4-marketplace-review.test.cjs';

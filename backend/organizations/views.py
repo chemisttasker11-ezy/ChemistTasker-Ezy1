@@ -1,6 +1,6 @@
 """Organisation API: organisations, pharmacies, chains and pharmacy admins."""
 from organizations.feature_port import pharmacy_features
-from core.request_fingerprint import request_fingerprint
+from infrastructure.request_fingerprint import request_fingerprint
 
 from rest_framework import permissions, serializers, status, viewsets
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin

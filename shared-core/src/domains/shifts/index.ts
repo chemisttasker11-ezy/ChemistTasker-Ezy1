@@ -39,6 +39,8 @@ export * from './visibility';
 export * from './workProfile';
 export * from './draftSlots';
 export * from './postingDraft';
+export * from './audience';
+export * from './postingWindow';
 export * from './descriptionTemplates';
 export * from './skillPresets';
 // Draft previews (post shift review) render an unsaved payload through the same mapping as API responses.
