@@ -36,5 +36,39 @@ class NativeAcceptanceConfigurationTests(unittest.TestCase):
         self.assertNotIn('XCODE_PATH="/Applications/Xcode_26.2.app"', ios)
 
 
+    def test_both_native_flows_open_the_real_admin_persona_picker(self):
+        """After signing in as a pharmacist, admin is a persona option, not the landing screen."""
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        switcher = (ROOT / "frontend_mobile/components/shell/WorkspaceSwitch.tsx").read_text(encoding="utf-8")
+        self.assertIn('accessibilityLabel={`${group.sheetTitle}. Current: ${group.label}`}', switcher)
+        self.assertIn('accessibilityLabel={option.helper ? `${option.label}, ${option.helper}` : option.label}', switcher)
+        # Two embedded Maestro journeys: Android and iOS. Both select the
+        # specific pharmacy admin radio from the authenticated worker home.
+        self.assertEqual(2, workflow.count('- tapOn: "Switch workspace. Current: Pharmacist"'))
+        self.assertEqual(2, workflow.count('- tapOn: "Admin, Native Pharmacy A"'))
+        self.assertEqual(2, workflow.count('- tapOn: "Native Pharmacy B"'))
+        self.assertNotIn('- tapOn: "Admin"\n', workflow)
+        self.assertNotIn('- assertVisible: "Welcome Native,"', workflow)
+        self.assertNotIn('visible: "Welcome Native,"', workflow)
+        self.assertNotIn('visible: "Admin workspace"', workflow)
+        self.assertNotIn('Admin( workspace)?', workflow)
+        self.assertNotIn('Pharmacist( workspace)?', workflow)
+        self.assertEqual(2, workflow.count('visible: "Shift Centre"'))
+        self.assertNotIn('visible: "Shift Center"', workflow)
+        for job in (workflow.split("\n  ios-native:\n", 1)[0], workflow.split("\n  ios-native:\n", 1)[1]):
+            for selector in (
+                '- tapOn: "Switch workspace. Current: Pharmacist"',
+                '- tapOn: "Admin, Native Pharmacy A"',
+                '- tapOn: "Administering pharmacy. Current: Native Pharmacy A"',
+                '- tapOn: "Native Pharmacy B"',
+                'visible: "Administering pharmacy. Current: Native Pharmacy B"',
+                '- tapOn: "Switch workspace. Current: Admin"',
+                '- tapOn: "Pharmacist"',
+                'visible: "Shift Centre"',
+            ):
+                self.assertIn(selector, job)
+        self.assertIn("'shifts/index': 'Shift Centre'", (ROOT / 'frontend_mobile/app/admin/_layout.tsx').read_text(encoding='utf-8'))
+
+
 if __name__ == "__main__":
     unittest.main()
