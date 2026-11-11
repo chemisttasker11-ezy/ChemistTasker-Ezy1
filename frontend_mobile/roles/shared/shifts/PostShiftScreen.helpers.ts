@@ -102,6 +102,9 @@ export type PharmacyHoursForDate = SlotTime & {
 export type PharmacyOption = {
     id: number;
     name?: string;
+    timezone?: string | null;
+    state?: string | null;
+    postcode?: string | null;
     has_chain?: boolean;
     hasChain?: boolean;
     claimed?: boolean;
@@ -132,6 +135,24 @@ export const toIsoDate = (value: string): Date | null => {
 
 export const toLocalIsoDate = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+export const pharmacyPostingDate = (timezone?: string | null, now = new Date(), state?: string | null, postcode?: string | null): string => {
+    const zones: Record<string, string> = {
+        NSW: 'Sydney', 'NEW SOUTH WALES': 'Sydney', VIC: 'Melbourne', VICTORIA: 'Melbourne',
+        QLD: 'Brisbane', QUEENSLAND: 'Brisbane', WA: 'Perth', 'WESTERN AUSTRALIA': 'Perth',
+        SA: 'Adelaide', 'SOUTH AUSTRALIA': 'Adelaide', TAS: 'Hobart', TASMANIA: 'Hobart',
+        ACT: 'Sydney', 'AUSTRALIAN CAPITAL TERRITORY': 'Sydney', NT: 'Darwin', 'NORTHERN TERRITORY': 'Darwin',
+    };
+    const fallback = `Australia/${String(postcode || '').trim() === '2880' ? 'Broken_Hill' : zones[(state || '').trim().replace(/\s+/g, ' ').toUpperCase()] || 'Sydney'}`;
+    let formatter: Intl.DateTimeFormat;
+    try {
+        formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone?.trim() || fallback, year: 'numeric', month: '2-digit', day: '2-digit' });
+    } catch {
+        formatter = new Intl.DateTimeFormat('en-CA', { timeZone: fallback, year: 'numeric', month: '2-digit', day: '2-digit' });
+    }
+    const parts = formatter.formatToParts(now);
+    return ['year', 'month', 'day'].map((part) => parts.find((item) => item.type === part)?.value).join('-');
+};
 
 /** Native date/time picker adapters must preserve the local calendar day, not UTC. */
 export const getEscalationClock = (value?: string | null): { hours: number; minutes: number } => {
@@ -309,13 +330,13 @@ export function validateSlotEntry(entry: Partial<SlotEntry>): string | null {
     return null;
 }
 
-export function validateSlotEntries(entries: SlotEntry[]): string | null {
+export function validateSlotEntries(entries: SlotEntry[], today: string = pharmacyPostingDate()): string | null {
     if (!entries.length) return 'Select at least one date from the calendar.';
     for (const entry of entries) {
         const error = validateSlotEntry(entry);
         if (error) return error;
-        if (!splitPostableDates([entry.date], new Date()).valid.length ||
-            (entry.isRecurring && !splitPostableDates([entry.recurringEndDate], new Date()).valid.length)) {
+        if (!splitPostableDates([entry.date], today).valid.length ||
+            (entry.isRecurring && !splitPostableDates([entry.recurringEndDate], today).valid.length)) {
             return 'That date has passed. Pick today or later.';
         }
     }
