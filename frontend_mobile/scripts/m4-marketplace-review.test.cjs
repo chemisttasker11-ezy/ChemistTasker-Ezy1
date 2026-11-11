@@ -228,3 +228,90 @@ test('R retained Photos waits for pending upload metadata before deleting and re
   assert.deepEqual(h.callsOf('submit').at(-1).images, [], 'removed image is never submitted');
   h.unmount();
 });
+
+test('R remounted Review retry waits for the pending upload receipt and never re-uploads', async () => {
+  const h = createMarketplace();
+  await h.setDraft(1001, {});
+  h.env.stack = ['photos', 'audience', 'review'];
+  await h.render();
+
+  const uploading = deferred();
+  h.queue('upload', uploading);
+  h.queue('upload', { id: 18, moderation_status: 'PENDING' });
+  h.click('Submit for review');
+  await settle(h);
+  assert.equal(h.callsOf('upload').length, 1);
+  const pendingReceiptWrite = h.pauseNextWrite();
+  uploading.resolve({ id: 17, moderation_status: 'PENDING' });
+  await settle(h);
+  assert.equal(h.callsOf('submit').length, 0, 'first attempt is waiting for the durable upload receipt');
+
+  // Back to Audience unmounts Review; opening Review again is a fresh instance.
+  h.env.stack.pop();
+  await h.render();
+  h.env.stack.push('review');
+  await h.render();
+  h.click('Submit for review');
+  await settle(h);
+  assert.equal(h.callsOf('upload').length, 1, 'retry must wait for the pending receipt write');
+
+  pendingReceiptWrite.resolve();
+  await settle(h);
+  assert.equal(h.callsOf('create').length, 1, 'retry uses the existing listing receipt');
+  assert.equal(h.callsOf('upload').length, 1, 'uploaded photo is not uploaded again');
+  assert.deepEqual(h.callsOf('submit').at(-1).images, [17], 'submitted draft has the latest receipt');
+  assert.equal(h.nav.filter(row => row[0] === 'replace').length, 1);
+  h.unmount();
+});
+
+async function failedSubmitThenBackToAudience() {
+  const h = createMarketplace();
+  await h.setDraft(1001, { image_uris: [], private_pickup_details: 'OLD pickup' });
+  h.env.stack = ['audience', 'review'];
+  await h.render();
+  h.queue('submit', Error('Submission unavailable'));
+  h.click('Submit for review');
+  await settle(h);
+  assert.equal(h.callsOf('create').length, 1);
+  assert.equal(h.callsOf('submit').length, 1);
+  h.env.stack.pop();
+  await h.render();
+  return h;
+}
+
+test('R retry after a queued pickup edit sends the settled saved draft, not stale Review props', async () => {
+  const h = await failedSubmitThenBackToAudience();
+  const pendingEdit = h.pauseNextWrite();
+  const pickup = h.currentNodes().find(node => node.type === 'Field' &&
+    node.props.label === 'Private pickup details');
+  pickup.props.onChangeText('NEW pickup');
+  await settle(h);
+  // Reopen Review at once: its load reads storage before the edit is saved.
+  h.env.stack.push('review');
+  await h.render();
+  h.click('Submit for review');
+  await settle(h);
+  assert.equal(h.callsOf('update').length, 0, 'retry waits for the queued edit');
+  pendingEdit.resolve();
+  await settle(h);
+  assert.equal(h.callsOf('create').length, 1, 'retry reuses the listing receipt');
+  assert.equal(h.callsOf('update').length, 1);
+  assert.equal(h.callsOf('update')[0].body.private_pickup_details, 'NEW pickup');
+  assert.equal(h.callsOf('submit').length, 2);
+  assert.equal(h.nav.filter(row => row[0] === 'replace').length, 1);
+  h.unmount();
+});
+
+test('C retry with no edit still sends one update and one submit for the same listing', async () => {
+  const h = await failedSubmitThenBackToAudience();
+  h.env.stack.push('review');
+  await h.render();
+  h.click('Submit for review');
+  await settle(h);
+  assert.equal(h.callsOf('create').length, 1);
+  assert.equal(h.callsOf('update').length, 1);
+  assert.equal(h.callsOf('update')[0].body.private_pickup_details, 'OLD pickup');
+  assert.equal(h.callsOf('submit').length, 2);
+  assert.equal(h.nav.filter(row => row[0] === 'replace').length, 1);
+  h.unmount();
+});
