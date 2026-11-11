@@ -274,13 +274,13 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
    const current=()=>scopeRef.current===targetScope&&submissionGeneration.current===attempt;
    setBusy(true);setLocalError('');
    try{
-     // A partial earlier attempt may have persisted the server create receipt
-     // and one image while ReviewStep retained its older draft props.
-     // Merge only durable progress, not unrelated fields or other users' data.
+     // Draft props can predate queued field edits and server receipts (a
+     // partial earlier attempt), so the payload is built from the settled
+     // saved draft of this account; receipts keep the create/upload de-dup.
      const saved=await loadSettledMarketplaceDraft(targetScope);
      if(!current())return;
      const progress:MarketplaceMobileDraft={
-       ...draft,
+       ...saved,
        created_listing_id:saved.created_listing_id||draft.created_listing_id,
        created_listing_version:saved.created_listing_version??draft.created_listing_version,
        uploaded_image_uris:Array.from(new Set([
