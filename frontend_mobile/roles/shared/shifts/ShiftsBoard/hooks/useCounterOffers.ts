@@ -1,7 +1,7 @@
 // useCounterOffers - Complete counter offer state management
 // Exact logic from web with AsyncStorage adaptation for mobile
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
 import {
@@ -85,6 +85,7 @@ export const useCounterOffers = ({
 }: UseCounterOffersParams) => {
     const [counterOffers, setCounterOffers] = useState<Record<number, CounterOfferTrack>>({});
     const [counterSubmitting, setCounterSubmitting] = useState(false);
+    const pendingCounterOffers = useRef<Set<number>>(new Set());
     const [reviewOfferShiftId, setReviewOfferShiftId] = useState<number | null>(null);
     const [reviewOffers, setReviewOffers] = useState<any[]>([]);
     const [reviewLoading, setReviewLoading] = useState(false);
@@ -395,6 +396,7 @@ export const useCounterOffers = ({
 
     const handleSubmitCounterOffer = async () => {
         if (!counterOfferShift || !onSubmitCounterOffer) return;
+        if (pendingCounterOffers.current.has(counterOfferShift.id)) return;
         const canNegotiateRate = getShiftNegotiable(counterOfferShift);
         const slotOfferMap: Record<number, { rate: string; start: string; end: string }> = {};
         const hasRealSlots = (counterOfferShift.slots?.length ?? 0) > 0;
@@ -442,6 +444,7 @@ export const useCounterOffers = ({
         }
 
         setCounterOfferError(null);
+        pendingCounterOffers.current.add(counterOfferShift.id);
         setCounterSubmitting(true);
         try {
             await onSubmitCounterOffer(payload);
@@ -449,6 +452,8 @@ export const useCounterOffers = ({
             setCounterOfferError(err instanceof Error && err.message.trim().length > 0 ? err.message : 'Failed to submit counter offer.');
             setCounterSubmitting(false);
             return;
+        } finally {
+            pendingCounterOffers.current.delete(counterOfferShift.id);
         }
 
         slotsToSend.forEach((slot) => {
