@@ -445,35 +445,33 @@ jobs:
               text: "Not now"
               optional: true
           - extendedWaitUntil:
-              visible: "Admin"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
-          - assertVisible: "Welcome Native,"
-          - tapOn: "Admin"
+          - tapOn: "Switch workspace. Current: Pharmacist"
+          - tapOn: "Admin, Native Pharmacy A"
           - extendedWaitUntil:
-              visible: "Admin workspace"
+              visible: "Administering pharmacy. Current: Native Pharmacy A"
               timeout: 30000
-          - assertVisible: "Native Pharmacy A"
-          - assertVisible: "Native Pharmacy B"
+          - tapOn: "Administering pharmacy. Current: Native Pharmacy A"
           - tapOn: "Native Pharmacy B"
           - stopApp
           - launchApp
           - extendedWaitUntil:
-              visible: "Admin workspace"
+              visible: "Administering pharmacy. Current: Native Pharmacy B"
               timeout: 30000
-          - assertVisible: "Native Pharmacy B"
+          - tapOn: "Switch workspace. Current: Admin"
           - tapOn: "Pharmacist"
           - extendedWaitUntil:
-              visible: "Welcome Native,"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
           - stopApp
           - launchApp
           - extendedWaitUntil:
-              visible: "Welcome Native,"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
-          - assertVisible: "Admin"
           - openLink: "frontendmobile://admin/shifts"
           - extendedWaitUntil:
-              visible: "Shift Center"
+              visible: "Shift Centre"
               timeout: 30000
           - openLink: "frontendmobile://attendance/clock"
           - extendedWaitUntil:
@@ -905,7 +903,6 @@ jobs:
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
-          # iOS exposes each workspace switch as one element labelled "<Role> workspace".
           - launchApp:
               stopApp: true
               permissions:
@@ -931,32 +928,30 @@ jobs:
               text: "Not now"
               optional: true
           - extendedWaitUntil:
-              visible: "Admin( workspace)?"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
-          - assertVisible: "Welcome Native,"
-          - tapOn: "Admin( workspace)?"
+          - tapOn: "Switch workspace. Current: Pharmacist"
+          - tapOn: "Admin, Native Pharmacy A"
           - extendedWaitUntil:
-              visible: "Admin workspace"
+              visible: "Administering pharmacy. Current: Native Pharmacy A"
               timeout: 30000
-          - assertVisible: "Native Pharmacy A"
-          - assertVisible: "Native Pharmacy B"
+          - tapOn: "Administering pharmacy. Current: Native Pharmacy A"
           - tapOn: "Native Pharmacy B"
           - stopApp
           - launchApp
           - extendedWaitUntil:
-              visible: "Admin workspace"
+              visible: "Administering pharmacy. Current: Native Pharmacy B"
               timeout: 30000
-          - assertVisible: "Native Pharmacy B"
-          - tapOn: "Pharmacist( workspace)?"
+          - tapOn: "Switch workspace. Current: Admin"
+          - tapOn: "Pharmacist"
           - extendedWaitUntil:
-              visible: "Welcome Native,"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
           - stopApp
           - launchApp
           - extendedWaitUntil:
-              visible: "Welcome Native,"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
-          - assertVisible: "Admin( workspace)?"
           - openLink: "frontendmobile://admin/shifts"
           # Handle subsequent custom-scheme security confirmation if presented.
           - runFlow:
@@ -965,7 +960,7 @@ jobs:
               commands:
                 - tapOn: "Open"
           - extendedWaitUntil:
-              visible: "Shift Center"
+              visible: "Shift Centre"
               timeout: 30000
           - openLink: "frontendmobile://attendance/clock"
           # Handle subsequent custom-scheme security confirmation if presented.
