@@ -51,6 +51,17 @@ export default function ShiftsScreen() {
   if (!section) return <ContentState kind="forbidden" style={styles.state} />;
 
   const panel = (key: ShiftSection) => {
+    // Poster panels request poster lists and payroll on mount, so a poster without shift management never mounts them.
+    if (!worker && !surface.canManageShifts && (key === 'active' || key === 'confirmed' || key === 'history')) {
+      return (
+        <ContentState
+          kind="forbidden"
+          title="No shift management access"
+          description="You do not have permission to manage shifts in this scope."
+          style={styles.state}
+        />
+      );
+    }
     switch (key) {
       case 'public':
         return <PublicShiftsView activeTabOverride={boardTab} />;
