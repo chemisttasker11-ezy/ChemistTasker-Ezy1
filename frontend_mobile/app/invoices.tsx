@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { resolveInitialWorkspace } from '@/utils/mobilePersona';
@@ -12,8 +12,11 @@ export default function InvoicesPage() {
     let current = true;
     void resolveInitialWorkspace(user).then(home => {
       const persona = home.split('/')[1];
-      if (current && ['owner', 'admin', 'organization', 'pharmacist', 'otherstaff'].includes(persona)) {
+      if (!current) return;
+      if (['owner', 'admin', 'organization', 'pharmacist', 'otherstaff'].includes(persona)) {
         router.replace({ pathname: `/${persona}/invoice`, params } as any);
+      } else {
+        router.replace(home as any);
       }
     });
     return () => { current = false; };
