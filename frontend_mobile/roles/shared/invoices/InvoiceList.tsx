@@ -19,6 +19,7 @@ import {
   updateInvoice,
 } from '@chemisttasker/shared-core';
 import { shareLegacyInvoicePdf } from './shareLegacyInvoicePdf';
+import { useAuth } from '@/context/AuthContext';
 import MobileInvoiceStats from './MobileInvoiceStats';
 import { colors, font, radius, space, touch } from '@/constants/tokens';
 import FinanceWorkspace from './FinanceWorkspace';
@@ -75,6 +76,11 @@ export default function InvoiceList({ basePath }: Props) {
 }
 
 function LegacyInvoiceList({ basePath, header }: Props & { header?: ReactNode }) {
+  const { user } = useAuth();
+  const shareAccount = React.useRef(user?.id);
+  shareAccount.current = user?.id;
+  const shareScope = React.useRef(0);
+  React.useEffect(() => () => { shareScope.current += 1; }, [user?.id]);
   const router = useRouter();
   const segments = useSegments();
   const role = (segments[0] as string) || 'pharmacist';
@@ -157,8 +163,10 @@ function LegacyInvoiceList({ basePath, header }: Props & { header?: ReactNode })
     if (sharingPdfRef.current) return;
     sharingPdfRef.current = true;
     setSharingPdfId(id);
+    const generation = shareScope.current;
+    const account = user?.id;
     try {
-      await shareLegacyInvoicePdf(id);
+      await shareLegacyInvoicePdf(id, () => account != null && shareAccount.current === account && shareScope.current === generation);
     } catch (error: any) {
       setSnackbar(error?.message || 'Unable to open invoice PDF');
     } finally {

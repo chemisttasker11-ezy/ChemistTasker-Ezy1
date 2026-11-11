@@ -138,7 +138,8 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   };
   const sharePdf = async (invoice: FinanceInvoice, received = false, version?: number) => {
     const requestedScope = ownerScope;
-    const current = () => scopeRef.current === requestedScope;
+    const generation = csvGeneration.current;
+    const current = () => scopeRef.current === requestedScope && csvGeneration.current === generation;
     if (!current()) return;
     if (!(await Sharing.isAvailableAsync())) throw new Error('PDF sharing is not available on this device.');
     if (!current()) return;

@@ -92,6 +92,10 @@ export default function InvoiceDetail({ basePath }: Props) {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
   const { user } = useAuth();
+  const shareAccount = React.useRef(user?.id);
+  shareAccount.current = user?.id;
+  const shareScope = React.useRef(0);
+  useEffect(() => () => { shareScope.current += 1; }, [user?.id]);
   const segments = useSegments();
   const role = (segments[0] as string) || 'pharmacist';
   const resolvedBase = basePath || `/${role}/invoice`;
@@ -291,7 +295,9 @@ export default function InvoiceDetail({ basePath }: Props) {
     if (!invoice?.id || sharingPdf) return;
     setSharingPdf(true);
     try {
-      await shareLegacyInvoicePdf(invoice.id);
+      const generation = shareScope.current;
+      const account = user?.id;
+      await shareLegacyInvoicePdf(invoice.id, () => account != null && shareAccount.current === account && shareScope.current === generation);
     } catch (err: any) {
       setSnackbar(err?.message || 'Unable to open invoice PDF');
     } finally {
