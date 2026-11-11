@@ -57,3 +57,31 @@ test('C existing valid date and time controls are unchanged', () => {
   assert.equal(helper.validateSlotEntries([]), 'Select at least one date from the calendar.');
   assert.equal(helper.validateSlotEntries([entry('nope')]), 'Pick a date first.');
 });
+
+test('pharmacy wall date controls the posting window across device zones and DST', () => {
+  const helper = loadHelpers();
+  const cases = [
+    ['Australia/Sydney', 'Australia/Perth', '2026-11-06T13:30:00Z', '2026-11-06'],
+    ['Australia/Perth', 'Australia/Sydney', '2026-11-06T13:30:00Z', '2026-11-07'],
+    ['Australia/Perth', 'Australia/Sydney', '2026-10-03T14:30:00Z', '2026-10-04'],
+    ['Australia/Sydney', 'Australia/Sydney', '2026-11-06T13:30:00Z', '2026-11-07'],
+  ];
+  for (const [device, pharmacy, instant, expected] of cases) {
+    process.env.TZ = device;
+    const today = helper.pharmacyPostingDate(pharmacy, new Date(instant));
+    assert.equal(today, expected, `${device} / ${pharmacy}`);
+    assert.equal(helper.validateSlotEntries([entry(expected)], today), null);
+    const yesterday = new Date(`${expected}T12:00:00Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    assert.equal(helper.validateSlotEntries([entry(yesterday.toISOString().slice(0, 10))], today),
+      'That date has passed. Pick today or later.');
+  }
+  process.env.TZ = 'Australia/Sydney';
+});
+
+test('posting screen supplies pharmacy date at every window decision', () => {
+  const screen = fs.readFileSync(path.resolve(__dirname, '../roles/shared/shifts/PostShiftScreen.tsx'), 'utf8');
+  assert.match(screen, /pharmacyPostingDate\(selectedPharmacy\?\.timezone/);
+  assert.doesNotMatch(screen, /(?:shiftPostingDateWindow|splitPostableDates)\([^\n]*new Date\(\)/);
+  assert.match(screen, /validateSlotEntries\(entries,\s*pharmacyToday/);
+});

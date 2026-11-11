@@ -61,7 +61,7 @@ function addSlot(path, times) {
   });
   const exports = {};
   vm.runInNewContext(outputText, {
-    exports, validateSlotEntries, toLocalIsoDate: helpers.toLocalIsoDate,
+    exports, validateSlotEntries, pharmacyToday: () => '2026-11-07', toLocalIsoDate: helpers.toLocalIsoDate,
     splitPostableDates: windowPolicy.splitPostableDates, postingWindow: { minIso: '2026-11-07' },
     slots: [], slotDate: date, slotStart: path === 'bulk' || path === 'per-date' ? '09:00' : times.startTime,
     slotEnd: path === 'bulk' || path === 'per-date' ? '09:00' : times.endTime,
