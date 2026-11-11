@@ -126,6 +126,9 @@ jobs:
       - name: Active shift audience tests
         run: node --test src/pages/dashboard/sidebar/ActiveShiftsPage/utils/m5Audience.test.mjs
         working-directory: frontend_web
+      - name: M4 web contracts
+        run: node --test scripts/post-shift-time-validation.test.mjs scripts/talent-storage.test.mjs shared/postShift/m4CalendarPreview.test.mjs shared/postShift/m4CalendarTimezoneIsolation.test.mjs src/layouts/m4TopBarAccountRace.test.mjs src/pages/attendance/m4Correction.test.mjs src/pages/dashboard/shiftCenter/m4Explorer.test.mjs src/pages/m4PublicDiscovery.test.mjs src/pages/finance/m4Finance.test.mjs src/pages/finance/m4WorksheetDownload.test.mjs
+        working-directory: frontend_web
       - name: Build Vite app
         run: npx vite build
         working-directory: frontend_web
@@ -174,6 +177,9 @@ jobs:
         working-directory: frontend_web/landing_next
       - name: Marketplace review tests
         run: node --test features/marketplace/m4Review.test.mjs
+        working-directory: frontend_web/landing_next
+      - name: M4 public hub and proxy contracts
+        run: node --test app/hubs/m4Community.test.mjs lib/platform-proxy.test.mjs
         working-directory: frontend_web/landing_next
       - run: npm run build
         working-directory: frontend_web/landing_next
@@ -263,13 +269,13 @@ jobs:
       - name: Large-module ratchet
         run: python backend/manage.py test core.test_module_size_ratchet --settings=core.contract_test_settings
       - name: Public content contracts
-        run: python backend/manage.py test public_hub.tests --settings=public_hub.test_settings
+        run: python backend/manage.py test public_hub.tests public_hub.test_m4_articles public_hub.test_m4_community --settings=public_hub.test_settings
       - name: Membership, engagement and invoice contracts
         run: python backend/manage.py test client_profile.test_membership_application_integrity invoicing.test_integrity worker_finance.test_preview_source invoicing.test_smtp_protocol core.test_invoice_acceptance_fixture --settings=core.contract_test_settings
       - name: Real PDF rendering contract
         run: python backend/manage.py test core.test_pdf_rendering_contract --settings=core.contract_test_settings
       - name: Kernel and domain app tests
-        run: python backend/manage.py test client_profile attendance.test_approval_locking attendance.test_favourite_cover attendance.test_helpers attendance.test_pin_clock attendance.test_rostered_corrections attendance.test_timezone_resolution chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar core.test_admin_registry_contract --settings=core.contract_test_settings
+        run: python backend/manage.py test client_profile attendance.test_m4_scope attendance.test_approval_locking attendance.test_favourite_cover attendance.test_helpers attendance.test_pin_clock attendance.test_rostered_corrections attendance.test_timezone_resolution chat invoicing notifications pharmacy_hub ratings rewards talent team_calendar core.test_admin_registry_contract --settings=core.contract_test_settings
       - name: Pharmacy authorization and multipart preservation contracts
         run: python backend/manage.py test organizations.test_pharmacy_access_characterization organizations.test_pharmacy_upload_contract --settings=core.contract_test_settings
       - name: Promoted domain app and architecture contracts
@@ -296,7 +302,7 @@ jobs:
           python -m unittest attendance_tests.test_security_boundaries
           python -m unittest attendance_tests.test_roster_worker_actions.RosterWorkerActionsTests.test_acknowledgement_action_available_only_on_published_week
       - name: Workforce and finance contracts
-        run: python backend/manage.py test workforce.tests.test_assignment_protection workforce.tests.test_employment workforce.tests.test_pr201_roster workforce.tests.test_publication_contract workforce.tests.test_roster_admin_capabilities workforce.tests.test_roster_escalation workforce.tests.test_roster_escalation_lock workforce.tests.test_roster_revision workforce.tests.test_roster_shift_republish workforce.tests.test_roster_slot_concurrency workforce.tests.test_roster_slot_http_contract workforce.tests.test_rostered_corrections workforce.tests.test_timesheet_state_machine workforce.tests.test_payroll_activation_locking workforce.tests.test_assignment_freeze workforce.tests.test_assignment_freeze_postgres workforce.tests.test_timesheets workforce.tests.test_timezone_resolution worker_finance.tests --settings=core.contract_test_settings
+        run: python backend/manage.py test workforce.tests.test_assignment_protection workforce.tests.test_employment workforce.tests.test_pr201_roster workforce.tests.test_publication_contract workforce.tests.test_roster_admin_capabilities workforce.tests.test_roster_escalation workforce.tests.test_roster_escalation_lock workforce.tests.test_roster_revision workforce.tests.test_roster_shift_republish workforce.tests.test_roster_slot_concurrency workforce.tests.test_roster_slot_http_contract workforce.tests.test_rostered_corrections workforce.tests.test_timesheet_state_machine workforce.tests.test_payroll_activation_locking workforce.tests.test_assignment_freeze workforce.tests.test_assignment_freeze_postgres workforce.tests.test_timesheets workforce.tests.test_timezone_resolution workforce.test_m4_correction_requests worker_finance.tests worker_finance.test_m4_presentation_contract --settings=core.contract_test_settings
       - name: Isolated finance API contracts
         run: python backend/manage.py test worker_finance.tests --settings=worker_finance.tests.settings
       - name: Signal and startup contracts
@@ -337,7 +343,7 @@ jobs:
       - name: PostgreSQL migration rehearsal
         run: python backend/manage.py migrate --noinput --settings=core.postgres_test_settings
       - name: PostgreSQL concurrency contracts
-        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards billing.test_pr201_finance_pg billing.test_checkout_reservations_postgres worker_finance.test_preview_source ethical_marketplace.test_pr201_b31_pg marketplace.tests marketplace.test_pr201_b24_b25 marketplace.test_m4_submission attendance.test_approval_locking attendance.test_kiosk_pairing attendance.test_kiosk_review attendance.test_clock_locking attendance.test_pin_eligibility attendance.test_unbooked_locum_cover attendance.test_cover_terms_acceptance attendance.test_cover_terms_concurrency attendance.test_cover_terms_review invoicing.test_assignment_terms_postgres invoicing.test_delivery_postgres workforce.tests.test_cover_terms_authority workforce.tests.test_locum_approval_gate attendance_tests.test_double_clock_guard onboarding.test_verification_transitions shifts.test_shift_actions_contract shifts.test_offer_terms_version_postgres shifts.test_m5_posting_scope workforce.tests.test_publication_contract workforce.tests.test_roster_slot_concurrency workforce.tests.test_timesheets workforce.tests.test_timesheet_state_machine workforce.tests.test_payroll_activation_locking workforce.tests.test_assignment_freeze workforce.tests.test_assignment_freeze_postgres client_profile.test_membership_application_integrity.DeferredPayrollActivationTests --settings=core.postgres_test_settings
+        run: python backend/manage.py test client_profile.test_postgres_concurrency rewards.test_rewards billing.test_pr201_finance_pg billing.test_checkout_reservations_postgres worker_finance.test_preview_source ethical_marketplace.test_pr201_b31_pg marketplace.tests marketplace.test_pr201_b24_b25 marketplace.test_m4_submission attendance.test_approval_locking attendance.test_kiosk_pairing attendance.test_kiosk_review attendance.test_clock_locking attendance.test_pin_eligibility attendance.test_unbooked_locum_cover attendance.test_cover_terms_acceptance attendance.test_cover_terms_concurrency attendance.test_cover_terms_review invoicing.test_assignment_terms_postgres invoicing.test_delivery_postgres workforce.tests.test_cover_terms_authority workforce.tests.test_locum_approval_gate attendance_tests.test_double_clock_guard onboarding.test_verification_transitions shifts.test_shift_actions_contract shifts.test_offer_terms_version_postgres shifts.test_m5_posting_scope workforce.tests.test_publication_contract workforce.tests.test_roster_slot_concurrency workforce.tests.test_timesheets workforce.tests.test_timesheet_state_machine workforce.tests.test_payroll_activation_locking workforce.tests.test_assignment_freeze workforce.tests.test_assignment_freeze_postgres client_profile.test_membership_application_integrity.DeferredPayrollActivationTests talent.test_pitch_idempotency --settings=core.postgres_test_settings
 
   boundary-audit:
     runs-on: ubuntu-latest
