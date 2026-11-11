@@ -713,19 +713,20 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
             if (result) {
                 const targetShift = shifts.find((s) => s.id === targetShiftId);
                 const offerId = (result as any)?.offerId ?? (result as any)?.offer_id ?? null;
-                setReviewOfferDialog((prev) => ({
-                    ...prev,
-                    candidate: prev.candidate
-                        ? { ...prev.candidate, pendingConfirmation: true, pendingOfferId: offerId ?? prev.candidate.pendingOfferId }
-                        : prev.candidate,
-                }));
+                // An offer belongs to one worker on one slot: other slots and other open dialogs keep their own state.
+                setReviewOfferDialog((prev) => (
+                    prev.candidate && prev.shiftId === targetShiftId && prev.candidate.userId === userId && (prev.slotId ?? null) === (slotId ?? null)
+                        ? { ...prev, candidate: { ...prev.candidate, pendingConfirmation: true, pendingOfferId: offerId ?? prev.candidate.pendingOfferId } }
+                        : prev
+                ));
                 setTabData((prev) => {
                     const next = { ...prev };
                     Object.entries(next).forEach(([key, value]) => {
                         if (!key.startsWith(`${targetShiftId}_`) || !value) return;
-                        const patchRecord = (record: any) => {
+                        const patchRecord = (record: any, listSlotId: number | null = null) => {
                             const recordUserId = getCandidateUserId(record);
-                            if (recordUserId !== userId) return record;
+                            const recordSlotId = record?.slotId ?? record?.slot_id ?? listSlotId;
+                            if (recordUserId !== userId || (slotId != null && Number(recordSlotId) !== slotId)) return record;
                             return {
                                 ...record,
                                 pendingConfirmation: true,
@@ -735,18 +736,18 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                             };
                         };
                         const updated: any = { ...value };
-                        if (Array.isArray(updated.interestsAll)) updated.interestsAll = updated.interestsAll.map(patchRecord);
+                        if (Array.isArray(updated.interestsAll)) updated.interestsAll = updated.interestsAll.map((record: any) => patchRecord(record));
                         if (updated.interestsBySlot) {
                             updated.interestsBySlot = Object.fromEntries(Object.entries(updated.interestsBySlot).map(([sid, list]) => [
                                 sid,
-                                Array.isArray(list) ? list.map(patchRecord) : list,
+                                Array.isArray(list) ? list.map((record: any) => patchRecord(record, Number(sid))) : list,
                             ]));
                         }
-                        if (Array.isArray(updated.members)) updated.members = updated.members.map(patchRecord);
+                        if (Array.isArray(updated.members)) updated.members = updated.members.map((record: any) => patchRecord(record));
                         if (updated.membersBySlot) {
                             updated.membersBySlot = Object.fromEntries(Object.entries(updated.membersBySlot).map(([sid, list]) => [
                                 sid,
-                                Array.isArray(list) ? list.map(patchRecord) : list,
+                                Array.isArray(list) ? list.map((record: any) => patchRecord(record, Number(sid))) : list,
                             ]));
                         }
                         next[key] = updated;

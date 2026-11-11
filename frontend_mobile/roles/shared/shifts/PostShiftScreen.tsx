@@ -899,7 +899,8 @@ export default function PostShiftScreen() {
     ]);
 
     const mergeSelectedDates = useCallback((incomingDates: string[]) => {
-        const { valid, past, late } = splitPostableDates(incomingDates, postingWindow.minIso);
+        // Today is read at call time: a wizard left open past midnight must not accept yesterday.
+        const { valid, past, late } = splitPostableDates(incomingDates, new Date());
         if (!valid.length) {
             if (past.length || late.length) setError('That date has passed. Pick today or later.');
             return;
@@ -923,7 +924,7 @@ export default function PostShiftScreen() {
             setSlotStart(latestHours.startTime);
             setSlotEnd(latestHours.endTime);
         }
-    }, [getDefaultTimesForDate, postingWindow.minIso]);
+    }, [getDefaultTimesForDate]);
 
     const selectedDateObjects = useMemo(
         () => selectedDates.map((d) => new Date(`${d}T00:00:00`)),
@@ -1126,7 +1127,7 @@ export default function PostShiftScreen() {
             setError('Select at least one date from the calendar.');
             return false;
         }
-        const { valid, past, late } = splitPostableDates(selectedDates, postingWindow.minIso);
+        const { valid, past, late } = splitPostableDates(selectedDates, new Date());
         if (!valid.length) {
             setError('That date has passed. Pick today or later.');
             return false;
@@ -1242,7 +1243,7 @@ export default function PostShiftScreen() {
         const draft = postingDraft();
         const validation = validateShiftPostingDraft(draft);
         if (validation) { setError(validation); return; }
-        if (!editingId && draft.slots.some((slot) => !splitPostableDates([slot.date], postingWindow.minIso).valid.length)) {
+        if (!editingId && draft.slots.some((slot) => !splitPostableDates([slot.date], new Date()).valid.length)) {
             setError('That date has passed. Pick today or later.');
             return;
         }
@@ -1610,7 +1611,7 @@ export default function PostShiftScreen() {
                     const pickedIsos = pickedDates
                         .filter(Boolean)
                         .map((d) => toLocalIsoDate(d));
-                    const { valid } = splitPostableDates(pickedIsos, postingWindow.minIso);
+                    const { valid } = splitPostableDates(pickedIsos, new Date());
                     if (valid.some((d) => !selectedDateSet.has(d))) markTouched();
                     mergeSelectedDates(pickedIsos);
                     setSlotDatePickerOpen(false);

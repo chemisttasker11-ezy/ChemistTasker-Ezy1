@@ -12,6 +12,8 @@ export function useCounterOffers(scopeKey?: string) {
     const [counterOffersErrorByShift, setCounterOffersErrorByShift] = useState<Record<number, string | null>>({});
     const [counterActionLoading, setCounterActionLoading] = useState<number | null>(null);
     const generationsRef = useRef<Record<string, number>>({});
+    // State updates are asynchronous; one synchronous lock per offer stops same-render double accepts/rejects.
+    const pendingOffers = useRef<Set<number>>(new Set());
     useEffect(() => {
         // Scope switch invalidates stale responses, previous pharmacy offers and errors.
         Object.keys(generationsRef.current).forEach(key => { generationsRef.current[key] += 1; });
@@ -62,6 +64,8 @@ export function useCounterOffers(scopeKey?: string) {
 
     const acceptOffer = useCallback(
         async (payload: { offer: any; shiftId: number; slotId: number | null }, onSuccess?: () => void) => {
+            if (pendingOffers.current.has(payload.offer.id)) return null;
+            pendingOffers.current.add(payload.offer.id);
             setCounterActionLoading(payload.offer.id);
             try {
                 const resolvedSlotId = payload.slotId ?? resolveOfferSlotId(payload.offer);
@@ -89,6 +93,7 @@ export function useCounterOffers(scopeKey?: string) {
                 const detail = (error as any)?.data?.detail || (error as any)?.message || 'Failed to accept offer';
                 return { ok: false, detail };
             } finally {
+                pendingOffers.current.delete(payload.offer.id);
                 setCounterActionLoading(null);
             }
         },
@@ -97,6 +102,8 @@ export function useCounterOffers(scopeKey?: string) {
 
     const rejectOffer = useCallback(
         async (payload: { offer: any; shiftId: number }, onSuccess?: () => void) => {
+            if (pendingOffers.current.has(payload.offer.id)) return;
+            pendingOffers.current.add(payload.offer.id);
             setCounterActionLoading(payload.offer.id);
             try {
                 await rejectShiftCounterOfferService({
@@ -107,6 +114,7 @@ export function useCounterOffers(scopeKey?: string) {
             } catch (error) {
                 console.error('Failed to reject counter offer', error);
             } finally {
+                pendingOffers.current.delete(payload.offer.id);
                 setCounterActionLoading(null);
             }
         },
