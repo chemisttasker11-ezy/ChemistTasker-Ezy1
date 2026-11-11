@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const ts = require('../node_modules/typescript');
 
 const root = path.resolve(__dirname, '..');
-const jsx = (type, props) => ({ type, props: props || {} });
+const jsx = (type, props, key) => ({ type, props: props || {}, key });
 function load(relative, imports) {
   const baseFile = process.env.M5_BASE && path.join(process.env.M5_BASE, relative);
   const source = fs.readFileSync(baseFile && fs.existsSync(baseFile) ? baseFile : path.join(root, relative), 'utf8');
@@ -255,28 +255,41 @@ function mountedActive(overrides = {}) {
     persona: 'owner', scopedPharmacyId: 7, ...overrides.surface };
   const params = { ...overrides.params };
   const user = { id: 91, role: 'OWNER' };
-  const calls = { posts: [], share: [], checkout: [], buzz: [], reload: 0 };
+  const calls = { posts: [], share: [], checkout: [], buzz: [], pills: [], tabLoads: [], alerts: [], rendered: [], reload: 0 };
   let settledCheckout;
   const waitCheckout = new Promise(resolve => { settledCheckout = resolve; });
   let settledBuzz;
   const waitBuzz = new Promise(resolve => { settledBuzz = resolve; });
-  const stateSlots = [], refSlots = [];
-  let stateIndex = 0, refIndex = 0;
+  const stateSlots = [], refSlots = [], memoSlots = [], effectSlots = [];
+  let stateIndex = 0, refIndex = 0, memoIndex = 0, effectIndex = 0, queued = [], dirty = false, instance = 0;
+  // With overrides.effects, memo/callback/effect hooks follow React's dependency rules and a key change remounts.
+  const changed = (prev, deps) => !prev || !deps || deps.length !== prev.length || deps.some((v, i) => !Object.is(v, prev[i]));
+  const memo = (fn, deps) => {
+    const i = memoIndex++;
+    if (changed(memoSlots[i]?.deps, deps)) memoSlots[i] = { value: fn(), deps };
+    return memoSlots[i].value;
+  };
   const react = {
     useState(init) {
-      const i = stateIndex++;
+      const i = stateIndex++, owner = instance;
       if (!(i in stateSlots)) stateSlots[i] = typeof init === 'function' ? init() : init;
       return [stateSlots[i], value => {
-        stateSlots[i] = typeof value === 'function' ? value(stateSlots[i]) : value;
+        if (owner !== instance) return; // an unmounted instance's setState is a no-op
+        const next = typeof value === 'function' ? value(stateSlots[i]) : value;
+        if (!Object.is(next, stateSlots[i])) dirty = true;
+        stateSlots[i] = next;
       }];
     },
     useRef(init) {
       const i = refIndex++;
       return refSlots[i] ||= { current: init };
     },
-    useMemo: fn => fn(),
-    useCallback: fn => fn,
-    useEffect: () => {},
+    useMemo: overrides.effects ? memo : fn => fn(),
+    useCallback: overrides.effects ? (fn, deps) => memo(() => fn, deps) : fn => fn,
+    useEffect: overrides.effects ? (fn, deps) => {
+      const i = effectIndex++;
+      if (changed(effectSlots[i]?.deps, deps)) queued.push([i, fn, deps]);
+    } : () => {},
   };
   react.default = react;
   const t = {};
@@ -285,10 +298,11 @@ function mountedActive(overrides = {}) {
   const candidate = load('roles/shared/shifts/ActiveShiftsPage/utils/candidateHelpers.ts', t);
   const offerHelpers = load('roles/shared/shifts/ActiveShiftsPage/utils/offerHelpers.ts', t);
   const core = {
-    payShiftWithPills: () => new Promise(() => {}),
+    payShiftWithPills: overrides.pills ?? (() => new Promise(() => {})),
     chargeShiftFulfillment: async (...args) => {
       calls.checkout.push(args);
       await waitCheckout;
+      if (overrides.checkout) return overrides.checkout(...args);
       return {};
     },
     resumeFulfillmentCheckout: async () => ({}),
@@ -299,7 +313,7 @@ function mountedActive(overrides = {}) {
   const page = load('roles/shared/shifts/ActiveShiftsPage/index.tsx', {
     react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': {
-      Alert: { alert() {} }, View: 'View', ScrollView: 'ScrollView',
+      Alert: { alert: (...args) => calls.alerts.push(args) }, View: 'View', ScrollView: 'ScrollView',
       Linking: { openURL: async () => {} },
     },
     'lucide-react-native': { Plus: 'Plus' },
@@ -317,7 +331,11 @@ function mountedActive(overrides = {}) {
     '@/utils/pushNotifications': { subscribeShiftSlotActivity: () => ({ remove() {} }) },
     '@chemisttasker/shared-core': core,
     '@/context/AuthContext': { useAuth: () => ({ user }) },
-    './hooks/useShiftsData': {
+    // overrides.fetchAll mounts the real data hook over mocked shared-core loaders.
+    './hooks/useShiftsData': overrides.fetchAll ? load('roles/shared/shifts/ActiveShiftsPage/hooks/useShiftsData.ts', {
+      react, '../utils/activeShiftRuntime': runtime,
+      '@chemisttasker/shared-core': { fetchAllActiveShifts: overrides.fetchAll, fetchPosterShiftDetailService: overrides.fetchDetail },
+    }) : {
       useShiftsData: () => ({
         shifts: overrides.shifts ?? [card.shift],
         setShifts: () => {},
@@ -330,11 +348,11 @@ function mountedActive(overrides = {}) {
       useTabData: () => overrides.tabs ? {
         tabData: overrides.tabs.data,
         setTabData: update => { overrides.tabs.data = typeof update === 'function' ? update(overrides.tabs.data) : update; },
-        loadTabDataForShift: async () => {},
+        loadTabDataForShift: async (s, level) => { calls.tabLoads.push([s.id, level]); },
       } : ({
         tabData: { '12_FULL_PART_TIME': card.data.tabData['12:FULL_PART_TIME'] },
         setTabData: () => {},
-        loadTabDataForShift: async () => {},
+        loadTabDataForShift: async (s, level) => { calls.tabLoads.push([s.id, level]); },
       }),
     },
     './hooks/useCounterOffers': {
@@ -352,7 +370,10 @@ function mountedActive(overrides = {}) {
       useWorkerRatings: () => ({ summary: null, comments: [], page: 1, pageCount: 0,
         loadRatings: async () => {}, reset: () => {} }),
     },
-    './hooks/useShiftActions': {
+    // overrides.escalate mounts the real action hook over a mocked escalate service.
+    './hooks/useShiftActions': overrides.escalate ? load('roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts', {
+      react, '@chemisttasker/shared-core': { escalateShiftService: overrides.escalate },
+    }) : {
       useShiftActions: () => ({
         actionLoading: {}, handleEscalate: async () => true,
         handleDelete: async () => true, handleAccept: overrides.handleAccept ?? (async () => ({})),
@@ -365,7 +386,11 @@ function mountedActive(overrides = {}) {
     '@/components/ui/ContentState': { ContentState: 'ContentState' },
     '@/components/ui/ConfirmDialog': { ConfirmDialog: 'ConfirmDialog' },
     './components/Dialogs/CounterOfferDialog': { default: 'CounterOfferDialog' },
-    './ActiveShiftCards': { default: props => { overrides.captureActions?.(props.actions); return card.component(props); } },
+    './ActiveShiftCards': { default: props => {
+      overrides.captureActions?.(props.actions);
+      calls.rendered.push(props.data.orderedShifts.map(s => s.id));
+      return card.component(props);
+    } },
     './utils/shiftHelpers': shiftHelpers,
     './utils/candidateHelpers': candidate,
     './utils/offerHelpers': offerHelpers,
@@ -384,11 +409,35 @@ function mountedActive(overrides = {}) {
     }
     return out;
   };
+  let centreKey;
   function render() {
-    stateIndex = 0; refIndex = 0;
-    return expanded(page({ title: 'Active Shifts' }));
+    for (let pass = 0; pass < 50; pass++) {
+      stateIndex = 0; refIndex = 0; memoIndex = 0; effectIndex = 0; queued = []; dirty = false;
+      const element = page({ title: 'Active Shifts' });
+      if (overrides.effects && centreKey !== undefined && element.key !== centreKey) {
+        effectSlots.forEach(slot => slot?.cleanup?.());
+        stateSlots.length = refSlots.length = memoSlots.length = effectSlots.length = 0;
+        instance++;
+      }
+      centreKey = element.key;
+      const tree = expanded(element);
+      for (const [i, fn, deps] of queued) {
+        effectSlots[i]?.cleanup?.();
+        effectSlots[i] = { deps, cleanup: fn() };
+      }
+      if (!dirty) return tree;
+    }
+    throw Error('Active shifts state never settled');
   }
-  return { render, calls, surface, params, finishCheckout: () => settledCheckout(), finishBuzz: () => settledBuzz(), card };
+  async function flush() {
+    let tree;
+    for (let k = 0; k < 10; k++) {
+      await new Promise(resolve => setImmediate(resolve));
+      tree = render();
+    }
+    return tree;
+  }
+  return { render, flush, calls, surface, params, finishCheckout: () => settledCheckout(), finishBuzz: () => settledBuzz(), card };
 }
 
 test('C mounted ActiveShiftsPage renders the real cards with audience, metrics and review attention', () => {
@@ -519,4 +568,147 @@ test('C slot-specific offer: the assigned slot dialog shows its pending offer', 
   f.release(); await assign;
   assert.equal(f.dialog().props.candidate.pendingConfirmation, true);
   assert.equal(f.dialog().props.candidate.pendingOfferId, 555);
+});
+
+function escalationShift() {
+  return { id: 12, visibility: 'FULL_PART_TIME', roleNeeded: 'PHARMACIST', employmentType: 'LOCUM',
+    allowedEscalationLevels: ['FULL_PART_TIME', 'LOCUM_CASUAL', 'PLATFORM'], slots: [{ id: 34, date: '2026-11-20' }], paymentOptions: [] };
+}
+function openWorkspace(h) {
+  h.render().find(n => n.type === 'Button' && n.props.children === 'Manage candidates').props.onPress();
+  return h.render().find(n => n.type === 'EscalationStepper').props;
+}
+const snackbarText = tree => tree.find(n => n.type === 'Snackbar' && n.props.visible)?.props.children;
+test('C escalation: locked level is refused locally, success reloads, server refusal keeps the level', async () => {
+  const sent = [];
+  let outcome = async () => ({});
+  for (const surface of [{}, { persona: 'admin', scopeKey: 'admin:7', scopedPharmacyId: 7 }]) {
+    const h = mountedActive({ shifts: [escalationShift()], surface, escalate: (...args) => { sent.push(args); return outcome(); } });
+    sent.length = 0; outcome = async () => ({});
+    let stepper = openWorkspace(h);
+    h.calls.tabLoads.length = 0;
+    stepper.onSelectLevel('PLATFORM');
+    assert.equal(snackbarText(h.render()), 'Escalate to this level to review members status.');
+    assert.deepEqual(sent, [], 'a locked level never calls the server');
+    assert.deepEqual(h.calls.tabLoads, []);
+    await stepper.onEscalate(escalationShift(), 'LOCUM_CASUAL');
+    assert.deepEqual(JSON.parse(JSON.stringify(sent)), [[12, { targetVisibility: 'LOCUM_CASUAL' }]], 'one escalate call (Dee too)');
+    assert.deepEqual(h.calls.tabLoads, [[12, 'LOCUM_CASUAL']], 'reloads the new level');
+    assert.equal(h.calls.reload, 1, 'reloads shifts');
+    stepper = h.render().find(n => n.type === 'EscalationStepper').props;
+    assert.equal(stepper.selectedLevel, 'LOCUM_CASUAL');
+    outcome = async () => { throw Object.assign(new Error('Permission denied.'), { status: 403 }); };
+    await stepper.onEscalate(escalationShift(), 'PLATFORM');
+    const tree = h.render();
+    assert.equal(snackbarText(tree), 'Failed to escalate shift', 'web shows the same failure text');
+    assert.equal(tree.find(n => n.type === 'EscalationStepper').props.selectedLevel, 'LOCUM_CASUAL', 'level unchanged');
+    assert.equal(h.calls.reload, 1, 'no reload after a refusal');
+    assert.equal(h.calls.tabLoads.length, 1);
+  }
+});
+test('C payment box: Pills pays the selected offers once and each payable row shows Payment pending', async () => {
+  let finish;
+  const shift = { id: 12, visibility: 'FULL_PART_TIME', roleNeeded: 'PHARMACIST', employmentType: 'LOCUM',
+    slots: [{ id: 34, date: '2026-11-20' }, { id: 35, date: '2026-11-21' }],
+    paymentOptions: [{ offerId: 81, slotId: 34 }, { offerId: 82, slotId: 34 }, { offerId: 83, slotId: 35 }] };
+  const h = mountedActive({ shifts: [shift], pills: (...args) => { h.calls.pills.push(args); return new Promise(r => { finish = r; }); } });
+  h.render().find(n => n.type === 'Button' && n.props.children === 'Manage candidates').props.onPress();
+  let tree = h.render();
+  assert.equal(tree.filter(n => n.type === 'Pill' && n.props.label === 'Payment pending').length, 3);
+  touchableWith(tree, /Offer #82/)[0].props.onPress();
+  const [pills] = touchableWith(h.render(), /Pay selected with Pills/);
+  assert.ok(pills, 'Pills control rendered');
+  pills.props.onPress(); pills.props.onPress();
+  assert.equal(h.calls.pills.length, 1, 'single-flight');
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.pills[0])), [12, [83, 82]], 'the selected offer per slot');
+  finish({ detail: 'Paid' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(snackbarText(h.render()), 'Paid');
+  assert.equal(h.calls.reload, 1);
+});
+test('C personas: Sam (no shift management) never mounts the candidate workspace', () => {
+  const h = mountedActive({ shifts: [escalationShift()], surface: { persona: 'admin', canManageShifts: false, scopeKey: 'admin:7' } });
+  const tree = h.render();
+  assert.equal(tree.find(n => n.type === 'ContentState')?.props.kind, 'forbidden');
+  assert.equal(tree.some(n => n.type === 'EscalationStepper' || n.type === 'Card'), false);
+  assert.deepEqual(h.calls.tabLoads, [], 'no member-status loads');
+});
+
+const plain = value => JSON.parse(JSON.stringify(value));
+function linkedShift(extra = {}) {
+  return { id: 12, visibility: 'PLATFORM', roleNeeded: 'PHARMACIST', employmentType: 'LOCUM', pharmacy: 7,
+    allowedEscalationLevels: ['FULL_PART_TIME', 'PLATFORM'],
+    slots: [{ id: 34, date: '2026-11-20' }, { id: 35, date: '2026-11-21' }], paymentOptions: [], ...extra };
+}
+test('C deep links: shift_id + slot_id expand that shift and select that slot', async () => {
+  const h = mountedActive({ effects: true, shifts: [linkedShift()], params: { shift_id: '12', slot_id: '35' } });
+  const tree = await h.flush();
+  assert.ok(tree.some(n => n.type === 'Button' && n.props.children === 'Hide candidates'), 'linked shift is expanded');
+  assert.equal(tree.find(n => n.type === 'PublicLevelView').props.slotId, 35, 'linked slot selected');
+});
+test('C deep links: a new notification_id reloads exactly once', async () => {
+  const fetches = [];
+  const h = mountedActive({ effects: true, params: { notification_id: 'n1' },
+    fetchAll: async () => { fetches.push(1); return [linkedShift()]; } });
+  await h.flush();
+  assert.equal(fetches.length, 1);
+  await h.flush();
+  assert.equal(fetches.length, 1, 'rerender with the same notification does not reload');
+  h.params.notification_id = 'n2';
+  await h.flush();
+  assert.equal(fetches.length, 2, 'a new notification reloads once');
+});
+test('C deep links: dedicated shifts are listed first under Direct / Private Offers', () => {
+  const h = mountedActive({ shifts: [linkedShift(), linkedShift({ id: 14, dedicatedUser: 88 })] });
+  const tree = h.render();
+  assert.deepEqual(plain(h.calls.rendered.at(-1)), [14, 12]);
+  const heading = tree.findIndex(n => n.type === 'Text' && n.props.children === 'Direct / Private Offers');
+  assert.ok(heading >= 0, 'private section heading shown');
+  assert.equal(tree.filter(n => n.type === 'Text' && n.props.children === 'Direct / Private Offers').length, 1);
+  assert.ok(heading < tree.findIndex(n => n.type === 'Card'), 'heading sits above the first (private) card');
+});
+test('C deep links: a checkout conflict keeps its three choices', async () => {
+  const shift = linkedShift({ visibility: 'FULL_PART_TIME', paymentOptions: [{ offerId: 81, slotId: 34 }] });
+  const h = mountedActive({ shifts: [shift], checkout: async () => {
+    throw Object.assign(new Error('conflict'), { status: 409, payload: { checkout_id: 'c1' } });
+  } });
+  h.render().find(n => n.type === 'Button' && n.props.children === 'Manage candidates').props.onPress();
+  touchableWith(h.render(), /Pay selected with Stripe/)[0].props.onPress();
+  h.finishCheckout();
+  for (let k = 0; k < 5; k++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.calls.alerts.length, 1);
+  assert.equal(h.calls.alerts[0][0], 'Checkout already in progress');
+  assert.deepEqual(plain(h.calls.alerts[0][2].map(b => b.text)), ['Cancel', 'Expire unpaid and replace', 'Continue existing']);
+});
+
+test('C scope: Dee scoped to A sees only A rows', async () => {
+  const h = mountedActive({ effects: true, surface: { persona: 'admin', scopeKey: 'admin:7', scopedPharmacyId: 7 },
+    fetchAll: async () => [linkedShift(), linkedShift({ id: 13, pharmacy: 8 })] });
+  await h.flush();
+  assert.deepEqual(plain(h.calls.rendered.at(-1)), [12]);
+  assert.equal(h.calls.rendered.some(ids => ids.includes(13)), false, 'B row never rendered');
+});
+test('R scope: Sam gets the forbidden state and never loads active shifts', async () => {
+  const fetches = [];
+  const h = mountedActive({ effects: true, surface: { persona: 'admin', canManageShifts: false, scopeKey: 'admin:7', scopedPharmacyId: 7 },
+    fetchAll: async () => { fetches.push(1); return [linkedShift()]; } });
+  const tree = await h.flush();
+  assert.equal(tree.find(n => n.type === 'ContentState')?.props.kind, 'forbidden');
+  assert.equal(fetches.length, 0, 'zero fetchAllActiveShifts calls');
+});
+test('C scope: switching Tom -> Nadia while Tom\'s load is deferred never renders Tom\'s rows', async () => {
+  const pending = {};
+  const h = mountedActive({ effects: true, surface: { persona: 'owner', scopeKey: 'owner:91', scopedPharmacyId: null },
+    fetchAll: () => new Promise(resolve => { pending[h.surface.scopeKey] = resolve; }) });
+  await h.flush();
+  assert.ok(pending['owner:91'], 'Tom load in flight');
+  Object.assign(h.surface, { scopeKey: 'owner:92' });
+  await h.flush();
+  assert.ok(pending['owner:92'], 'Nadia load in flight');
+  pending['owner:91']([linkedShift({ id: 501 })]);
+  await h.flush();
+  pending['owner:92']([linkedShift({ id: 601 })]);
+  await h.flush();
+  assert.equal(h.calls.rendered.some(ids => ids.includes(501)), false, 'Tom rows never rendered');
+  assert.deepEqual(plain(h.calls.rendered.at(-1)), [601]);
 });
