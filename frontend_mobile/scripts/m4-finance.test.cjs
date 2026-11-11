@@ -28,7 +28,7 @@ function compile(relative, modules) {
   const module = { exports: {} };
   vm.runInNewContext(output, {
     module, exports: module.exports, Date, URL, URLSearchParams, Blob, console,
-    TextEncoder, Uint8Array, setTimeout, clearTimeout,
+    TextEncoder, Uint8Array, setTimeout, clearTimeout, process,
     require(name) {
       if (!Object.prototype.hasOwnProperty.call(modules, name)) {
         throw Error('Unmocked finance import: ' + name + ' from ' + relative);
@@ -825,3 +825,69 @@ test('R: parity BAS rejects results for edited period and basis and can recalcul
     assert.ok((await app.render()).some(n => n.type === 'MetricGrid'), field);
   }
 });
+
+test('invoice alias sends unlisted personas home', async () => {
+  const h = createHooks(), redirects = [];
+  const page = compile('frontend_mobile/app/invoices.tsx', {
+    react: h.react, 'expo-router': { useRouter: () => ({ replace: x => redirects.push(x) }), useLocalSearchParams: () => ({}) },
+    '@/context/AuthContext': { useAuth: () => ({ user: { id: 1 }, isLoading: false }) },
+    '@/utils/mobilePersona': { resolveInitialWorkspace: async () => '/explorer/dashboard' },
+  });
+  await h.settled(page.default, {});
+  assert.equal(redirects[0], '/explorer/dashboard');
+  h.unmount();
+});
+
+test('CSV started during PDF retains both shares for the same user', async () => {
+  const app = financeWorkspace(), pending = later();
+  app.finance.pdf = () => pending.promise;
+  await click(app, 'View invoice');
+  button(await app.render(), 'Share PDF').props.onPress();
+  await app.h.flush();
+  await click(app, 'Export invoices CSV');
+  pending.resolve(new Blob(['%PDF-1.4']));
+  await awaitAsyncWork(app, () => app.shares.length === 2);
+  assert.deepEqual(app.shares.map(s => s.opts.mimeType).sort(), ['application/pdf', 'text/csv']);
+  app.h.unmount();
+});
+
+for (const role of ['owner', 'organization']) {
+  test(`${role} referral shares only while mounted`, async () => {
+    const pending = later(), shares = [];
+    let calls = 0;
+    function mount() {
+      const h = createHooks();
+      const component = name => Object.assign(function Component(props) { return jsx(name, props); }, {
+        Content: 'Content', Title: 'Title', Actions: 'Actions', Image: 'Image', Text: 'AvatarText', Item: 'Item', Icon: 'Icon',
+      });
+      const paper = Object.fromEntries(['Text','Avatar','List','Button','Surface','Divider','Switch','IconButton','Card','Portal','Dialog','TextInput'].map(n => [n, component(n)]));
+      const core = { createFriendPillReferralService: () => ++calls === 1 ? pending.promise : Promise.resolve({ referral_code: 'NEW' }),
+        getOnboarding: async () => ({ first_name: 'A', last_name: 'B' }), getCurrentSubscription: async () => ({}), fetchPillBalanceService: async () => ({}) };
+      const auth = { useAuth: () => ({ user: { id: 1 }, logout() {} }) };
+      const page = compile(`frontend_mobile/roles/${role}/profile.tsx`, {
+        react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx },
+        'react-native': { View:'View', ScrollView:'ScrollView', StyleSheet: { create: x => x }, Alert: { alert() {} }, Share: { share: async x => shares.push(x) } },
+        'react-native-paper': paper, 'react-native-safe-area-context': { SafeAreaView:'SafeAreaView' },
+        'expo-router': { useRouter: () => ({}) }, 'expo-constants': { default: {} },
+        '@chemisttasker/shared-core': core, '../../context/AuthContext': auth, '@/context/AuthContext': auth,
+        '@/components/ui/BrandLoader': { BrandLoader:'Loader' }, '@/features/explore/webLinks': {},
+        'expo-image-picker': { MediaTypeOptions: { Images: 'Images' } }, 'expo-linear-gradient': { LinearGradient:'Gradient' },
+        '../../utils/apiClient': {}, '@/utils/apiClient': {}, '@/roles/shared/dashboard/ManagerHome': { orgCapabilities: () => ({}) },
+      });
+      return { h, render: () => h.settled(page.default, {}) };
+    }
+    const first = mount();
+    const action = (await first.render()).find(n => n.type === 'Card' && text(n).includes('Share a referral link'));
+    assert.ok(action);
+    const old = action.props.onPress();
+    first.h.unmount();
+    const next = mount();
+    const newAction = (await next.render()).find(n => n.type === 'Card' && text(n).includes('Share a referral link'));
+    await newAction.props.onPress();
+    pending.resolve({ referral_code: 'OLD' });
+    await old;
+    assert.equal(shares.length, 1);
+    assert.match(shares[0].url, /NEW/);
+    next.h.unmount();
+  });
+}
