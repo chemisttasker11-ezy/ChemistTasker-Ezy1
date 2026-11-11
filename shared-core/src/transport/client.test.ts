@@ -69,15 +69,80 @@ describe('createApiClient', () => {
       });
     });
 
+    const refreshAuthToken = vi.fn(async () => 'new-token');
     const api = createApiClient({
       baseUrl: 'https://example.test/api/v1',
       getAuthToken: () => 'old-token',
-      refreshAuthToken: async () => 'new-token',
+      getSessionGeneration: () => 1,
+      refreshAuthToken,
       fetchImpl: fetchImpl as typeof fetch,
     });
 
     await expect(api.get('/attendance/worker/status/')).resolves.toEqual({ ok: true });
     expect(seenTokens).toEqual(['Bearer old-token', 'Bearer new-token']);
+    expect(refreshAuthToken).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a delayed 401 after the session changes without refreshing or replaying the write', async () => {
+    let generation = 0;
+    let release!: (response: Response) => void;
+    const fetchImpl = vi.fn().mockImplementationOnce(() => new Promise<Response>(resolve => { release = resolve; }))
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const refreshAuthToken = vi.fn(async () => 'token-b');
+    const onAuthFailure = vi.fn();
+    const api = createApiClient({ baseUrl: 'https://example.test/api', getAuthToken: () => 'token-a',
+      getSessionGeneration: () => generation, refreshAuthToken, onAuthFailure, fetchImpl });
+    const pending = api.post('/write/', { owner: 'a' });
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledOnce());
+    generation++;
+    release(new Response('', { status: 401 }));
+    await expect(pending).rejects.toBeDefined();
+    expect(refreshAuthToken).not.toHaveBeenCalled();
+    expect(onAuthFailure).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('shares one refresh across concurrent 401s in the same session', async () => {
+    let release!: (token: string) => void;
+    const refreshAuthToken = vi.fn(() => new Promise<string>(resolve => { release = resolve; }));
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) =>
+      new Response(null, { status: new Headers(init?.headers).get('Authorization') === 'Bearer fresh' ? 204 : 401 }));
+    const api = createApiClient({ baseUrl: 'https://example.test/api', getAuthToken: () => 'old',
+      getSessionGeneration: () => 1, refreshAuthToken, fetchImpl });
+    const calls = [api.post('/one/', {}), api.post('/two/', {})];
+    await vi.waitFor(() => expect(refreshAuthToken).toHaveBeenCalledOnce());
+    release('fresh');
+    await expect(Promise.all(calls)).resolves.toEqual([undefined, undefined]);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    expect(refreshAuthToken).toHaveBeenCalledOnce();
+  });
+
+  it('does not send after the session changes during token lookup', async () => {
+    let generation = 0;
+    let release!: (token: string) => void;
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 204 }));
+    const api = createApiClient({ baseUrl: 'https://example.test/api', getSessionGeneration: () => generation,
+      getAuthToken: () => new Promise<string>(resolve => { release = resolve; }), fetchImpl });
+    const pending = api.post('/write/', {});
+    generation++;
+    release('token-b');
+    await expect(pending).rejects.toBeDefined();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('does not replay after the session changes during refresh', async () => {
+    let generation = 0;
+    let release!: (token: string) => void;
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 401 }));
+    const refreshAuthToken = vi.fn(() => new Promise<string>(resolve => { release = resolve; }));
+    const api = createApiClient({ baseUrl: 'https://example.test/api', getSessionGeneration: () => generation,
+      getAuthToken: () => 'old', refreshAuthToken, fetchImpl });
+    const pending = api.post('/write/', {});
+    await vi.waitFor(() => expect(refreshAuthToken).toHaveBeenCalledOnce());
+    generation++;
+    release('fresh');
+    await expect(pending).rejects.toBeDefined();
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
   it('does not retry forever when the refreshed token is also rejected', async () => {
