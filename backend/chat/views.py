@@ -495,14 +495,7 @@ class ConversationViewSet(mixins.ListModelMixin,
         Payload: { "target": "message", "message_id": 123 }
         """
         conv = self.get_object()
-        # A user can (historically) have multiple Participant rows in the same conversation.
-        # Pick the first match instead of raising MultipleObjectsReturned.
-        my_part = (
-            Participant.objects
-            .filter(conversation=conv, membership__user=request.user)
-            .order_by('id')
-            .first()
-        )
+        my_part = authorized_participant(conv.pk, request.user.pk)
         if not my_part:
             return Response({"detail": "Not a participant of this conversation."}, status=status.HTTP_403_FORBIDDEN)
         
@@ -731,7 +724,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         """
         message = self.get_object()
         
-        my_participant = message.conversation.participants.filter(membership__user=request.user).first()
+        my_participant = authorized_participant(message.conversation_id, request.user.pk)
         if not my_participant or message.sender != my_participant.membership:
             raise PermissionDenied("You can only edit your own messages.")
 
@@ -762,7 +755,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         """
         message = self.get_object()
         
-        my_participant = message.conversation.participants.filter(membership__user=request.user).first()
+        my_participant = authorized_participant(message.conversation_id, request.user.pk)
         if not my_participant or message.sender != my_participant.membership:
             raise PermissionDenied("You can only delete your own messages.")
 

@@ -277,7 +277,7 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
      // A partial earlier attempt may have persisted the server create receipt
      // and one image while ReviewStep retained its older draft props.
      // Merge only durable progress, not unrelated fields or other users' data.
-     const saved=await loadMarketplaceDraft(targetScope);
+     const saved=await loadSettledMarketplaceDraft(targetScope);
      if(!current())return;
      const progress:MarketplaceMobileDraft={
        ...draft,
