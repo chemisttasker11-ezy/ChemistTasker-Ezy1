@@ -90,6 +90,10 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
+      - name: Verify native acceptance selector and toolchain contracts
+        shell: bash
+        run: python -m unittest discover -s frontend_mobile/scripts -p test_native_acceptance_config.py -v
+
       - name: Prepare hermetic native-smoke backend
         shell: bash
         run: |
@@ -431,7 +435,7 @@ jobs:
           - extendedWaitUntil:
               visible: "Welcome back"
               timeout: 30000
-          - tapOn: "Work email"
+          - tapOn: "Email"
           - inputText: "native-smoke@example.test"
           - tapOn: "Password"
           - inputText: "NativeSmoke1234"
@@ -441,35 +445,33 @@ jobs:
               text: "Not now"
               optional: true
           - extendedWaitUntil:
-              visible: "Admin"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
-          - assertVisible: "Welcome Native,"
-          - tapOn: "Admin"
+          - tapOn: "Switch workspace. Current: Pharmacist"
+          - tapOn: "Admin, Native Pharmacy A"
           - extendedWaitUntil:
-              visible: "Admin workspace"
+              visible: "Administering pharmacy. Current: Native Pharmacy A"
               timeout: 30000
-          - assertVisible: "Native Pharmacy A"
-          - assertVisible: "Native Pharmacy B"
+          - tapOn: "Administering pharmacy. Current: Native Pharmacy A"
           - tapOn: "Native Pharmacy B"
           - stopApp
           - launchApp
           - extendedWaitUntil:
-              visible: "Admin workspace"
+              visible: "Administering pharmacy. Current: Native Pharmacy B"
               timeout: 30000
-          - assertVisible: "Native Pharmacy B"
+          - tapOn: "Switch workspace. Current: Admin"
           - tapOn: "Pharmacist"
           - extendedWaitUntil:
-              visible: "Welcome Native,"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
           - stopApp
           - launchApp
           - extendedWaitUntil:
-              visible: "Welcome Native,"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
-          - assertVisible: "Admin"
           - openLink: "frontendmobile://admin/shifts"
           - extendedWaitUntil:
-              visible: "Shift Center"
+              visible: "Shift Centre"
               timeout: 30000
           - openLink: "frontendmobile://attendance/clock"
           - extendedWaitUntil:
@@ -516,7 +518,7 @@ jobs:
   ios-native:
     name: iOS native acceptance
     if: ${{ inputs.platform != 'android' }}
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - name: Install macOS PDF runtime dependencies
@@ -557,6 +559,10 @@ jobs:
       - name: Verify iOS driver bootstrap recovery contracts
         shell: bash
         run: python -m unittest discover -s frontend_mobile/scripts -p test_ios_link_consent.py -v
+
+      - name: Verify native acceptance selector and toolchain contracts
+        shell: bash
+        run: python -m unittest discover -s frontend_mobile/scripts -p test_native_acceptance_config.py -v
 
       - name: Prepare hermetic native-smoke backend
         shell: bash
@@ -723,13 +729,13 @@ jobs:
             sleep "$((attempt * 10))"
           done
 
-      - name: Select Xcode 26.2 with Swift 6.2 toolchain
+      - name: Select Xcode 26.6 with Swift 6.3 toolchain
         shell: bash
         run: |
           set -euo pipefail
-          XCODE_PATH="/Applications/Xcode_26.2.app"
+          XCODE_PATH="/Applications/Xcode_26.6.app"
           test -d "$XCODE_PATH" || {
-            echo "Xcode 26.2 not found at $XCODE_PATH" >&2
+            echo "Xcode 26.6 not found at $XCODE_PATH" >&2
             exit 1
           }
           sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
@@ -738,14 +744,14 @@ jobs:
           test "$(xcode-select -p)" = "$XCODE_PATH/Contents/Developer"
           XCODEBUILD_VERSION="$(xcodebuild -version)"
           echo "$XCODEBUILD_VERSION"
-          echo "$XCODEBUILD_VERSION" | grep -Eq '^Xcode 26\.2' || {
-            echo "Selected xcodebuild is not 26.2: $XCODEBUILD_VERSION" >&2
+          echo "$XCODEBUILD_VERSION" | grep -Eq '^Xcode 26\.6' || {
+            echo "Selected xcodebuild is not 26.6: $XCODEBUILD_VERSION" >&2
             exit 1
           }
           SWIFT_VERSION="$(swift --version)"
           echo "$SWIFT_VERSION"
-          echo "$SWIFT_VERSION" | grep -Eq 'Swift version 6\.2' || {
-            echo "Swift toolchain does not provide Swift 6.2: $SWIFT_VERSION" >&2
+          echo "$SWIFT_VERSION" | grep -Eq 'Swift version 6\.3' || {
+            echo "Swift toolchain does not provide Swift 6.3: $SWIFT_VERSION" >&2
             exit 1
           }
 
@@ -897,7 +903,6 @@ jobs:
           cat > /tmp/native-acceptance.yaml <<'YAML'
           appId: com.chemisttasker.app
           ---
-          # iOS exposes each workspace switch as one element labelled "<Role> workspace".
           - launchApp:
               stopApp: true
               permissions:
@@ -913,7 +918,7 @@ jobs:
           - extendedWaitUntil:
               visible: "Welcome back"
               timeout: 30000
-          - tapOn: "Work email"
+          - tapOn: "Email"
           - inputText: "native-smoke@example.test"
           - tapOn: "Password"
           - inputText: "NativeSmoke1234"
@@ -923,32 +928,30 @@ jobs:
               text: "Not now"
               optional: true
           - extendedWaitUntil:
-              visible: "Admin( workspace)?"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
-          - assertVisible: "Welcome Native,"
-          - tapOn: "Admin( workspace)?"
+          - tapOn: "Switch workspace. Current: Pharmacist"
+          - tapOn: "Admin, Native Pharmacy A"
           - extendedWaitUntil:
-              visible: "Admin workspace"
+              visible: "Administering pharmacy. Current: Native Pharmacy A"
               timeout: 30000
-          - assertVisible: "Native Pharmacy A"
-          - assertVisible: "Native Pharmacy B"
+          - tapOn: "Administering pharmacy. Current: Native Pharmacy A"
           - tapOn: "Native Pharmacy B"
           - stopApp
           - launchApp
           - extendedWaitUntil:
-              visible: "Admin workspace"
+              visible: "Administering pharmacy. Current: Native Pharmacy B"
               timeout: 30000
-          - assertVisible: "Native Pharmacy B"
-          - tapOn: "Pharmacist( workspace)?"
+          - tapOn: "Switch workspace. Current: Admin"
+          - tapOn: "Pharmacist"
           - extendedWaitUntil:
-              visible: "Welcome Native,"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
           - stopApp
           - launchApp
           - extendedWaitUntil:
-              visible: "Welcome Native,"
+              visible: "Switch workspace. Current: Pharmacist"
               timeout: 30000
-          - assertVisible: "Admin( workspace)?"
           - openLink: "frontendmobile://admin/shifts"
           # Handle subsequent custom-scheme security confirmation if presented.
           - runFlow:
@@ -957,7 +960,7 @@ jobs:
               commands:
                 - tapOn: "Open"
           - extendedWaitUntil:
-              visible: "Shift Center"
+              visible: "Shift Centre"
               timeout: 30000
           - openLink: "frontendmobile://attendance/clock"
           # Handle subsequent custom-scheme security confirmation if presented.
