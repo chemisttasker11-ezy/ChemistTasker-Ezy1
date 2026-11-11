@@ -35,6 +35,19 @@ class NativeAcceptanceConfigurationTests(unittest.TestCase):
         self.assertIn("Swift version 6\\.3", ios)
         self.assertNotIn('XCODE_PATH="/Applications/Xcode_26.2.app"', ios)
 
+    def test_ios_keyboard_dismissal_avoids_hide_keyboard(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        ios = workflow.split("\n  ios-native:\n", 1)[1]
+        self.assertNotRegex(ios, r"(?m)^\s*- hideKeyboard\s*$")
+        self.assertRegex(ios, r'- inputText: "NativeSmoke1234"\s*\n\s*- tapOn: "Welcome back"\s*\n\s*- tapOn: "Sign in"')
+
+        invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
+        android_dismiss = '    when:\n      platform: Android\n    commands:\n      - hideKeyboard'
+        ios_dismiss = '    when:\n      platform: iOS\n    commands:\n      - tapOn: "Items & services"'
+        self.assertEqual(2, invoice.count(android_dismiss))
+        self.assertEqual(2, invoice.count(ios_dismiss))
+        self.assertNotIn("hideKeyboard", invoice.replace(android_dismiss, ""))
+
 
     def test_both_native_flows_open_the_real_admin_persona_picker(self):
         """After signing in as a pharmacist, admin is a persona option, not the landing screen."""

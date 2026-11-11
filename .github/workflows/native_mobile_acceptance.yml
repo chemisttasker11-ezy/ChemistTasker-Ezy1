@@ -922,7 +922,7 @@ jobs:
           - inputText: "native-smoke@example.test"
           - tapOn: "Password"
           - inputText: "NativeSmoke1234"
-          - hideKeyboard
+          - tapOn: "Welcome back"
           - tapOn: "Sign in"
           - tapOn:
               text: "Not now"
