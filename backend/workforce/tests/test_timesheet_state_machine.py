@@ -517,7 +517,7 @@ class TimesheetStateMachineTests(TestCase):
 
         self.built()
         self.assertFalse(self.timesheet.needs_rebuild)
-        terms = engagement(self.work_date)
+        terms = engagement(self.period.start_date)
         self.timesheet.refresh_from_db()
         self.assertTrue(self.timesheet.needs_rebuild)
         revision = self.built()
