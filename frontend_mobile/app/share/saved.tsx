@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, Text } from 'react-native-paper';
 import { useAuth } from '@/context/AuthContext';
+import { getSessionGeneration } from '@/utils/authSession';
 import { listSavedContacts, removeContact, saveContact, type SavedContact } from '@/features/share/savedContacts';
 import { safeShareCodeLabel } from '@/features/share/shareCode';
 import { colors, radius, space } from '@/constants/tokens';
@@ -49,12 +50,14 @@ export default function SavedQrContacts() {
   const syncDrafts = async () => {
     if (id == null || syncing) return;
     const ticket=++generation.current;
+    const sessionGeneration=getSessionGeneration();
     setSyncing(true); setError('');
     try {
       for (const contact of contacts) {
+        if (sessionGeneration !== getSessionGeneration()) return;
         if (contact.kind === 'pharmacy-invitation' || contact.synced) continue;
         await saveContact(id, contact);
-        if (ticket !== generation.current) return;
+        if (ticket !== generation.current || sessionGeneration !== getSessionGeneration()) return;
       }
       const rows=await listSavedContacts(id);
       if (ticket === generation.current) {

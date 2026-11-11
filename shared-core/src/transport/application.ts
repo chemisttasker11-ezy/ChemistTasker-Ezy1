@@ -3,6 +3,7 @@ export interface ApplicationApiConfig {
     baseURL: string;
     getToken: NonNullable<ApiClientConfig['getAuthToken']>;
     refreshToken?: ApiClientConfig['refreshAuthToken'];
+    getSessionGeneration?: ApiClientConfig['getSessionGeneration'];
     onAuthFailure?: ApiClientConfig['onAuthFailure'];
     credentials?: RequestCredentials;
     fetchImpl?: typeof fetch;
@@ -20,6 +21,7 @@ export function configureApi(configuration: ApplicationApiConfig): void {
     application = { config, client: createApiClient({
             baseUrl: config.baseURL,
             getAuthToken: config.getToken,
+            getSessionGeneration: config.getSessionGeneration,
             refreshAuthToken: config.refreshToken,
             onAuthFailure: config.onAuthFailure,
             credentials: config.credentials ?? 'include',

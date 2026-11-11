@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { markRoomAsRead } from '@chemisttasker/shared-core';
 import { fetchWsTicket } from '../../../utils/apiClient';
+import { getSessionGeneration } from '../../../utils/authSession';
 
 type IncomingHandler = (payload: any) => void;
 
@@ -23,11 +24,13 @@ export function useLiveMessages(
 
   useEffect(() => {
     let isCancelled = false;
+    const sessionGeneration = getSessionGeneration();
+    const currentSession = () => !isCancelled && sessionGeneration === getSessionGeneration();
     const setupWs = async () => {
-      if (!roomId || !accessToken) return;
+      if (!currentSession() || !roomId || !accessToken) return;
       try {
         const ticket = await fetchWsTicket();
-        if (isCancelled || !ticket) return;
+        if (!currentSession() || !ticket) return;
 
         const base = process.env.EXPO_PUBLIC_WS_URL || process.env.EXPO_PUBLIC_API_URL || '';
         const httpBase = base.endsWith('/api') ? base.slice(0, -4) : base;
@@ -44,10 +47,10 @@ export function useLiveMessages(
         wsRef.current = ws;
         reconnectAttempts.current = 0;
         ws.onopen = () => {
-          if (!isCancelled) void markRoomAsRead(roomId);
+          if (currentSession()) void markRoomAsRead(roomId);
         };
         ws.onmessage = (event) => {
-          if (isCancelled) return;
+          if (!currentSession()) return;
           try {
             const payload = JSON.parse(event.data);
             onMessageRef.current(payload);
@@ -62,7 +65,7 @@ export function useLiveMessages(
           console.error('WS error', err?.message || 'WebSocket connection error.');
         };
         ws.onclose = (event) => {
-          if (isCancelled) return;
+          if (!currentSession()) return;
           if (__DEV__) {
             console.log(`WS closed. Code: ${event.code}, Reason: ${event.reason}`);
           }
@@ -70,7 +73,7 @@ export function useLiveMessages(
           reconnectAttempts.current = attempt;
           const delay = Math.min(30000, 1000 * 2 ** attempt);
           setTimeout(() => {
-            if (!isCancelled) {
+            if (currentSession()) {
               wsRef.current = null; // Ensure ref is cleared before reconnecting
               void setupWs();
             }

@@ -58,13 +58,15 @@ const domain = (client: ApiClient): DomainApi => ({ request: client.request });
 export function createChemistTaskerApi(config: ApiClientConfig) {
   const client = createApiClient(config);
   const publicGet = async <T>(path: string, query?: ApiQuery): Promise<T> => {
+    const generation = config.getSessionGeneration?.();
     const token = await config.getAuthToken?.();
+    if (generation !== config.getSessionGeneration?.()) throw new Error('Session changed during request');
     if (!token) return client.get<T>(path, query, { retryAuth: false });
     const optionalClient = createApiClient({ ...config, getAuthToken: () => token, onAuthFailure: undefined });
     try {
       return await optionalClient.get<T>(path, query, { retryAuth: false });
     } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 401) throw error;
+      if (generation !== config.getSessionGeneration?.() || !(error instanceof ApiError) || error.status !== 401) throw error;
       return optionalClient.get<T>(path, query, { auth: false, retryAuth: false });
     }
   };

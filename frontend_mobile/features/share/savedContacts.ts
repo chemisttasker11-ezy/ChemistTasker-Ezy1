@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { deleteSavedProfessionalContact, listSavedProfessionalContacts, saveProfessionalContact, type SavedProfessionalContact } from '@chemisttasker/shared-core';
+import { getSessionGeneration } from '../../utils/authSession';
 import type { ShareCode } from './shareCode';
 import { parseChemistTaskerShareCode } from './shareCode';
 
@@ -66,6 +67,7 @@ export async function listSavedContacts(accountId:number|string):Promise<SavedCo
 }
 
 export async function saveContact(accountId:number|string,contact:ShareCode):Promise<SavedContact[]>{
+ const generation=getSessionGeneration();
  const identity=cloudIdentity(contact);
  // A failed network sync never prevents keeping a local draft.
  let synced=false;
@@ -73,6 +75,7 @@ export async function saveContact(accountId:number|string,contact:ShareCode):Pro
   try{await saveProfessionalContact(identity);synced=true;}
   catch{synced=false;}
  }
+ if(generation!==getSessionGeneration())throw new Error('Session changed during contact sync');
  const existing=await listSavedContacts(accountId);
  const next:SavedContact={...contact,savedAt:new Date().toISOString(),synced};
  if(contact.kind==='pharmacy-invitation'){
@@ -82,19 +85,23 @@ export async function saveContact(accountId:number|string,contact:ShareCode):Pro
   const publicContacts=[next,...existing.filter(row=>row.kind!=='pharmacy-invitation'&&row.url!==contact.url)].slice(0,100);
   await AsyncStorage.setItem(key(accountId),JSON.stringify(publicContacts));
  }
+ if(generation!==getSessionGeneration())throw new Error('Session changed during contact sync');
  return listSavedContacts(accountId);
 }
 
 export async function removeContact(accountId:number|string,url:string):Promise<SavedContact[]>{
+ const generation=getSessionGeneration();
  const parsed=parseChemistTaskerShareCode(url);
  if(!parsed)throw new Error('Invalid saved contact.');
  const identity=cloudIdentity(parsed);
  if(identity){
   // Do not falsely report deletion when this contact still exists on another device.
   const remote=await listSavedProfessionalContacts();
+  if(generation!==getSessionGeneration())throw new Error('Session changed during contact removal');
   const match=remote.find(row=>row.kind===identity.kind&&row.reference===identity.reference);
   if(match)await deleteSavedProfessionalContact(match.id);
  }
+ if(generation!==getSessionGeneration())throw new Error('Session changed during contact removal');
  const next=(await listSavedContacts(accountId)).filter(row=>row.url!==url);
  await Promise.all([
   AsyncStorage.setItem(key(accountId),JSON.stringify(next.filter(row=>row.kind!=='pharmacy-invitation'))),
