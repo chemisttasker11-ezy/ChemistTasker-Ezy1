@@ -441,3 +441,131 @@ test('R child date and action presses stop parent card toggling', () => {
   viewProfile.props.onPress({ stopPropagation: () => { stopped = true; } });
   assert.equal(stopped, true, 'View profile must not trigger the parent card');
 });
+
+// The real Shifts tab with the real surface policy and the real Confirmed/History containers; services are counted.
+function shiftsScreenHarness(who) {
+  const slots = [], effects = [];
+  let cursor = 0;
+  const same = (a, b) => a && b && a.length === b.length && a.every((v, i) => v === b[i]);
+  const react = {
+    useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial;
+      return [slots[i], v => { slots[i] = typeof v === 'function' ? v(slots[i]) : v; }]; },
+    useRef(value) { const i = cursor++; return slots[i] ||= { current: value }; },
+    useMemo(fn, deps) { const i = cursor++; if (!slots[i] || !same(slots[i].deps, deps)) slots[i] = { deps, value: fn() }; return slots[i].value; },
+    useCallback(fn, deps) { return react.useMemo(() => fn, deps); },
+    useEffect(fn, deps) { const i = cursor++; if (!slots[i] || !same(slots[i].deps, deps)) {
+      const old = slots[i]; effects.push(() => { if (old?.cleanup) old.cleanup(); slots[i] = { deps, cleanup: fn() }; }); } },
+  }; react.default = react;
+  const calls = {}, mounted = [];
+  const count = name => async () => { calls[name] = (calls[name] || 0) + 1; return []; };
+  const core = Object.fromEntries(['fetchAllConfirmedShifts', 'fetchDeferredPayrollOffersService', 'fetchHistoryShifts',
+    'fetchMyConfirmedShifts', 'fetchMyHistoryShifts', 'fetchRatingsSummaryService', 'fetchMyRatingForTargetService',
+    'createRatingService', 'viewAssignedShiftProfileService', 'activateShiftOfferPayrollService'].map(name => [name, count(name)]));
+  const router = { push() {}, setParams() {} };
+  const expo = { useRouter: () => router, usePathname: () => who.pathname,
+    useLocalSearchParams: () => ({ section: who.section }) };
+  const workspace = { workspace: who.workspace ?? 'internal', canUsePlatform: true, selectedPharmacyId: 7, isLoading: false };
+  const policy = load('roles/shared/shifts/shiftSurface.ts', {});
+  const logic = load('roles/shared/shifts/shiftsScreenLogic.ts', { './shiftSurface': policy });
+  const surfaceHook = load('roles/shared/shifts/useShiftSurface.ts', {
+    react, 'expo-router': expo,
+    '@/context/AuthContext': { useAuth: () => ({ user: { role: who.role, id: 91 },
+      hasCapability: (cap, pharmacyId) => (who.caps || []).includes(`${cap}:${pharmacyId}`) }) },
+    '@/context/WorkspaceContext': { useWorkspace: () => workspace },
+    '@/context/AdminWorkspaceContext': { useOptionalAdminWorkspace: () => who.pathname.startsWith('/admin')
+      ? { activePharmacyId: 7, isLoading: false } : null },
+    '@/roles/shared/dashboard/ManagerHome': { orgCapabilities: () => ({ roster: Boolean(who.orgRoster) }) },
+    './shiftSurface': policy,
+  });
+  const paper = Object.fromEntries(['Button', 'Card', 'Snackbar', 'Text', 'Dialog', 'Portal', 'TextInput'].map(x => [x, x]));
+  paper.Dialog = Object.assign(function Dialog(p) { return jsx('Dialog', p); }, { Title: 'Dialog.Title', Content: 'Dialog.Content', Actions: 'Dialog.Actions' });
+  const screenTokens = { ...tokens, font: { inter: { regular: '', semiBold: '' } },
+    type: { bodySmall: { fontSize: 14, lineHeight: 20 }, labelLarge: { fontSize: 15, lineHeight: 20 } } };
+  const common = {
+    react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': { View: 'View', Text: 'Text', Pressable: 'Pressable', ScrollView: 'ScrollView',
+      RefreshControl: 'RefreshControl', StyleSheet: { create: s => s } },
+    'react-native-paper': paper, '@chemisttasker/shared-core': core,
+    '@/components/ui': { ContentState: 'ContentState', IconTile: 'IconTile', ScalePressable: 'ScalePressable', tabPanelProps: () => ({}) },
+    '@/constants/tokens': screenTokens, './OwnerAssignedShiftBoard': { default: 'Board' },
+    './useShiftSurface': surfaceHook, './WorkerProfileDialog': { WorkerProfileDialog: 'WorkerProfileDialog' },
+    './confirmedPayroll': load('roles/shared/shifts/confirmedPayroll.ts', {}),
+    '@/context/AuthContext': { useAuth: () => ({ user: { role: who.role, id: 91 } }) },
+    '@/context/WorkspaceContext': { useWorkspace: () => workspace },
+    'expo-router': expo, '@/utils/chatRoutes': load('utils/chatRoutes.ts', {}),
+    '../chat/hooks': { startDirectChat: async () => ({}) },
+    '@/components/ui/BrandActivityIndicator': { BrandActivityIndicator: 'ActivityIndicator' },
+    'lucide-react-native': roleIcons, './shiftsScreenLogic': logic, './shiftSurface': policy,
+    './WorkerBookedShifts': { BookedShiftsState: 'BookedShiftsState', PharmacyDetailsDialog: 'PharmacyDetailsDialog',
+      WorkerBookedShiftCard: 'WorkerBookedShiftCard' },
+    './ShiftSectionTabs': { ShiftSectionTabs: 'ShiftSectionTabs', useShiftSection: sections =>
+      [policy.pickShiftSection(sections, who.section), () => {}] },
+  };
+  common['./ConfirmedShiftsView'] = load('roles/shared/shifts/ConfirmedShiftsView.tsx', common);
+  common['./HistoryShiftsView'] = load('roles/shared/shifts/HistoryShiftsView.tsx', common);
+  common['./WorkerConfirmedShiftsView'] = load('roles/shared/shifts/WorkerConfirmedShiftsView.tsx', common);
+  common['./WorkerHistoryShiftsView'] = load('roles/shared/shifts/WorkerHistoryShiftsView.tsx', common);
+  const board = name => ({ default: function Board() { mounted.push(name); return jsx('Board', { name }); } });
+  Object.assign(common, { './ActiveShiftsPage': board('active'), './PublicShiftsView': board('public'),
+    './CommunityShiftsView': board('community') });
+  const screen = load('roles/shared/shifts/ShiftsScreen.tsx', common);
+  const expand = node => {
+    if (Array.isArray(node)) return node.map(expand);
+    if (!node || typeof node !== 'object') return node;
+    if (typeof node.type === 'function') return expand(node.type(node.props));
+    return { ...node, props: { ...node.props, children: expand(node.props && node.props.children) } };
+  };
+  async function open() {
+    let tree;
+    for (let pass = 0; pass < 3; pass++) {
+      cursor = 0; mounted.length = 0; tree = expand(screen.default());
+      while (effects.length) effects.shift()();
+      await flush();
+    }
+    return tree;
+  }
+  return { calls, mounted, open };
+}
+const POSTER_REQUESTS = ['fetchAllConfirmedShifts', 'fetchDeferredPayrollOffersService', 'fetchHistoryShifts'];
+const sam = { role: 'PHARMACIST', pathname: '/admin/shifts' };
+
+test('R Shifts tab: Sam (admin shell, no MANAGE_ROSTER) opening Active/Confirmed/History makes zero poster or payroll requests', async () => {
+  for (const section of ['confirmed', 'history', 'active']) {
+    const h = shiftsScreenHarness({ ...sam, section });
+    const tree = await h.open();
+    assert.deepEqual(POSTER_REQUESTS.filter(name => h.calls[name]), [], `${section}: no poster/payroll requests`);
+    assert.deepEqual(h.mounted, [], `${section}: no poster panel mounts`);
+    assert.equal(find(tree, x => x.type === 'ContentState')[0]?.props.kind, 'forbidden', `${section}: no-access state`);
+  }
+});
+
+test('C Shifts tab: owner, org admin with manage_roster and an admin with MANAGE_ROSTER still load poster lists; pharmacist loads its own', async () => {
+  const posters = [
+    { role: 'OWNER', pathname: '/owner/shifts' },
+    { role: 'ORG_ADMIN', pathname: '/organization/shifts', orgRoster: true },
+    { ...sam, caps: ['MANAGE_ROSTER:7'] },
+  ];
+  for (const who of posters) {
+    const confirmed = shiftsScreenHarness({ ...who, section: 'confirmed' });
+    await confirmed.open();
+    assert.equal(confirmed.calls.fetchAllConfirmedShifts, 1, `${who.pathname} confirmed list`);
+    assert.equal(confirmed.calls.fetchDeferredPayrollOffersService, 1, `${who.pathname} payroll`);
+    const history = shiftsScreenHarness({ ...who, section: 'history' });
+    await history.open();
+    assert.equal(history.calls.fetchHistoryShifts, 1, `${who.pathname} history list`);
+    const active = shiftsScreenHarness({ ...who, section: 'active' });
+    await active.open();
+    assert.deepEqual(active.mounted, ['active'], `${who.pathname} active panel mounts`);
+  }
+  const pharmacist = { role: 'PHARMACIST', pathname: '/pharmacist/shifts' };
+  const confirmed = shiftsScreenHarness({ ...pharmacist, section: 'confirmed' });
+  await confirmed.open();
+  assert.equal(confirmed.calls.fetchMyConfirmedShifts, 1, 'pharmacist confirmed');
+  const history = shiftsScreenHarness({ ...pharmacist, section: 'history' });
+  await history.open();
+  assert.equal(history.calls.fetchMyHistoryShifts, 1, 'pharmacist history');
+  const board = shiftsScreenHarness({ ...pharmacist, section: 'community' });
+  await board.open();
+  assert.deepEqual(board.mounted, ['community'], 'pharmacist worker board');
+  for (const h of [confirmed, history, board]) assert.deepEqual(POSTER_REQUESTS.filter(name => h.calls[name]), []);
+});

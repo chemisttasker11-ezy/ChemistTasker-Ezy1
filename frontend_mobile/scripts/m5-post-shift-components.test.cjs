@@ -633,6 +633,30 @@ test('C header and progress: titles, step count, next label and jump-back rules 
   assert.equal(segments[2].props.onPress, undefined);
 });
 
+test('C header and progress: the Who sees it step shows the web visibility titles and hints (mounted step)', async () => {
+  const screen = mountPostShift(Date, { effects: true, pharmacies: [pharmacyA] });
+  screen.render(); await screen.flush();
+  screen.slots[45] = 'visibility';
+  const tree = screen.render();
+  const icons = new Proxy({}, { get: (_, name) => String(name) });
+  const colors = new Proxy({}, { get: (_, name) => name === 'status' || name === 'tone'
+    ? new Proxy({}, { get: () => ({ fg: '#000', bg: '#fff' }) }) : '#000' });
+  const stepImports = { ...common, 'react-native': { ...native, Pressable: 'Pressable' },
+    '@/constants/tokens': { ...tokens, colors }, 'lucide-react-native': icons };
+  const Progress = load('frontend_mobile/roles/shared/shifts/PostShiftProgress.tsx', stepImports, true).default;
+  const header = nodes(Progress(stepNode(tree, 'PostShiftProgress').props)).map(n => [].concat(n.props.children).join(''));
+  for (const copy of ['Step 3 of 6', 'Who sees it', 'Next: Dates']) assert.ok(header.includes(copy), 'progress shows ' + copy);
+  const Visibility = load('frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx', { ...stepImports,
+    '@/components/ui/ResponsiveSegmentedButtons': { ResponsiveSegmentedButtons: 'SegmentedButtons' } }).default;
+  const shown = nodes(Visibility(stepNode(tree, 'PostShiftVisibilityStep').props)).filter(n => n.type === 'Text').map(textOf);
+  for (const copy of [
+    'Who sees it first?', 'Start small if you like; you can open it to more people later.',
+    'Your pharmacy team', 'Full-time and part-time staff at this pharmacy.',
+    'Your favourite staff', 'Locums and casuals you have marked as favourites.',
+    'Still not filled? Open it up later', 'The audience widens one group at a time, and only while nobody has shown interest.',
+  ]) assert.ok(shown.includes(copy), 'visibility step shows ' + copy);
+});
+
 // UI-only setters (menus, pickers, calendar paging) are deliberately unwrapped and never mark the form dirty.
 const UI_ONLY = new Set(['setPharmacyMenuVisible', 'setSlotDatePickerOpen', 'setRecurringEndPickerOpen', 'setEscalationPicker',
   'setEscalationTimePicker', 'setCalendarMonthAnchor']);

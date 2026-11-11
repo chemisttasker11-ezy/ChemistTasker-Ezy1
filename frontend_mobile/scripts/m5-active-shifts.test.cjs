@@ -344,7 +344,11 @@ function mountedActive(overrides = {}) {
         loadShifts: async () => { calls.reload++; },
       }),
     },
-    './hooks/useTabData': {
+    // overrides.memberStatus mounts the real tab-data hook over mocked shared-core loaders.
+    './hooks/useTabData': overrides.memberStatus ? load('roles/shared/shifts/ActiveShiftsPage/hooks/useTabData.ts', {
+      react, '../utils/shiftHelpers': shiftHelpers, '../utils/activeShiftRuntime': runtime,
+      '@chemisttasker/shared-core': { fetchShiftMemberStatus: overrides.memberStatus, fetchShiftInterests: overrides.interests },
+    }) : {
       useTabData: () => overrides.tabs ? {
         tabData: overrides.tabs.data,
         setTabData: update => { overrides.tabs.data = typeof update === 'function' ? update(overrides.tabs.data) : update; },
@@ -632,6 +636,31 @@ test('C personas: Sam (no shift management) never mounts the candidate workspace
   assert.equal(tree.find(n => n.type === 'ContentState')?.props.kind, 'forbidden');
   assert.equal(tree.some(n => n.type === 'EscalationStepper' || n.type === 'Card'), false);
   assert.deepEqual(h.calls.tabLoads, [], 'no member-status loads');
+});
+function countedDataHooks() {
+  const sent = { shifts: 0, members: 0, interests: 0 };
+  return { sent, effects: true,
+    fetchAll: async () => { sent.shifts++; return [{ ...escalationShift(), pharmacy: 7 }]; },
+    memberStatus: async () => { sent.members++; return []; },
+    interests: async () => { sent.interests++; return []; } };
+}
+test('R personas: Sam with both real data hooks requests no active shifts, member status or interests', async () => {
+  const hooks = countedDataHooks();
+  const h = mountedActive({ ...hooks, surface: { persona: 'admin', canManageShifts: false, scopeKey: 'admin:7', scopedPharmacyId: 7 } });
+  const tree = await h.flush();
+  assert.equal(tree.find(n => n.type === 'ContentState')?.props.kind, 'forbidden');
+  assert.equal(tree.some(n => n.type === 'EscalationStepper' || n.type === 'Card'), false);
+  assert.deepEqual(hooks.sent, { shifts: 0, members: 0, interests: 0 }, 'zero fetchAllActiveShifts / fetchShiftMemberStatus / fetchShiftInterests calls');
+});
+test('C personas: owner and Dee with both real data hooks load shifts and member status', async () => {
+  for (const surface of [{}, { persona: 'admin', scopeKey: 'admin:7', scopedPharmacyId: 7 }]) {
+    const hooks = countedDataHooks();
+    const h = mountedActive({ ...hooks, surface });
+    const tree = await h.flush();
+    assert.ok(tree.some(n => n.type === 'Card'), 'shift card rendered');
+    assert.equal(hooks.sent.shifts, 1, 'one fetchAllActiveShifts call');
+    assert.ok(hooks.sent.members >= 1, 'member status loaded for the shift slot');
+  }
 });
 
 const plain = value => JSON.parse(JSON.stringify(value));
