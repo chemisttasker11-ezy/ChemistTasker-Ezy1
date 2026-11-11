@@ -137,7 +137,7 @@ test('C platform callbacks pass the selected shift, offer and slot without cross
  const interest={id:101,userId:61,slotId:34,revealed:false};
  const calls=[];
  const mounted=mountPlatform({shift:multi,slotId:34,counterOffers:[offer],
-  interestsAll:[interest],onReviewOffer:(...args)=>calls.push(args)});
+  interestsAll:[interest],onReviewOffer:(...args)=>calls.push(args),onSelectSlot(){}});
  const action=mounted.find(n=>n.type==='TouchableOpacity' &&
   String(n.props.accessibilityLabel).startsWith('Reveal offer from'));
  assert.ok(action,'counter offer action must be mounted for selected slot');
