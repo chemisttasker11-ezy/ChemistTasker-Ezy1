@@ -351,6 +351,90 @@ const click = async (app, label) => {
   await action.props.onPress(); await app.h.flush();
 };
 
+test('logout unmount invalidates an in-flight private invoice PDF before another account mounts', async () => {
+  const app = financeWorkspace(), pending = later();
+  app.finance.pdf = () => pending.promise;
+  await click(app, 'View invoice');
+  const nodes = await app.render();
+  button(nodes, 'Share PDF').props.onPress();
+  await app.h.flush();
+  app.h.unmount();
+  const next = financeWorkspace();
+  next.state.userId = 702;
+  await next.render();
+  pending.resolve(new Blob(['%PDF-1.4']));
+  await app.h.flush();
+  assert.equal(app.shares.length, 0);
+  assert.ok(app.files.every(file => file.deleted));
+  next.h.unmount();
+});
+
+test('invoice alias redirects each active persona to its canonical route with parameters', async () => {
+  for (const [home, expected] of [['/owner/dashboard', '/owner/invoice'], ['/admin', '/admin/invoice'],
+    ['/organization/dashboard', '/organization/invoice'], ['/pharmacist/dashboard', '/pharmacist/invoice'],
+    ['/otherstaff/dashboard', '/otherstaff/invoice']]) {
+    const h = createHooks(), redirects = [], user = { id: 1 }, params = { invoice: '51' };
+    const router = { replace: value => redirects.push(value) };
+    const page = compile('frontend_mobile/app/invoices.tsx', {
+      react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+      '@/components/RootPageHeader': { RootPageHeader: 'Header' },
+      '../roles/shared/invoices/InvoiceList': { default: 'InvoiceList' },
+      '@/context/AuthContext': { useAuth: () => ({ user, isLoading: false }) },
+      '@/utils/mobilePersona': { resolveInitialWorkspace: async () => home },
+      'expo-router': { useRouter: () => router, useLocalSearchParams: () => params },
+    });
+    await h.settled(page.default, {});
+    assert.equal(redirects.length, 1);
+    assert.equal(redirects[0].pathname, expected);
+    assert.equal(redirects[0].params.invoice, '51');
+    h.unmount();
+  }
+});
+
+test('canonical invoice screens retain received and issued persona modes', async () => {
+  for (const role of ['owner', 'admin', 'organization', 'pharmacist', 'otherstaff']) {
+    const h = createHooks();
+    const module = compile('frontend_mobile/roles/shared/invoices/InvoiceList.tsx', {
+      react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx },
+      'react-native': { StyleSheet: { create: v => v } }, 'react-native-paper': {},
+      '@/components/ui/BrandActivityIndicator': {}, 'react-native-safe-area-context': {},
+      'expo-router': { useSegments: () => [role] }, '@chemisttasker/shared-core': {},
+      './shareLegacyInvoicePdf': {}, './MobileInvoiceStats': {}, './FinanceWorkspace': { __esModule: true, default: 'FinanceWorkspace' },
+      '@/context/AuthContext': {}, './invoiceStats': {},
+      '@/constants/tokens': { colors: { status: { red: {} } }, font: { outfit: {} }, radius: {}, space: {}, touch: {} },
+    });
+    const nodes = await h.settled(module.default, {});
+    assert.equal(nodes.find(n => n.type === 'FinanceWorkspace').props.receivedMode,
+      ['owner', 'admin', 'organization'].includes(role), role);
+    h.unmount();
+  }
+});
+
+test('legacy PDF abandons stale downloads and removes files abandoned during write', async () => {
+  for (const stage of ['download', 'write', 'success']) {
+    const pending = later(), files = [], shares = [];
+    let live = true;
+    class File {
+      constructor() { this.uri = 'file:///invoice.pdf'; files.push(this); }
+      create() {}
+      async write() { if (stage === 'write') await pending.promise; }
+      delete() { this.deleted = true; }
+    }
+    const helper = compile('frontend_mobile/roles/shared/invoices/shareLegacyInvoicePdf.ts', {
+      'expo-file-system': { File, Paths: { cache: 'cache' } },
+      'expo-sharing': { isAvailableAsync: async () => true, shareAsync: async uri => shares.push(uri) },
+      '@chemisttasker/shared-core': { downloadInvoicePdf: () => stage === 'download' ? pending.promise : Promise.resolve('pdf') },
+      '@/features/parity/nativeFileBytes': { nativeFileBytes: async () => new Uint8Array([37, 80, 68, 70, 45]) },
+    });
+    const work = helper.shareLegacyInvoicePdf(1, () => live);
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+    if (stage !== 'success') { live = false; pending.resolve('pdf'); }
+    await work;
+    assert.equal(shares.length, stage === 'success' ? 1 : 0, stage);
+    assert.ok(files.every(file => file.deleted), stage);
+  }
+});
+
 test('account and mode switches clear finance and review while ignoring old loads and history', async () => {
   for (const change of ['account', 'mode']) {
     const app = financeWorkspace(), oldLoad = later(), newLoad = later(), history = later();
