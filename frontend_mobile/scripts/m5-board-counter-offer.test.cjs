@@ -26,7 +26,7 @@ function harness() {
   vm.runInNewContext(code, { module, exports: module.exports, console, __DEV__: false, require(name) {
     if (name === 'react') return react;
     if (name === '@react-native-async-storage/async-storage') return { setItem: async () => {} };
-    if (name === 'date-fns') return { format: () => '2026-11-11' };
+    if (name === 'date-fns') return require('date-fns');
     if (name === '@chemisttasker/shared-core') return {};
     if (name === '../constants') return { EMPTY_TRAVEL_LOCATION: {}, shiftStorageKey: () => 'key' };
     if (name === '../utils/counterOffers') return {};
@@ -42,8 +42,8 @@ function harness() {
     onSubmitCounterOffer: payload => new Promise((resolve, reject) => calls.push({ payload, resolve, reject })),
   };
   function render() { index = 0; current = module.exports.useCounterOffers(params); return current; }
-  async function open(id) {
-    await current.openCounterOffer({ id, slots: [{ id: id * 10, startTime: '09:00', endTime: '17:00' }] });
+  async function open(id, date) {
+    await current.openCounterOffer({ id, slots: [{ id: id * 10, date, startTime: '09:00', endTime: '17:00' }] });
     return render();
   }
   render();
@@ -80,3 +80,11 @@ test('C different shifts can submit independently', async () => {
   await Promise.all([first, second]);
 });
 
+
+test('counter offer preserves date-only values west of UTC', async () => {
+  process.env.TZ = 'America/Los_Angeles';
+  const h = harness(), board = await h.open(12, '2026-11-11');
+  const pending = board.handleSubmitCounterOffer();
+  assert.equal(h.calls[0].payload.slots[0].slotDate, '2026-11-11');
+  h.calls[0].resolve(); await pending;
+});

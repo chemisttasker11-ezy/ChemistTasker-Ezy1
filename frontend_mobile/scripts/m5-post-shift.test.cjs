@@ -85,3 +85,17 @@ test('posting screen supplies pharmacy date at every window decision', () => {
   assert.doesNotMatch(screen, /(?:shiftPostingDateWindow|splitPostableDates)\([^\n]*new Date\(\)/);
   assert.match(screen, /validateSlotEntries\(entries,\s*pharmacyToday/);
 });
+
+ test('final submit revalidates recurrence after switching pharmacy at a month boundary', () => {
+  const screen = fs.readFileSync(path.resolve(__dirname, '../roles/shared/shifts/PostShiftScreen.tsx'), 'utf8');
+  const submit = screen.slice(screen.indexOf('const handleSubmit = async'), screen.indexOf('const dismissToast'));
+  assert.match(submit, /slot\.recurringEndDate/ );
+  const helper = loadHelpers();
+  for (const device of ['Australia/Sydney', 'America/Los_Angeles']) {
+    process.env.TZ = device;
+    const instant = new Date('2026-01-31T13:30:00Z');
+    const slot = { ...entry('2026-02-01'), isRecurring: true, recurringDays: [1], recurringEndDate: '2026-06-01' };
+    assert.equal(helper.validateSlotEntries([slot], helper.pharmacyPostingDate('Australia/Sydney', instant)), null);
+    assert.notEqual(helper.validateSlotEntries([slot], helper.pharmacyPostingDate('Australia/Perth', instant)), null);
+  }
+});
