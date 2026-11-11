@@ -1244,7 +1244,10 @@ export default function PostShiftScreen() {
         const draft = postingDraft();
         const validation = validateShiftPostingDraft(draft);
         if (validation) { setError(validation); return; }
-        if (!editingId && draft.slots.some((slot) => !splitPostableDates([slot.date], pharmacyToday()).valid.length)) {
+        if (!editingId && draft.slots.some((slot) => {
+            const dates = [slot.date, ...(slot.isRecurring ? [slot.recurringEndDate || ''] : [])];
+            return splitPostableDates(dates, pharmacyToday()).valid.length !== new Set(dates).size;
+        })) {
             setError('That date has passed. Pick today or later.');
             return;
         }

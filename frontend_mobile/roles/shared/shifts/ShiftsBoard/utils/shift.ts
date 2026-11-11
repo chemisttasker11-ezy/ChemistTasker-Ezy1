@@ -67,8 +67,8 @@ export const expandRecurringSlotsForDisplay = (slots: ShiftSlot[]): ShiftSlot[] 
             return;
         }
 
-        const start = startOfDay(new Date(slot.date));
-        const end = endOfDay(new Date(recurringEnd));
+        const start = startOfDay(new Date(`${slot.date}T00:00:00`));
+        const end = endOfDay(new Date(`${recurringEnd}T00:00:00`));
         if (!isValid(start) || !isValid(end)) {
             expanded.push(slot);
             return;
@@ -108,26 +108,40 @@ export const getExpandedSlotsForDisplay = (slots: ShiftSlot[]) => {
     return expandRecurringSlotsForDisplay(slots);
 };
 
-const getSlotStartDateTime = (slot: ShiftSlot) => {
+type PharmacyClock = { timezone?: string | null; state?: string | null; postcode?: string | null };
+
+const getSlotStartDateTime = (slot: ShiftSlot, pharmacy?: PharmacyClock | null) => {
     const raw: any = slot;
     const date = raw?.date ?? raw?.slot_date ?? raw?.slotDate;
     const timeRaw = raw?.startTime ?? raw?.start_time ?? raw?.startHour ?? raw?.start_hour;
     if (!date || timeRaw == null) return null;
-    const timeStr =
-        typeof timeRaw === 'number'
-            ? `${String(timeRaw).padStart(2, '0')}:00`
-            : String(timeRaw);
-    const normalized = timeStr.length === 5 ? `${timeStr}:00` : timeStr;
-    const dt = new Date(`${date}T${normalized}`);
-    return isValid(dt) ? dt : null;
+    const time = typeof timeRaw === 'number' ? `${String(timeRaw).padStart(2, '0')}:00:00` : String(timeRaw);
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+    const clock = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(time);
+    if (!match || !clock) return null;
+    const states: Record<string, string> = { NSW: 'Sydney', 'NEW SOUTH WALES': 'Sydney', VIC: 'Melbourne', VICTORIA: 'Melbourne', QLD: 'Brisbane', QUEENSLAND: 'Brisbane', WA: 'Perth', 'WESTERN AUSTRALIA': 'Perth', SA: 'Adelaide', 'SOUTH AUSTRALIA': 'Adelaide', TAS: 'Hobart', TASMANIA: 'Hobart', ACT: 'Sydney', 'AUSTRALIAN CAPITAL TERRITORY': 'Sydney', NT: 'Darwin', 'NORTHERN TERRITORY': 'Darwin' };
+    const fallback = `Australia/${String(pharmacy?.postcode || '').trim() === '2880' ? 'Broken_Hill' : states[(pharmacy?.state || '').trim().replace(/\s+/g, ' ').toUpperCase()] || 'Sydney'}`;
+    let formatter: Intl.DateTimeFormat;
+    try { formatter = new Intl.DateTimeFormat('en-GB', { timeZone: pharmacy?.timezone?.trim() || fallback, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }); }
+    catch { formatter = new Intl.DateTimeFormat('en-GB', { timeZone: fallback, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }); }
+    const parts = (instant: number) => {
+        const values: Record<string, number> = {};
+        formatter.formatToParts(new Date(instant)).forEach(p => { values[p.type] = Number(p.value); });
+        return Date.UTC(values.year, values.month - 1, values.day, values.hour, values.minute, values.second);
+    };
+    const target = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(clock[1]), Number(clock[2]), Number(clock[3] || 0));
+    // Try offsets on either side of a DST transition; retain the first occurrence of an ambiguous clock time.
+    const candidates = [-86400000, 86400000].map(delta => target - (parts(target + delta) - (target + delta)));
+    const valid = candidates.filter(instant => parts(instant) === target);
+    return valid.length ? new Date(Math.min(...valid)) : null;
 };
 
-export const getUpcomingSlotsForDisplay = (slots: ShiftSlot[]) => {
+export const getUpcomingSlotsForDisplay = (slots: ShiftSlot[], pharmacy?: PharmacyClock | null) => {
     const expanded = getExpandedSlotsForDisplay(slots);
     if (!expanded.length) return expanded;
     const now = new Date();
     return expanded.filter((slot) => {
-        const start = getSlotStartDateTime(slot);
+        const start = getSlotStartDateTime(slot, pharmacy);
         if (!start) return true;
         return !isBefore(start, now);
     });

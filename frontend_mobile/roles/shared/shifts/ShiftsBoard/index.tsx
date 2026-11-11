@@ -293,7 +293,7 @@ const ScopedShiftsBoard: React.FC<BoardPresentationProps & { scopeKey: string }>
         if (effectiveSlotFilterMode === 'all') return processedShifts;
 
         const filteredShifts = processedShifts.filter((shift) => {
-            const slots = getUpcomingSlotsForDisplay(shift.slots ?? []);
+            const slots = getUpcomingSlotsForDisplay(shift.slots ?? [], shift.pharmacyDetail);
             const counterInfo = counterOffers[shift.id];
             const counterSlotIds = new Set<number>(
                 Object.keys(counterInfo?.slots ?? {})
