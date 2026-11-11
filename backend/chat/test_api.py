@@ -147,6 +147,106 @@ class DirectMessageTests(ChatBase):
         self.assertIsNotNone(current_part.last_read_at)
         self.assertIsNone(revoked_part.last_read_at)
 
+    def legacy_dual_membership_room(self):
+        # Revoked row first, so a plain `.first()` lookup picks it.
+        _, current_pharmacy = make_owner_with_pharmacy("Current membership for chat")
+        Membership.objects.filter(pk=self.alice_m.pk).update(is_active=False)
+        current = Membership.objects.create(
+            user=self.alice, pharmacy=current_pharmacy, role="PHARMACIST",
+            employment_type="FULL_TIME", status="ACCEPTED", is_active=True,
+        )
+        room = Conversation.objects.create(type="DM")
+        revoked_part = Participant.objects.create(conversation=room, membership=self.alice_m)
+        current_part = Participant.objects.create(conversation=room, membership=current)
+        Participant.objects.create(conversation=room, membership=self.bob_m)
+        return room, revoked_part, current_part
+
+    def room_row(self, user, room):
+        return next(r for r in self.rows(client_for(user).get(ROOMS)) if r["id"] == room.pk)
+
+    def test_legacy_dual_member_can_edit_and_delete_own_message(self):
+        room, _, current_part = self.legacy_dual_membership_room()
+        alice = client_for(self.alice)
+        sent = alice.post(MESSAGES, {"conversation": room.pk, "body": "original"}, format="json")
+        self.assertEqual(sent.status_code, 201, sent.data)
+        self.assertEqual(Message.objects.get(pk=sent.data["id"]).sender_id, current_part.membership_id)
+        edited = alice.patch(f"{MESSAGES}{sent.data['id']}/", {"body": "edited"}, format="json")
+        self.assertEqual(edited.status_code, 200, edited.data)
+        self.assertEqual(Message.objects.get(pk=sent.data["id"]).body, "edited")
+        self.assertEqual(alice.delete(f"{MESSAGES}{sent.data['id']}/").status_code, 204)
+        self.assertTrue(Message.objects.get(pk=sent.data["id"]).is_deleted)
+
+    def test_legacy_dual_member_cannot_edit_or_delete_as_revoked_membership(self):
+        room, revoked_part, _ = self.legacy_dual_membership_room()
+        old = Message.objects.create(conversation=room, sender=revoked_part.membership, body="sent before revocation")
+        alice = client_for(self.alice)
+        self.assertEqual(alice.patch(f"{MESSAGES}{old.pk}/", {"body": "edited"}, format="json").status_code, 403)
+        self.assertEqual(alice.delete(f"{MESSAGES}{old.pk}/").status_code, 403)
+        old.refresh_from_db()
+        self.assertEqual((old.body, old.is_edited, old.is_deleted), ("sent before revocation", False, False))
+
+    def test_legacy_dual_member_room_list_clears_unread_after_read(self):
+        room, _, current_part = self.legacy_dual_membership_room()
+        sent = client_for(self.bob).post(MESSAGES, {"conversation": room.pk, "body": "hi"}, format="json")
+        self.assertEqual(sent.status_code, 201, sent.data)
+        before = self.room_row(self.alice, room)
+        self.assertEqual(before["unread_count"], 1)
+        self.assertEqual(before["my_membership_id"], current_part.membership_id)
+        self.assertEqual(client_for(self.alice).post(f"{ROOMS}{room.pk}/read/").status_code, 200)
+        after = self.room_row(self.alice, room)
+        self.assertEqual(after["unread_count"], 0)
+        self.assertIsNotNone(after["my_last_read_at"])
+
+    def test_legacy_dual_member_pins_use_current_participant(self):
+        room, revoked_part, current_part = self.legacy_dual_membership_room()
+        stale = Message.objects.create(conversation=room, sender=self.bob_m, body="pinned by the revoked row")
+        Participant.objects.filter(pk=revoked_part.pk).update(is_pinned=True, pinned_message=stale)
+        msg = Message.objects.create(conversation=room, sender=self.bob_m, body="pin me")
+        alice = client_for(self.alice)
+        pinned = alice.post(f"{ROOMS}{room.pk}/toggle-pin/", {"target": "conversation"}, format="json")
+        self.assertEqual(pinned.status_code, 200, pinned.data)
+        self.assertTrue(pinned.data["is_pinned"])
+        pinned = alice.post(
+            f"{ROOMS}{room.pk}/toggle-pin/", {"target": "message", "message_id": msg.pk}, format="json",
+        )
+        self.assertEqual(pinned.status_code, 200, pinned.data)
+        self.assertEqual(pinned.data["pinned_message"]["id"], msg.pk)
+        current_part.refresh_from_db()
+        revoked_part.refresh_from_db()
+        self.assertEqual((current_part.is_pinned, current_part.pinned_message_id), (True, msg.pk))
+        self.assertEqual((revoked_part.is_pinned, revoked_part.pinned_message_id), (True, stale.pk))
+        # Message rows read the pin from the same participant (newest first).
+        listed = self.rows(alice.get(f"{ROOMS}{room.pk}/messages/"))
+        self.assertEqual([(m["id"], m["is_pinned"]) for m in listed], [(msg.pk, True), (stale.pk, False)])
+
+    def test_single_membership_member_unread_and_pins_unchanged(self):
+        room = self.dm(self.alice, self.bob).json()["id"]
+        bob_msg = client_for(self.bob).post(MESSAGES, {"conversation": room, "body": "hi"}, format="json").data["id"]
+        alice = client_for(self.alice)
+        row = next(r for r in self.rows(alice.get(ROOMS)) if r["id"] == room)
+        self.assertEqual((row["unread_count"], row["my_membership_id"]), (1, self.alice_m.pk))
+        self.assertEqual(alice.post(f"{ROOMS}{room}/read/").status_code, 200)
+        self.assertEqual(next(r for r in self.rows(alice.get(ROOMS)) if r["id"] == room)["unread_count"], 0)
+        pinned = alice.post(f"{ROOMS}{room}/toggle-pin/", {"target": "message", "message_id": bob_msg}, format="json")
+        self.assertEqual(pinned.data["pinned_message"]["id"], bob_msg)
+        self.assertEqual([m["is_pinned"] for m in self.rows(alice.get(f"{ROOMS}{room}/messages/"))], [True])
+        self.assertEqual(Participant.objects.get(conversation_id=room, membership=self.alice_m).pinned_message_id, bob_msg)
+
+    def test_fully_revoked_member_cannot_send_edit_delete_or_read(self):
+        room = self.dm(self.alice, self.bob).json()["id"]
+        msg = client_for(self.alice).post(MESSAGES, {"conversation": room, "body": "kept"}, format="json").data["id"]
+        Membership.objects.filter(pk=self.alice_m.pk).update(is_active=False)
+        alice = client_for(self.alice)
+        self.assertIn(alice.post(MESSAGES, {"conversation": room, "body": "x"}, format="json").status_code, (403, 404))
+        self.assertIn(alice.patch(f"{MESSAGES}{msg}/", {"body": "x"}, format="json").status_code, (403, 404))
+        self.assertIn(alice.delete(f"{MESSAGES}{msg}/").status_code, (403, 404))
+        self.assertIn(alice.post(f"{ROOMS}{room}/read/").status_code, (403, 404))
+        self.assertIn(alice.post(f"{ROOMS}{room}/toggle-pin/", {"target": "conversation"}, format="json").status_code, (403, 404))
+        m = Message.objects.get(pk=msg)
+        self.assertEqual((m.body, m.is_edited, m.is_deleted), ("kept", False, False))
+        self.assertIsNone(Participant.objects.get(conversation_id=room, membership=self.alice_m).last_read_at)
+        self.assertEqual(Message.objects.filter(conversation_id=room).count(), 1)
+
     def test_room_visibility_is_limited_to_participants(self):
         room = self.dm(self.alice, self.bob).json()["id"]
         self.assertEqual([r["id"] for r in self.rows(client_for(self.alice).get(ROOMS))], [room])
