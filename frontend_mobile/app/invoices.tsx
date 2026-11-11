@@ -9,6 +9,10 @@ export default function InvoicesPage() {
   const { user, isLoading } = useAuth();
   useEffect(() => {
     if (isLoading || !user) return;
+    if (String(user.role).toUpperCase() === 'EXPLORER') {
+      router.replace('/explorer/dashboard' as any);
+      return;
+    }
     let current = true;
     void resolveInitialWorkspace(user).then(home => {
       const persona = home.split('/')[1];
