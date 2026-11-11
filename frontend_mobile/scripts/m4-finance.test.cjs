@@ -891,3 +891,17 @@ for (const role of ['owner', 'organization']) {
     next.h.unmount();
   });
 }
+
+test('invoice alias sends an explorer home even with an invoice workspace selected', async () => {
+  const h = createHooks(), redirects = [];
+  const router = { replace: x => redirects.push(x) };
+  const page = compile('frontend_mobile/app/invoices.tsx', {
+    react: h.react, 'expo-router': { useRouter: () => router, useLocalSearchParams: () => ({}) },
+    '@/context/AuthContext': { useAuth: () => ({ user: { id: 1, role: 'EXPLORER' }, isLoading: false }) },
+    '@/utils/mobilePersona': { resolveInitialWorkspace: async () => '/owner/dashboard' },
+  });
+  await h.settled(page.default, {});
+  assert.ok(redirects.length > 0);
+  assert.ok(redirects.every(path => path === '/explorer/dashboard'));
+  h.unmount();
+});
