@@ -293,6 +293,7 @@ function mountedActive(overrides = {}) {
     },
     resumeFulfillmentCheckout: async () => ({}),
     expireFulfillmentCheckout: async () => ({}),
+    normalizeShiftWorkProfile: profile => profile,
     buzzShiftOffer: async (...args) => { calls.buzz.push(args); await waitBuzz; return { detail: 'Reminder sent' }; },
   };
   const page = load('roles/shared/shifts/ActiveShiftsPage/index.tsx', {
@@ -326,7 +327,11 @@ function mountedActive(overrides = {}) {
       }),
     },
     './hooks/useTabData': {
-      useTabData: () => ({
+      useTabData: () => overrides.tabs ? {
+        tabData: overrides.tabs.data,
+        setTabData: update => { overrides.tabs.data = typeof update === 'function' ? update(overrides.tabs.data) : update; },
+        loadTabDataForShift: async () => {},
+      } : ({
         tabData: { '12_FULL_PART_TIME': card.data.tabData['12:FULL_PART_TIME'] },
         setTabData: () => {},
         loadTabDataForShift: async () => {},
@@ -350,7 +355,7 @@ function mountedActive(overrides = {}) {
     './hooks/useShiftActions': {
       useShiftActions: () => ({
         actionLoading: {}, handleEscalate: async () => true,
-        handleDelete: async () => true, handleAccept: async () => ({}),
+        handleDelete: async () => true, handleAccept: overrides.handleAccept ?? (async () => ({})),
       }),
     },
     './hooks/useShareShift': {
@@ -424,27 +429,32 @@ test('C mounted ActiveShiftsPage renders correct empty/error/permission states w
   }
 });
 
+// The pay controls are touchables wrapping a Text label, so match on the label they contain.
+const touchableWith = (tree, pattern) => tree.filter(n => n.type === 'TouchableOpacity' &&
+  collect(n.props.children, c => c.type === 'Text' && pattern.test([].concat(c.props.children).join(''))).length);
 test('C mounted ActiveShiftsPage keeps rapid payment taps single-flight', async () => {
-  const h = mountedActive();
-  const cards = h.render().find(n => n.type === 'SafeAreaView');
-  assert.ok(cards, 'the active page mounts');
-  // Calling the real callbacks passed to the actual ActiveShiftCards preserves
-  // the production paymentBusyRef and context guard.
+  const shift = { id: 12, visibility: 'FULL_PART_TIME', roleNeeded: 'PHARMACIST', employmentType: 'LOCUM',
+    slots: [{ id: 34, date: '2026-11-20' }, { id: 35, date: '2026-11-21' }],
+    paymentOptions: [{ offerId: 81, slotId: 34 }, { offerId: 82, slotId: 34 }, { offerId: 83, slotId: 35 }] };
+  const h = mountedActive({ shifts: [shift] });
   let tree = h.render();
-  const shiftCard = tree.find(n => n.type === 'Card');
-  assert.ok(shiftCard, 'real active card is mounted');
-  // The payment buttons are inside the expanded card. Use the same card event.
-  const open = tree.find(n => n.type === 'Button' && n.props.children === 'Manage candidates');
-  open.props.onPress();
+  assert.ok(tree.find(n => n.type === 'Card'), 'real active card is mounted');
+  tree.find(n => n.type === 'Button' && n.props.children === 'Manage candidates').props.onPress();
   tree = h.render();
-  const checkout = tree.find(n => n.type === 'Button' && /Stripe/.test(String(n.props.children)));
-  if (checkout) {
-    const action = checkout.props.onPress;
-    action(); action();
-    assert.equal(h.calls.checkout.length, 1, 'rapid taps create one checkout attempt');
-    h.finishCheckout();
-    await Promise.resolve();
-  }
+  const [checkout] = touchableWith(tree, /Pay selected with Stripe/);
+  assert.ok(checkout, 'a payable shift must render the Stripe control');
+  assert.notEqual(checkout.props.disabled, true);
+  checkout.props.onPress(); checkout.props.onPress();
+  assert.equal(h.calls.checkout.length, 1, 'rapid taps create one checkout attempt');
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.checkout[0])), [12, { offerIds: [81, 83], platform: 'mobile' }],
+    'one default offer per slot is charged on the mobile platform');
+  h.finishCheckout();
+  await new Promise(resolve => setImmediate(resolve));
+  touchableWith(h.render(), /Offer #82/)[0].props.onPress();
+  touchableWith(h.render(), /Pay selected with Stripe/)[0].props.onPress();
+  assert.equal(h.calls.checkout.length, 2, 'a settled checkout releases the lock for the next payment');
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.checkout[1])), [12, { offerIds: [83, 82], platform: 'mobile' }],
+    'the row the poster picked replaces the other offer on the same slot');
 });
 
 test('R mounted M5-02 Buzz action does not double-send from same render', async () => {
@@ -461,4 +471,52 @@ test('R mounted M5-02 Buzz action does not double-send from same render', async 
   assert.equal(h.calls.buzz.length,1,'invalid offers cannot send reminders');
   await actions.handleBuzzWorker(901);
   assert.equal(h.calls.buzz.length,2,'completed reminder permits an explicit later retry');
+});
+
+function twoSlotOffer() {
+  const shift = { id: 12, visibility: 'FULL_PART_TIME', roleNeeded: 'PHARMACIST', employmentType: 'LOCUM',
+    slots: [{ id: 201, date: '2026-11-20' }, { id: 202, date: '2026-11-21' }], paymentOptions: [] };
+  const member = slotId => ({ userId: 87, slotId, status: 'interested', displayName: 'Wren Worker' });
+  const tabs = { data: { '12_FULL_PART_TIME': { loading: false, error: null,
+    members: [member(201), member(202)], membersBySlot: { 201: [member(201)], 202: [member(202)] } } } };
+  let release;
+  const accepted = new Promise(resolve => { release = resolve; });
+  let actions;
+  const h = mountedActive({ shifts: [shift], tabs, handleAccept: async () => { await accepted; return { offerId: 555 }; },
+    captureActions: captured => { actions = captured; } });
+  h.render();
+  const dialog = () => h.render().find(n => n.type === 'CounterOfferDialog');
+  return { shift, member, tabs, h, dialog, release: () => release(), actions: () => actions };
+}
+test('R slot-specific offer: assigning W to slot A leaves W on slot B unpatched', async () => {
+  const f = twoSlotOffer();
+  await f.actions().handleReviewCandidate(f.shift, f.member(201), null, 201);
+  assert.equal(f.dialog().props.slotId, 201);
+  const assign = f.dialog().props.onAssign(87, 201);
+  f.release(); await assign;
+  const data = f.tabs.data['12_FULL_PART_TIME'];
+  assert.equal(data.membersBySlot[201][0].pendingOfferId, 555, 'slot A shows its pending offer');
+  assert.equal(data.membersBySlot[202][0].pendingConfirmation, undefined, 'slot B must not be marked pending');
+  assert.equal(data.members.find(m => m.slotId === 202).pendingConfirmation, undefined, 'flat slot B record stays clean');
+  assert.equal(data.members.find(m => m.slotId === 201).pendingConfirmation, true);
+  await f.actions().handleReviewCandidate(f.shift, data.membersBySlot[202][0], null, 202);
+  assert.equal(f.dialog().props.candidate.pendingConfirmation, false, 'slot B dialog still offers Assign');
+});
+test('R slot-specific offer: a slot A result must not change an open slot B dialog', async () => {
+  const f = twoSlotOffer();
+  await f.actions().handleReviewCandidate(f.shift, f.member(201), null, 201);
+  const assign = f.dialog().props.onAssign(87, 201);
+  await f.actions().handleReviewCandidate(f.shift, f.member(202), null, 202);
+  f.release(); await assign;
+  assert.equal(f.dialog().props.slotId, 202);
+  assert.equal(f.dialog().props.candidate.pendingConfirmation, false);
+  assert.equal(f.dialog().props.candidate.pendingOfferId, null);
+});
+test('C slot-specific offer: the assigned slot dialog shows its pending offer', async () => {
+  const f = twoSlotOffer();
+  await f.actions().handleReviewCandidate(f.shift, f.member(201), null, 201);
+  const assign = f.dialog().props.onAssign(87, 201);
+  f.release(); await assign;
+  assert.equal(f.dialog().props.candidate.pendingConfirmation, true);
+  assert.equal(f.dialog().props.candidate.pendingOfferId, 555);
 });

@@ -8,7 +8,7 @@ const { execFileSync } = require('node:child_process');
 const ts = require('../node_modules/typescript');
 const root = path.resolve(__dirname, '../..');
 const jsx = (type, props) => ({ type, props: props || {} });
-function load(file, imports, head = false) {
+function load(file, imports, head = false, DateImpl = Date) {
   const source = process.env.M5_BASE === '1' && !head
     ? execFileSync('git', ['show', `5c28634d:${file}`], { cwd: root, encoding: 'utf8' })
     : fs.readFileSync(path.join(root, file), 'utf8');
@@ -17,7 +17,7 @@ function load(file, imports, head = false) {
     jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } }).outputText;
   const module = { exports: {} };
-  vm.runInNewContext(output, { module, exports: module.exports, Date, console,
+  vm.runInNewContext(output, { module, exports: module.exports, Date: DateImpl, console, URLSearchParams,
     require(name) {
       if (!(name in imports)) throw Error(`Unmocked import ${name}`);
       return imports[name];
@@ -191,7 +191,8 @@ test('R midnight rollover: mounted Post Shift picker must advance its minimum da
     'a wizard left open overnight must not permit yesterday');
 });
 
-test('R success_destination: actual mounted Post Shift keeps confirmation visible before navigation', async () => {
+// Mounts the real Post Shift screen with state hooks; DateImpl is the clock the screen module sees.
+function mountPostShift(DateImpl = Date, opts = {}) {
   const slots = [], refs = [];
   let index = 0, refIndex = 0;
   const hooks = {
@@ -234,7 +235,8 @@ test('R success_destination: actual mounted Post Shift keeps confirmation visibl
       .map(name => [`./${name}`, { default: name }]));
   const destinations = [], submissions = [];
   const api = { ...core,
-    createOwnerShiftService: async payload => { submissions.push(payload); return { id: 95 }; },
+    ApiError,
+    createOwnerShiftService: async payload => { submissions.push(payload); return opts.create ? opts.create(payload) : { id: 95 }; },
     updateOwnerShiftService: async () => { throw Error('edit not part of the posting control'); },
   };
   const imports = { ...common, ...components, react: hooks,
@@ -249,37 +251,52 @@ test('R success_destination: actual mounted Post Shift keeps confirmation visibl
       useRouter: () => ({ replace: route => destinations.push(route) }),
     },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
-    '@/context/AuthContext': { useAuth: () => ({ hasCapability: () => true }) },
+    '@/context/AuthContext': { useAuth: () => ({ hasCapability: opts.hasCapability ?? (() => true) }) },
     '@/components/ui': { ContentState: 'ContentState' },
     './useShiftSurface': {
       useShiftSurface: () => ({
         ready: true, persona: 'owner', canManageShifts: true, scopeKey: 'owner:7',
-        scopedPharmacyId: 7,
+        scopedPharmacyId: 7, ...opts.surface,
       }),
     },
-    './shiftSurface': { shiftRoute: () => '/owner/shifts?section=active' },
+    './shiftSurface': load('frontend_mobile/roles/shared/shifts/shiftSurface.ts', {}, true),
     '../forms/useUnsavedChangesGuard': {
       useUnsavedChangesGuard: () => ({ markClean() {} }),
     },
   };
-  const component = load('frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx', imports).default;
+  const component = load('frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx', imports, false, DateImpl).default;
   function render() {
     index = 0; refIndex = 0;
     return nodes(component());
   }
-
-  // These values are established through the actual form's state setters during normal
-  // hydrated use. Start from the same hydrated values to focus this mounted test
-  // on the submit-success/navigation boundary.
-  render();
+  return { slots, render, submissions, destinations };
+}
+const { ApiError } = load('shared-core/src/transport/errors.ts', {
+  '../domains/onboarding/ahpra': { reportAhpraError: () => null, AHPRA_UNREADABLE_MESSAGE: '' } }, true);
+const postButton = tree => tree.find(n => n.type === 'Button' && n.props.children === 'Post Shift');
+// Local calendar day `offset` days from now, so fixtures never age into the past.
+function isoDayFromNow(offset, now = new Date()) {
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+  return [day.getFullYear(), String(day.getMonth() + 1).padStart(2, '0'), String(day.getDate()).padStart(2, '0')].join('-');
+}
+function hydrateReview(slots, date) {
   slots[1] = [{ id: 7, name: 'Pharmacy A', allowed_escalation_levels: ['FULL_PART_TIME','LOCUM_CASUAL'] }];
   slots[2] = 7;
   slots[3] = true;
   slots[19] = [{
-    date: '2026-11-12', startTime: '09:00', endTime: '17:00',
+    date, startTime: '09:00', endTime: '17:00',
     isRecurring: false, recurringDays: [], recurringEndDate: '',
   }];
   slots[45] = 'review';
+}
+
+test('R success_destination: actual mounted Post Shift keeps confirmation visible before navigation', async () => {
+  const { slots, render, submissions, destinations } = mountPostShift();
+  // These values are established through the actual form's state setters during normal
+  // hydrated use. Start from the same hydrated values to focus this mounted test
+  // on the submit-success/navigation boundary.
+  render();
+  hydrateReview(slots, isoDayFromNow(5));
 
   let tree = render();
   const post = tree.find(n => n.type === 'Button' && n.props.children === 'Post Shift');
@@ -295,4 +312,109 @@ test('R success_destination: actual mounted Post Shift keeps confirmation visibl
   assert.equal(snackbar.props.children, 'Shift posted successfully!');
   snackbar.props.onDismiss();
   assert.deepEqual(destinations, ['/owner/shifts?section=active']);
+});
+
+test('R midnight submit: Post pressed after midnight without a rerender must not send yesterday', async () => {
+  let now = '2026-11-07T23:58:00+11:00';
+  class MovingDate extends Date {
+    constructor(...args) { super(...(args.length ? args : [now])); }
+    static now() { return new Date(now).getTime(); }
+  }
+  const { slots, render, submissions } = mountPostShift(MovingDate);
+  render();
+  hydrateReview(slots, '2026-11-07');
+  const post = render().find(n => n.type === 'Button' && n.props.children === 'Post Shift');
+  assert.ok(post, 'real mounted wizard has its Post Shift control');
+  now = '2026-11-08T00:02:00+11:00';
+  await post.props.onPress();
+  assert.equal(submissions.length, 0, 'a slot dated yesterday must not reach create');
+  assert.match(String(slots.find(v => typeof v === 'string' && /date has passed/.test(v))), /date has passed/);
+});
+
+test('C midnight submit: the same render before midnight still posts today', async () => {
+  const now = '2026-11-07T23:58:00+11:00';
+  class FixedDate extends Date {
+    constructor(...args) { super(...(args.length ? args : [now])); }
+    static now() { return new Date(now).getTime(); }
+  }
+  const { slots, render, submissions } = mountPostShift(FixedDate);
+  render();
+  hydrateReview(slots, '2026-11-07');
+  await render().find(n => n.type === 'Button' && n.props.children === 'Post Shift').props.onPress();
+  assert.equal(submissions.length, 1);
+  assert.equal(submissions[0].slots?.[0]?.date ?? submissions[0].slots_data?.[0]?.date, '2026-11-07');
+});
+
+test('R server_error_text: the server message is shown, fields are kept and a retry posts once', async () => {
+  const message = 'Maximum of 10 public shifts per day reached for A.';
+  let fail = true;
+  const { slots, render, submissions, destinations } = mountPostShift(Date, {
+    create: () => { if (fail) throw new ApiError(message, 400, { detail: message }); return { id: 96 }; } });
+  render();
+  const date = isoDayFromNow(5);
+  hydrateReview(slots, date);
+  await postButton(render()).props.onPress();
+  assert.equal(submissions.length, 1);
+  const tree = render();
+  assert.ok(tree.some(n => [].concat(n.props?.children).includes(message)), 'the server text is visible on the form');
+  assert.equal(tree.some(n => [].concat(n.props?.children).includes('Unable to save shift')), false);
+  assert.equal(slots[2], 7, 'pharmacy kept');
+  assert.equal(slots[19][0].date, date, 'slot kept');
+  assert.equal(slots[45], 'review', 'still on review');
+  assert.deepEqual(destinations, []);
+  fail = false;
+  const retry = postButton(tree);
+  await retry.props.onPress();
+  assert.equal(submissions.length, 2, 'the retry posts exactly once');
+});
+
+test('R success_destination: organization and admin posters land on their own Shift Centre Active', async () => {
+  for (const [surface, route] of [
+    [{ persona: 'organization', scopeKey: 'organization:3', scopedPharmacyId: null }, '/organization/shifts?section=active'],
+    [{ persona: 'admin', scopeKey: 'admin:7', scopedPharmacyId: 7 }, '/admin/shifts?section=active'],
+  ]) {
+    const { slots, render, submissions, destinations } = mountPostShift(Date, { surface });
+    render();
+    hydrateReview(slots, isoDayFromNow(5));
+    await postButton(render()).props.onPress();
+    assert.equal(submissions.length, 1, surface.persona);
+    render().find(n => n.type === 'Snackbar' && n.props.visible).props.onDismiss();
+    assert.deepEqual(destinations, [route], surface.persona);
+  }
+});
+
+test('C posting: two presses of Post from the same render send one create; a validation error sends none', async () => {
+  let finish;
+  const { slots, render, submissions } = mountPostShift(Date, { create: () => new Promise(resolve => { finish = resolve; }) });
+  render();
+  hydrateReview(slots, isoDayFromNow(5));
+  const post = postButton(render());
+  const first = post.props.onPress(), second = post.props.onPress();
+  assert.equal(submissions.length, 1, 'same-render double press is single-flight');
+  finish({ id: 97 });
+  await Promise.all([first, second]);
+  const invalid = mountPostShift();
+  invalid.render();
+  hydrateReview(invalid.slots, isoDayFromNow(5));
+  invalid.slots[19] = [];
+  await postButton(invalid.render()).props.onPress();
+  assert.equal(invalid.submissions.length, 0, 'a draft without dates is refused before the API');
+});
+
+test('C access: staff-only admin and worker/explorer personas get the forbidden state and never post', async () => {
+  for (const [name, surface] of [
+    ['Sam', { persona: 'admin', canManageShifts: false, scopeKey: 'admin:7' }],
+    ['Omar', { persona: 'pharmacist', canManageShifts: false, scopeKey: 'pharmacist' }],
+    ['Ali', { persona: 'otherstaff', canManageShifts: false, scopeKey: 'otherstaff' }],
+    ['Zoe', { persona: 'explorer', canManageShifts: false, scopeKey: 'explorer' }],
+  ]) {
+    const { slots, render, submissions } = mountPostShift(Date, { surface, hasCapability: () => false });
+    render();
+    hydrateReview(slots, isoDayFromNow(5));
+    const tree = render();
+    const state = tree.find(n => n.type === 'ContentState');
+    assert.equal(state?.props.kind, 'forbidden', name);
+    assert.equal(postButton(tree), undefined, name + ' has no Post control');
+    assert.equal(submissions.length, 0, name);
+  }
 });
