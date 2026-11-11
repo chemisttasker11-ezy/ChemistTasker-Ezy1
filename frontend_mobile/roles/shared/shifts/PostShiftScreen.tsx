@@ -114,7 +114,7 @@ export default function PostShiftScreen() {
             loadGenRef.current += 1;
         };
     }, [editingId, surface.scopedPharmacyId]);
-    const [loadError, setLoadError] = useState<{ kind: 'pharmacies' | 'shift'; message: string } | null>(null);
+    const [loadError, setLoadError] = useState<{ kind: 'pharmacies' | 'shift' | 'access'; message: string } | null>(null);
 
     const [pharmacies, setPharmacies] = useState<PharmacyOption[]>([]);
     const [pharmacyId, setPharmacyId] = useState<number | ''>('');
@@ -449,7 +449,7 @@ export default function PostShiftScreen() {
             : Number(pharmacyValue);
         if (surface.persona === 'admin' && surface.scopedPharmacyId != null &&
             hydratedPharmacyId !== surface.scopedPharmacyId) {
-            setLoadError({ kind: 'shift', message: 'You do not have access to this shift.' });
+            setLoadError({ kind: 'access', message: 'You do not have access to this shift.' });
             setError('You do not have access to this shift.');
             router.back();
             return;
@@ -899,7 +899,8 @@ export default function PostShiftScreen() {
     ]);
 
     const mergeSelectedDates = useCallback((incomingDates: string[]) => {
-        const { valid, past, late } = splitPostableDates(incomingDates, postingWindow.minIso);
+        // Today is read at call time: a wizard left open past midnight must not accept yesterday.
+        const { valid, past, late } = splitPostableDates(incomingDates, new Date());
         if (!valid.length) {
             if (past.length || late.length) setError('That date has passed. Pick today or later.');
             return;
@@ -923,7 +924,7 @@ export default function PostShiftScreen() {
             setSlotStart(latestHours.startTime);
             setSlotEnd(latestHours.endTime);
         }
-    }, [getDefaultTimesForDate, postingWindow.minIso]);
+    }, [getDefaultTimesForDate]);
 
     const selectedDateObjects = useMemo(
         () => selectedDates.map((d) => new Date(`${d}T00:00:00`)),
@@ -1126,7 +1127,7 @@ export default function PostShiftScreen() {
             setError('Select at least one date from the calendar.');
             return false;
         }
-        const { valid, past, late } = splitPostableDates(selectedDates, postingWindow.minIso);
+        const { valid, past, late } = splitPostableDates(selectedDates, new Date());
         if (!valid.length) {
             setError('That date has passed. Pick today or later.');
             return false;
@@ -1242,7 +1243,7 @@ export default function PostShiftScreen() {
         const draft = postingDraft();
         const validation = validateShiftPostingDraft(draft);
         if (validation) { setError(validation); return; }
-        if (!editingId && draft.slots.some((slot) => !splitPostableDates([slot.date], postingWindow.minIso).valid.length)) {
+        if (!editingId && draft.slots.some((slot) => !splitPostableDates([slot.date], new Date()).valid.length)) {
             setError('That date has passed. Pick today or later.');
             return;
         }
@@ -1474,13 +1475,13 @@ export default function PostShiftScreen() {
         if (stepIndex > 0) setActiveStep(stepOrder[stepIndex - 1]);
     };
 
-    if (surface.ready && !hasAccess) {
+    if ((surface.ready && !hasAccess) || loadError?.kind === 'access') {
         return (
             <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <ContentState
                     kind="forbidden"
                     title="No access"
-                    description="You don't have permission to post shifts in this workspace."
+                    description={loadError?.kind === 'access' ? loadError.message : "You don't have permission to post shifts in this workspace."}
                     actionLabel="Go back"
                     onAction={() => router.back()}
                 />
@@ -1610,7 +1611,7 @@ export default function PostShiftScreen() {
                     const pickedIsos = pickedDates
                         .filter(Boolean)
                         .map((d) => toLocalIsoDate(d));
-                    const { valid } = splitPostableDates(pickedIsos, postingWindow.minIso);
+                    const { valid } = splitPostableDates(pickedIsos, new Date());
                     if (valid.some((d) => !selectedDateSet.has(d))) markTouched();
                     mergeSelectedDates(pickedIsos);
                     setSlotDatePickerOpen(false);

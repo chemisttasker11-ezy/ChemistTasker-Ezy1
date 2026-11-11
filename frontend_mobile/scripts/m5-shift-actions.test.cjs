@@ -89,3 +89,81 @@ test('R candidate offers to separate dates remain independent while one request 
   assert.equal(results[2].id,910);
   assert.equal(h.notices.filter(x=>x.includes('Offer sent')).length,2);
 });
+
+function hookHarness(file,core){
+  const react={useState:v=>[v,()=>{}],useRef:v=>({current:v}),useCallback:fn=>fn,useEffect:()=>{}};
+  const source=path.resolve(__dirname,'../roles/shared/shifts/ActiveShiftsPage/hooks',file);
+  const result=ts.transpileModule(fs.readFileSync(source,'utf8'),{
+    compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,esModuleInterop:true}
+  }).outputText;
+  const module={exports:{}};
+  vm.runInNewContext(result,{module,exports:module.exports,console:{...console,error(){},log(){}},__DEV__:false,require(name){
+    if(name==='react')return react;
+    if(name==='@chemisttasker/shared-core')return core;
+    if(name==='../utils/activeShiftRuntime')return {getNextGeneration:()=>1,isLatestGeneration:()=>true};
+    throw Error('Unexpected M5 hook dependency '+name);
+  }},{filename:source});
+  return module.exports;
+}
+function deferredCalls(){
+  const calls=[];
+  return {calls,service:(...args)=>new Promise((resolve,reject)=>calls.push({args,resolve,reject}))};
+}
+function counterHarness(){
+  const accept=deferredCalls(),reject=deferredCalls();
+  const hook=hookHarness('useCounterOffers.ts',{acceptShiftCounterOfferService:accept.service,
+    rejectShiftCounterOfferService:reject.service,fetchShiftCounterOffersService:async()=>[]});
+  return {accept,reject,offers:hook.useCounterOffers('owner:7')};
+}
+test('R counter-offer accept sends once on same-render taps, then permits a retry',async()=>{
+  const h=counterHarness();
+  const offer={id:555};
+  let successes=0;
+  const a=h.offers.acceptOffer({offer,shiftId:12,slotId:201},()=>{successes++;});
+  const b=h.offers.acceptOffer({offer,shiftId:12,slotId:201},()=>{successes++;});
+  assert.equal(h.accept.calls.length,1,'a second immediate tap must not accept the counter offer twice');
+  h.accept.calls[0].resolve({});
+  await Promise.all([a,b]);
+  assert.equal(successes,1);
+  const later=h.offers.acceptOffer({offer,shiftId:12,slotId:201});
+  assert.equal(h.accept.calls.length,2,'a settled accept permits an explicit retry');
+  h.accept.calls[1].resolve({});
+  assert.equal((await later).ok,true);
+});
+test('R counter-offer reject cannot race a pending accept of the same offer',async()=>{
+  const h=counterHarness();
+  const offer={id:555};
+  const a=h.offers.acceptOffer({offer,shiftId:12,slotId:201});
+  const r=h.offers.rejectOffer({offer,shiftId:12});
+  const r2=h.offers.rejectOffer({offer:{id:556},shiftId:12});
+  assert.equal(h.reject.calls.length,1,'only the other offer is rejected while 555 is being accepted');
+  assert.equal(h.reject.calls[0].args[0].offerId,556);
+  h.accept.calls[0].reject(Error('conflict'));
+  h.reject.calls[0].resolve({});
+  assert.equal((await a).ok,false);
+  await Promise.all([r,r2]);
+  const again=h.offers.rejectOffer({offer,shiftId:12}),twice=h.offers.rejectOffer({offer,shiftId:12});
+  assert.equal(h.reject.calls.length,2,'a failed accept releases the lock; rejecting twice still sends once');
+  h.reject.calls[1].resolve({});
+  await Promise.all([again,twice]);
+});
+test('R reveal sends once on same-render taps and both taps get the revealed candidate',async()=>{
+  const reveal=deferredCalls();
+  const notices=[];
+  const hook=hookHarness('useRevealInterest.ts',{revealShiftInterestService:reveal.service});
+  const {revealInterest}=hook.useRevealInterest((id,level)=>`${id}_${level}`,()=>{},msg=>notices.push(msg));
+  const shift={id:12},interest={id:3,userId:87,slotId:201};
+  const a=revealInterest(shift,interest,'PLATFORM'),b=revealInterest(shift,interest,'PLATFORM');
+  assert.equal(reveal.calls.length,1,'a second immediate tap must not reveal twice');
+  reveal.calls[0].resolve({id:87,firstName:'Wren'});
+  const [first,second]=await Promise.all([a,b]);
+  assert.equal(first.id,87);
+  assert.equal(second.id,87,'the later tap still opens the revealed candidate');
+  assert.equal(notices.filter(x=>x==='Candidate revealed.').length,1);
+  const other=revealInterest(shift,{id:4,userId:88,slotId:201},'PLATFORM');
+  const retry=revealInterest(shift,interest,'PLATFORM');
+  assert.equal(reveal.calls.length,3,'other candidates and a settled retry are not blocked');
+  reveal.calls[1].resolve({id:88});reveal.calls[2].reject(Error('offline'));
+  assert.equal((await other).id,88);
+  assert.equal(await retry,null);
+});
