@@ -174,6 +174,7 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
         shiftId,
         scopeKey: surface.scopeKey,
         notificationKey,
+        enabled: surface.canManageShifts,
     });
     const { tabData, setTabData, loadTabDataForShift } = useTabData(shifts, selectedLevelByShift, getTabKey);
 

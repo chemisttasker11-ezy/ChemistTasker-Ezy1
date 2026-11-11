@@ -12,9 +12,10 @@ interface UseShiftsDataParams {
     shiftId?: number | null;
     scopeKey?: string;
     notificationKey?: string | null;
+    enabled?: boolean;
 }
 
-export function useShiftsData({ selectedPharmacyId, shiftId, scopeKey, notificationKey }: UseShiftsDataParams) {
+export function useShiftsData({ selectedPharmacyId, shiftId, scopeKey, notificationKey, enabled = true }: UseShiftsDataParams) {
     const [shifts, setShifts] = useState<Shift[]>(EMPTY_SHIFTS);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -50,12 +51,14 @@ export function useShiftsData({ selectedPharmacyId, shiftId, scopeKey, notificat
     }, [selectedPharmacyId, shiftId, scopeKey, notificationKey]);
 
     useEffect(() => {
+        // A surface without shift management never requests the poster list.
+        if (!enabled) return;
         loadShifts();
         return () => {
             const genKey = shiftId != null ? `shift_${shiftId}` : 'all';
             getNextGeneration(generationsRef.current, genKey);
         };
-    }, [loadShifts, shiftId]);
+    }, [enabled, loadShifts, shiftId]);
 
     return {
         shifts,

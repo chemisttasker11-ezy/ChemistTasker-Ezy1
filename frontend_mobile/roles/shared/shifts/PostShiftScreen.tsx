@@ -114,7 +114,7 @@ export default function PostShiftScreen() {
             loadGenRef.current += 1;
         };
     }, [editingId, surface.scopedPharmacyId]);
-    const [loadError, setLoadError] = useState<{ kind: 'pharmacies' | 'shift'; message: string } | null>(null);
+    const [loadError, setLoadError] = useState<{ kind: 'pharmacies' | 'shift' | 'access'; message: string } | null>(null);
 
     const [pharmacies, setPharmacies] = useState<PharmacyOption[]>([]);
     const [pharmacyId, setPharmacyId] = useState<number | ''>('');
@@ -449,7 +449,7 @@ export default function PostShiftScreen() {
             : Number(pharmacyValue);
         if (surface.persona === 'admin' && surface.scopedPharmacyId != null &&
             hydratedPharmacyId !== surface.scopedPharmacyId) {
-            setLoadError({ kind: 'shift', message: 'You do not have access to this shift.' });
+            setLoadError({ kind: 'access', message: 'You do not have access to this shift.' });
             setError('You do not have access to this shift.');
             router.back();
             return;
@@ -1475,13 +1475,13 @@ export default function PostShiftScreen() {
         if (stepIndex > 0) setActiveStep(stepOrder[stepIndex - 1]);
     };
 
-    if (surface.ready && !hasAccess) {
+    if ((surface.ready && !hasAccess) || loadError?.kind === 'access') {
         return (
             <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <ContentState
                     kind="forbidden"
                     title="No access"
-                    description="You don't have permission to post shifts in this workspace."
+                    description={loadError?.kind === 'access' ? loadError.message : "You don't have permission to post shifts in this workspace."}
                     actionLabel="Go back"
                     onAction={() => router.back()}
                 />
