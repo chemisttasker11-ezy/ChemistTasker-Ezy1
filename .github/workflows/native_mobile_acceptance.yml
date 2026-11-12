@@ -924,6 +924,12 @@ jobs:
           - inputText: "NativeSmoke1234"
           - tapOn: "Welcome back"
           - tapOn: "Sign in"
+          - extendedWaitUntil:
+              visible: "Switch workspace. Current: Pharmacist|Not Now|Not now"
+              timeout: 30000
+          - tapOn:
+              text: "Not Now"
+              optional: true
           - tapOn:
               text: "Not now"
               optional: true
