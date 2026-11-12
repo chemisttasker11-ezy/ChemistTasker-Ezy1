@@ -510,6 +510,7 @@ test('R: parity native customer editor renders ABN evidence, then hides it when 
     'InfoNote', 'MetricGrid', 'ParityPage', 'Section',
   ].map(name => [name, name]));
   const module = compile('frontend_mobile/features/parity/finance.tsx', {
+    '@/utils/authSession': { getSessionGeneration: () => 0 },
     react: engine.react, 'react/jsx-runtime': { jsx, jsxs: jsx },
     '@/context/AuthContext': { useAuth: () => ({ user: { id: 701 } }) },
     './receiptShare': { ReceiptShareSession: class {} },
@@ -626,6 +627,7 @@ async function parityBas(worksheetCall) {
     'InfoNote', 'MetricGrid', 'ParityPage', 'Section',
   ].map(name => [name, name]));
   const module = compile('frontend_mobile/features/parity/finance.tsx', {
+    '@/utils/authSession': { getSessionGeneration: () => 0 },
     react: engine.react, 'react/jsx-runtime': { jsx, jsxs: jsx },
     '@/context/AuthContext': { useAuth: () => ({ user: { id: 701 } }) },
     './receiptShare': { ReceiptShareSession: class {} },
