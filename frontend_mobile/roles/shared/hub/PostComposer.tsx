@@ -13,6 +13,7 @@ import {
 import type { HubPost, HubPostPayload } from './types';
 import { SubmissionNotice, useSubmissionGuard } from './submissionGuard';
 import { useAuth } from '@/context/AuthContext';
+import { getSessionGeneration } from '@/utils/authSession';
 import { BrandActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -181,7 +182,7 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
     }
   };
 
-  const normalizeAttachments = async () => {
+  const normalizeAttachments = async (temporaryFiles: string[]) => {
     const cacheDir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory || null;
     return Promise.all(
       attachments.map(async (file, idx) => {
@@ -200,6 +201,7 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
           try {
             const ext = (file.name && file.name.split('.').pop()) || 'bin';
             const target = `${cacheDir}hub-attach-${Date.now()}-${idx}.${ext}`;
+            temporaryFiles.push(target);
             await FileSystem.copyAsync({ from: uri, to: target });
             uri = target;
           } catch {
@@ -229,8 +231,11 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
       return;
     }
     setError(null);
+    const generation = getSessionGeneration();
+    const temporaryFiles: string[] = [];
     try {
-      const files = await normalizeAttachments();
+      const files = await normalizeAttachments(temporaryFiles);
+      if (generation !== getSessionGeneration()) return;
 
       const payload: HubPostPayload = {
         body: body.trim(),
@@ -257,6 +262,11 @@ export function PostComposer({ visible, onDismiss, scope, onSaved, editing }: Pr
     } catch (err: any) {
       setError(getErrorMessage(err, 'Save failed'));
     } finally {
+      const discardedFiles = generation !== getSessionGeneration()
+        ? attachments.filter(file => file.uri.startsWith('file://')).map(file => file.uri) : [];
+      for (const uri of [...temporaryFiles, ...discardedFiles]) {
+        try { new FileSystem.File(uri).delete(); } catch {}
+      }
       submission.finish();
     }
   };

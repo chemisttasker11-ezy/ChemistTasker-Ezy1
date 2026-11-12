@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useSegments } from 'expo-router';
 import {
   deleteInvoice,
+  fetchAllPages,
   getInvoices,
   reportInvoiceIssue,
   sendInvoiceEmail,
@@ -47,18 +48,18 @@ const PAGE_SIZE = 10;
 // DRF collection pagination is server-owned. Never report an empty invoice
 // history when page two or a later page has not been fetched.
 export async function fetchCompleteLegacyInvoices(): Promise<Invoice[]> {
-  const collected: Invoice[] = [];
   const visited = new Set<string>();
-  for (let page = 1; page <= 100; page += 1) {
+  return fetchAllPages<Invoice>(async (page) => {
+    if (page > 100) throw new Error('Invoice history exceeds the available page limit. Please narrow the server query.');
     const data = await getInvoices({ page });
-    if (Array.isArray(data)) return [...collected, ...(data as Invoice[])];
+    if (Array.isArray(data)) return data as Invoice[];
     if (!data || !Array.isArray(data.results)) throw new Error('Unexpected legacy invoice list response.');
-    collected.push(...data.results as Invoice[]);
-    if (!data.next) return collected;
-    if (visited.has(data.next)) throw new Error('Legacy invoice pagination repeated a page.');
-    visited.add(data.next);
-  }
-  throw new Error('Invoice history exceeds the available page limit. Please narrow the server query.');
+    if (data.next) {
+      if (visited.has(data.next)) throw new Error('Legacy invoice pagination repeated a page.');
+      visited.add(data.next);
+    }
+    return { results: data.results as Invoice[], next: data.next };
+  });
 }
 
 type Props = { basePath?: string };

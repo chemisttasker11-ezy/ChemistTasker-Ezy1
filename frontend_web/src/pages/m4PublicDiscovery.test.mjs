@@ -55,6 +55,7 @@ function hooks() {
 }
 const talent=load('shared-core/src/talent.ts',{
   './domains/talent/api':{},'./utils/serialization':{},
+  './transport/application':{getSessionGeneration:()=>undefined},
 });
 const skill=load('shared-core/src/skills.ts',{});
 const newcomer=load('shared-core/src/domains/onboarding/newcomer.ts',{});

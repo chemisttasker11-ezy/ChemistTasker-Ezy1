@@ -7,7 +7,11 @@ import ts from 'typescript';
 const src = readFileSync(new URL('./discussionModel.ts', import.meta.url), 'utf8');
 const exports = {};
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-vm.runInNewContext(js, { exports, URL, process: { env: {} }, require: () => ({}) });
+const serialization = {};
+const serializationJs = ts.transpileModule(readFileSync(new URL('../../../shared-core/src/utils/serialization.ts', import.meta.url), 'utf8'),
+  { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+vm.runInNewContext(serializationJs, { exports: serialization, require: () => ({ getSessionGeneration: () => undefined }) });
+vm.runInNewContext(js, { exports, URL, process: { env: {} }, require: () => serialization });
 
 const {
   isScopeCurrent,

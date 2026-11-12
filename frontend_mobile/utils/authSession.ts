@@ -271,13 +271,15 @@ export async function refreshAccessToken(baseURL: string): Promise<string | null
         return null;
       }
       const isWeb = Platform.OS === 'web';
+      const csrfToken = isWeb ? await getBrowserCsrfToken(baseURL) : '';
+      if (generation !== sessionGeneration) return null;
       const response = await fetch(`${baseURL}${TOKEN_REFRESH_PATH}`, {
         method: 'POST',
         credentials: isWeb ? 'include' : 'omit',
         headers: {
           'Content-Type': 'application/json',
           'X-Client-Platform': isWeb ? 'web' : 'mobile',
-          ...(isWeb ? { 'X-CSRFToken': await getBrowserCsrfToken(baseURL) } : {}),
+          ...(isWeb ? { 'X-CSRFToken': csrfToken } : {}),
         },
         body: JSON.stringify(isWeb ? {} : { refresh }),
       });
@@ -317,7 +319,9 @@ export async function refreshAccessToken(baseURL: string): Promise<string | null
 }
 
 export async function getValidAccessToken(baseURL: string): Promise<string | null> {
+  const generation = sessionGeneration;
   const session = inMemorySession || (await readStoredSession());
+  if (generation !== sessionGeneration) return null;
   const access = normalizeToken(session?.access ?? session?.tokens?.access);
   if (access && !isJwtExpired(access)) {
     return access;

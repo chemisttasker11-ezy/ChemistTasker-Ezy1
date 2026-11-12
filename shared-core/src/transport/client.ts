@@ -10,6 +10,7 @@ export interface ApiClientConfig {
   /** Absolute Django API base, or a same-origin browser BFF base. */
   baseUrl: string;
   getAuthToken?: () => MaybePromise<string | null | undefined>;
+  getSessionGeneration?: () => number;
   refreshAuthToken?: () => MaybePromise<string | null | undefined>;
   onAuthFailure?: () => MaybePromise<void>;
   credentials?: RequestCredentials;
@@ -61,21 +62,26 @@ export function createApiClient(configuration: ApiClientConfig): ApiClient {
   const config = { ...configuration };
   const fetchImpl = config.fetchImpl ?? globalThis.fetch;
   if (!fetchImpl) throw new Error('A fetch implementation is required');
-  let refreshInFlight: Promise<string | null | undefined> | undefined;
-  const refresh = (): Promise<string | null | undefined> => {
-    if (!refreshInFlight) {
-      const pending = Promise.resolve().then(() => config.refreshAuthToken?.());
-      refreshInFlight = pending;
+  let refreshInFlight: { generation: number | undefined; promise: Promise<string | null | undefined> } | undefined;
+  const refresh = (generation: number | undefined, assertCurrent: () => void): Promise<string | null | undefined> => {
+    if (!refreshInFlight || refreshInFlight.generation !== generation) {
+      const pending = Promise.resolve().then(() => { assertCurrent(); return config.refreshAuthToken?.(); });
+      refreshInFlight = { generation, promise: pending };
       // Use both handlers, not an ignored rejected finally() promise.
       void pending.then(
-        () => { if (refreshInFlight === pending) refreshInFlight = undefined; },
-        () => { if (refreshInFlight === pending) refreshInFlight = undefined; },
+        () => { if (refreshInFlight?.promise === pending) refreshInFlight = undefined; },
+        () => { if (refreshInFlight?.promise === pending) refreshInFlight = undefined; },
       );
     }
-    return refreshInFlight;
+    return refreshInFlight.promise;
   };
 
   const response = async (path: string, options: ApiRequestOptions = {}, policy: ApiRequestPolicy = {}): Promise<Response> => {
+    const generation = config.getSessionGeneration?.();
+    const auth = options.auth ?? true;
+    const assertCurrent = () => {
+      if (auth && generation !== config.getSessionGeneration?.()) throw new Error('Session changed during request');
+    };
     let url: URL;
     try {
       url = apiUrl(config.baseUrl, path, options.query);
@@ -84,7 +90,7 @@ export function createApiClient(configuration: ApiClientConfig): ApiClient {
       if (policy.errorMessage) throw new Error(policy.errorMessage);
       throw error;
     }
-    const { auth = true, retryAuth = true, query: _query, body: requestBody, ...requestInit } = options;
+    const { auth: _auth, retryAuth = true, query: _query, body: requestBody, ...requestInit } = options;
     const headers = new Headers(options.headers ?? {});
     let body = requestBody as BodyInit | null | undefined;
     const multipart = typeof FormData !== 'undefined' && requestBody instanceof FormData;
@@ -95,6 +101,7 @@ export function createApiClient(configuration: ApiClientConfig): ApiClient {
       headers.set('Content-Type', 'application/json');
     }
     const send = async (token: string | null | undefined) => {
+      assertCurrent();
       const attemptHeaders = new Headers(headers);
       if (auth && token) attemptHeaders.set('Authorization', `Bearer ${token}`);
       if (!auth) attemptHeaders.delete('Authorization');
@@ -107,17 +114,21 @@ export function createApiClient(configuration: ApiClientConfig): ApiClient {
         headers: attemptHeaders,
       });
     };
+    assertCurrent();
     let result = await send(auth ? await config.getAuthToken?.() : null);
     if (result.status === 401 && auth && retryAuth && config.refreshAuthToken) {
       let refreshed: string | null | undefined;
-      try { refreshed = await refresh(); }
+      assertCurrent();
+      try { refreshed = await refresh(generation, assertCurrent); }
       catch (error) {
+        assertCurrent();
         if (config.onAuthFailure) await config.onAuthFailure();
         throw error;
       }
+      assertCurrent();
       if (refreshed) result = await send(refreshed);
     }
-    if (result.status === 401 && auth && config.onAuthFailure) await config.onAuthFailure();
+    if (result.status === 401 && auth && config.onAuthFailure) { assertCurrent(); await config.onAuthFailure(); }
     if (!result.ok) throw await responseError(result);
     return result;
   };

@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { RichContent } from '@/features/explore/RichContent';
 import { publicWebUrl } from '@/features/explore/webLinks';
 import { colors, radius, space, touch } from '@/constants/tokens';
+import { getSessionGeneration } from '@/utils/authSession';
 
 function nextPage(url: string | null): number | null {
   const match = /[?&]page=(\d+)(?:[&#]|$)/.exec(url || '');
@@ -203,9 +204,11 @@ function PublicHubFeedView() {
     if (!user) return router.push({ pathname: '/login', params: { returnTo: '/explore/hubs/' + encodeURIComponent(hub) } } as any);
     if (!poll.can_interact || poll.is_closed || busy) return;
     const ticket = generation.current;
+    const sessionGeneration = getSessionGeneration();
     setBusy(true); setActionError('');
     try {
       await chemistTaskerApi.publicContent.voteCommunityPoll(poll.id, optionId);
+      if (sessionGeneration !== getSessionGeneration()) return;
       // Refresh every visible page after a vote, preserving the loaded discussion and
       // previously paginated polls rather than dropping page 2+ to page 1.
       const pagesAtRefresh = pollPagesRef.current;

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { getSessionGeneration } from '@/utils/authSession';
 import { ReceiptShareSession } from './receiptShare';
 import { Button, Chip, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -222,14 +223,16 @@ function ExpenseReceipt({expense,loading,error,onReload}:{expense?:FinanceExpens
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
   const upload=async()=>{
     if(!expense)return;setBusy(true);setLocalError('');
+    const generation=getSessionGeneration();let assetUri:string|undefined;
     try{
       const permission=await ImagePicker.requestCameraPermissionsAsync();
       const result=permission.granted?await ImagePicker.launchCameraAsync({mediaTypes:['images'],quality:0.85}):await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:0.85});
       if(result.canceled)return;
-      const asset=result.assets[0];const blob=await (await fetch(asset.uri)).blob();
+      const asset=result.assets[0];assetUri=asset.uri;const blob=await (await fetch(asset.uri)).blob();
+      if(generation!==getSessionGeneration())return;
       await finance.uploadReceipt(expense.id,blob,asset.fileName||`receipt-${Date.now()}.jpg`);
       await onReload();
-    }catch(e){setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{setBusy(false);}
+    }catch(e){setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}setBusy(false);}
   };
   return <ParityPage title="Expense receipt" subtitle="Capture or attach evidence to this expense." loading={loading} error={error||localError}>
     {!expense?<EmptyState title="Expense not found" body="The requested expense is unavailable."/>:<>

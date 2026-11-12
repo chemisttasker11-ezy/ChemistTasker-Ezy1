@@ -49,6 +49,7 @@ function savedContactHarness({plainRows=[],protectedRows=[],cloud=[]}={}){
  const protectedStore=new Map([['ct.mobile.qr.invites.v1.7',JSON.stringify(protectedRows)]]);
  const mutations=[];
  let remote=cloud;
+ let gen=0;
  const modules={
   '@react-native-async-storage/async-storage':{
    getItem: async k=>plain.get(k)||null,
@@ -64,6 +65,7 @@ function savedContactHarness({plainRows=[],protectedRows=[],cloud=[]}={}){
    saveProfessionalContact: async()=>({}),
    deleteSavedProfessionalContact: async()=>({})
   },
+  '../../utils/authSession':{getSessionGeneration:()=>gen},
   './shareCode':{parseChemistTaskerShareCode:parse}
  };
  const tsSource=readFileSync(new URL('./savedContacts.ts',import.meta.url),'utf8');
@@ -73,8 +75,54 @@ function savedContactHarness({plainRows=[],protectedRows=[],cloud=[]}={}){
   return modules[name];
  },Date,Map,JSON,String,Array,Promise,encodeURIComponent};
  vm.runInNewContext(compiled,env);
- return {api:env.exports,plain,protectedStore,mutations,setRemote:value=>{remote=value;}};
+ return {api:env.exports,plain,protectedStore,mutations,modules,switchSession:()=>{gen++;},setRemote:value=>{remote=value;}};
 }
+test('contact sync stops after an account switch and succeeds in the same session',async()=>{
+ const url='https://chemisttasker.com.au/talent/public-board?reference_code=ABCDE1';
+ const contact=parse(url);
+ for(const switched of [true,false]){
+  const h=savedContactHarness();
+  let resolveSave;
+  let lists=0;
+  h.modules['@chemisttasker/shared-core'].saveProfessionalContact=()=>new Promise(resolve=>{resolveSave=resolve;});
+  h.modules['@chemisttasker/shared-core'].listSavedProfessionalContacts=async()=>{lists++;return [];};
+  const pending=h.api.saveContact(7,contact);
+  if(switched)h.switchSession();
+  resolveSave({});
+  if(switched){
+   await assert.rejects(pending,/Session changed/);
+   assert.deepEqual(h.mutations,[]);
+   assert.equal(lists,0);
+  }else{
+   await pending;
+   assert.deepEqual(h.mutations,['plain']);
+   assert.equal(lists,2);
+  }
+ }
+});
+test('contact removal stops after an account switch and succeeds in the same session',async()=>{
+ const url='https://chemisttasker.com.au/talent/public-board?reference_code=ABCDE1';
+ for(const switched of [true,false]){
+  const h=savedContactHarness();
+  let resolveList;
+  let deletes=0;
+  let lists=0;
+  h.modules['@chemisttasker/shared-core'].listSavedProfessionalContacts=()=>++lists===1 ? new Promise(resolve=>{resolveList=resolve;}) : Promise.resolve([]);
+  h.modules['@chemisttasker/shared-core'].deleteSavedProfessionalContact=async()=>{deletes++;};
+  const pending=h.api.removeContact(7,url);
+  if(switched)h.switchSession();
+  resolveList([{id:9,kind:'WORKER_LISTING',reference:'ABCDE1'}]);
+  if(switched){
+   await assert.rejects(pending,/Session changed/);
+   assert.equal(deletes,0);
+   assert.deepEqual(h.mutations,[]);
+  }else{
+   await pending;
+   assert.equal(deletes,1);
+   assert.deepEqual(h.mutations,['plain','secure']);
+  }
+ }
+});
 test('legacy bearer invite migrates to SecureStore before plaintext is purged',async()=>{
  const h=savedContactHarness({plainRows:[
   {url:'https://chemisttasker.com.au/membership/apply/abcdefghijk',savedAt:'2026-11-05T00:00:00Z'},
