@@ -115,12 +115,9 @@ class NotificationDatabaseBoundaryTests(SimpleTestCase):
         from types import SimpleNamespace
         from notifications.services import _deliver_notification
         row = SimpleNamespace(pk=1, user_id=1)
-        queryset = mock.MagicMock()
-        queryset.filter.return_value.exists.return_value = True
-        queryset.unread.side_effect = DatabaseError("database offline")
-        with mock.patch("notifications.services.get_user_model") as user_model, mock.patch("notifications.services._serialize_notification", return_value={}), mock.patch(
+        with mock.patch("notifications.services._serialize_notification", return_value={}), mock.patch(
             "notifications.services._broadcast",
-        ), mock.patch("notifications.services.Notification.objects.visible_to", return_value=queryset), mock.patch(
+        ), mock.patch("notifications.services.Notification.objects.filter", side_effect=DatabaseError("database offline")), mock.patch(
             "notifications.services._send_expo_push",
         ) as push:
             with self.assertRaisesMessage(DatabaseError, "database offline"):
