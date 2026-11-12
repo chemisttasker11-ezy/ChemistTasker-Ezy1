@@ -55,6 +55,9 @@ appId: com.chemisttasker.app
     visible: "View invoice"
     timeout: 30000
 - tapOn: "View invoice"
+- extendedWaitUntil:
+    visible: "Revision 1.*"
+    timeout: 30000
 - scrollUntilVisible:
     element:
       text: "Edit invoice"
@@ -62,6 +65,9 @@ appId: com.chemisttasker.app
     timeout: 30000
     centerElement: true
 - tapOn: "Edit invoice"
+- extendedWaitUntil:
+    visible: "Save revision"
+    timeout: 30000
 - scrollUntilVisible:
     element:
       id: "invoice-quantity-1"
@@ -96,6 +102,9 @@ appId: com.chemisttasker.app
     visible: "View invoice"
     timeout: 30000
 - tapOn: "View invoice"
+- extendedWaitUntil:
+    visible: "Revision 2.*"
+    timeout: 30000
 - assertVisible: "Revision 2.*"
 - scrollUntilVisible:
     element:
@@ -104,11 +113,22 @@ appId: com.chemisttasker.app
     timeout: 30000
     centerElement: true
 - tapOn: "Send email"
+- extendedWaitUntil:
+    visible: "Confirm"
+    timeout: 30000
 - tapOn: "Confirm"
+- extendedWaitUntil:
+    visible:
+      text: "Sent"
+      below: "INV-000001"
+    timeout: 30000
 - extendedWaitUntil:
     visible: "View invoice"
     timeout: 30000
 - tapOn: "View invoice"
+- extendedWaitUntil:
+    visible: "Revision 2.*"
+    timeout: 30000
 - assertVisible: "Sent"
 - assertVisible: ".*616.00.*"
 - scrollUntilVisible:
