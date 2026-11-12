@@ -8,6 +8,92 @@ const root = path.resolve(__dirname, '..');
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 
+for (const stale of [true, false]) {
+  const session = stale ? 'switched session' : 'same session';
+  test(`worker public feed: ${session} ${stale ? 'sends no next page' : 'loads the next page'}`, async () => {
+    let generation = 7;
+    const gate = deferred(), requests = [], displayed = [];
+    const load = closure('app/share/worker.tsx', 'ShareWorkerQr', 'load', {
+      useCallback: fn => fn, getSessionGeneration: () => generation, requestRef: { current: 0 }, userId: 4,
+      setLoading() {}, setError() {}, setPost: post => { if (post) displayed.push(post.id); },
+      nextPageUrl: url => url ? 2 : null,
+      getPublicTalentFeed: async ({ page }) => {
+        requests.push({ page, generation });
+        if (page === 1) await gate.promise;
+        return { results: page === 1 ? [] : [{ id: 9, author_user_id: 4, reference_code: 'public-card' }],
+          next: page === 1 ? '?page=2' : null };
+      },
+    });
+    const pending = load();
+    assert.equal(requests.length, 1);
+    if (stale) generation++;
+    gate.resolve();
+    await pending;
+    assert.deepEqual(requests, (stale ? [1] : [1, 2]).map(page => ({ page, generation: 7 })),
+      'public-feed continuation must use the captured session');
+    if (!stale) assert.deepEqual(displayed, [9]);
+  });
+
+  test(`hub vote: ${session} ${stale ? 'sends no poll refresh' : 'refreshes all loaded poll pages'}`, async () => {
+    let sessionGeneration = 7;
+    const gate = deferred(), votes = [], requests = [], displayed = [];
+    const vote = closure('app/explore/hubs/[hub].tsx', 'PublicHubFeedView', 'vote', {
+      getSessionGeneration: () => sessionGeneration, generation: { current: 0 }, user: { id: 4 }, busy: false,
+      hub: 'public-hub', pollPagesRef: { current: 2 }, setBusy() {}, setActionError() {}, setPollNext() {},
+      nextPage: () => null, setPolls: rows => displayed.push(...rows.map(row => row.id)),
+      chemistTaskerApi: { publicContent: {
+        voteCommunityPoll: async (...args) => { votes.push(args); await gate.promise; },
+        listCommunityPolls: async (hub, { page }) => {
+          requests.push({ page, generation: sessionGeneration });
+          return { results: [{ id: page }], next: null };
+        },
+      } },
+    });
+    const pending = vote({ id: 12, can_interact: true, is_closed: false }, 3);
+    assert.deepEqual(votes, [[12, 3]]);
+    // The auth session changes before React unmount cleanup updates the local ref.
+    if (stale) sessionGeneration++;
+    gate.resolve();
+    await pending;
+    assert.deepEqual(requests, (stale ? [] : [1, 2]).map(page => ({ page, generation: 7 })),
+      'completed vote must not refresh polls in a new session');
+    if (!stale) assert.deepEqual(displayed, [1, 2]);
+  });
+
+  for (const component of ['NewChatModal', 'NewGroupModal', 'GroupManageModal']) {
+    test(`${component} search: ${session} ${stale ? 'sends no delayed search' : 'searches and displays results'}`, async () => {
+      let generation = 7, timer;
+      const requests = [], displayed = [];
+      const file = `roles/shared/chat/${component}.tsx`;
+      const source = ts.createSourceFile(file, fs.readFileSync(path.join(root, file), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      let effect;
+      function find(node) {
+        if (ts.isCallExpression(node) && node.expression.getText(source) === 'useEffect' &&
+          node.arguments[0].getText(source).includes('setTimeout')) effect = node.arguments[0];
+        ts.forEachChild(node, find);
+      }
+      find(source);
+      assert.ok(effect, 'delayed search effect exists');
+      const runEffect = evaluate(`(${effect.getText(source)})`, {
+        getSessionGeneration: () => generation, query: 'Alex', setLoading() {}, setError() {},
+        setResults: rows => displayed.push(...rows.map(row => row.id)),
+        setTimeout: (callback, delay) => { assert.equal(delay, 250); timer = callback; return 1; }, clearTimeout() {},
+        searchParticipants: async query => { requests.push({ query, generation }); return [{ id: 9 }]; },
+      });
+      const cleanup = runEffect();
+      assert.equal(typeof timer, 'function');
+      assert.equal(requests.length, 0);
+      // Fire before effect cleanup: cancellation alone cannot guard this window.
+      if (stale) generation++;
+      await timer();
+      assert.deepEqual(requests, stale ? [] : [{ query: 'Alex', generation: 7 }],
+        'delayed participant search must use the captured session');
+      assert.deepEqual(displayed, stale ? [] : [9]);
+      cleanup();
+    });
+  }
+}
+
 // Execute production closures with only their React state/native/network boundaries supplied.
 function closure(file, component, name, globals) {
   const source = ts.createSourceFile(file, fs.readFileSync(path.join(root, file), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
