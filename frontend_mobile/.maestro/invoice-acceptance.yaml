@@ -54,6 +54,12 @@ appId: com.chemisttasker.app
 - extendedWaitUntil:
     visible: "View invoice"
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "View invoice"
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
 - tapOn: "View invoice"
 - extendedWaitUntil:
     visible: "Revision 1.*"
@@ -101,6 +107,12 @@ appId: com.chemisttasker.app
 - extendedWaitUntil:
     visible: "View invoice"
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "View invoice"
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
 - tapOn: "View invoice"
 - extendedWaitUntil:
     visible: "Revision 2.*"
@@ -125,6 +137,12 @@ appId: com.chemisttasker.app
 - extendedWaitUntil:
     visible: "View invoice"
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "View invoice"
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
 - tapOn: "View invoice"
 - extendedWaitUntil:
     visible: "Revision 2.*"
