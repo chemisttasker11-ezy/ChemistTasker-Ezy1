@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
@@ -45,7 +45,8 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       {/* Delayed fade: a fast session restore never flashes the status line. */}
-      <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(durations.fast).delay(durations.slow)} style={styles.boot}>
+      {/* Not on Android: the entering animation can overlap router.replace and crash Fabric (removeViewAt, D90). */}
+      <Animated.View entering={reduceMotion || Platform.OS === 'android' ? undefined : FadeIn.duration(durations.fast).delay(durations.slow)} style={styles.boot}>
         <BrandLoader size={56} accessibilityLabel="Loading your workspace" />
       </Animated.View>
     </SafeAreaView>
