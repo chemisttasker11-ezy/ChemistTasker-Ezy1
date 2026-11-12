@@ -20,15 +20,24 @@ appId: com.chemisttasker.app
       id: "invoice-quantity-1"
     direction: DOWN
     timeout: 30000
+    centerElement: true
 - tapOn:
     id: "invoice-quantity-1"
 - eraseText: 20
 - inputText: "7.5"
-- assertVisible: "7.5"
+- assertVisible:
+    id: "invoice-quantity-1"
+    text: "7[.]5"
 - runFlow:
     when:
       platform: iOS
     commands:
+      - scrollUntilVisible:
+          element:
+            text: "Items & services"
+          direction: UP
+          timeout: 30000
+          centerElement: true
       - tapOn: "Items & services"
 - runFlow:
     when:
@@ -40,26 +49,54 @@ appId: com.chemisttasker.app
       text: ".*577.50.*"
     direction: DOWN
     timeout: 30000
+    centerElement: true
 - tapOn: "Save invoice"
 - extendedWaitUntil:
     visible: "View invoice"
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "View invoice"
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
 - tapOn: "View invoice"
+- extendedWaitUntil:
+    visible: "Revision 1.*"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Edit invoice"
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
 - tapOn: "Edit invoice"
+- extendedWaitUntil:
+    visible: "Save revision"
+    timeout: 30000
 - scrollUntilVisible:
     element:
       id: "invoice-quantity-1"
     direction: DOWN
     timeout: 30000
+    centerElement: true
 - tapOn:
     id: "invoice-quantity-1"
 - eraseText: 20
 - inputText: "8"
-- assertVisible: "8"
+- assertVisible:
+    id: "invoice-quantity-1"
+    text: "8"
 - runFlow:
     when:
       platform: iOS
     commands:
+      - scrollUntilVisible:
+          element:
+            text: "Items & services"
+          direction: UP
+          timeout: 30000
+          centerElement: true
       - tapOn: "Items & services"
 - runFlow:
     when:
@@ -70,19 +107,46 @@ appId: com.chemisttasker.app
 - extendedWaitUntil:
     visible: "View invoice"
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "View invoice"
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
 - tapOn: "View invoice"
+- extendedWaitUntil:
+    visible: "Revision 2.*"
+    timeout: 30000
 - assertVisible: "Revision 2.*"
 - scrollUntilVisible:
     element:
       text: "Send email"
     direction: DOWN
     timeout: 30000
+    centerElement: true
 - tapOn: "Send email"
+- extendedWaitUntil:
+    visible: "Confirm"
+    timeout: 30000
 - tapOn: "Confirm"
+- extendedWaitUntil:
+    visible:
+      text: "Sent"
+      below: "INV-000001"
+    timeout: 30000
 - extendedWaitUntil:
     visible: "View invoice"
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "View invoice"
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
 - tapOn: "View invoice"
+- extendedWaitUntil:
+    visible: "Revision 2.*"
+    timeout: 30000
 - assertVisible: "Sent"
 - assertVisible: ".*616.00.*"
 - scrollUntilVisible:
@@ -90,6 +154,7 @@ appId: com.chemisttasker.app
       text: "Share PDF"
     direction: DOWN
     timeout: 30000
+    centerElement: true
 - tapOn:
     text: "Share PDF"
     index: 0

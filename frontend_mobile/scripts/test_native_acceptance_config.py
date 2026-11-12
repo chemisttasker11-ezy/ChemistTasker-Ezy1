@@ -43,11 +43,92 @@ class NativeAcceptanceConfigurationTests(unittest.TestCase):
 
         invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
         android_dismiss = '    when:\n      platform: Android\n    commands:\n      - hideKeyboard'
-        ios_dismiss = '    when:\n      platform: iOS\n    commands:\n      - tapOn: "Items & services"'
+        ios_dismiss = (
+            '    when:\n      platform: iOS\n    commands:\n'
+            '      - scrollUntilVisible:\n'
+            '          element:\n            text: "Items & services"\n'
+            '          direction: UP\n          timeout: 30000\n'
+            '          centerElement: true\n'
+            '      - tapOn: "Items & services"'
+        )
         self.assertEqual(2, invoice.count(android_dismiss))
         self.assertEqual(2, invoice.count(ios_dismiss))
         self.assertNotIn("hideKeyboard", invoice.replace(android_dismiss, ""))
 
+    def test_invoice_edits_center_the_quantity_and_assert_its_value(self):
+        invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
+        for value in ("7.5", "8"):
+            with self.subTest(value=value):
+                self.assertIn(
+                    '- scrollUntilVisible:\n'
+                    '    element:\n      id: "invoice-quantity-1"\n'
+                    '    direction: DOWN\n    timeout: 30000\n'
+                    '    centerElement: true\n'
+                    '- tapOn:\n    id: "invoice-quantity-1"\n'
+                    '- eraseText: 20\n'
+                    f'- inputText: "{value}"\n'
+                    '- assertVisible:\n    id: "invoice-quantity-1"\n'
+                    f'    text: "{value.replace(".", "[.]")}"',
+                    invoice,
+                )
+
+    def test_invoice_modal_opens_are_confirmed_after_the_list_refresh(self):
+        invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
+        markers = re.findall(
+            r'- tapOn: "View invoice"\n- extendedWaitUntil:\n'
+            r'    visible: "Revision ([12])\.\*"\n    timeout: 30000', invoice
+        )
+        self.assertEqual(["1", "2", "2"], markers)
+        self.assertIn(
+            '- tapOn: "Confirm"\n- extendedWaitUntil:\n'
+            '    visible:\n      text: "Sent"\n      below: "INV-000001"\n'
+            '    timeout: 30000\n- extendedWaitUntil:\n    visible: "View invoice"', invoice
+        )
+        self.assertIn('- tapOn: "Edit invoice"\n- extendedWaitUntil:\n    visible: "Save revision"\n    timeout: 30000', invoice)
+
+    def test_every_view_invoice_tap_centres_the_button_first(self):
+        # After a send the list card's button sits under the tab bar edge; an edge tap misses it (run 43308831873).
+        invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
+        centred = (
+            '- scrollUntilVisible:\n'
+            '    element:\n      text: "View invoice"\n'
+            '    direction: DOWN\n    timeout: 30000\n'
+            '    centerElement: true\n'
+            '- tapOn: "View invoice"\n'
+        )
+        self.assertEqual(3, invoice.count('- tapOn: "View invoice"\n'))
+        self.assertEqual(3, invoice.count(centred))
+
+    def test_invoice_other_scrolled_targets_clear_the_screen_edges(self):
+        invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
+        for target in (".*577.50.*", "Edit invoice", "Send email", "Share PDF"):
+            with self.subTest(target=target):
+                self.assertIn(
+                    '- scrollUntilVisible:\n'
+                    f'    element:\n      text: "{target}"\n'
+                    '    direction: DOWN\n    timeout: 30000\n'
+                    '    centerElement: true\n',
+                    invoice,
+                )
+        # These are in the modal's top summary, above its long list of actions.
+        for assertion in ('"Revision 2.*"', '"Sent"', '".*616.00.*"'):
+            self.assertIn(f'- assertVisible: {assertion}', invoice)
+
+
+    def test_ios_waits_for_and_dismisses_password_prompts_after_sign_in(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        ios = workflow.split("\n  ios-native:\n", 1)[1]
+        self.assertRegex(
+            ios,
+            r'- tapOn: "Welcome back"\s*\n\s*- tapOn: "Sign in"\s*\n'
+            r'\s*- extendedWaitUntil:\s*\n'
+            r'\s*visible: "Switch workspace\. Current: Pharmacist\|Not Now\|Not now"\s*\n'
+            r'\s*timeout: 30000\s*\n'
+            r'\s*- tapOn:\s*\n\s*text: "Not Now"\s*\n\s*optional: true\s*\n'
+            r'\s*- tapOn:\s*\n\s*text: "Not now"\s*\n\s*optional: true\s*\n'
+            r'\s*- extendedWaitUntil:\s*\n'
+            r'\s*visible: "Switch workspace\. Current: Pharmacist"\s*\n\s*timeout: 30000',
+        )
 
     def test_both_native_flows_open_the_real_admin_persona_picker(self):
         """After signing in as a pharmacist, admin is a persona option, not the landing screen."""
