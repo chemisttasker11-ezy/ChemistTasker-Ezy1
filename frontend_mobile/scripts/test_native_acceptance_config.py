@@ -72,6 +72,20 @@ class NativeAcceptanceConfigurationTests(unittest.TestCase):
                     invoice,
                 )
 
+    def test_invoice_modal_opens_are_confirmed_after_the_list_refresh(self):
+        invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
+        markers = re.findall(
+            r'- tapOn: "View invoice"\n- extendedWaitUntil:\n'
+            r'    visible: "Revision ([12])\.\*"\n    timeout: 30000', invoice
+        )
+        self.assertEqual(["1", "2", "2"], markers)
+        self.assertIn(
+            '- tapOn: "Confirm"\n- extendedWaitUntil:\n'
+            '    visible:\n      text: "Sent"\n      below: "INV-000001"\n'
+            '    timeout: 30000\n- extendedWaitUntil:\n    visible: "View invoice"', invoice
+        )
+        self.assertIn('- tapOn: "Edit invoice"\n- extendedWaitUntil:\n    visible: "Save revision"\n    timeout: 30000', invoice)
+
     def test_invoice_other_scrolled_targets_clear_the_screen_edges(self):
         invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
         for target in (".*577.50.*", "Edit invoice", "Send email", "Share PDF"):
