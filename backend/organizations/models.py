@@ -1,6 +1,7 @@
 """Organisations, pharmacies, chains, pharmacy admins and pharmacy claims."""
 from django.db import models
 from access_control.pharmacy_roles import PharmacyAdminPolicy
+from access_control.admin_roles import validate_admin_user
 from django.db.models import Q
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -430,12 +431,19 @@ class PharmacyAdmin(models.Model):
         return capability in self.capabilities
 
     def clean(self):
+        if self.user_id:
+            validate_admin_user(self.user)
         # Prevent demoting the pharmacy owner record
         if (
             self.admin_level != self.AdminLevel.OWNER
             and getattr(self.pharmacy.owner, "user_id", None) == self.user_id
         ):
             raise ValidationError("Pharmacy owner must remain an OWNER level admin.")
+
+    def save(self, *args, **kwargs):
+        # Model.save() does not run clean(), including ORM create/update_or_create.
+        validate_admin_user(self.user)
+        return super().save(*args, **kwargs)
 
     def can_be_removed_by(self, acting_user) -> bool:
         """

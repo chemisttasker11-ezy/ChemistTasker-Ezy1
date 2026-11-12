@@ -5,6 +5,7 @@ patch point. Transaction boundaries and operation bodies retain their order.
 Composition supplies these operations through the organisation-owned port.
 """
 from django.conf import settings
+from access_control.admin_roles import validate_admin_user, validate_admin_user_for_api
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -60,6 +61,7 @@ def accept_admin_invitation(self, request, pk=None):
             pk=pk, user=request.user, is_active=False,
             membership__status__in=[Membership.Status.PENDING, Membership.Status.ACCEPTED],
         )
+        validate_admin_user_for_api(assignment.user)
         membership = Membership.objects.select_for_update().get(pk=assignment.membership_id)
         if membership.status != Membership.Status.PENDING and not (
             membership.status == Membership.Status.ACCEPTED and membership.is_active
@@ -164,6 +166,7 @@ def create_admin(self, request, *args, async_task, **kwargs):
         return Response({"detail": "Not allowed to manage admins for this pharmacy."}, status=status.HTTP_403_FORBIDDEN)
 
     user = User.objects.filter(email__iexact=email).first()
+    validate_admin_user_for_api(user)
     if user and PharmacyAdmin.objects.filter(user=user, pharmacy=pharmacy, is_active=True).exists():
         return Response(
             {"detail": "This user already has active admin access. Edit their assignment instead."},
@@ -313,9 +316,10 @@ def revoke_admin(self, request, *args, **kwargs):
     # my-pending-invitations and accept-invitation cannot resurrect it.
     # Keep the inactive assignment for audit and let a fresh authorized
     # create() explicitly re-link membership for any later re-invite.
-    assignment.is_active = False
-    assignment.membership = None
-    assignment.save(update_fields=["is_active", "membership", "updated_at"])
+    # Revoking historical invalid access must remain possible without passing the grant guard.
+    PharmacyAdmin.objects.filter(pk=assignment.pk).update(
+        is_active=False, membership=None, updated_at=now,
+    )
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -353,6 +357,7 @@ def chain_remove_user(self, request, pk=None):
 
 
 def link_owner(user, pharmacy):
+    validate_admin_user(user)
     membership, _created = Membership.objects.get_or_create(
         user=user,
         pharmacy=pharmacy,
@@ -377,6 +382,7 @@ def link_owner(user, pharmacy):
 
 
 def bootstrap_contact(user, pharmacy, inviter):
+    validate_admin_user(user)
     worker_role = personal_pharmacy_role(user)
     pharmacy_membership, _ = Membership.objects.get_or_create(
         user=user,

@@ -1,6 +1,7 @@
 """Organization membership API: inviting organization users, listing and changing their roles
 (with delegation limits) and the role definitions."""
 from users.membership_port import membership_services
+from access_control.admin_roles import validate_admin_user_for_api
 from rest_framework import viewsets, permissions, generics, status, mixins
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
@@ -70,6 +71,11 @@ class InviteOrgUserView(generics.CreateAPIView):
     required_roles     = ['ORG_ADMIN', 'CHIEF_ADMIN', 'REGION_ADMIN']
     permission_classes = [permissions.IsAuthenticated, OrganizationRolePermission]
 
+    def create(self, request, *args, **kwargs):
+        # Keep the public refusal a scalar detail before serializer field-error normalization.
+        validate_admin_user_for_api(User.objects.filter(email__iexact=request.data.get('email')).first())
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         data = serializer.validated_data
         organization = data['organization']
@@ -94,7 +100,7 @@ class InviteOrgUserView(generics.CreateAPIView):
 
         # 1) Find or create the User
         try:
-            user = User.objects.get(email=data['email'])
+            user = User.objects.get(email__iexact=data['email'])
             temp_password = None
         except User.DoesNotExist:
             temp_password = None
@@ -173,6 +179,10 @@ class OrganizationMembershipViewSet(mixins.ListModelMixin,
                                     viewsets.GenericViewSet):
     serializer_class = OrganizationMembershipDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def update(self, request, *args, **kwargs):
+        validate_admin_user_for_api(self.get_object().user)
+        return super().update(request, *args, **kwargs)
 
     def _management_memberships(self, user):
         memberships = user.organization_memberships.select_related('organization').prefetch_related('pharmacies')

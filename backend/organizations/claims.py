@@ -2,6 +2,7 @@
 from rest_framework import mixins, permissions, status, viewsets
 from organizations.membership_port import membership_operations
 from organizations.models import Pharmacy, PharmacyAdmin, PharmacyClaim
+from access_control.admin_roles import validate_admin_user_for_api
 from onboarding.models import OwnerOnboarding
 from notifications.models import Notification
 from rest_framework.response import Response
@@ -183,9 +184,10 @@ class OwnerOnboardingClaim(APIView):
         # A new account starts as a PHARMACY_MANAGER: admin dashboard first, no onboarding; the person may later
         # choose Pharmacist or Other Staff once. An existing account keeps its type.
         user, created = User.objects.get_or_create(
-            email=email,
-            defaults={'role': 'PHARMACY_MANAGER'}
+            email__iexact=email,
+            defaults={'email': email, 'role': 'PHARMACY_MANAGER'}
         )
+        validate_admin_user_for_api(user)
         temp_password = None
         if created:
             user.set_unusable_password()

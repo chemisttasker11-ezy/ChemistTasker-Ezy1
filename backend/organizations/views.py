@@ -1,5 +1,6 @@
 """Organisation API: organisations, pharmacies, chains and pharmacy admins."""
 from organizations.feature_port import pharmacy_features
+from access_control.admin_roles import validate_admin_user_for_api
 from infrastructure.request_fingerprint import request_fingerprint
 
 from rest_framework import permissions, serializers, status, viewsets
@@ -201,6 +202,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
+        validate_admin_user_for_api(user)
         owner_onboarding = None
         organization = None
 
