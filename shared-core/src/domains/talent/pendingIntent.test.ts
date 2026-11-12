@@ -128,16 +128,19 @@ it('allows only one persisted winner for concurrent acquisitions across store in
   expect(await open().load()).toEqual(one);
 });
 
-it('recovers corrupt general-intent JSON as empty and allows a fresh acquisition', async () => {
+it('preserves corrupt general-intent JSON until explicit recovery after review', async () => {
   const { open, records, storage } = fixture();
-  const original = await open().acquire({ title: 'Before corruption' });
+  await open().acquire({ title: 'Before corruption' });
   const scope = storage.setItem.mock.calls[0][0];
   records.set(scope, '{broken');
+  // Intended behaviour change, D99: recovery requires explicit review.
+  await expect(open().load()).rejects.toThrow('Recover your pending intent');
+  expect(records.get(scope)).toBe('{broken');
+  await expect(open().acquire({ title: 'After corruption' })).rejects.toThrow('Recover your pending intent');
+  expect(records.get(scope)).toBe('{broken');
+  await open().recoverCorruptAfterReview();
+  expect(records.has(scope)).toBe(false);
   await expect(open().load()).resolves.toBeNull();
-  await expect(open().load()).resolves.toBeNull();
-  const fresh = await open().acquire({ title: 'After recovery' });
-  expect(fresh.key).not.toBe(original.key);
-  expect(await open().load()).toEqual(fresh);
 });
 
 it('loads the exact legacy v1 pitch format through both general and existing pitch paths', async () => {
