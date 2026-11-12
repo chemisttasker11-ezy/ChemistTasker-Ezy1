@@ -60,7 +60,7 @@ it('preserves pending pitch error messages', async () => {
   const { storage, lock, store } = fixture('talent.pitch.create');
   const pitch = createPendingPitchStore(storage, lock, store.scope, () => key);
   const intent = await pitch.acquire({}, 'EXPLORER');
-  await expect(pitch.reject('wrong')).rejects.toThrow('The pending pitch changed. Reopen it to continue.');
+  await expect(pitch.reject('wrong')).rejects.toThrow('The pending pitch changed. Reopen your pitch to continue.');
   await expect(pitch.resolve(intent.key)).rejects.toThrow('Review the pending pitch before starting another one.');
 });
 
@@ -85,9 +85,19 @@ it('rejects an invalid pitch update without changing storage', async () => {
 
 it('persists general pitch acquisitions and settlements the pitch reader accepts', async () => {
   const { storage, lock, store } = fixture('talent.pitch.create');
-  const intent = await store.acquire({ headline: 'Pitch', role: 'EXPLORER' });
+  const intent = await store.acquire({ headline: 'Pitch' }, 'EXPLORER');
   const pitch = createPendingPitchStore(storage, lock, store.scope);
   expect(await pitch.read()).toMatchObject({ ...intent, roleAtSubmission: 'EXPLORER' });
   await store.settle(intent.key, 7);
   expect(await pitch.read()).toMatchObject({ ...intent, resultId: 7 });
+});
+
+it('keeps the caller role and exact serialized pitch payload', async () => {
+  const { store } = fixture('talent.pitch.create');
+  const payload = { role_category: 'PHARMACIST', headline: 'Pitch', availability_days: ['Monday'] };
+  const bytes = JSON.stringify(payload);
+  const intent = await store.acquire(payload, 'EXPLORER');
+  expect(intent).toMatchObject({ roleAtSubmission: 'EXPLORER' });
+  expect(JSON.stringify(intent.exactPayload)).toBe(bytes);
+  expect(JSON.stringify((await store.load())!.exactPayload)).toBe(bytes);
 });

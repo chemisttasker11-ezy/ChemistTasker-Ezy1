@@ -77,9 +77,9 @@ it('replays a committed response lost before restart with the persisted key and 
 it('never loads account A for account B or dispatches a captured pitch after switching accounts', async () => {
   const { open, storage, lock } = fixture();
   // Pitch acquisitions now require a role so the pitch reader can accept them.
-  const intent = await open(pitch, 'A').acquire({ headline: 'Account A', role: 'EXPLORER' });
+  const intent = await open(pitch, 'A').acquire({ headline: 'Account A' }, 'EXPLORER');
   expect(await open(pitch, 'B').load()).toBeNull();
-  const accountB = await open(pitch, 'B').acquire({ headline: 'Account B', role: 'EXPLORER' });
+  const accountB = await open(pitch, 'B').acquire({ headline: 'Account B' }, 'EXPLORER');
   expect(accountB.key).not.toBe(intent.key);
   const fetchImpl = vi.fn(async () => new Response('{"id":7}', {
     status: 201, headers: { 'content-type': 'application/json' },
@@ -96,7 +96,7 @@ it('never loads account A for account B or dispatches a captured pitch after swi
 it('isolates two operations belonging to the same environment and account', async () => {
   const { open } = fixture();
   // Pitch acquisitions now require a role so the pitch reader can accept them.
-  const pitchIntent = await open(pitch).acquire({ headline: 'Pitch', role: 'EXPLORER' });
+  const pitchIntent = await open(pitch).acquire({ headline: 'Pitch' }, 'EXPLORER');
   expect(await open(marketplace).load()).toBeNull();
   const listingIntent = await open(marketplace).acquire({ title: 'Listing' });
   expect(listingIntent.key).not.toBe(pitchIntent.key);
