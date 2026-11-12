@@ -60,7 +60,7 @@ function intentStore<T extends PendingIntent>(storage: PitchIntentStorage, lock:
   async function update(key: string, changes: Partial<T>) {
     return lock(scope, async () => {
       const intent = await read();
-      if (!intent || intent.key !== key) throw new Error(`The pending ${kind} changed. Reopen it to continue.`);
+      if (!intent || intent.key !== key) throw new Error(`The pending ${kind} changed. Reopen ${kind === 'pitch' ? 'your pitch' : 'it'} to continue.`);
       return write({ ...intent, ...changes });
     });
   }
@@ -93,7 +93,7 @@ export function createPendingIntentStore({ storage, lock, environment, userId, o
     value => !isPitch || validPitch(value as PendingPitch), isPitch ? corruptPitch : () => null, newKey, isPitch ? 'pitch' : 'intent');
   return {
     scope, load: store.read,
-    acquire: (payload: Record<string, unknown>) => store.acquire(payload, isPitch ? { roleAtSubmission: payload.role } as Partial<PendingPitch> : {}),
+    acquire: (payload: Record<string, unknown>, roleAtSubmission?: string) => store.acquire(payload, isPitch ? { roleAtSubmission } as Partial<PendingPitch> : {}),
     settle: async (key: string, resultId: number) => {
       if (!Number.isSafeInteger(resultId) || resultId <= 0) throw new Error('Invalid result ID.');
       return store.update(key, { resultId });
@@ -150,7 +150,7 @@ export async function sendPendingPitch(store: ReturnType<typeof createPendingPit
     if (isCurrentAccount() && error?.status === 400 && error?.payload?.code !== 'IDEMPOTENCY_KEY_REQUIRED') {
       await store.reject(intent.key);
     } else if (isCurrentAccount() && ['IDEMPOTENCY_PAYLOAD_MISMATCH', 'PITCH_DELETED', 'IDEMPOTENCY_REPLAY_EXPIRED'].includes(error?.payload?.code)) {
-      await store.reconcile(intent.key, error.payload.code, error.payload.post_id);
+      await store.reconcile(intent.key, error.payload.code, error.payload.post_id ?? undefined);
     }
     throw error;
   }
