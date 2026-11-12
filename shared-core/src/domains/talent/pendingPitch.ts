@@ -25,60 +25,92 @@ export function pitchIntentScope(environment: string, userId: string | number): 
   return `talent.pitch.create:v1:${JSON.stringify([environment, String(userId)])}`;
 }
 
-export function createPendingPitchStore(storage: PitchIntentStorage, lock: PitchIntentLock, scope: string,
-  newKey = () => globalThis.crypto.randomUUID()) {
-  async function read(): Promise<PendingPitch | null> {
+export type PendingIntent = {
+  version: 1;
+  key: string;
+  exactPayload: Record<string, unknown>;
+  createdAt: string;
+  resultId?: number;
+};
+
+function intentStore<T extends PendingIntent>(storage: PitchIntentStorage, lock: PitchIntentLock, scope: string,
+  valid: (value: T) => boolean, corrupt: () => T | null, newKey: () => string) {
+  async function read(): Promise<T | null> {
     const raw = await storage.getItem(scope);
     if (raw === null) return null;
     try {
-      const value = JSON.parse(raw) as PendingPitch;
+      const value = JSON.parse(raw) as T;
       if (!value || value.version !== 1 || !uuid.test(value.key) || !value.exactPayload ||
           typeof value.exactPayload !== 'object' || Array.isArray(value.exactPayload) ||
-          typeof value.roleAtSubmission !== 'string' || !Number.isFinite(Date.parse(value.createdAt)) ||
+          !Number.isFinite(Date.parse(value.createdAt)) ||
           (value.resultId !== undefined && (!Number.isSafeInteger(value.resultId) || value.resultId <= 0)) ||
-          (value.acknowledged !== undefined && typeof value.acknowledged !== 'boolean') ||
-          (value.rejected !== undefined && typeof value.rejected !== 'boolean') ||
-          (value.acknowledged && !value.resultId) ||
-          (value.terminalCode !== undefined && !['IDEMPOTENCY_PAYLOAD_MISMATCH', 'PITCH_DELETED', 'IDEMPOTENCY_REPLAY_EXPIRED'].includes(value.terminalCode))) {
-        throw new Error();
-      }
+          !valid(value)) throw new Error();
       return value;
-    } catch {
-      throw new Error('Recover your pending pitch by reviewing your saved pitches. Browser storage could not be read safely.');
-    }
+    } catch { return corrupt(); }
   }
-  async function write(intent: PendingPitch): Promise<PendingPitch> {
+  async function write(intent: T): Promise<T> {
     const raw = JSON.stringify(intent);
     await storage.setItem(scope, raw);
     if (await storage.getItem(scope) !== raw) throw new Error('Your pending pitch could not be saved safely. Please retry.');
-    return JSON.parse(raw) as PendingPitch;
+    return JSON.parse(raw) as T;
   }
-  async function update(key: string, changes: Partial<PendingPitch>) {
+  async function update(key: string, changes: Partial<T>) {
     return lock(scope, async () => {
       const intent = await read();
-      if (!intent || intent.key !== key) throw new Error('The pending pitch changed. Reopen your pitch to continue.');
+      if (!intent || intent.key !== key) throw new Error('The pending intent changed. Reopen it to continue.');
       return write({ ...intent, ...changes });
     });
   }
   return {
-    scope, read,
-    acquire: (exactPayload: Record<string, unknown>, roleAtSubmission: string) => lock(scope, async () =>
-      (await read()) ?? write({ version: 1, key: newKey(), exactPayload, roleAtSubmission, createdAt: new Date().toISOString() })),
-    acknowledge: (key: string, resultId: number) => update(key, { resultId, acknowledged: true }),
-    reject: (key: string) => update(key, { rejected: true }),
-    reconcile: (key: string, terminalCode: NonNullable<PendingPitch['terminalCode']>, resultId?: number) =>
-      update(key, { terminalCode, resultId }),
-    resolve: (key: string) => lock(scope, async () => {
+    read, update,
+    acquire: (exactPayload: Record<string, unknown>, extra: Partial<T> = {}) => lock(scope, async () =>
+      (await read()) ?? write({ version: 1, key: newKey(), exactPayload, createdAt: new Date().toISOString(), ...extra } as T)),
+    remove: (key: string, allowed: (intent: T) => boolean) => lock(scope, async () => {
       const intent = await read();
-      if (!intent || intent.key !== key || (!intent.acknowledged && !intent.terminalCode && !intent.rejected)) {
-        throw new Error('Review the pending pitch before starting another one.');
-      }
+      if (!intent || intent.key !== key || !allowed(intent)) throw new Error('Review the pending intent before starting another one.');
       await storage.removeItem(scope);
     }),
+  };
+}
+
+export function createPendingIntentStore({ storage, lock, environment, userId, operation, newKey = () => globalThis.crypto.randomUUID() }: {
+  storage: PitchIntentStorage; lock: PitchIntentLock; environment: string; userId: string | number;
+  operation: string; newKey?: () => string;
+}) {
+  const scope = `${operation}:v1:${JSON.stringify([environment, String(userId)])}`;
+  const store = intentStore<PendingIntent>(storage, lock, scope, () => true, () => null, newKey);
+  return {
+    scope, load: store.read,
+    acquire: (payload: Record<string, unknown>) => store.acquire(payload),
+    settle: (key: string, resultId: number) => {
+      if (!Number.isSafeInteger(resultId) || resultId <= 0) throw new Error('Invalid result ID.');
+      return store.update(key, { resultId });
+    },
+    clear: (key: string) => store.remove(key, intent => intent.resultId !== undefined),
+  };
+}
+
+export function createPendingPitchStore(storage: PitchIntentStorage, lock: PitchIntentLock, scope: string,
+  newKey = () => globalThis.crypto.randomUUID()) {
+  const store = intentStore<PendingPitch>(storage, lock, scope, value =>
+    typeof value.roleAtSubmission === 'string' &&
+    (value.acknowledged === undefined || typeof value.acknowledged === 'boolean') &&
+    (value.rejected === undefined || typeof value.rejected === 'boolean') &&
+    (!value.acknowledged || !!value.resultId) &&
+    (value.terminalCode === undefined || ['IDEMPOTENCY_PAYLOAD_MISMATCH', 'PITCH_DELETED', 'IDEMPOTENCY_REPLAY_EXPIRED'].includes(value.terminalCode)),
+  () => { throw new Error('Recover your pending pitch by reviewing your saved pitches. Browser storage could not be read safely.'); }, newKey);
+  return {
+    scope, read: store.read,
+    acquire: (exactPayload: Record<string, unknown>, roleAtSubmission: string) => store.acquire(exactPayload, { roleAtSubmission }),
+    acknowledge: (key: string, resultId: number) => store.update(key, { resultId, acknowledged: true }),
+    reject: (key: string) => store.update(key, { rejected: true }),
+    reconcile: (key: string, terminalCode: NonNullable<PendingPitch['terminalCode']>, resultId?: number) =>
+      store.update(key, { terminalCode, resultId }),
+    resolve: (key: string) => store.remove(key, intent => !!(intent.acknowledged || intent.terminalCode || intent.rejected)),
     recoverCorruptAfterReview: () => lock(scope, async () => {
       // The caller must ask the person to reconcile saved pitches first.
       let corrupt = false;
-      try { await read(); } catch { corrupt = true; }
+      try { await store.read(); } catch { corrupt = true; }
       if (!corrupt) throw new Error('Resolve the saved pending pitch before clearing it.');
       await storage.removeItem(scope);
     }),
