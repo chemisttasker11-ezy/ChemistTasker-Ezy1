@@ -71,10 +71,7 @@ class SecurityBoundaryTests(unittest.TestCase):
         storage = Mock()
         membership = object()
         participant = SimpleNamespace(membership=membership)
-        conversation = MagicMock()
-        conversation.participants.filter.return_value.first.return_value = participant
         message = MagicMock()
-        message.conversation = conversation
         message.conversation_id = 42
         message.id = 9
         message.sender = membership
@@ -82,8 +79,9 @@ class SecurityBoundaryTests(unittest.TestCase):
         message.attachment.storage = storage
         view = MessageViewSet()
         view.get_object = Mock(return_value=message)
-        with patch("chat.realtime.get_channel_layer") as get_layer, patch("chat.realtime.async_to_sync") as as_sync:
-            response = view.destroy(SimpleNamespace(user=object()))
+        with patch("chat.views.authorized_participant", return_value=participant) as get_participant, patch("chat.realtime.get_channel_layer") as get_layer, patch("chat.realtime.async_to_sync") as as_sync:
+            response = view.destroy(SimpleNamespace(user=SimpleNamespace(pk=7)))
+        get_participant.assert_called_once_with(42, 7)
         self.assertEqual(response.status_code, 204)
         self.assertTrue(message.is_deleted)
         self.assertEqual(message.body, "")

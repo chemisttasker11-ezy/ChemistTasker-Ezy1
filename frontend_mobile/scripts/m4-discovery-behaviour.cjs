@@ -69,7 +69,10 @@ const datum = (id, opts={}) => ({
 function talentHarness(reference='', role=null) {
   const ui=renderer(), calls=[], queue=[], routes=[], session={user:role?{id:71,role}:null,reference};
   const registry=JSON.parse(fs.readFileSync(path.resolve(root,'../shared-core/skills_registry.json'),'utf8'));
-  const talent=load('../shared-core/src/talent.ts', {'./domains/talent/api':{},'./utils/serialization':{}});
+  const talent=load('../shared-core/src/talent.ts', {
+    './domains/talent/api':{},'./utils/serialization':{},
+    './transport/application':load('../shared-core/src/transport/application.ts', {'./client':{}}),
+  });
   const presentation=load('../shared-core/src/domains/talent/presentation.ts',{
     '../../skills':load('../shared-core/src/skills.ts', {}),
     '../onboarding/newcomer':load('../shared-core/src/domains/onboarding/newcomer.ts', {}),

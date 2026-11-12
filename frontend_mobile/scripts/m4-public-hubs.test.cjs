@@ -28,6 +28,7 @@ function deferred() { let resolve,reject;const promise=new Promise((r,j)=>{resol
   return {promise,resolve,reject};}
 function env(overrides={}) {
   const values=[], effects=[], cleanups={};
+  let sessionGeneration=0;
   let activeKey=null, cursor=0, hub=overrides.hub||'public', user=overrides.user===undefined?{id:7,role:'PHARMACIST'}:overrides.user;
   const calls={posts:[],polls:[],votes:[]};
   const api={
@@ -59,6 +60,7 @@ function env(overrides={}) {
     'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
     '@/config/api':{chemistTaskerApi:{publicContent:api}},
     '@/context/AuthContext':{useAuth:()=>({user})},
+    '@/utils/authSession':{getSessionGeneration:()=>sessionGeneration},
     '@/features/explore/RichContent':{RichContent:'RichContent'},
     '@/features/explore/webLinks':{publicWebUrl:x=>x},
     '@/constants/tokens':{colors:{pageBg:'',textPrimary:'',surfaceBg:'',border:'',textSecondary:'',primary:'',status:{red:{fg:''}}},
@@ -91,7 +93,7 @@ function env(overrides={}) {
   }
   function button(label,tree=render()){const items=find(tree,n=>n.type==='Button');
     return items.find(n=>find(n.props?.children,x=>x===label).length||n.props?.children===label||String(n.props?.children).includes(label));}
-  return {render,tick,button,calls,api,find,key:()=>screen().props.key,changeHub:newHub=>{hub=newHub;},changeUser:newUser=>{user=newUser;},
+  return {render,tick,button,calls,api,find,key:()=>screen().props.key,changeHub:newHub=>{hub=newHub;},changeUser:newUser=>{sessionGeneration++;user=newUser;},
     unmount(){Object.values(cleanups).forEach(fn=>typeof fn==='function'&&fn());}};
 }
 test('R: search submit trims and caps at 200; post pagination retains q and clear resets',async()=>{
