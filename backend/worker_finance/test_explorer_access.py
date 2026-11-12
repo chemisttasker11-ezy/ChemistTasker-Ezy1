@@ -9,6 +9,8 @@ class ExplorerFinanceAccessTests(TestCase):
         client = APIClient()
         client.force_authenticate(user)
         routes = [
+            ('get', '/api/v1/finance/customers/'), ('get', '/api/v1/finance/items/'),
+            ('post', '/api/v1/finance/shift-hours/'),
             ('get', '/api/v1/finance/invoices/'), ('post', '/api/v1/finance/invoices/'),
             ('get', '/api/v1/finance/invoices/1/'), ('patch', '/api/v1/finance/invoices/1/'),
             ('get', '/api/v1/finance/invoices/1/pdf/'), ('get', '/api/v1/finance/invoices/1/revisions/1/pdf/'),
@@ -38,10 +40,23 @@ class FinanceRoleControlsTests(TestCase):
         for role in ('PHARMACIST', 'OTHER_STAFF', 'OWNER', 'ORG_STAFF', 'PHARMACY_MANAGER'):
             user = get_user_model().objects.create_user(email=f'{role}@example.test', role=role)
             client.force_authenticate(user)
-            for url in ('/api/v1/finance/invoices/', '/api/v1/finance/received-invoices/',
+            for url in ('/api/v1/finance/customers/', '/api/v1/finance/items/',
+                        '/api/v1/finance/invoices/', '/api/v1/finance/received-invoices/',
                         '/api/v1/finance/expenses/', '/api/v1/invoices/'):
                 with self.subTest(role=role, url=url):
                     self.assertEqual(client.get(url).status_code, 200)
+
+    def test_pharmacist_keeps_shift_hours_access(self):
+        user = get_user_model().objects.create_user(email='shift-hours@example.test', role='PHARMACIST')
+        client = APIClient()
+        client.force_authenticate(user)
+        response = client.post('/api/v1/finance/shift-hours/', {
+            'start': '2026-01-01T09:00:00+10:00',
+            'end': '2026-01-01T17:00:00+10:00',
+            'break_minutes': 30,
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {'hours': '7.50'})
 
     def test_managed_legacy_delegate_denies_explorer(self):
         user = get_user_model().objects.create_user(email='managed@example.test', role='EXPLORER')
