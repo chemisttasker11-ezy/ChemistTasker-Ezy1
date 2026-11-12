@@ -49,6 +49,21 @@ class NativeAcceptanceConfigurationTests(unittest.TestCase):
         self.assertNotIn("hideKeyboard", invoice.replace(android_dismiss, ""))
 
 
+    def test_ios_waits_for_and_dismisses_password_prompts_after_sign_in(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        ios = workflow.split("\n  ios-native:\n", 1)[1]
+        self.assertRegex(
+            ios,
+            r'- tapOn: "Welcome back"\s*\n\s*- tapOn: "Sign in"\s*\n'
+            r'\s*- extendedWaitUntil:\s*\n'
+            r'\s*visible: "Switch workspace\. Current: Pharmacist\|Not Now\|Not now"\s*\n'
+            r'\s*timeout: 30000\s*\n'
+            r'\s*- tapOn:\s*\n\s*text: "Not Now"\s*\n\s*optional: true\s*\n'
+            r'\s*- tapOn:\s*\n\s*text: "Not now"\s*\n\s*optional: true\s*\n'
+            r'\s*- extendedWaitUntil:\s*\n'
+            r'\s*visible: "Switch workspace\. Current: Pharmacist"\s*\n\s*timeout: 30000',
+        )
+
     def test_both_native_flows_open_the_real_admin_persona_picker(self):
         """After signing in as a pharmacist, admin is a persona option, not the landing screen."""
         workflow = WORKFLOW.read_text(encoding="utf-8")
