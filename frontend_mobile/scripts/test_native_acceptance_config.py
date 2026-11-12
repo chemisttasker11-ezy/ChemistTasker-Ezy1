@@ -86,6 +86,19 @@ class NativeAcceptanceConfigurationTests(unittest.TestCase):
         )
         self.assertIn('- tapOn: "Edit invoice"\n- extendedWaitUntil:\n    visible: "Save revision"\n    timeout: 30000', invoice)
 
+    def test_every_view_invoice_tap_centres_the_button_first(self):
+        # After a send the list card's button sits under the tab bar edge; an edge tap misses it (run 43308831873).
+        invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
+        centred = (
+            '- scrollUntilVisible:\n'
+            '    element:\n      text: "View invoice"\n'
+            '    direction: DOWN\n    timeout: 30000\n'
+            '    centerElement: true\n'
+            '- tapOn: "View invoice"\n'
+        )
+        self.assertEqual(3, invoice.count('- tapOn: "View invoice"\n'))
+        self.assertEqual(3, invoice.count(centred))
+
     def test_invoice_other_scrolled_targets_clear_the_screen_edges(self):
         invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
         for target in (".*577.50.*", "Edit invoice", "Send email", "Share PDF"):
