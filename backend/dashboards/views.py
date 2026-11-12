@@ -11,7 +11,6 @@ from shifts.models import (
     ShiftSlotAssignment,
 )
 from invoicing.models import Invoice, manager_visible_state
-from worker_finance.permissions import CanAccessFinance
 from invoicing.navigation import invoice_action_url
 from pharmacy_hub.models import PharmacyHubPost
 from organizations.serializers import PharmacyClaimSerializer
@@ -635,8 +634,6 @@ class OrganizationDashboardView(APIView):
                 invoices_qs = invoices_qs.filter(pharmacy_id=requested_pharmacy_id)
         else:
             invoices_qs = Invoice.objects.none()
-        if not CanAccessFinance().has_permission(request, self):
-            invoices_qs = Invoice.objects.none()
         open_shifts = _open_active_shifts(shifts_qs, today, now)
         all_active_shifts = _all_active_shifts(shifts_qs, today, now)
         extras = _dashboard_payload_extras(
@@ -687,8 +684,7 @@ class OwnerDashboard(APIView):
                 slot_assignments__isnull=False,
                 payment_status__in=['PAID', 'NOT_REQUIRED'],
             ).distinct()
-            invoices_qs = (Invoice.objects.filter(user=user, pharmacy__isnull=True)
-                           if CanAccessFinance().has_permission(request, self) else Invoice.objects.none())
+            invoices_qs = Invoice.objects.filter(user=user, pharmacy__isnull=True)
             extras = _dashboard_payload_extras(
                 shifts_qs=public_shifts,
                 confirmed_qs=confirmed_shifts,
@@ -781,8 +777,6 @@ class OwnerDashboard(APIView):
             if user_can_manage_billing_for_pharmacy(user, pharmacy)
         ]
         invoices_qs = Invoice.objects.filter(manager_visible_state(), pharmacy_id__in=billing_pharmacy_ids).distinct()
-        if not CanAccessFinance().has_permission(request, self):
-            invoices_qs = Invoice.objects.none()
         extras = _dashboard_payload_extras(
             shifts_qs=upcoming_shifts,
             confirmed_qs=confirmed_shifts,
