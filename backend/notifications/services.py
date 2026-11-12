@@ -145,16 +145,13 @@ def push_allowed_for_notification(notification: Notification, now=None) -> bool:
 
 
 def _deliver_notification(notification: Notification) -> None:
-    user = get_user_model().objects.get(pk=notification.user_id)
-    if not Notification.objects.visible_to(user).filter(pk=notification.pk).exists():
-        return
     payload = {"notification": _serialize_notification(notification)}
     try:
         _broadcast(notification.user_id, "notification.created", payload)
     except Exception:
         logger.exception("Notification %s WebSocket delivery failed", notification.pk)
     # Read durable state outside the transport catch, including for a PostgreSQL-backed channel layer.
-    unread = Notification.objects.visible_to(user).unread().count()
+    unread = Notification.objects.filter(user_id=notification.user_id, read_at__isnull=True).count()
     try:
         _broadcast(notification.user_id, "notification.counter", {"unread": unread})
     except Exception:
@@ -167,7 +164,7 @@ def _deliver_notification(notification: Notification) -> None:
 
 
 def mark_notifications_read(user, notification_ids: Optional[Sequence[int]] = None) -> int:
-    qs = Notification.objects.visible_to(user).unread()
+    qs = Notification.objects.filter(user=user, read_at__isnull=True)
     if notification_ids:
         qs = qs.filter(id__in=notification_ids)
     notifications = list(qs)
@@ -179,10 +176,10 @@ def mark_notifications_read(user, notification_ids: Optional[Sequence[int]] = No
     Notification.objects.bulk_update(notifications, ["read_at"])
     for n in notifications:
         _broadcast(n.user_id, "notification.updated", {"notification": _serialize_notification(n)})
-    _broadcast_notification_counter(user)
+    _broadcast_notification_counter(user.id)
     return len(notifications)
 
 
-def _broadcast_notification_counter(user) -> None:
-    unread = Notification.objects.visible_to(user).unread().count()
-    _broadcast(user.id, "notification.counter", {"unread": unread})
+def _broadcast_notification_counter(user_id: int) -> None:
+    unread = Notification.objects.filter(user_id=user_id, read_at__isnull=True).count()
+    _broadcast(user_id, "notification.counter", {"unread": unread})

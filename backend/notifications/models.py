@@ -3,24 +3,9 @@ from django.db import models
 from datetime import time
 from django.conf import settings
 from django.utils import timezone
-from types import SimpleNamespace
-
-from worker_finance.permissions import CanAccessFinance
-
-
-FINANCE_NOTIFICATION_KINDS = (
-    'invoice_issue', 'invoice_revision_requested', 'invoice_approved_for_payment', 'invoice_paid',
-)
 
 
 class NotificationQuerySet(models.QuerySet):
-    def visible_to(self, user):
-        qs = self.filter(user=user)
-        if not CanAccessFinance().has_permission(SimpleNamespace(user=user), None):
-            qs = qs.filter(models.Q(payload__kind__isnull=True) | ~models.Q(payload__kind__in=FINANCE_NOTIFICATION_KINDS))
-            qs = qs.filter(models.Q(payload__template_name__isnull=True) | ~models.Q(payload__template_name='emails/invoice_sent.html'))
-        return qs
-
     def unread(self):
         return self.filter(read_at__isnull=True)
 
