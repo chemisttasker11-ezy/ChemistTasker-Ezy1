@@ -73,6 +73,13 @@ function intentStore<T extends PendingIntent>(storage: PitchIntentStorage, lock:
       if (!intent || intent.key !== key || !allowed(intent)) throw new Error(`Review the pending ${kind} before starting another one.`);
       await storage.removeItem(scope);
     }),
+    recoverCorruptAfterReview: () => lock(scope, async () => {
+      // The caller must reconcile saved results first.
+      let corrupt = false;
+      try { await read(); } catch { corrupt = true; }
+      if (!corrupt) throw new Error(`Resolve the saved pending ${kind} before clearing it.`);
+      await storage.removeItem(scope);
+    }),
   };
 }
 
@@ -82,6 +89,7 @@ const validPitch = (value: PendingPitch) => typeof value.roleAtSubmission === 's
   (!value.acknowledged || !!value.resultId) &&
   (value.terminalCode === undefined || ['IDEMPOTENCY_PAYLOAD_MISMATCH', 'PITCH_DELETED', 'IDEMPOTENCY_REPLAY_EXPIRED'].includes(value.terminalCode));
 const corruptPitch = (): never => { throw new Error('Recover your pending pitch by reviewing your saved pitches. Browser storage could not be read safely.'); };
+const corruptIntent = (): never => { throw new Error('Recover your pending intent by reviewing your saved results. Storage could not be read safely.'); };
 
 export function createPendingIntentStore({ storage, lock, environment, userId, operation, newKey = () => globalThis.crypto.randomUUID() }: {
   storage: PitchIntentStorage; lock: PitchIntentLock; environment: string; userId: string | number;
@@ -90,9 +98,9 @@ export function createPendingIntentStore({ storage, lock, environment, userId, o
   const scope = `${operation}:v1:${JSON.stringify([environment, String(userId)])}`;
   const isPitch = operation === 'talent.pitch.create';
   const store = intentStore<PendingIntent>(storage, lock, scope,
-    value => !isPitch || validPitch(value as PendingPitch), isPitch ? corruptPitch : () => null, newKey, isPitch ? 'pitch' : 'intent');
+    value => !isPitch || validPitch(value as PendingPitch), isPitch ? corruptPitch : corruptIntent, newKey, isPitch ? 'pitch' : 'intent');
   return {
-    scope, load: store.read,
+    scope, load: store.read, recoverCorruptAfterReview: store.recoverCorruptAfterReview,
     acquire: (payload: Record<string, unknown>, roleAtSubmission?: string) => store.acquire(payload, isPitch ? { roleAtSubmission } as Partial<PendingPitch> : {}),
     settle: async (key: string, resultId: number) => {
       if (!Number.isSafeInteger(resultId) || resultId <= 0) throw new Error('Invalid result ID.');
@@ -113,13 +121,7 @@ export function createPendingPitchStore(storage: PitchIntentStorage, lock: Pitch
     reconcile: (key: string, terminalCode: NonNullable<PendingPitch['terminalCode']>, resultId?: number) =>
       store.update(key, { terminalCode, resultId }),
     resolve: (key: string) => store.remove(key, intent => !!(intent.acknowledged || intent.terminalCode || intent.rejected)),
-    recoverCorruptAfterReview: () => lock(scope, async () => {
-      // The caller must ask the person to reconcile saved pitches first.
-      let corrupt = false;
-      try { await store.read(); } catch { corrupt = true; }
-      if (!corrupt) throw new Error('Resolve the saved pending pitch before clearing it.');
-      await storage.removeItem(scope);
-    }),
+    recoverCorruptAfterReview: store.recoverCorruptAfterReview,
   };
 }
 
