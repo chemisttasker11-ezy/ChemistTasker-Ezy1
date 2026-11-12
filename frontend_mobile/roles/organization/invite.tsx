@@ -324,7 +324,8 @@ export default function OrganizationInviteScreen() {
     } catch (err: any) {
       const detail =
         err?.response?.data?.detail ||
-        (typeof err?.response?.data === 'object' ? JSON.stringify(err.response.data) : null);
+        (typeof err?.response?.data === 'object' ? JSON.stringify(err.response.data) : null) ||
+        err?.message;
       setError(detail || 'Failed to send invite.');
     } finally {
       setSubmitting(false);
@@ -392,7 +393,7 @@ export default function OrganizationInviteScreen() {
       setEditForm(null);
       await loadMembers();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to update member.');
+      setError(err?.response?.data?.detail || err?.message || 'Failed to update member.');
     } finally {
       setSavingMember(false);
     }

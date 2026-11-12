@@ -1327,7 +1327,7 @@ function PharmacyPageContent({
         err?.response?.data?.detail ??
         (Array.isArray(err?.response?.data?.pharmacy_email)
           ? err.response.data.pharmacy_email[0]
-          : "Claim failed. Please confirm you have organization access.");
+          : err?.message || "Claim failed. Please confirm you have organization access.");
       setClaimError(message);
     } finally {
       setClaimSubmitting(false);
@@ -2065,7 +2065,7 @@ function PharmacyPageContent({
         // No response: the create may have landed; the kept key makes a retry safe.
         setError("We couldn't confirm the pharmacy was saved. Press Save again — it won't create a duplicate.");
       } else {
-        setError("An unexpected error occurred.");
+        setError(err instanceof ApiError ? err.message : "An unexpected error occurred.");
       }
       return false;
     } finally {

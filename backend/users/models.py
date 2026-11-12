@@ -3,6 +3,7 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from access_control.pharmacy_roles import PharmacyAdminPolicy
+from access_control.admin_roles import validate_admin_user
 
 class CustomUserManager(BaseUserManager):
     use_in_migrations = True
@@ -123,6 +124,15 @@ class OrganizationMembership(models.Model):
 
     def __str__(self):
         return f"{self.user.email} ({self.role}) @ {self.organization.name}"
+
+    def clean(self):
+        super().clean()
+        if self.user_id:
+            validate_admin_user(self.user, assignment=self)
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
 
 class DeviceToken(models.Model):
