@@ -1,4 +1,5 @@
 import type { ReactionSummary } from '@chemisttasker/shared-core';
+import { fetchAllPages } from '@chemisttasker/shared-core';
 
 export interface ActionScope {
   accountKey: string;
@@ -215,14 +216,13 @@ export async function refreshLoadedPublicPages<T extends { id: number }>(
   loadedPageCount: number
 ): Promise<{ items: T[]; nextPage: number | null }> {
   const count = Math.max(1, loadedPageCount);
-  let merged: T[] = [];
-  let lastResp: { results: T[]; next: string | null } | null = null;
+  let hasNext = false;
   let fetched = 0;
-  for (let p = 1; p <= count; p++) {
-    lastResp = await fetchPage(p);
+  const rows = await fetchAllPages(async (p) => {
+    const response = await fetchPage(p);
     fetched = p;
-    merged = mergeItems(merged, lastResp.results || []);
-    if (!lastResp.next) break;
-  }
-  return { items: merged, nextPage: lastResp?.next ? fetched + 1 : null };
+    hasNext = !!response.next;
+    return { results: response.results || [], next: p + 1 <= count ? response.next : null };
+  });
+  return { items: mergeItems([], rows), nextPage: hasNext ? fetched + 1 : null };
 }

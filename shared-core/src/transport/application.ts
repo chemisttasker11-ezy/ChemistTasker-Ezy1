@@ -34,6 +34,8 @@ function currentApplication(): NonNullable<typeof application> {
     return application;
 }
 export function getApiConfig(): Readonly<ApplicationApiConfig> { return currentApplication().config; }
+/** Public page loaders can also run without a configured application session. */
+export function getSessionGeneration(): number | undefined { return application?.config.getSessionGeneration?.(); }
 export function performApiRequest(path: string, options: ApplicationRequestOptions = {}, policy: ApiRequestPolicy = {}): Promise<Response> {
     const { skipAuth = false, ...request } = options;
     // Snapshot the instance before any await. Reconfiguration cannot change in-flight credentials.

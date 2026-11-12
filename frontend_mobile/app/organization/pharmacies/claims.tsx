@@ -3,7 +3,7 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Button, Card, Chip, Text, TextInput } from 'react-native-paper';
 import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
-import { claimOnboarding, getPharmacyClaims } from '@chemisttasker/shared-core';
+import { claimOnboarding, fetchAllPages, getPharmacyClaims } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { ContentState } from '@/components/ui/ContentState';
 import { colors, space } from '@/constants/tokens';
@@ -51,21 +51,17 @@ export default function OrganizationPharmacyClaimsScreen() {
       return;
     }
     try {
-      const scoped: Claim[] = [];
-      let page = 1;
-      while (page <= 50) {
-        if (request !== currentRequest.current) return;
+      const rows = await fetchAllPages(async (page) => {
+        if (request !== currentRequest.current) return null;
         const response: any = await getPharmacyClaims({ organization: organizationId, page });
-        const all = Array.isArray(response?.results) ? response.results : Array.isArray(response) ? response : [];
-        // Defensive scope filtering; backend is still the authorization authority.
-        scoped.push(...all.filter((row: any) => {
-          const value = row.organization;
-          const id = typeof value === 'object' ? value?.id : value;
-          return Number(id) === organizationId;
-        }));
-        if (!response?.next) break;
-        page += 1;
-      }
+        return page >= 50 && !Array.isArray(response) && response ? { ...response, next: null } : response;
+      });
+      // Defensive scope filtering; backend is still the authorization authority.
+      const scoped = rows.filter((row: any) => {
+        const value = row.organization;
+        const id = typeof value === 'object' ? value?.id : value;
+        return Number(id) === organizationId;
+      }) as Claim[];
       if (request === currentRequest.current) setClaims(scoped);
     } catch (failure: any) {
       if (request === currentRequest.current) setError(failure?.response?.data?.detail || failure?.message || 'Could not load claim history.');
