@@ -9,6 +9,7 @@ import { getPublicTalentFeed, type ExplorerPostApi } from '@chemisttasker/shared
 import { useAuth } from '@/context/AuthContext';
 import { colors, radius, space } from '@/constants/tokens';
 import { publicWebOrigin } from '@/features/explore/webLinks';
+import { getSessionGeneration } from '@/utils/authSession';
 
 function nextPageUrl(next: string | null | undefined): number | null {
   const match = /[?&]page=(\d+)(?:[&#]|$)/.exec(next || '');
@@ -25,6 +26,7 @@ export default function ShareWorkerQr() {
   const requestRef = useRef(0);
   const userId = Number(user?.id);
   const load = useCallback(async () => {
+    const sessionGeneration = getSessionGeneration();
     const request = ++requestRef.current;
     setLoading(true); setError(''); setPost(null);
     try {
@@ -34,6 +36,7 @@ export default function ShareWorkerQr() {
       let page: number | null = 1;
       let found: ExplorerPostApi | null = null;
       for (let index = 0; index < 10 && page !== null && !found; index++) {
+        if (sessionGeneration !== getSessionGeneration()) return;
         const response = await getPublicTalentFeed({ page, page_size: 100 }) as { results?: ExplorerPostApi[]; next?: string | null } | ExplorerPostApi[];
         if (request !== requestRef.current) return;
         const rows = Array.isArray(response) ? response : response.results || [];

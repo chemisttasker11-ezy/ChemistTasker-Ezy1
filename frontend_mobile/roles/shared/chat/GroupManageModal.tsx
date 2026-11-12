@@ -6,6 +6,7 @@ import { fetchChatParticipants } from '@chemisttasker/shared-core';
 import type { ChatRoom } from './types';
 import { searchParticipants } from './hooks';
 import { deleteRoomService, createOrUpdateGroupRoom } from '@chemisttasker/shared-core';
+import { getSessionGeneration } from '@/utils/authSession';
 
 type Props = {
   room: ChatRoom | null;
@@ -67,7 +68,9 @@ export default function GroupManageModal({ room, visible, onDismiss, onUpdated, 
 
   useEffect(() => {
     let cancelled = false;
+    const sessionGeneration = getSessionGeneration();
     const run = async () => {
+      if (cancelled || sessionGeneration !== getSessionGeneration()) return;
       if (!query || query.length < 2) {
         setResults([]);
         return;

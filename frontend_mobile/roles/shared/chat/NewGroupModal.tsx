@@ -5,6 +5,7 @@ import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/Bra
 import type { UserLite } from './types';
 import { searchParticipants } from './hooks';
 import { createOrUpdateGroupRoom } from '@chemisttasker/shared-core';
+import { getSessionGeneration } from '@/utils/authSession';
 
 type Props = {
   visible: boolean;
@@ -23,7 +24,9 @@ export default function NewGroupModal({ visible, onDismiss, onCreated }: Props) 
 
   useEffect(() => {
     let cancelled = false;
+    const sessionGeneration = getSessionGeneration();
     const run = async () => {
+      if (cancelled || sessionGeneration !== getSessionGeneration()) return;
       if (!query || query.length < 2) {
         setResults([]);
         return;

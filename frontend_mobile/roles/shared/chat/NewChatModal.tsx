@@ -4,6 +4,7 @@ import { Modal, Portal, Text, TextInput, Button, Avatar, useTheme, HelperText } 
 import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import type { UserLite } from './types';
 import { searchParticipants, startDirectChat } from './hooks';
+import { getSessionGeneration } from '@/utils/authSession';
 
 type Props = {
   visible: boolean;
@@ -21,7 +22,9 @@ export default function NewChatModal({ visible, onDismiss, onCreated }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    const sessionGeneration = getSessionGeneration();
     const run = async () => {
+      if (cancelled || sessionGeneration !== getSessionGeneration()) return;
       if (!query || query.length < 2) {
         setResults([]);
         return;
