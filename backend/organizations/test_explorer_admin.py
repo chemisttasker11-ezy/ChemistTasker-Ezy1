@@ -34,9 +34,10 @@ class ExplorerPharmacyAdminTests(TestCase):
     def legacy_invite(self, user):
         member = Membership.objects.create(user=user, pharmacy=self.pharmacy, role="CONTACT",
             employment_type="FULL_TIME", status="PENDING", is_active=False)
-        assignment = PharmacyAdmin(user=user, pharmacy=self.pharmacy, membership=member,
-            admin_level="MANAGER", is_active=False, created_at=timezone.now(), updated_at=timezone.now())
-        assignment.save_base(raw=True)
+        assignment = PharmacyAdmin.objects.create(user=make_user("PHARMACIST"), pharmacy=self.pharmacy,
+            membership=member, admin_level="MANAGER", is_active=False)
+        PharmacyAdmin.objects.filter(pk=assignment.pk).update(user=user)
+        assignment.refresh_from_db()
         return member, assignment
 
     def test_every_admin_level_and_contact_invite_refuses_explorer_without_writes(self):
@@ -195,6 +196,57 @@ class ExplorerPharmacyAdminTests(TestCase):
                     operation(explorer)
                 self.assertFalse(Membership.objects.filter(user=explorer).exists())
                 self.assertFalse(PharmacyAdmin.objects.filter(user=explorer).exists())
+
+    def test_historical_model_allows_unrelated_edits_and_deactivation(self):
+        _, assignment = self.legacy_invite(self.explorer)
+        for active in (False, True):
+            with self.subTest(active=active):
+                PharmacyAdmin.objects.filter(pk=assignment.pk).update(is_active=active)
+                assignment.refresh_from_db()
+                assignment.job_title = f"Historical title {active}"
+                assignment.clean()
+                assignment.save()
+                assignment.refresh_from_db()
+                self.assertEqual(assignment.job_title, f"Historical title {active}")
+                self.assertEqual(assignment.is_active, active)
+                assignment.is_active = False
+                assignment.save(update_fields=["is_active", "admin_level"])
+                assignment.refresh_from_db()
+                self.assertFalse(assignment.is_active)
+
+    def test_historical_serializer_allows_unrelated_edits_and_deactivation(self):
+        _, assignment = self.legacy_invite(self.explorer)
+        PharmacyAdmin.objects.filter(pk=assignment.pk).update(is_active=True)
+        assignment.refresh_from_db()
+        serializer = PharmacyAdminSerializer(
+            assignment, data={"job_title": "Updated title"}, partial=True)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.job_title, "Updated title")
+        self.assertTrue(assignment.is_active)
+        serializer = PharmacyAdminSerializer(assignment, data={"is_active": False}, partial=True)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        assignment.refresh_from_db()
+        self.assertFalse(assignment.is_active)
+
+    def test_historical_activation_and_level_changes_refused_without_writes(self):
+        _, assignment = self.legacy_invite(self.explorer)
+        before = PharmacyAdmin.objects.values().get(pk=assignment.pk)
+        for field, value in (("is_active", True), ("admin_level", "ROSTER_MANAGER")):
+            with self.subTest(field=field):
+                setattr(assignment, field, value)
+                assignment.job_title = "Must not persist"
+                with self.assertRaisesMessage(ValidationError, MESSAGE):
+                    assignment.save()
+                self.assertEqual(PharmacyAdmin.objects.values().get(pk=assignment.pk), before)
+                assignment.refresh_from_db()
+        serializer = PharmacyAdminSerializer(
+            assignment, data={"is_active": True, "job_title": "Must not persist"}, partial=True)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn(MESSAGE, str(serializer.errors))
+        self.assertEqual(PharmacyAdmin.objects.values().get(pk=assignment.pk), before)
 
     def test_models_forms_and_serializer_refuse_each_level_and_user_reassignment(self):
         for level in PharmacyAdmin.AdminLevel.values:

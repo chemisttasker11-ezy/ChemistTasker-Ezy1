@@ -31,8 +31,10 @@ class ExplorerOrganizationAdminTests(TestCase):
 
     def legacy_membership(self):
         # Represent a row predating this rule; never change a user's account role.
-        member = OrganizationMembership(user=self.explorer, organization=self.org, role="ORG_ADMIN")
-        member.save_base(raw=True)
+        member = OrganizationMembership.objects.create(
+            user=make_user("PHARMACIST"), organization=self.org, role="ORG_ADMIN")
+        OrganizationMembership.objects.filter(pk=member.pk).update(user=self.explorer)
+        member.refresh_from_db()
         return member
 
     def test_invite_refuses_each_organisation_role_without_writes_or_delivery(self):
@@ -85,7 +87,7 @@ class ExplorerOrganizationAdminTests(TestCase):
         sent.assert_not_called()
         response = client_for(self.actor).patch(
             f"/api/v1/users/organization-memberships/{member.pk}/",
-            {"job_title": "Changed"}, format="json",
+            {"role": "CHIEF_ADMIN", "job_title": "Changed"}, format="json",
         )
         self.assertEqual(response.status_code, 400, response.content)
         self.assertEqual(response.json()["detail"], MESSAGE)
@@ -100,10 +102,11 @@ class ExplorerOrganizationAdminTests(TestCase):
                 with self.assertRaisesMessage(ValidationError, MESSAGE):
                     member.save()
         member = self.legacy_membership()
+        member.role = "CHIEF_ADMIN"
         member.job_title = "Changed"
         with self.assertRaisesMessage(ValidationError, MESSAGE):
-            member.save(update_fields=["job_title"])
-        serializer = OrganizationMembershipDetailSerializer(member, data={"job_title": "Changed"}, partial=True)
+            member.save(update_fields=["role", "job_title"])
+        serializer = OrganizationMembershipDetailSerializer(member, data={"role": "CHIEF_ADMIN", "job_title": "Changed"}, partial=True)
         self.assertFalse(serializer.is_valid())
         self.assertIn(MESSAGE, str(serializer.errors))
 
@@ -111,8 +114,82 @@ class ExplorerOrganizationAdminTests(TestCase):
         model_admin = admin.site._registry[OrganizationMembership]
         for instance in (None, self.legacy_membership()):
             form = model_admin.get_form(SimpleNamespace(user=self.actor), instance)(data={
-                "user": self.explorer.pk, "organization": self.org.pk, "role": "ORG_ADMIN",
+                "user": self.explorer.pk, "organization": self.org.pk, "role": "CHIEF_ADMIN",
                 "admin_level": "MANAGER", "job_title": "", "region": "",
             }, instance=instance)
             self.assertFalse(form.is_valid())
             self.assertIn(MESSAGE, str(form.errors))
+
+    def test_historical_model_allows_unrelated_saves_and_unchanged_roles(self):
+        member = self.legacy_membership()
+        member.job_title = "Updated historical title"
+        member.save()
+        member.refresh_from_db()
+        self.assertEqual(member.job_title, "Updated historical title")
+        member.region = "North"
+        member.save(update_fields=["region", "role", "admin_level"])
+        member.refresh_from_db()
+        self.assertEqual(member.region, "North")
+        self.assertEqual(member.user_id, self.explorer.pk)
+
+    def test_historical_serializer_allows_unrelated_edits(self):
+        member = self.legacy_membership()
+        serializer = OrganizationMembershipDetailSerializer(
+            member, data={"job_title": "Serializer title"}, partial=True)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        member.refresh_from_db()
+        self.assertEqual(member.job_title, "Serializer title")
+        self.assertEqual(member.user_id, self.explorer.pk)
+
+    def test_historical_api_allows_unrelated_edits(self):
+        member = self.legacy_membership()
+        response = client_for(self.actor).patch(
+            f"/api/v1/users/organization-memberships/{member.pk}/",
+            {"job_title": "API title", "role": member.role, "admin_level": member.admin_level}, format="json")
+        self.assertEqual(response.status_code, 200, response.content)
+        member.refresh_from_db()
+        self.assertEqual(member.job_title, "API title")
+        self.assertEqual(member.user_id, self.explorer.pk)
+
+    def test_historical_role_and_level_changes_refused_without_writes(self):
+        member = self.legacy_membership()
+        before = OrganizationMembership.objects.values().get(pk=member.pk)
+        for field, value in (("role", "CHIEF_ADMIN"), ("admin_level", "ROSTER_MANAGER")):
+            with self.subTest(field=field):
+                setattr(member, field, value)
+                member.job_title = "Must not persist"
+                with self.assertRaisesMessage(ValidationError, MESSAGE):
+                    member.save()
+                self.assertEqual(OrganizationMembership.objects.values().get(pk=member.pk), before)
+                member.refresh_from_db()
+                response = client_for(self.actor).patch(
+                    f"/api/v1/users/organization-memberships/{member.pk}/",
+                    {field: value, "job_title": "Must not persist"}, format="json")
+                self.assertEqual(response.status_code, 400, response.content)
+                self.assertEqual(response.json()["detail"], MESSAGE)
+                self.assertEqual(OrganizationMembership.objects.values().get(pk=member.pk), before)
+
+    def test_reassignment_to_explorer_refused_without_writes(self):
+        member = OrganizationMembership.objects.create(
+            user=make_user("PHARMACIST"), organization=self.org, role="ORG_ADMIN")
+        before = OrganizationMembership.objects.values().get(pk=member.pk)
+        member.user = self.explorer
+        member.job_title = "Must not persist"
+        with self.assertRaisesMessage(ValidationError, MESSAGE):
+            member.save()
+        self.assertEqual(OrganizationMembership.objects.values().get(pk=member.pk), before)
+
+    def test_historical_guard_compares_stored_row_not_mutated_instance(self):
+        member = self.legacy_membership()
+        stale = OrganizationMembership.objects.get(pk=member.pk)
+        OrganizationMembership.objects.filter(pk=member.pk).update(role="CHIEF_ADMIN")
+        before = OrganizationMembership.objects.values().get(pk=member.pk)
+        stale.job_title = "Must not persist"
+        serializer = OrganizationMembershipDetailSerializer(
+            stale, data={"job_title": stale.job_title}, partial=True)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn(MESSAGE, str(serializer.errors))
+        with self.assertRaisesMessage(ValidationError, MESSAGE):
+            stale.save()
+        self.assertEqual(OrganizationMembership.objects.values().get(pk=member.pk), before)
