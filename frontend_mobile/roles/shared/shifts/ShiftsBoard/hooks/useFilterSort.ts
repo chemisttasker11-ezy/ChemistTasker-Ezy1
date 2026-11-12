@@ -271,13 +271,13 @@ export const useFilterSort = ({
         serverResult = serverResult.filter((shift) => {
             const rawSlots = shift.slots ?? [];
             if (rawSlots.length === 0) return true;
-            const slots = getUpcomingSlotsForDisplay(rawSlots);
+            const slots = getUpcomingSlotsForDisplay(rawSlots, shift.pharmacyDetail);
             return slots.length > 0;
         });
         // Apply local min-rate filter even with server filtering to catch pharmacist-provided zeros.
         if (filterConfig.minRate > 0) {
             serverResult = serverResult.filter((shift) => {
-                const slots = getUpcomingSlotsForDisplay(shift.slots ?? []);
+                const slots = getUpcomingSlotsForDisplay(shift.slots ?? [], shift.pharmacyDetail);
                     const maxRate = Math.max(
                         ...(slots || [])
                             .map((slot) => getSlotRate(slot, shift, pharmacistRatePref))
@@ -295,7 +295,7 @@ export const useFilterSort = ({
         }
 
     result = result.filter((shift) => {
-        const slots = getUpcomingSlotsForDisplay(shift.slots ?? []);
+        const slots = getUpcomingSlotsForDisplay(shift.slots ?? [], shift.pharmacyDetail);
         const hasOverlap = (predicate: (slot: ShiftSlot) => boolean) => slots.some(predicate);
         if ((shift.slots ?? []).length > 0 && slots.length === 0) return false;
 

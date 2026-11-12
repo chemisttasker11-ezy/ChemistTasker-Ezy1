@@ -66,6 +66,8 @@ def anonymize_pharmacy_detail(detail: dict | None) -> dict | None:
         'name': 'Anonymous Pharmacy',
         'suburb': suburb,
     }
+    if detail.get('timezone'):
+        masked['timezone'] = detail['timezone']
     if state is not None:
         masked['state'] = state
     if postcode is not None:

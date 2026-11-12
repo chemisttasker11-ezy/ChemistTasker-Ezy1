@@ -3,6 +3,8 @@
 The serializer validates and translates the request; these functions apply the business rules (defaults, escalation
 level, public limit, dedicated offers, pharmacy rate defaults) and schedule the after-commit announcements.
 """
+from calendar import monthrange
+from datetime import date
 from decimal import Decimal
 
 from django.db import transaction
@@ -15,6 +17,7 @@ from shifts.emails import send_shift_updated_notifications
 from shifts.escalation import ESCALATION_FIELD_MAP
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.models import Shift, ShiftOffer, ShiftSlot
+from organizations.timezone import get_pharmacy_timezone
 
 
 def normalize_money_value(value, *, field_name, slot_index):
@@ -59,6 +62,23 @@ def normalize_slots_payload(slots_data):
     return normalized
 
 
+def validate_posting_window(pharmacy, slots_data):
+    today = timezone.now().astimezone(get_pharmacy_timezone(pharmacy)).date()
+    year, month = divmod(today.year * 12 + today.month - 1 + 4, 12)
+    last_day = date(year, month + 1, monthrange(year, month + 1)[1])
+    date_field = serializers.DateField()
+    for slot in slots_data:
+        for value in (slot.get('date'), slot.get('recurring_end_date') if slot.get('is_recurring') else None):
+            if value is None:
+                continue
+            try:
+                day = date_field.run_validation(value)
+            except serializers.ValidationError as exc:
+                raise serializers.ValidationError({'slots': exc.detail}) from exc
+            if not today <= day <= last_day:
+                raise serializers.ValidationError({'slots': ['That date has passed. Pick today or later.']})
+
+
 def post_shift(
     *,
     validated_data,
@@ -76,6 +96,7 @@ def post_shift(
     pharmacy's daily limit, offers a dedicated shift to its worker, optionally copies the rates to the pharmacy, and
     announces the shift after commit. `allowed_tiers` must contain the chosen visibility."""
     pharmacy    = validated_data['pharmacy']
+    validate_posting_window(pharmacy, slots_data)
     protect_direct_booking(validated_data)
     rate_type   = validated_data.get('rate_type')
     employment_type = validated_data.get('employment_type')

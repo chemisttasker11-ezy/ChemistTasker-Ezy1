@@ -45,6 +45,7 @@ import {
     pharmacyHoursForDate,
     toIsoDate,
     toLocalIsoDate,
+    pharmacyPostingDate,
     withEscalationDate,
     withEscalationTime,
     getEscalationClock,
@@ -102,8 +103,6 @@ export default function PostShiftScreen() {
     const parsedParams = useMemo(() => parsePostShiftSearchParams(params), [paramsKey]);
     const { editingId, routePharmacyId, isEmbedded } = parsedParams;
     const hasAccess = canAccessPostShift(surface, routePharmacyId, hasCapability);
-    // Recompute on render so a wizard open through midnight never accepts yesterday.
-    const postingWindow = shiftPostingDateWindow(new Date());
 
     const loadedVisibilityRef = React.useRef<string | null>(null);
     const loadGenRef = React.useRef(0);
@@ -335,6 +334,8 @@ export default function PostShiftScreen() {
         () => pharmacies.find((x) => x.id === pharmacyId),
         [pharmacyId, pharmacies]
     );
+    const pharmacyToday = () => pharmacyPostingDate(selectedPharmacy?.timezone, new Date(), selectedPharmacy?.state, selectedPharmacy?.postcode);
+    const postingWindow = shiftPostingDateWindow(pharmacyToday());
     const getDefaultTimesForDate = useCallback(
         (date: string, fallback?: SlotTime) =>
             pharmacyHoursForDate(
@@ -900,7 +901,7 @@ export default function PostShiftScreen() {
 
     const mergeSelectedDates = useCallback((incomingDates: string[]) => {
         // Today is read at call time: a wizard left open past midnight must not accept yesterday.
-        const { valid, past, late } = splitPostableDates(incomingDates, new Date());
+        const { valid, past, late } = splitPostableDates(incomingDates, pharmacyToday());
         if (!valid.length) {
             if (past.length || late.length) setError('That date has passed. Pick today or later.');
             return;
@@ -924,7 +925,7 @@ export default function PostShiftScreen() {
             setSlotStart(latestHours.startTime);
             setSlotEnd(latestHours.endTime);
         }
-    }, [getDefaultTimesForDate]);
+    }, [getDefaultTimesForDate, selectedPharmacy]);
 
     const selectedDateObjects = useMemo(
         () => selectedDates.map((d) => new Date(`${d}T00:00:00`)),
@@ -1058,7 +1059,7 @@ export default function PostShiftScreen() {
         entries: SlotEntry[],
         options?: { clearDates?: string[]; clearAllSelected?: boolean; resetRecurring?: boolean }
     ) => {
-        const error = validateSlotEntries(entries);
+        const error = validateSlotEntries(entries, pharmacyToday());
         if (error) {
             setError(error);
             return false;
@@ -1127,7 +1128,7 @@ export default function PostShiftScreen() {
             setError('Select at least one date from the calendar.');
             return false;
         }
-        const { valid, past, late } = splitPostableDates(selectedDates, new Date());
+        const { valid, past, late } = splitPostableDates(selectedDates, pharmacyToday());
         if (!valid.length) {
             setError('That date has passed. Pick today or later.');
             return false;
@@ -1243,7 +1244,10 @@ export default function PostShiftScreen() {
         const draft = postingDraft();
         const validation = validateShiftPostingDraft(draft);
         if (validation) { setError(validation); return; }
-        if (!editingId && draft.slots.some((slot) => !splitPostableDates([slot.date], new Date()).valid.length)) {
+        if (!editingId && draft.slots.some((slot) => {
+            const dates = [slot.date, ...(slot.isRecurring ? [slot.recurringEndDate || ''] : [])];
+            return splitPostableDates(dates, pharmacyToday()).valid.length !== new Set(dates).size;
+        })) {
             setError('That date has passed. Pick today or later.');
             return;
         }
@@ -1611,7 +1615,7 @@ export default function PostShiftScreen() {
                     const pickedIsos = pickedDates
                         .filter(Boolean)
                         .map((d) => toLocalIsoDate(d));
-                    const { valid } = splitPostableDates(pickedIsos, new Date());
+                    const { valid } = splitPostableDates(pickedIsos, pharmacyToday());
                     if (valid.some((d) => !selectedDateSet.has(d))) markTouched();
                     mergeSelectedDates(pickedIsos);
                     setSlotDatePickerOpen(false);

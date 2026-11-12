@@ -3,7 +3,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { format } from 'date-fns';
 import {
     Shift,
     ShiftCounterOfferPayload,
@@ -298,7 +297,7 @@ export const useCounterOffers = ({
             }
         }
         const baseSlots = shift.slots ?? [];
-        const normalizedSlots = getUpcomingSlotsForDisplay(baseSlots as ShiftSlot[]);
+        const normalizedSlots = getUpcomingSlotsForDisplay(baseSlots as ShiftSlot[], shift.pharmacyDetail);
         const slotIds = selectedSlots && selectedSlots.size > 0 ? selectedSlots : null;
         const slotsToUse = slotIds ? normalizedSlots.filter((slot) => slotIds.has(slot.id)) : normalizedSlots;
 
@@ -414,7 +413,7 @@ export const useCounterOffers = ({
         const dedupedSlots: CounterOfferFormSlot[] = [];
         const seenPairs = new Set<string>();
         slotsToSend.forEach((slot) => {
-            const normalizedDate = slot.dateValue ? format(new Date(slot.dateValue), 'yyyy-MM-dd') : '';
+            const normalizedDate = slot.dateValue || '';
             const key = `${slot.slotId ?? 'none'}|${normalizedDate}`;
             if (seenPairs.has(key)) return;
             seenPairs.add(key);
@@ -432,7 +431,7 @@ export const useCounterOffers = ({
             slots: dedupedSlots.map(
                 (slot): ShiftCounterOfferSlotPayloadWithDate => ({
                     slotId: slot.slotId != null ? (slot.slotId as number) : undefined,
-                    slotDate: slot.dateValue ? format(new Date(slot.dateValue), 'yyyy-MM-dd') : undefined,
+                    slotDate: slot.dateValue || undefined,
                     proposedStartTime: slot.startTime,
                     proposedEndTime: slot.endTime,
                     proposedRate: canNegotiateRate && slot.rate ? Number(slot.rate) : null,
