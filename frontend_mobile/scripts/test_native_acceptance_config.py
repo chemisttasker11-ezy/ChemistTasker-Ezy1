@@ -43,10 +43,49 @@ class NativeAcceptanceConfigurationTests(unittest.TestCase):
 
         invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
         android_dismiss = '    when:\n      platform: Android\n    commands:\n      - hideKeyboard'
-        ios_dismiss = '    when:\n      platform: iOS\n    commands:\n      - tapOn: "Items & services"'
+        ios_dismiss = (
+            '    when:\n      platform: iOS\n    commands:\n'
+            '      - scrollUntilVisible:\n'
+            '          element:\n            text: "Items & services"\n'
+            '          direction: UP\n          timeout: 30000\n'
+            '          centerElement: true\n'
+            '      - tapOn: "Items & services"'
+        )
         self.assertEqual(2, invoice.count(android_dismiss))
         self.assertEqual(2, invoice.count(ios_dismiss))
         self.assertNotIn("hideKeyboard", invoice.replace(android_dismiss, ""))
+
+    def test_invoice_edits_center_the_quantity_and_assert_its_value(self):
+        invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
+        for value in ("7.5", "8"):
+            with self.subTest(value=value):
+                self.assertIn(
+                    '- scrollUntilVisible:\n'
+                    '    element:\n      id: "invoice-quantity-1"\n'
+                    '    direction: DOWN\n    timeout: 30000\n'
+                    '    centerElement: true\n'
+                    '- tapOn:\n    id: "invoice-quantity-1"\n'
+                    '- eraseText: 20\n'
+                    f'- inputText: "{value}"\n'
+                    '- assertVisible:\n    id: "invoice-quantity-1"\n'
+                    f'    text: "{value.replace(".", "[.]")}"',
+                    invoice,
+                )
+
+    def test_invoice_other_scrolled_targets_clear_the_screen_edges(self):
+        invoice = (ROOT / "frontend_mobile/.maestro/invoice-acceptance.yaml").read_text(encoding="utf-8")
+        for target in (".*577.50.*", "Edit invoice", "Send email", "Share PDF"):
+            with self.subTest(target=target):
+                self.assertIn(
+                    '- scrollUntilVisible:\n'
+                    f'    element:\n      text: "{target}"\n'
+                    '    direction: DOWN\n    timeout: 30000\n'
+                    '    centerElement: true\n',
+                    invoice,
+                )
+        # These are in the modal's top summary, above its long list of actions.
+        for assertion in ('"Revision 2.*"', '"Sent"', '".*616.00.*"'):
+            self.assertIn(f'- assertVisible: {assertion}', invoice)
 
 
     def test_ios_waits_for_and_dismisses_password_prompts_after_sign_in(self):
