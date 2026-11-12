@@ -221,3 +221,16 @@ it('keeps a refused validation request until the person explicitly starts correc
   await store.resolve(intent.key);
   expect(await store.read()).toBeNull();
 });
+
+it('reconciles a deleted pitch with a null post ID and allows resolving it', async () => {
+  const store = fixture().open();
+  const intent = await store.acquire({ headline: 'Original' }, 'EXPLORER');
+  configureApi({ baseURL: 'https://example.test/api/v1', getToken: () => 'token',
+    fetchImpl: async () => new Response(JSON.stringify({ code: 'PITCH_DELETED', post_id: null }),
+      { status: 410, headers: { 'content-type': 'application/json' } }) });
+  await expect(sendPendingPitch(store, intent, () => true)).rejects.toMatchObject({ status: 410 });
+  expect(await store.read()).toMatchObject({ terminalCode: 'PITCH_DELETED' });
+  expect((await store.read())?.resultId).toBeUndefined();
+  await store.resolve(intent.key);
+  expect(await store.read()).toBeNull();
+});
