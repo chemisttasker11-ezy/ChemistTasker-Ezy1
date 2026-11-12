@@ -114,6 +114,7 @@ function boardHarness() {
   const realSkills=load('../shared-core/src/skills.ts',{});
   const sharedTalent=load('../shared-core/src/talent.ts', {
     './domains/talent/api': {}, './utils/serialization': {},
+    './transport/application': { getSessionGeneration: () => undefined },
   });
   const presentation=load('../shared-core/src/domains/talent/presentation.ts', {
     '../../skills': realSkills,

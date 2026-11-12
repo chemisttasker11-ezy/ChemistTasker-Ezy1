@@ -30,6 +30,60 @@ function evaluate(code, globals) {
   const output = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText;
   return vm.runInNewContext(output, { console, Promise, Date, FormData, Blob, ...globals });
 }
+
+function pagination(generation) {
+  const module = { exports: {} };
+  const code = ts.transpileModule(fs.readFileSync(path.join(root, '../shared-core/src/utils/serialization.ts'), 'utf8'),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  vm.runInNewContext(code, { module, exports: module.exports,
+    require: () => ({ getSessionGeneration: generation }) });
+  return module.exports.fetchAllPages;
+}
+
+for (const kind of ['claims', 'legacy invoices', 'public comments']) {
+  test(`${kind}: delayed page stops at the old session; same-session pages remain complete`, async () => {
+    for (const stale of [false, true]) {
+      let generation = 7;
+      const gate = deferred(), requests = [], errors = [], displayed = [];
+      const request = async ({ page }) => {
+        requests.push({ page, token: `token-${generation}` });
+        if (page === 1) await gate.promise;
+        return { results: [{ id: page, organization: 4 }], next: page === 1 ? '?page=2' : null };
+      };
+      const globals = { fetchAllPages: pagination(() => generation), getInvoices: request, getPharmacyClaims: request,
+        useCallback: fn => fn, currentRequest: { current: 0 }, organizationId: 4,
+        setLoading() {}, setError: error => { if (error) errors.push(error); },
+        setClaims: rows => { if (rows.length) displayed.push(...rows); } };
+      let run;
+      if (kind === 'claims') {
+        run = closure('app/organization/pharmacies/claims.tsx', 'OrganizationPharmacyClaimsScreen', 'load', globals);
+      } else if (kind === 'legacy invoices') {
+        const source = fs.readFileSync(path.join(root, 'roles/shared/invoices/InvoiceList.tsx'), 'utf8');
+        run = evaluate(`(${source.slice(source.indexOf('export async function fetchCompleteLegacyInvoices'), source.indexOf('type Props'))
+          .replace('export async function', 'async function')})`, globals);
+      } else {
+        const module = { exports: {} };
+        const code = ts.transpileModule(fs.readFileSync(path.join(root, 'features/explore/discussionModel.ts'), 'utf8'),
+          { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+        vm.runInNewContext(code, { module, exports: module.exports, require: () => globals });
+        run = async () => (await module.exports.refreshLoadedPublicPages(page => request({ page }), 2)).items;
+      }
+      const pending = run();
+      await flush();
+      assert.equal(requests.length, 1);
+      if (stale) generation += 2;
+      gate.resolve();
+      if (kind !== 'claims' && stale) await assert.rejects(pending, /Session changed/);
+      else {
+        const rows = await pending;
+        if (kind !== 'claims') displayed.push(...rows);
+        if (stale) assert.match(errors.join(), /Session changed/);
+      }
+      assert.deepEqual(requests, (stale ? [1] : [1, 2]).map(page => ({ page, token: 'token-7' })));
+      assert.deepEqual(displayed.map(row => row.id), stale ? [] : [1, 2]);
+    }
+  });
+}
 const post = 'roles/shared/hub/PostComposer.tsx';
 for (const platform of ['android', 'web']) for (const editing of [null, { id: 8 }]) {
   test(`hub ${platform} ${editing ? 'edit' : 'create'} drops prepared files on session switch; same session uploads and cleans copies`, async () => {
