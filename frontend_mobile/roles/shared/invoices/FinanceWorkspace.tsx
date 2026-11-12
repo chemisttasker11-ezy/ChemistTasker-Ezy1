@@ -43,7 +43,7 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const [customers, setCustomers] = useState<FinanceCustomer[]>([]); const [items, setItems] = useState<FinanceItem[]>([]);
   const [invoices, setInvoices] = useState<FinanceInvoice[]>([]); const [receivedInvoices, setReceivedInvoices] = useState<FinanceInvoice[]>([]); const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const running = useRef(false); const [error, setError] = useState('');
-  const [csvBusy, setCsvBusy] = useState(false); const csvPending = useRef(false); const csvGeneration = useRef(0);
+  const [csvBusy, setCsvBusy] = useState(false); const csvPending = useRef(false); const csvGeneration = useRef(0); const pdfGeneration = useRef(0);
   const [editor, setEditor] = useState<{ invoice?: FinanceInvoice; key: string } | null>(null);
   const [form, setForm] = useState<Form | null>(null); const [formError, setFormError] = useState('');
   const [selected, setSelected] = useState<FinanceInvoice | null>(null);
@@ -85,13 +85,13 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     // refreshing the new authorized scope.
     setInvoices([]); setReceivedInvoices([]); setCustomers([]); setItems([]); setExpenses([]);
     historyGen.current += 1;
-    csvGeneration.current += 1; csvPending.current = false; setCsvBusy(false);
+    csvGeneration.current += 1; pdfGeneration.current += 1; csvPending.current = false; setCsvBusy(false);
     handledLink.current = '';
     setSelected(null); setHistoryDocument(null); setForm(null); setEditor(null);
     setHistoryLoading(false); setHistoryError(''); setWorksheet(null);
     setError(''); setLoading(true);
     void load().catch(() => {});
-    return () => { loadGen.current += 1; historyGen.current += 1; csvGeneration.current += 1; worksheetGen.current += 1; };
+    return () => { loadGen.current += 1; historyGen.current += 1; csvGeneration.current += 1; pdfGeneration.current += 1; worksheetGen.current += 1; };
   }, [load]);
   // Consume ?invoice= only after the authorized finance list has loaded. A
   // re-fetch or screen re-render must not reopen a dismissed review modal.
@@ -138,7 +138,8 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   };
   const sharePdf = async (invoice: FinanceInvoice, received = false, version?: number) => {
     const requestedScope = ownerScope;
-    const current = () => scopeRef.current === requestedScope;
+    const generation = pdfGeneration.current;
+    const current = () => scopeRef.current === requestedScope && pdfGeneration.current === generation;
     if (!current()) return;
     if (!(await Sharing.isAvailableAsync())) throw new Error('PDF sharing is not available on this device.');
     if (!current()) return;

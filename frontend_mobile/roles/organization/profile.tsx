@@ -1,6 +1,6 @@
 import { createFriendPillReferralService } from '@chemisttasker/shared-core';
 import { fetchPillBalanceService } from '@chemisttasker/shared-core';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { openWebPage } from '@/features/explore/webLinks';
 import {
@@ -49,6 +49,8 @@ export default function OrganizationProfileScreen() {
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [referralLoading, setReferralLoading] = useState(false);
+  const referralLifetime = useRef(0);
+  useEffect(() => () => { referralLifetime.current += 1; }, []);
   const [pillSummary, setPillSummary] = useState({ balance: 0, shift_post_cost: 0 });
 
   const appVersion = typeof Constants?.expoConfig?.version === 'string' ? Constants.expoConfig.version : '';
@@ -86,18 +88,21 @@ export default function OrganizationProfileScreen() {
   }, []);
 
   const shareFriendReferral = async () => {
+    const lifetime = referralLifetime.current;
+    const current = () => referralLifetime.current === lifetime;
     setReferralLoading(true);
     try {
       const data = await createFriendPillReferralService({});
+      if (!current()) return;
       const code = data?.referral_code;
       if (!code) throw new Error('Referral code was not returned.');
       const baseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || webBaseUrl;
       const url = `${baseUrl.replace(/\/+$/, '')}/register?referral_code=${encodeURIComponent(code)}`;
       await Share.share({ message: url, url });
     } catch (err: any) {
-      Alert.alert('Referral failed', err?.response?.data?.detail || err?.message || 'Failed to create referral link.');
+      if (current()) Alert.alert('Referral failed', err?.response?.data?.detail || err?.message || 'Failed to create referral link.');
     } finally {
-      setReferralLoading(false);
+      if (current()) setReferralLoading(false);
     }
   };
 

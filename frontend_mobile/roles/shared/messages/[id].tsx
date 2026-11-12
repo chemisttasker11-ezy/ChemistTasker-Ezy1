@@ -735,7 +735,8 @@ const pinnedMessage = useMemo(() => {
             if (!attachmentAvailable) return;
             const accountId = user?.id ?? null;
             const roomId = parseRoomId();
-            const current = () => accountId != null && accountRef.current === accountId && parseRoomId() === roomId;
+            const generation = roomGenerationRef.current;
+            const current = () => generation === roomGenerationRef.current && accountId != null && accountRef.current === accountId && parseRoomId() === roomId;
             if (!current()) return;
             let file: File | null = null;
             try {

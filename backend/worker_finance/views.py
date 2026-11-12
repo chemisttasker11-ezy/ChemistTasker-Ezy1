@@ -20,6 +20,7 @@ from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from worker_finance.permissions import CanAccessFinance
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from django.apps import apps
@@ -56,7 +57,7 @@ class PrivateFinanceMixin:
 
 
 class OwnedViewSet(PrivateFinanceMixin, viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanAccessFinance]
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
 
     def get_queryset(self):
@@ -150,7 +151,7 @@ def pdf_response(record, document=None):
 
 
 class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanAccessFinance]
 
     def owned(self, request, pk, lock=False):
         qs = Invoice.objects.select_related('customer', 'user').filter(user=request.user, request_key__isnull=False)
@@ -329,7 +330,7 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
 class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     """Owner/admin view of internal invoices sent by workers."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanAccessFinance]
 
     def _managed_pharmacies(self, user):
         # Local import avoids a module import cycle while reusing the same
@@ -597,7 +598,7 @@ class ExpenseViewSet(OwnedViewSet):
 
 @never_cache
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def receipt_download(request, pk):
     receipt = get_object_or_404(Receipt, pk=pk, expense__owner=request.user)
     response = HttpResponse(bytes(receipt.content), content_type='application/octet-stream')
@@ -609,7 +610,7 @@ def receipt_download(request, pk):
 
 @never_cache
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def calculate_hours(request):
     try:
         start = datetime.fromisoformat(str(request.data.get('start')))
@@ -622,7 +623,7 @@ def calculate_hours(request):
 
 @never_cache
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def bas_worksheet(request):
     try:
         start, end = (date.fromisoformat(request.query_params[key]) for key in ('start', 'end'))

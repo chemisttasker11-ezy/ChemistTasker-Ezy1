@@ -1,5 +1,5 @@
 import { createFriendPillReferralService } from '@chemisttasker/shared-core';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Share } from 'react-native';
 import { BrandLoader } from '@/components/ui/BrandLoader';
 import { openWebPage } from '@/features/explore/webLinks';
@@ -34,6 +34,8 @@ export default function OwnerProfileScreen() {
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [referralLoading, setReferralLoading] = useState(false);
+  const referralLifetime = useRef(0);
+  useEffect(() => () => { referralLifetime.current += 1; }, []);
   const [subscriptionSummary, setSubscriptionSummary] = useState<{
     active: boolean;
     status: string;
@@ -158,18 +160,21 @@ export default function OwnerProfileScreen() {
   };
 
   const shareFriendReferral = async () => {
+    const lifetime = referralLifetime.current;
+    const current = () => referralLifetime.current === lifetime;
     setReferralLoading(true);
     try {
       const data = await createFriendPillReferralService({});
+      if (!current()) return;
       const code = data?.referral_code;
       if (!code) throw new Error('Referral code was not returned.');
       const baseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || webBaseUrl;
       const url = `${baseUrl.replace(/\/+$/, '')}/register?referral_code=${encodeURIComponent(code)}`;
       await Share.share({ message: url, url });
     } catch (err: any) {
-      Alert.alert('Referral failed', err?.response?.data?.detail || err?.message || 'Failed to create referral link.');
+      if (current()) Alert.alert('Referral failed', err?.response?.data?.detail || err?.message || 'Failed to create referral link.');
     } finally {
-      setReferralLoading(false);
+      if (current()) setReferralLoading(false);
     }
   };
 

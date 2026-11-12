@@ -28,7 +28,7 @@ function compile(relative, modules) {
   const module = { exports: {} };
   vm.runInNewContext(output, {
     module, exports: module.exports, Date, URL, URLSearchParams, Blob, console,
-    TextEncoder, Uint8Array, setTimeout, clearTimeout,
+    TextEncoder, Uint8Array, setTimeout, clearTimeout, process,
     require(name) {
       if (!Object.prototype.hasOwnProperty.call(modules, name)) {
         throw Error('Unmocked finance import: ' + name + ' from ' + relative);
@@ -350,6 +350,90 @@ const click = async (app, label) => {
   assert.equal(action.props.disabled === true, false, label + ' must be enabled');
   await action.props.onPress(); await app.h.flush();
 };
+
+test('logout unmount invalidates an in-flight private invoice PDF before another account mounts', async () => {
+  const app = financeWorkspace(), pending = later();
+  app.finance.pdf = () => pending.promise;
+  await click(app, 'View invoice');
+  const nodes = await app.render();
+  button(nodes, 'Share PDF').props.onPress();
+  await app.h.flush();
+  app.h.unmount();
+  const next = financeWorkspace();
+  next.state.userId = 702;
+  await next.render();
+  pending.resolve(new Blob(['%PDF-1.4']));
+  await app.h.flush();
+  assert.equal(app.shares.length, 0);
+  assert.ok(app.files.every(file => file.deleted));
+  next.h.unmount();
+});
+
+test('invoice alias redirects each active persona to its canonical route with parameters', async () => {
+  for (const [home, expected] of [['/owner/dashboard', '/owner/invoice'], ['/admin', '/admin/invoice'],
+    ['/organization/dashboard', '/organization/invoice'], ['/pharmacist/dashboard', '/pharmacist/invoice'],
+    ['/otherstaff/dashboard', '/otherstaff/invoice']]) {
+    const h = createHooks(), redirects = [], user = { id: 1 }, params = { invoice: '51' };
+    const router = { replace: value => redirects.push(value) };
+    const page = compile('frontend_mobile/app/invoices.tsx', {
+      react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+      '@/components/RootPageHeader': { RootPageHeader: 'Header' },
+      '../roles/shared/invoices/InvoiceList': { default: 'InvoiceList' },
+      '@/context/AuthContext': { useAuth: () => ({ user, isLoading: false }) },
+      '@/utils/mobilePersona': { resolveInitialWorkspace: async () => home },
+      'expo-router': { useRouter: () => router, useLocalSearchParams: () => params },
+    });
+    await h.settled(page.default, {});
+    assert.equal(redirects.length, 1);
+    assert.equal(redirects[0].pathname, expected);
+    assert.equal(redirects[0].params.invoice, '51');
+    h.unmount();
+  }
+});
+
+test('canonical invoice screens retain received and issued persona modes', async () => {
+  for (const role of ['owner', 'admin', 'organization', 'pharmacist', 'otherstaff']) {
+    const h = createHooks();
+    const module = compile('frontend_mobile/roles/shared/invoices/InvoiceList.tsx', {
+      react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx },
+      'react-native': { StyleSheet: { create: v => v } }, 'react-native-paper': {},
+      '@/components/ui/BrandActivityIndicator': {}, 'react-native-safe-area-context': {},
+      'expo-router': { useSegments: () => [role] }, '@chemisttasker/shared-core': {},
+      './shareLegacyInvoicePdf': {}, './MobileInvoiceStats': {}, './FinanceWorkspace': { __esModule: true, default: 'FinanceWorkspace' },
+      '@/context/AuthContext': {}, './invoiceStats': {},
+      '@/constants/tokens': { colors: { status: { red: {} } }, font: { outfit: {} }, radius: {}, space: {}, touch: {} },
+    });
+    const nodes = await h.settled(module.default, {});
+    assert.equal(nodes.find(n => n.type === 'FinanceWorkspace').props.receivedMode,
+      ['owner', 'admin', 'organization'].includes(role), role);
+    h.unmount();
+  }
+});
+
+test('legacy PDF abandons stale downloads and removes files abandoned during write', async () => {
+  for (const stage of ['download', 'write', 'success']) {
+    const pending = later(), files = [], shares = [];
+    let live = true;
+    class File {
+      constructor() { this.uri = 'file:///invoice.pdf'; files.push(this); }
+      create() {}
+      async write() { if (stage === 'write') await pending.promise; }
+      delete() { this.deleted = true; }
+    }
+    const helper = compile('frontend_mobile/roles/shared/invoices/shareLegacyInvoicePdf.ts', {
+      'expo-file-system': { File, Paths: { cache: 'cache' } },
+      'expo-sharing': { isAvailableAsync: async () => true, shareAsync: async uri => shares.push(uri) },
+      '@chemisttasker/shared-core': { downloadInvoicePdf: () => stage === 'download' ? pending.promise : Promise.resolve('pdf') },
+      '@/features/parity/nativeFileBytes': { nativeFileBytes: async () => new Uint8Array([37, 80, 68, 70, 45]) },
+    });
+    const work = helper.shareLegacyInvoicePdf(1, () => live);
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+    if (stage !== 'success') { live = false; pending.resolve('pdf'); }
+    await work;
+    assert.equal(shares.length, stage === 'success' ? 1 : 0, stage);
+    assert.ok(files.every(file => file.deleted), stage);
+  }
+});
 
 test('account and mode switches clear finance and review while ignoring old loads and history', async () => {
   for (const change of ['account', 'mode']) {
@@ -742,4 +826,84 @@ test('R: parity BAS rejects results for edited period and basis and can recalcul
     button(nodes, 'Calculate worksheet').props.onPress(); await app.engine.flush();
     assert.ok((await app.render()).some(n => n.type === 'MetricGrid'), field);
   }
+});
+
+test('invoice alias sends unlisted personas home', async () => {
+  const h = createHooks(), redirects = [];
+  const page = compile('frontend_mobile/app/invoices.tsx', {
+    react: h.react, 'expo-router': { useRouter: () => ({ replace: x => redirects.push(x) }), useLocalSearchParams: () => ({}) },
+    '@/context/AuthContext': { useAuth: () => ({ user: { id: 1 }, isLoading: false }) },
+    '@/utils/mobilePersona': { resolveInitialWorkspace: async () => '/explorer/dashboard' },
+  });
+  await h.settled(page.default, {});
+  assert.equal(redirects[0], '/explorer/dashboard');
+  h.unmount();
+});
+
+test('CSV started during PDF retains both shares for the same user', async () => {
+  const app = financeWorkspace(), pending = later();
+  app.finance.pdf = () => pending.promise;
+  await click(app, 'View invoice');
+  button(await app.render(), 'Share PDF').props.onPress();
+  await app.h.flush();
+  await click(app, 'Export invoices CSV');
+  pending.resolve(new Blob(['%PDF-1.4']));
+  await awaitAsyncWork(app, () => app.shares.length === 2);
+  assert.deepEqual(app.shares.map(s => s.opts.mimeType).sort(), ['application/pdf', 'text/csv']);
+  app.h.unmount();
+});
+
+for (const role of ['owner', 'organization']) {
+  test(`${role} referral shares only while mounted`, async () => {
+    const pending = later(), shares = [];
+    let calls = 0;
+    function mount() {
+      const h = createHooks();
+      const component = name => Object.assign(function Component(props) { return jsx(name, props); }, {
+        Content: 'Content', Title: 'Title', Actions: 'Actions', Image: 'Image', Text: 'AvatarText', Item: 'Item', Icon: 'Icon',
+      });
+      const paper = Object.fromEntries(['Text','Avatar','List','Button','Surface','Divider','Switch','IconButton','Card','Portal','Dialog','TextInput'].map(n => [n, component(n)]));
+      const core = { createFriendPillReferralService: () => ++calls === 1 ? pending.promise : Promise.resolve({ referral_code: 'NEW' }),
+        getOnboarding: async () => ({ first_name: 'A', last_name: 'B' }), getCurrentSubscription: async () => ({}), fetchPillBalanceService: async () => ({}) };
+      const auth = { useAuth: () => ({ user: { id: 1 }, logout() {} }) };
+      const page = compile(`frontend_mobile/roles/${role}/profile.tsx`, {
+        react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx },
+        'react-native': { View:'View', ScrollView:'ScrollView', StyleSheet: { create: x => x }, Alert: { alert() {} }, Share: { share: async x => shares.push(x) } },
+        'react-native-paper': paper, 'react-native-safe-area-context': { SafeAreaView:'SafeAreaView' },
+        'expo-router': { useRouter: () => ({}) }, 'expo-constants': { default: {} },
+        '@chemisttasker/shared-core': core, '../../context/AuthContext': auth, '@/context/AuthContext': auth,
+        '@/components/ui/BrandLoader': { BrandLoader:'Loader' }, '@/features/explore/webLinks': {},
+        'expo-image-picker': { MediaTypeOptions: { Images: 'Images' } }, 'expo-linear-gradient': { LinearGradient:'Gradient' },
+        '../../utils/apiClient': {}, '@/utils/apiClient': {}, '@/roles/shared/dashboard/ManagerHome': { orgCapabilities: () => ({}) },
+      });
+      return { h, render: () => h.settled(page.default, {}) };
+    }
+    const first = mount();
+    const action = (await first.render()).find(n => n.type === 'Card' && text(n).includes('Share a referral link'));
+    assert.ok(action);
+    const old = action.props.onPress();
+    first.h.unmount();
+    const next = mount();
+    const newAction = (await next.render()).find(n => n.type === 'Card' && text(n).includes('Share a referral link'));
+    await newAction.props.onPress();
+    pending.resolve({ referral_code: 'OLD' });
+    await old;
+    assert.equal(shares.length, 1);
+    assert.match(shares[0].url, /NEW/);
+    next.h.unmount();
+  });
+}
+
+test('invoice alias sends an explorer home even with an invoice workspace selected', async () => {
+  const h = createHooks(), redirects = [];
+  const router = { replace: x => redirects.push(x) };
+  const page = compile('frontend_mobile/app/invoices.tsx', {
+    react: h.react, 'expo-router': { useRouter: () => router, useLocalSearchParams: () => ({}) },
+    '@/context/AuthContext': { useAuth: () => ({ user: { id: 1, role: 'EXPLORER' }, isLoading: false }) },
+    '@/utils/mobilePersona': { resolveInitialWorkspace: async () => '/owner/dashboard' },
+  });
+  await h.settled(page.default, {});
+  assert.ok(redirects.length > 0);
+  assert.ok(redirects.every(path => path === '/explorer/dashboard'));
+  h.unmount();
 });
