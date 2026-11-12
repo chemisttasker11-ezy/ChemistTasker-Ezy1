@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import ts from '../../node_modules/typescript/lib/typescript.js';
+import ts from 'typescript';
 
 // Exercise the proxy without a Next server; NextRequest is only a type here.
 const source = readFileSync(new URL('./platform-proxy.ts', import.meta.url), 'utf8')

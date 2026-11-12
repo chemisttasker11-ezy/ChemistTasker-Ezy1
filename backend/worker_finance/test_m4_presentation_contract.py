@@ -7,6 +7,7 @@ from datetime import date
 from unittest.mock import patch
 from uuid import uuid4
 
+from django.core.cache import cache
 from django.test import TestCase
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from invoicing.models import Invoice
@@ -18,6 +19,7 @@ ROOT = '/api/v1/finance/'
 
 class FinancePresentationContractTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.worker = make_user('PHARMACIST')
         self.other = make_user('PHARMACIST')
         self.owner, self.pharmacy = make_owner_with_pharmacy('M4 Finance Pharmacy')
