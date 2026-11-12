@@ -20,15 +20,24 @@ appId: com.chemisttasker.app
       id: "invoice-quantity-1"
     direction: DOWN
     timeout: 30000
+    centerElement: true
 - tapOn:
     id: "invoice-quantity-1"
 - eraseText: 20
 - inputText: "7.5"
-- assertVisible: "7.5"
+- assertVisible:
+    id: "invoice-quantity-1"
+    text: "7[.]5"
 - runFlow:
     when:
       platform: iOS
     commands:
+      - scrollUntilVisible:
+          element:
+            text: "Items & services"
+          direction: UP
+          timeout: 30000
+          centerElement: true
       - tapOn: "Items & services"
 - runFlow:
     when:
@@ -40,26 +49,42 @@ appId: com.chemisttasker.app
       text: ".*577.50.*"
     direction: DOWN
     timeout: 30000
+    centerElement: true
 - tapOn: "Save invoice"
 - extendedWaitUntil:
     visible: "View invoice"
     timeout: 30000
 - tapOn: "View invoice"
+- scrollUntilVisible:
+    element:
+      text: "Edit invoice"
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
 - tapOn: "Edit invoice"
 - scrollUntilVisible:
     element:
       id: "invoice-quantity-1"
     direction: DOWN
     timeout: 30000
+    centerElement: true
 - tapOn:
     id: "invoice-quantity-1"
 - eraseText: 20
 - inputText: "8"
-- assertVisible: "8"
+- assertVisible:
+    id: "invoice-quantity-1"
+    text: "8"
 - runFlow:
     when:
       platform: iOS
     commands:
+      - scrollUntilVisible:
+          element:
+            text: "Items & services"
+          direction: UP
+          timeout: 30000
+          centerElement: true
       - tapOn: "Items & services"
 - runFlow:
     when:
@@ -77,6 +102,7 @@ appId: com.chemisttasker.app
       text: "Send email"
     direction: DOWN
     timeout: 30000
+    centerElement: true
 - tapOn: "Send email"
 - tapOn: "Confirm"
 - extendedWaitUntil:
@@ -90,6 +116,7 @@ appId: com.chemisttasker.app
       text: "Share PDF"
     direction: DOWN
     timeout: 30000
+    centerElement: true
 - tapOn:
     text: "Share PDF"
     index: 0
