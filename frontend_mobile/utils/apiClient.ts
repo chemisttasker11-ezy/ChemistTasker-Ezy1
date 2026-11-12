@@ -109,6 +109,7 @@ apiClient.interceptors.response.use(
 
         // If 401 and we haven't retried yet, try to refresh token
         if (error.response?.status === 401 && !originalRequest._retry && !isPublicAuthRequest(originalRequest.url)) {
+            originalRequest._retry = true;
             if (isRefreshing) {
                 return new Promise(function (resolve, reject) {
                     failedQueue.push({ resolve, reject });
@@ -121,7 +122,6 @@ apiClient.interceptors.response.use(
                     });
             }
 
-            originalRequest._retry = true;
             isRefreshing = true;
 
             try {

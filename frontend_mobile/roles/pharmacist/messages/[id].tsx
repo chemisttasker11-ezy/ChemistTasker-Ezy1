@@ -39,10 +39,12 @@ export default function PharmacistMessageDetailScreen() {
   }, [id]);
 
   const fetchMessages = useCallback(async () => {
+    const generation = getSessionGeneration();
     const roomId = parseRoomId();
     if (!roomId) return;
     try {
       const data = await getRoomMessages(roomId);
+      if (generation !== getSessionGeneration()) return;
       const list = Array.isArray((data as any)?.results)
         ? (data as any).results
         : Array.isArray(data)
@@ -134,7 +136,7 @@ export default function PharmacistMessageDetailScreen() {
 
     // fallback polling
     pollRef.current = setInterval(() => {
-      if (!isCancelled) fetchMessages().catch(() => { });
+      if (currentSession()) fetchMessages().catch(() => { });
     }, 5000) as unknown as number;
 
     return () => {

@@ -60,8 +60,8 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
   const publicGet = async <T>(path: string, query?: ApiQuery): Promise<T> => {
     const generation = config.getSessionGeneration?.();
     const token = await config.getAuthToken?.();
+    if (!token) return client.get<T>(path, query, { auth: false, retryAuth: false });
     if (generation !== config.getSessionGeneration?.()) throw new Error('Session changed during request');
-    if (!token) return client.get<T>(path, query, { retryAuth: false });
     const optionalClient = createApiClient({ ...config, getAuthToken: () => token, onAuthFailure: undefined });
     try {
       return await optionalClient.get<T>(path, query, { retryAuth: false });

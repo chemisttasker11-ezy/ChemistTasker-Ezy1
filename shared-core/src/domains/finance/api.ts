@@ -6,7 +6,7 @@ interface FinanceRequestOptions {
 }
 /** Domain-owned operations extracted from the established shared API. */
 import { API_ENDPOINTS } from '../../constants/endpoints';
-import { performApiRequest } from '../../transport/application';
+import { getApiConfig, performApiRequest } from '../../transport/application';
 import { buildQuery } from '../../utils/serialization';
 function financeRequest(endpoint: string, options: FinanceRequestOptions & {
     responseType: 'blob';
@@ -34,6 +34,7 @@ async function financeRequest<T = unknown>(endpoint: string, { method = 'GET', b
     return response.json();
 }
 async function financeListAll<T>(endpoint: string): Promise<T[]> {
+    const generation = getApiConfig().getSessionGeneration?.();
     const results: T[] = [];
     const seen = new Set<string>();
     let next: string | null | undefined = endpoint;
@@ -49,6 +50,7 @@ async function financeListAll<T>(endpoint: string): Promise<T[]> {
             results: T[];
             next?: string | null;
         }>(next);
+        if (generation !== getApiConfig().getSessionGeneration?.()) throw new Error('Session changed during pagination');
         if (!Array.isArray(page?.results))
             throw new Error('Unexpected finance list response.');
         results.push(...page.results);
