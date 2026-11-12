@@ -316,10 +316,9 @@ def revoke_admin(self, request, *args, **kwargs):
     # my-pending-invitations and accept-invitation cannot resurrect it.
     # Keep the inactive assignment for audit and let a fresh authorized
     # create() explicitly re-link membership for any later re-invite.
-    # Revoking historical invalid access must remain possible without passing the grant guard.
-    PharmacyAdmin.objects.filter(pk=assignment.pk).update(
-        is_active=False, membership=None, updated_at=now,
-    )
+    assignment.is_active = False
+    assignment.membership = None
+    assignment.save(update_fields=["is_active", "membership", "updated_at"])
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 

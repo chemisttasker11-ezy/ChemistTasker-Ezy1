@@ -128,7 +128,7 @@ class OrganizationMembership(models.Model):
     def clean(self):
         super().clean()
         if self.user_id:
-            validate_admin_user(self.user)
+            validate_admin_user(self.user, assignment=self)
 
     def save(self, *args, **kwargs):
         self.clean()

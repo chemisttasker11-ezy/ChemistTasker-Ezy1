@@ -181,7 +181,10 @@ class OrganizationMembershipViewSet(mixins.ListModelMixin,
     permission_classes = [permissions.IsAuthenticated]
 
     def update(self, request, *args, **kwargs):
-        validate_admin_user_for_api(self.get_object().user)
+        membership = self.get_object()
+        validate_admin_user_for_api(membership.user, assignment=membership, changes={
+            field: request.data[field] for field in ("role", "admin_level") if field in request.data
+        })
         return super().update(request, *args, **kwargs)
 
     def _management_memberships(self, user):

@@ -719,7 +719,7 @@ class PharmacyAdminSerializer(serializers.ModelSerializer):
         if not user or not pharmacy:
             raise serializers.ValidationError("user and pharmacy are required.")
 
-        validate_admin_user_for_api(user)
+        validate_admin_user_for_api(user, assignment=self.instance, changes=attrs)
 
         existing = PharmacyAdmin.objects.filter(
             user=user,

@@ -432,7 +432,7 @@ class PharmacyAdmin(models.Model):
 
     def clean(self):
         if self.user_id:
-            validate_admin_user(self.user)
+            validate_admin_user(self.user, assignment=self)
         # Prevent demoting the pharmacy owner record
         if (
             self.admin_level != self.AdminLevel.OWNER
@@ -442,7 +442,7 @@ class PharmacyAdmin(models.Model):
 
     def save(self, *args, **kwargs):
         # Model.save() does not run clean(), including ORM create/update_or_create.
-        validate_admin_user(self.user)
+        validate_admin_user(self.user, assignment=self)
         return super().save(*args, **kwargs)
 
     def can_be_removed_by(self, acting_user) -> bool:

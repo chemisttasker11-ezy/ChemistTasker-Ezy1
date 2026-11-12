@@ -283,7 +283,7 @@ class OrganizationMembershipDetailSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         instance = self.instance
         if instance:
-            validate_admin_user_for_api(instance.user)
+            validate_admin_user_for_api(instance.user, assignment=instance, changes=attrs)
         role = attrs.get('role', instance.role if instance else None)
         admin_level = attrs.get('admin_level', instance.admin_level if instance else None)
         job_title = attrs.get('job_title', instance.job_title if instance else '')
