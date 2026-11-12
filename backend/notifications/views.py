@@ -30,7 +30,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = NotificationPagination
 
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
+        return Notification.objects.visible_to(self.request.user).order_by('-created_at')
 
     @action(detail=False, methods=['post'], url_path='mark-read')
     def mark_read(self, request):
@@ -38,7 +38,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         if ids is not None and not isinstance(ids, list):
             raise ValidationError({"ids": "Provide a list of notification IDs."})
         marked = mark_notifications_read(request.user, notification_ids=ids or None)
-        unread = Notification.objects.filter(user=request.user, read_at__isnull=True).count()
+        unread = Notification.objects.visible_to(request.user).unread().count()
         return Response({"marked": marked, "unread": unread})
 
 
