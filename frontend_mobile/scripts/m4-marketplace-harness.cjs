@@ -116,10 +116,13 @@ function createScheduler() {
   return { react, render, settled, flush, unmount };
 }
 
-function createMarketplace() {
+// REPLAY-t1: `shared` lets a test restart the app (fresh modules) on the same
+// durable AsyncStorage and app files; `files` backs the expo-file-system mock.
+function createMarketplace(shared = {}) {
   const scheduler = createScheduler();
   const env = { user: { id: 1001, role: 'OWNER' }, params: {}, screen: 'review' };
-  const storage = new Map(), calls = [], nav = [], fetchQueue = new Map(), responses = new Map();
+  const storage = shared.storage ?? new Map(), files = shared.files ?? new Map(), purged = shared.purged ?? new Set();
+  const calls = [], nav = [], fetchQueue = new Map(), responses = new Map();
   const serverImages = new Set();
   const writeBarriers = [], readBarriers = [], photoQueue = [];
   const store = {
@@ -134,6 +137,49 @@ function createMarketplace() {
   });
   const model = load('frontend_mobile/features/parity/marketplaceBrowseModel.ts', {});
   const policy = load('shared-core/src/policy/marketplacePolicy.ts', {});
+  const pendingIntent = load('shared-core/src/domains/talent/pendingPitch.ts', { './api': {} }, { crypto: globalThis.crypto });
+  // Snapshot of durable state when a request leaves the app (persist-before-send checks).
+  const persisted = () => ({ storage: new Map(storage), files: new Map(files) });
+  const uriOf = parts => parts.map(part => typeof part === 'string' ? part : part.uri).join('/').replace(/([^:])\/+/g, '$1/');
+  class HarnessFile {
+    constructor(...parts) { this.uri = uriOf(parts); }
+    get exists() { return files.has(this.uri) || (!this.uri.startsWith('file:///document/') && !purged.has(this.uri)); }
+    get name() { return this.uri.split('/').pop(); }
+    get size() { return (files.get(this.uri) ?? 'real-bytes').length; }
+    read() { if (files.has(this.uri)) return files.get(this.uri); if (!this.exists) throw Error('Missing file ' + this.uri); return 'real-bytes'; }
+    create() { files.set(this.uri, files.get(this.uri) ?? ''); }
+    write(content) { files.set(this.uri, typeof content === 'string' ? content : Buffer.from(content).toString()); }
+    copy(destination) { files.set(destination.uri, this.read()); }
+    move(destination) { this.copy(destination); files.delete(this.uri); this.uri = destination.uri; }
+    delete() { files.delete(this.uri); }
+    async bytes() { return new Uint8Array(Buffer.from(this.read())); }
+    bytesSync() { return new Uint8Array(Buffer.from(this.read())); }
+    async text() { return this.read(); }
+    textSync() { return this.read(); }
+    async base64() { return Buffer.from(this.read()).toString('base64'); }
+  }
+  class HarnessDirectory {
+    constructor(...parts) { this.uri = uriOf(parts).replace(/\/?$/, '/'); }
+    get exists() { return true; }
+    create() {}
+    delete() { for (const uri of [...files.keys()]) if (uri.startsWith(this.uri)) files.delete(uri); }
+    list() { return [...files.keys()].filter(uri => uri.startsWith(this.uri)).map(uri => new HarnessFile(uri)); }
+  }
+  const fileSystem = { File: HarnessFile, Directory: HarnessDirectory,
+    Paths: { document: new HarnessDirectory('file:///document/'), cache: new HarnessDirectory('file:///cache/') } };
+  // RN FormData accepts {uri,name,type} parts as well as Blobs; record both.
+  class HarnessFormData {
+    constructor() { this.parts = []; }
+    append(name, value, filename) { this.parts.push({ name, value, filename }); }
+    get(name) { return this.parts.find(part => part.name === name)?.value ?? null; }
+  }
+  async function bytesOf(value) {
+    if (value && typeof value.text === 'function' && !(value instanceof HarnessFile)) return value.text();
+    const uri = value?.uri;
+    if (!uri) return null;
+    if (files.has(uri)) return files.get(uri);
+    return uri.startsWith('file:///document/') || purged.has(uri) ? null : 'real-bytes';
+  }
   function queue(method, next) {
     if (!responses.has(method)) responses.set(method, []);
     responses.get(method).push(next);
@@ -155,26 +201,26 @@ function createMarketplace() {
       role_guidance: [], seller_policy_version: 'v1',
     }),
     createListing: async body => {
-      calls.push({ step: 'create', owner: env.user?.id, body });
+      calls.push({ step: 'create', owner: env.user?.id, body, persisted: persisted() });
       return take('create', { id: 'a1111111-1111-4111-8111-111111111111', version: 1 });
     },
-    updateListing: async (id, body) => {
-      calls.push({ step: 'update', owner: env.user?.id, id, body });
+    updateListing: async (id, body, key) => {
+      calls.push({ step: 'update', owner: env.user?.id, id, body, key, persisted: persisted() });
       return take('update', { id, version: body.expected_version + 1 });
     },
-    updateAudience: async (id, body) => {
-      calls.push({ step: 'audience', owner: env.user?.id, id, body });
+    updateAudience: async (id, body, key) => {
+      calls.push({ step: 'audience', owner: env.user?.id, id, body, key, persisted: persisted() });
       return take('audience', { version: body.expected_version + 1 });
     },
-    uploadImage: async (id, body) => {
-      calls.push({ step: 'upload', owner: env.user?.id, id, form: body });
+    uploadImage: async (id, body, key) => {
+      calls.push({ step: 'upload', owner: env.user?.id, id, form: body, key, persisted: persisted(), bytes: bytesOf(body?.get?.('image')) }); // promise: keeps the original await timing
       const image = await take('upload', { id: 17, moderation_status: 'PENDING' });
       serverImages.add(image.id);
       return image;
     },
     deleteImage: async id => { calls.push({ step: 'delete', id }); const result = await take('delete', undefined); serverImages.delete(id); return result; },
-    actOnListing: async (id, action, version) => {
-      calls.push({ step: 'submit', owner: env.user?.id, id, action, version, images: [...serverImages] });
+    actOnListing: async (id, action, version, key) => {
+      calls.push({ step: 'submit', owner: env.user?.id, id, action, version, key, persisted: persisted(), images: [...serverImages] });
       return take('submit', { publication_status: 'PENDING_REVIEW', version: version + 1 });
     },
   };
@@ -188,6 +234,8 @@ function createMarketplace() {
   };
   const mockedFetch = async uri => {
     calls.push({ step: 'local-fetch', owner: env.user?.id, uri });
+    if (files.has(uri)) { const value = files.get(uri); return { blob: async () => new Blob([value], { type: 'image/jpeg' }) }; }
+    if (purged.has(uri) || String(uri).startsWith('file:///document/')) throw Error('File no longer available: ' + uri);
     const queue = fetchQueue.get(uri) || [];
     if (!queue.length) return { blob: async () => new Blob(['real-bytes'], { type: 'image/jpeg' }) };
     const response = queue.shift();
@@ -216,13 +264,14 @@ function createMarketplace() {
     } },
     '@/config/api': { chemistTaskerApi: { marketplace: api } },
     '@/context/AuthContext': { useAuth: () => ({ user: env.user }) },
-    '@chemisttasker/shared-core': policy,
+    '@chemisttasker/shared-core': { ...policy, ...pendingIntent },
+    'expo-file-system': fileSystem,
     './ParityUI': widgets,
     './utils': utils,
     './marketplaceDraft': draftModule,
     './marketplaceBrowseModel': model,
     './MarketplaceAccessResolution': { MarketplaceAccessResolution: 'MarketplaceAccessResolution' },
-  }, { fetch: mockedFetch });
+  }, { fetch: mockedFetch, FormData: HarnessFormData, crypto: globalThis.crypto });
   // Native stack screens remain mounted after another route is pushed.
   function Stack() { return env.stack.map(screen => jsx(module.MarketplaceParityScreen, { screen }, screen)); }
   const component = () => env.stack ? Stack : module.MarketplaceParityScreen;
@@ -258,9 +307,12 @@ function createMarketplace() {
   const pauseNextWrite = () => { const gate = deferred(); writeBarriers.push(gate); return gate; };
   const pauseNextRead = () => { const gate = deferred(); readBarriers.push(gate); return gate; };
   const queuePhoto = next => photoQueue.push(next);
+  // The OS cleared the picker's temporary file: only a durable app copy remains readable.
+  const purgeLocal = uri => purged.add(uri);
+  const restart = () => { scheduler.unmount(); return createMarketplace({ storage, files, purged }); };
   return { scheduler, env, storage, calls, nav, queue, queueLocal, pauseNextWrite, api,
     render, currentNodes, button, click, clickSameRender, setDraft, getDraft, callsOf, deferred, queuePhoto,
-    pauseNextRead, draftModule,
+    pauseNextRead, draftModule, files, purgeLocal, restart, bytesOf,
     unmount: scheduler.unmount, flush: scheduler.flush };
 }
 module.exports = { createMarketplace, deferred };
