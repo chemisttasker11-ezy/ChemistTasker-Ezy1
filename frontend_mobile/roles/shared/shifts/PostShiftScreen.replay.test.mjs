@@ -182,3 +182,20 @@ test('user can clear a corrupt post intent after review', async () => {
   w.env.alertButtons.find(button => button.text === 'Confirm').onPress(); await flush();
   assert.equal(w.data.has(key), false);
 });
+
+test('settled intent left by an interrupted settle does not turn a fresh form into an edit', async () => {
+  const w = world(); w.env.lost = false;
+  const first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  assert.equal(w.rows.length, 1);
+  // Re-create the state a kill/account switch right after store.settle leaves behind.
+  const stored = savedIntents(w.calls[0].stored)[0];
+  const key = [...w.calls[0].stored].find(([k]) => k.startsWith('shift.create:'))[0];
+  w.data.set(key, JSON.stringify({ ...stored, resultId: w.rows[0].id }));
+  const next = await postScreen(w, { fill: true });
+  next.current.setSlots([{ date: '2026-12-09', startTime: '10:00', endTime: '14:00', isRecurring: false }]);
+  next.current.setDescription('A different shift next week'); next.render();
+  await next.current.handleSubmit();
+  assert.equal(w.edits.length, 0, `fresh form PATCHed shift ${w.edits[0]?.id} with ${JSON.stringify(Object.keys(w.edits[0]?.payload ?? {}))}`);
+  assert.equal(w.rows.length, 2);
+});

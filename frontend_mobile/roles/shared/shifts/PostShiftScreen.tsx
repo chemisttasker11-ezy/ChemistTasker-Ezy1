@@ -1277,8 +1277,13 @@ export default function PostShiftScreen() {
             const draft = postingDraft();
             const store = !editingId && !recoveredShiftRef.current && user?.id != null
                 ? mobilePendingIntentStore(getApiConfig?.()?.baseURL ?? '', user.id, 'shift.create') : null;
-            const pending = store ? await store.load() : null;
+            let pending = store ? await store.load() : null;
             if (!stillCurrent()) return;
+            if (pending?.resultId && store) {
+                await store.clear(pending.key);
+                if (!stillCurrent()) return;
+                pending = null;
+            }
             if ((pending as typeof pending & { rejected?: boolean })?.rejected) { setError('Start another post before submitting again.'); return; }
             if (!pending || pending.resultId) {
                 const validation = validateShiftPostingDraft(draft);
