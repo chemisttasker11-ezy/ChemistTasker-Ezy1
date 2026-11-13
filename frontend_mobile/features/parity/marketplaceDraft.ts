@@ -63,7 +63,8 @@ export function pendingMarketplaceIntent(intent:MarketplacePendingIntent|null,dr
 export async function saveMarketplaceIntent(scope:string,intent:MarketplacePendingIntent){
   const{key:intentKey,...payload}=intent;
   const saved=await intentStore(scope,()=>intentKey).acquire(payload);
-  if(saved.key!==intentKey)throw new Error('Review the pending listing change before starting another one.');
+  if(saved.key!==intentKey||!validIntent(saved.exactPayload))throw new Error('Review the pending listing change before starting another one.');
+  return {...saved.exactPayload,key:saved.key} as MarketplacePendingIntent;
 }
 /** Release a reconciled intent (outcome recorded in the draft, or its draft cleared). */
 export function releaseMarketplaceIntent(scope:string):Promise<void>{

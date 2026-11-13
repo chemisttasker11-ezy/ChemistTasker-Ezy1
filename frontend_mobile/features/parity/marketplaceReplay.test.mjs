@@ -229,6 +229,24 @@ test('create: a crash before its frozen body is durable cannot produce a second 
   h2.unmount();
 });
 
+test('create: reopening during a paused freeze sends the acquired body before the edit', async () => {
+  const h = await ready({ image_uris: [], title: 'Frozen title' });
+  const gate = h.pauseNextWrite();
+  h.click('Submit for review'); await settled(h);
+  h.unmount();
+  await h.draftModule.patchMarketplaceDraft('1001', { title: 'Edited while saving' });
+  await h.render();
+  h.click('Submit for review'); await settled(h);
+  gate.resolve(); await settled(h);
+  const [create] = h.callsOf('create');
+  const frozen = JSON.parse(create.persisted.storage.get(intentName(create.persisted.storage, create.body.client_request_id)));
+  assert.equal(json(create.body), json(frozen.exactPayload.body), 'the sent body is the acquired body');
+  assert.equal(create.body.title, 'Frozen title');
+  assert.equal(h.callsOf('update')[0].body.title, 'Edited while saving');
+  assert.equal(h.callsOf('submit').length, 1);
+  h.unmount();
+});
+
 test('a corrupt saved upload intent blocks the submission and never duplicates the upload', async () => {
   const h = await ready({ image_uris: ['file:///photo-1'] });
   h.queue('upload', lost());
@@ -380,9 +398,10 @@ test('409 STALE_VERSION on an update reloads the version and keeps the edit (not
   h.unmount();
 });
 
-test('409 payload mismatch on create is terminal: shown, kept, never resent', async () => {
+test('400 payload mismatch on create is terminal: shown, kept, never resent', async () => {
   const h = await ready({ image_uris: [] });
-  h.queue('create', httpError(409, 'IDEMPOTENCY_PAYLOAD_MISMATCH'));
+  // Correct the fixture to the create endpoint's actual validation response, not a weaker assertion.
+  h.queue('create', Object.assign(Error('validation'), { status: 400, payload: { client_request_id: 'REQUEST_ID_REUSED_WITH_DIFFERENT_PAYLOAD' } }));
   h.click('Submit for review'); await settled(h);
   const [first] = h.callsOf('create');
   assert.notEqual(screenError(h), '');

@@ -351,18 +351,22 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
        throw new Error(CONFLICT);
      };
      // `frozen` is null for a replay: that intent is already stored. Network/5xx failures keep it for a same-key resend.
-     const send=async(intent:MarketplacePendingIntent,frozen:Promise<void>|null,image?:Blob)=>{
-       if(frozen){await frozen;if(!current())return false;}
+     const send=async(intent:MarketplacePendingIntent,frozen:Promise<MarketplacePendingIntent>|null,image?:Blob):Promise<boolean>=>{
+       const requested=intent;
+       if(frozen){intent=await frozen;if(!current())return false;}
+       const changed=intent.snapshot!==requested.snapshot;
+       if(changed&&intent.operation!=='create')throw new Error('Review the pending listing change before starting another one.');
        let result:any;
        try{result=await run(intent,image);}
        catch(e:any){
-         const status=Number(e?.status??e?.response?.status),code=String((e?.payload??e?.response?.data??e?.data)?.code??'');
+         const status=Number(e?.status??e?.response?.status),payload=e?.payload??e?.response?.data??e?.data;
+         const code=String(payload?.code??(intent.operation==='create'&&status===400&&payload?.client_request_id==='REQUEST_ID_REUSED_WITH_DIFFERENT_PAYLOAD'?'IDEMPOTENCY_PAYLOAD_MISMATCH':''));
          if(status===409&&code==='STALE_VERSION'&&intent.id){
            await releaseMarketplaceIntent(targetScope); // refused: nothing committed
            const row=asArray<MarketplaceDashboardListing>(await api.getDashboard()).find(item=>String(item.id)===intent.id);
            if(row)return conflict(intent,row);
          }
-         if(status===410||(status===409&&code==='IDEMPOTENCY_PAYLOAD_MISMATCH'))return terminal(intent,code);
+         if(status===410||((status===409||(status===400&&intent.operation==='create'))&&code==='IDEMPOTENCY_PAYLOAD_MISMATCH'))return terminal(intent,code);
          else if(status>=400&&status<500){await releaseMarketplaceIntent(targetScope);dropCopy(intent.file);} // refused: nothing committed
          throw e;
        }
@@ -379,6 +383,11 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
        await patchMarketplaceDraft(targetScope,patch);
        void releaseMarketplaceIntent(targetScope).catch(()=>undefined); // queued ahead of the next freeze on the same lock
        dropCopy(intent.file);
+       if(changed&&current()){
+         const update:MarketplacePendingIntent={operation:'update',key:idempotencyKey(),draft:progress.create_request_id,
+           snapshot,id:listingId!,body:{...body,expected_version:expectedVersion}};
+         return send(update,freeze(update));
+       }
        return current();
      };
 
