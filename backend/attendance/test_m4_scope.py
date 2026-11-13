@@ -25,12 +25,12 @@ class M4AttendanceScopeContracts(TestCase):
         for pharmacy in (self.site_a, self.uncovered):
             pharmacy.organization = self.org
             pharmacy.save(update_fields=["organization"])
-        self.lina = make_user("EXPLORER")
+        self.lina = make_user("PHARMACIST")
         OrganizationMembership.objects.create(
             user=self.lina, organization=self.org, role="ORG_ADMIN",
             admin_level="MANAGER",
         )
-        self.grace = make_user("EXPLORER")
+        self.grace = make_user("PHARMACIST")
         scope = OrganizationMembership.objects.create(
             user=self.grace, organization=self.org, role="REGION_ADMIN",
             admin_level="ROSTER_MANAGER", region="M4 region",

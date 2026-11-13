@@ -249,7 +249,7 @@ class RosteredCorrectionContracts(RosteredCorrectionFixture, TestCase):
         self.assertEqual(corr_owner.corrected_by_id, self.owner.pk)
 
         # Positive control 2: Scoped organization manager with ROSTER_MANAGER authority
-        scoped_user = make_user("EXPLORER")
+        scoped_user = make_user("PHARMACIST")
         scoped_membership = OrganizationMembership.objects.create(
             user=scoped_user,
             organization=self.org,
