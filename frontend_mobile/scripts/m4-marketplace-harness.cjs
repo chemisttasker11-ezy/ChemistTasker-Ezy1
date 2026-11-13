@@ -218,6 +218,8 @@ function createMarketplace(shared = {}) {
       serverImages.add(image.id);
       return image;
     },
+    // Non-mutating read of the seller's listings (a pending submit is read back before any resend).
+    getDashboard: async () => { calls.push({ step: 'dashboard', owner: env.user?.id }); return take('dashboard', []); },
     deleteImage: async id => { calls.push({ step: 'delete', id }); const result = await take('delete', undefined); serverImages.delete(id); return result; },
     actOnListing: async (id, action, version, key) => {
       calls.push({ step: 'submit', owner: env.user?.id, id, action, version, key, persisted: persisted(), images: [...serverImages] });
