@@ -160,7 +160,7 @@ class TimesheetProjectionTests(TestCase):
             "slot_assignment": self.assignment.pk, "leave_type": "ANNUAL",
         })
         manager = get_user_model().objects.create(
-            username="wf_scoped_admin", email="wf-scoped-admin@example.invalid", role="EXPLORER",
+            username="wf_scoped_admin", email="wf-scoped-admin@example.invalid", role="PHARMACIST",
         )
         assignment = PharmacyAdmin.objects.create(
             user=manager, pharmacy=self.pharmacy,
