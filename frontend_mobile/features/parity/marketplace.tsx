@@ -4,12 +4,13 @@ import{Button,Card,Chip,IconButton,Searchbar,Text}from'react-native-paper';
 import { GuardedDatePickerInput as DatePickerInput, GuardedTimePickerModal as TimePickerModal } from '@/components/security/GuardedModal';
 import{useLocalSearchParams,useRouter}from'expo-router';
 import*as ImagePicker from'expo-image-picker';
+import{File,Paths}from'expo-file-system';
 import{chemistTaskerApi}from'@/config/api';
 import{useAuth}from'@/context/AuthContext';
 import{categoriesForSellerContext,clampMaximumAudience,nextMarketplaceAudience,permittedBuyerRolesForCategory,permittedModesForCategory,type MarketplaceCategory,type MarketplaceDashboardListing,type MarketplaceExchange,type MarketplaceListingOptions,type MarketplacePublicListing}from'@chemisttasker/shared-core';
 import{ActionButtons,ChoiceChips,DataRow,EmptyState,Field,InfoNote,MetricGrid,ParityPage,Section,palette}from'./ParityUI';
 import{asArray,dateLabel,errorMessage,idempotencyKey,money,replaceUnderscore,toNumber}from'./utils';
-import{clearMarketplaceDraft,emptyMarketplaceDraft,loadMarketplaceDraft,loadSettledMarketplaceDraft,patchMarketplaceDraft,type MarketplaceMobileDraft}from'./marketplaceDraft';
+import{clearMarketplaceDraft,emptyMarketplaceDraft,loadMarketplaceDraft,loadSettledMarketplaceDraft,patchMarketplaceDraft,loadMarketplaceIntent,pendingMarketplaceIntent,saveMarketplaceIntent,releaseMarketplaceIntent,recoverMarketplaceIntent,UNREADABLE_INTENT,type MarketplaceMobileDraft,type MarketplacePendingIntent}from'./marketplaceDraft';
 import{browseModes,browseQuery,categorySlug,normalizeBrowseMode,enquiryValidation,appendBrowsePage,nextBrowsePage,type BrowseMode}from'./marketplaceBrowseModel';
 import { MarketplaceAccessResolution } from './MarketplaceAccessResolution';
 
@@ -250,11 +251,13 @@ function AudienceStep({draft,options,loading,error}:{draft:MarketplaceMobileDraf
   <Button mode="contained" disabled={!value.allowed_buyer_roles.length||(postage&&(!value.postage_payer||!value.postage_organiser))} onPress={()=>router.push('/marketplace/new/review' as any)}>Review</Button>
  </ParityPage>;
 }
+const dropCopy=(file?:string)=>{if(file){const copy=new File(file);if(copy.exists)copy.delete();}};
+const CONFLICT='This listing changed on another device or screen. We reloaded it and kept your edits: review them and submit again.';
 function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:boolean;error:string}){
  const router=useRouter();
  const {user}=useAuth();
  const scope=String(user?.id??user?.email??user?.username??'anonymous');
- const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
+ const [busy,setBusy]=useState(false),[localError,setLocalError]=useState(''),[blocked,setBlocked]=useState<''|'unreadable'|'terminal'>('');
  const submittingRef=useRef(false),scopeRef=useRef(scope),submissionGeneration=useRef(0);
  scopeRef.current=scope;
  useEffect(()=>{
@@ -262,6 +265,7 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
    submittingRef.current=false;
    setBusy(false);
    setLocalError('');
+   setBlocked('');
    // The parent keys this content by account, so a previous ReviewStep can
    // remain in an async closure after unmount. Invalidate it at cleanup.
    return()=>{submissionGeneration.current+=1;submittingRef.current=false;};
@@ -272,13 +276,15 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
    submittingRef.current=true;
    const targetScope=scope,attempt=++submissionGeneration.current;
    const current=()=>scopeRef.current===targetScope&&submissionGeneration.current===attempt;
-   setBusy(true);setLocalError('');
+   setBusy(true);setLocalError('');setBlocked('');
    try{
      // Draft props can predate queued field edits and server receipts (a
      // partial earlier attempt), so the payload is built from the settled
      // saved draft of this account; receipts keep the create/upload de-dup.
-     const saved=await loadSettledMarketplaceDraft(targetScope);
+     const [saved,storedIntent]=await Promise.all([loadSettledMarketplaceDraft(targetScope),loadMarketplaceIntent(targetScope).catch(()=>undefined)]);
      if(!current())return;
+     // A corrupt or unreadable intent blocks this draft until it is read again or cleared after review (D104).
+     if(storedIntent===undefined){setBlocked('unreadable');setLocalError(UNREADABLE_INTENT);return;}
      const progress:MarketplaceMobileDraft={
        ...saved,
        created_listing_id:saved.created_listing_id||draft.created_listing_id,
@@ -308,58 +314,153 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
      };
      let listingId=progress.created_listing_id;
      let expectedVersion=progress.created_listing_version;
-     if(listingId&&expectedVersion!=null){
-       const updated=await api.updateListing(listingId,{...body,expected_version:expectedVersion});
-       if(!current())return;
-       expectedVersion=updated.version;
-       await patchMarketplaceDraft(targetScope,{created_listing_version:expectedVersion});
-       if(!current())return;
-     }else{
-       const created=await api.createListing(body);
-       if(!current())return;
-       listingId=String(created.id);expectedVersion=created.version;
-       await patchMarketplaceDraft(targetScope,{
-         created_listing_id:listingId,created_listing_version:expectedVersion,
-       });
-       if(!current())return;
-     }
-
-     if(progress.seller_context==='PHARMACY'){
-       const audience=await api.updateAudience(listingId,{
-         expected_version:Number(expectedVersion),current_circle:'OWNED_CHAIN',
-         maximum_circle:clampMaximumAudience(progress.maximum_circle),
-       });
-       if(!current())return;
-       expectedVersion=audience.version;
-       await patchMarketplaceDraft(targetScope,{
-         current_circle:'OWNED_CHAIN',created_listing_version:expectedVersion,
-       });
-       if(!current())return;
-     }
-
      let uploaded=[...progress.uploaded_image_uris];
      let imageIds={...saved.uploaded_image_ids,...draft.uploaded_image_ids};
+     // What this attempt sends; an intent frozen from another snapshot means the draft was edited since.
+     const snapshot=JSON.stringify({body,maximum_circle:progress.maximum_circle,image_uris:progress.image_uris});
+     const run=(intent:MarketplacePendingIntent,image?:Blob):Promise<any>=>{
+       if(intent.operation==='create')return api.createListing(intent.body);
+       if(intent.operation==='update')return api.updateListing(intent.id!,intent.body,intent.key);
+       if(intent.operation==='audience')return api.updateAudience(intent.id!,intent.body,intent.key);
+       if(intent.operation==='submit')return api.actOnListing(intent.id!,'submit',intent.version!,intent.key);
+       const data=new FormData();
+       // A replay reads the durable app copy: the picker's temporary file may be gone.
+       data.append('image',(image??{uri:intent.file,name:intent.name,type:'image/jpeg'}) as any,intent.name);
+       return api.uploadImage(intent.id!,data,intent.key);
+     };
+     // Each mutation is frozen (own key, exact request) for this account and durable before it leaves.
+     const freeze=(intent:MarketplacePendingIntent)=>{
+       const frozen=saveMarketplaceIntent(targetScope,intent);
+       frozen.catch(()=>undefined); // a failed write still rejects where it is awaited
+       return frozen;
+     };
+     // Terminal (409 mismatch, 410, listing missing): kept with its photo copy until the user discards it.
+     const terminal=async(intent:MarketplacePendingIntent,code:string):Promise<never>=>{
+       const reset=intent.operation==='create'||code==='LISTING_DELETED'||code==='LISTING_MISSING';
+       const message=!reset?'This saved change can no longer be applied on the server. Check My listings, then discard the saved change.'
+         :code==='IDEMPOTENCY_PAYLOAD_MISMATCH'?'This listing was already saved with different details. Check My listings, then discard the saved change to save this draft as a new listing.'
+         :'This listing no longer exists. Discard the saved change to save this draft as a new listing.';
+       await patchMarketplaceDraft(targetScope,{terminal_intent:{key:intent.key,message,reset}});
+       if(current())setBlocked('terminal');
+       throw new Error(message);
+     };
+     // A version conflict: reload the version, keep the user's edits; the next submit sends them with new keys.
+     const conflict=async(intent:MarketplacePendingIntent,row:MarketplaceDashboardListing):Promise<never>=>{
+       await patchMarketplaceDraft(targetScope,{created_listing_version:Number(row.version),settled_intent:intent.key});
+       await releaseMarketplaceIntent(targetScope);
+       throw new Error(CONFLICT);
+     };
+     // `frozen` is null for a replay: that intent is already stored. Network/5xx failures keep it for a same-key resend.
+     const send=async(intent:MarketplacePendingIntent,frozen:Promise<MarketplacePendingIntent>|null,image?:Blob):Promise<boolean>=>{
+       const requested=intent;
+       if(frozen){intent=await frozen;if(!current())return false;}
+       const changed=intent.snapshot!==requested.snapshot;
+       if(changed&&intent.operation!=='create')throw new Error('Review the pending listing change before starting another one.');
+       let result:any;
+       try{result=await run(intent,image);}
+       catch(e:any){
+         const status=Number(e?.status??e?.response?.status),payload=e?.payload??e?.response?.data??e?.data;
+         const code=String(payload?.code??(intent.operation==='create'&&status===400&&payload?.client_request_id==='REQUEST_ID_REUSED_WITH_DIFFERENT_PAYLOAD'?'IDEMPOTENCY_PAYLOAD_MISMATCH':''));
+         if(status===409&&code==='STALE_VERSION'&&intent.id){
+           await releaseMarketplaceIntent(targetScope); // refused: nothing committed
+           const row=asArray<MarketplaceDashboardListing>(await api.getDashboard()).find(item=>String(item.id)===intent.id);
+           if(row)return conflict(intent,row);
+         }
+         if(status===410||((status===409||(status===400&&intent.operation==='create'))&&code==='IDEMPOTENCY_PAYLOAD_MISMATCH'))return terminal(intent,code);
+         else if(status>=400&&status<500){await releaseMarketplaceIntent(targetScope);dropCopy(intent.file);} // refused: nothing committed
+         throw e;
+       }
+       if(!current())return false;
+       if(intent.operation==='submit')return true; // completion clears the draft and its intent together
+       // The outcome and the settled key are one draft write, so a crash cannot record one without the other.
+       const patch:Partial<MarketplaceMobileDraft>={settled_intent:intent.key};
+       if(intent.operation==='create'){listingId=String(result.id);patch.created_listing_id=listingId;}
+       if(intent.operation==='upload'){
+         uploaded=[...uploaded,intent.uri!];imageIds={...imageIds,[intent.uri!]:result.id};
+         patch.uploaded_image_uris=uploaded;patch.uploaded_image_ids=imageIds;
+       }else{expectedVersion=result.version;patch.created_listing_version=expectedVersion;}
+       if(intent.operation==='audience')patch.current_circle='OWNED_CHAIN';
+       await patchMarketplaceDraft(targetScope,patch);
+       void releaseMarketplaceIntent(targetScope).catch(()=>undefined); // queued ahead of the next freeze on the same lock
+       dropCopy(intent.file);
+       if(changed&&current()){
+         const update:MarketplacePendingIntent={operation:'update',key:idempotencyKey(),draft:progress.create_request_id,
+           snapshot,id:listingId!,body:{...body,expected_version:expectedVersion}};
+         return send(update,freeze(update));
+       }
+       return current();
+     };
+
+     const pending=pendingMarketplaceIntent(storedIntent,saved);
+     if(storedIntent&&!pending)await releaseMarketplaceIntent(targetScope); // reconciled already, or its draft was cleared
+     if(pending&&saved.terminal_intent?.key===pending.key){setBlocked('terminal');throw new Error(saved.terminal_intent.message);}
+     const unchanged=pending?.snapshot===snapshot;
+     let skipSave=false,skipAudience=false;
+     if(pending?.operation==='submit'){
+       // Orchestrator D125: read the listing back before resending a submit whose outcome is unknown.
+       const rows=await api.getDashboard();
+       if(!current())return;
+       const row=asArray<MarketplaceDashboardListing>(rows).find(item=>String(item.id)===pending.id);
+       if(!row)return await terminal(pending,'LISTING_MISSING');
+       const submitted=!['DRAFT','REJECTED'].includes(String(row.publication_status).toUpperCase());
+       if(!submitted&&Number(row.version)!==Number(pending.version))return await conflict(pending,row);
+       if(submitted||unchanged){
+         // An unchanged draft resends only the submit: an update first would move the version under its key.
+         if(!submitted&&!await send(pending,null))return;
+         await clearMarketplaceDraft(targetScope);
+         if(current())router.replace('/marketplace/mine' as any);
+         return;
+       }
+       await releaseMarketplaceIntent(targetScope); // edited since: save and submit afresh below
+       if(!current())return;
+     }else if(pending){
+       // Resend the frozen intent with its key first; later edits go out after it is reconciled.
+       if(!await send(pending,null))return;
+       // An upload replay keeps the existing retry path (save the draft, then the rest).
+       skipSave=unchanged&&pending.operation!=='upload';
+       skipAudience=unchanged&&pending.operation==='audience';
+     }
+     if(!skipSave){
+       if(listingId&&expectedVersion!=null){
+         const update:MarketplacePendingIntent={operation:'update',key:idempotencyKey(),draft:progress.create_request_id,
+           snapshot,id:listingId,body:{...body,expected_version:expectedVersion}};
+         if(!await send(update,freeze(update)))return;
+       }else{
+         const create:MarketplacePendingIntent={operation:'create',key:body.client_request_id,draft:progress.create_request_id,snapshot,body};
+         if(!await send(create,freeze(create)))return;
+       }
+     }
+
+     if(progress.seller_context==='PHARMACY'&&!skipAudience){
+       const audience:MarketplacePendingIntent={operation:'audience',key:idempotencyKey(),draft:progress.create_request_id,
+         snapshot,id:listingId!,body:{
+           expected_version:Number(expectedVersion),current_circle:'OWNED_CHAIN',
+           maximum_circle:clampMaximumAudience(progress.maximum_circle),
+         }};
+       if(!await send(audience,freeze(audience)))return;
+     }
+
      for(const uri of progress.image_uris){
        if(uploaded.includes(uri))continue;
        if(!current())return;
        const response=await fetch(uri);
        if(!current())return; // Account may switch during the local URI read.
+       // Durable copy and frozen intent first: a lost response is replayed after the picker's file is gone.
+       const name='listing-'+idempotencyKey()+'.jpg';
+       const copy=new File(Paths.document,name);
+       new File(uri).copy(copy);
+       const upload:MarketplacePendingIntent={operation:'upload',key:idempotencyKey(),draft:progress.create_request_id,
+         snapshot,id:listingId!,uri,file:copy.uri,name};
+       const frozen=freeze(upload); // written while the blob is read; awaited before the upload leaves
        const blob=await response.blob();
        if(!current())return; // Blob conversion is a second asynchronous boundary.
-       const data=new FormData();
-       data.append('image',blob as any,'listing-'+Date.now()+'.jpg');
-       if(!current())return;
-       const image=await api.uploadImage(listingId,data);
-       if(!current())return;
-       uploaded=[...uploaded,uri];
-       imageIds={...imageIds,[uri]:image.id};
-       await patchMarketplaceDraft(targetScope,{uploaded_image_uris:uploaded,uploaded_image_ids:imageIds});
-       if(!current())return;
+       if(!await send(upload,frozen,blob))return;
      }
      if(!current())return;
      if(submitForReview){
-       await api.actOnListing(listingId,'submit',Number(expectedVersion));
-       if(!current())return;
+       const submit:MarketplacePendingIntent={operation:'submit',key:idempotencyKey(),draft:progress.create_request_id,
+         snapshot,id:listingId!,version:Number(expectedVersion)};
+       if(!await send(submit,freeze(submit)))return;
      }
      // Clear only the original account's completed draft, never a new login's.
      await clearMarketplaceDraft(targetScope);
@@ -371,6 +472,26 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
    }finally{
      if(current()){submittingRef.current=false;setBusy(false);}
    }
+ };
+ // The user reviewed the blocked change: clear an unreadable record (D104), or discard a terminal one.
+ const resolveBlocked=async()=>{
+   if(submittingRef.current)return;
+   submittingRef.current=true;
+   const targetScope=scope,attempt=++submissionGeneration.current;
+   const current=()=>scopeRef.current===targetScope&&submissionGeneration.current===attempt;
+   setBusy(true);setLocalError('');
+   try{
+     if(blocked==='unreadable')await recoverMarketplaceIntent(targetScope);
+     else{
+       const [saved,intent]=await Promise.all([loadSettledMarketplaceDraft(targetScope),loadMarketplaceIntent(targetScope)]);
+       const ended=saved.terminal_intent;
+       if(ended&&intent?.key===ended.key){dropCopy(intent.file);await releaseMarketplaceIntent(targetScope);}
+       await patchMarketplaceDraft(targetScope,{terminal_intent:null,...(ended?.reset?{created_listing_id:null,created_listing_version:null,
+         uploaded_image_uris:[],uploaded_image_ids:{},create_request_id:idempotencyKey('marketplace-listing')}:{})});
+     }
+     if(current())setBlocked('');
+   }catch(e){if(current())setLocalError(errorMessage(e,'Unable to clear the saved change. Please retry.'));}
+   finally{if(current()){submittingRef.current=false;setBusy(false);}}
  };
  const postage=draft.delivery_method!=='PICKUP';
  const disabled=busy||!draft.category||!draft.title||
@@ -392,6 +513,7 @@ function ReviewStep({draft,loading,error}:{draft:MarketplaceMobileDraft;loading:
      <Button mode="outlined" loading={busy} disabled={disabled} onPress={()=>void complete(false)}>Save private draft</Button>
      <Button mode="contained" loading={busy} disabled={disabled} onPress={()=>void complete(true)}>Submit for review</Button>
    </ActionButtons>
+   {blocked?<Button mode="text" disabled={busy} onPress={()=>void resolveBlocked()}>{blocked==='unreadable'?'Clear unreadable saved change':'Discard saved change'}</Button>:null}
  </ParityPage>;
 }
 function MyListingDetail({row,loading,error,onReload}:{row:MarketplaceDashboardListing|undefined;loading:boolean;error:string;onReload:()=>Promise<void>}){

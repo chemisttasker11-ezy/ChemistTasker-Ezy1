@@ -48,6 +48,9 @@ test('R actual keyed unmount invalidates attempt while blob conversion is pendin
 
 test('R durable receipt-store await may complete for old account but may not launch later side effects', async () => {
   const h = await ready({ seller_context: 'PHARMACY', pharmacy: 11 });
+  // Changed (gate fix 3): the create intent is now durable before create is sent, so the first write
+  // passes and the pause holds the create receipt write that follows it.
+  h.pauseNextWrite().resolve();
   const saving = h.pauseNextWrite();
   h.click('Submit for review');
   await settle(h);
@@ -105,9 +108,11 @@ test('R failed submit retains durable ID/version and retry can finish using same
   h.click('Submit for review');
   await settle(h);
   assert.equal(h.callsOf('create').length, 1);
-  assert.equal(h.callsOf('update').length, 1);
+  // intentional (orchestrator D125): an unchanged draft is not re-saved; the pending submit is resent with its key and version
+  assert.equal(h.callsOf('update').length, 0);
   assert.equal(h.callsOf('submit').length, 2);
-  assert.equal(h.callsOf('submit')[1].version, 2);
+  assert.equal(h.callsOf('submit')[1].version, 1);
+  assert.equal(h.callsOf('submit')[1].key, h.callsOf('submit')[0].key);
   assert.equal(h.nav.length, 1);
   h.unmount();
 });
@@ -302,16 +307,17 @@ test('R retry after a queued pickup edit sends the settled saved draft, not stal
   h.unmount();
 });
 
-test('C retry with no edit still sends one update and one submit for the same listing', async () => {
+test('C retry with no edit resends the pending submit with the same key', async () => {
   const h = await failedSubmitThenBackToAudience();
   h.env.stack.push('review');
   await h.render();
   h.click('Submit for review');
   await settle(h);
   assert.equal(h.callsOf('create').length, 1);
-  assert.equal(h.callsOf('update').length, 1);
-  assert.equal(h.callsOf('update')[0].body.private_pickup_details, 'OLD pickup');
+  // intentional (orchestrator D125): an unchanged draft is not re-saved before the pending submit is resent
+  assert.equal(h.callsOf('update').length, 0);
   assert.equal(h.callsOf('submit').length, 2);
+  assert.equal(h.callsOf('submit')[1].key, h.callsOf('submit')[0].key);
   assert.equal(h.nav.filter(row => row[0] === 'replace').length, 1);
   h.unmount();
 });
