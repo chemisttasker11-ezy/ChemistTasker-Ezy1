@@ -115,8 +115,11 @@ class ReplayFixture:
         return self.keyed(user or self.tom, 'patch', API + f'listings/{listing_id}/', {'title': 'Keyed edit', 'expected_version': 1, **body}, key)
 
     def audience(self, listing_id, key, user=None, **body):
+        # a client retry resends the frozen payload, so the schedule time is fixed once per test
+        if not hasattr(self, '_due_at'):
+            self._due_at = (timezone.now() + timedelta(days=2)).isoformat()
         data = {'expected_version': 1, 'current_circle': 'OWNED_CHAIN', 'maximum_circle': 'PLATFORM',
-                'schedule': [{'target_circle': 'ORGANISATION', 'due_at': (timezone.now() + timedelta(days=2)).isoformat()}], **body}
+                'schedule': [{'target_circle': 'ORGANISATION', 'due_at': self._due_at}], **body}
         return self.keyed(user or self.tom, 'post', API + f'listings/{listing_id}/audience/', data, key)
 
     def submit(self, listing_id, key, user=None, version=1):
