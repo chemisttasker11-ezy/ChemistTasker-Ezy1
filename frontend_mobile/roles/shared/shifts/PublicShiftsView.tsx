@@ -321,12 +321,12 @@ function PublicShiftsBoard({
         }
     };
 
-    const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload) => {
+    const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload, key?: string) => {
         if (!guardVerified()) {
             throw new Error('Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.');
         }
         try {
-            await submitShiftCounterOfferService(payload);
+            return await submitShiftCounterOfferService(payload, key);
         } catch (err) {
             console.error('Failed to submit counter offer', err);
             throw new Error(errorMessage(err, 'Failed to submit counter offer.'));

@@ -1,4 +1,6 @@
 import { ApiError, buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, getShiftPostingOwnerAdjustedRate, shiftPostingDateWindow, splitPostableDates, type ShiftPostingDraft } from '@chemisttasker/shared-core';
+import { getApiConfig } from '@chemisttasker/shared-core';
+import { isTerminalIntentError, mobilePendingIntentStore } from '../talent-board/pendingPitch';
 import NativeShiftBoardPreview from './NativeShiftBoardPreview';
 import { expandShiftDraftSlots, reconcileShiftDraftRateRows } from '@chemisttasker/shared-core';
 import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults, type SupportEntry } from '@chemisttasker/shared-core';
@@ -78,7 +80,7 @@ export default function PostShiftScreen() {
     const router = useRouter();
     const params = useLocalSearchParams<PostShiftRawParams>();
     const surface = useShiftSurface();
-    const { hasCapability } = useAuth();
+    const { user, hasCapability } = useAuth();
     const paramsKey = useMemo(() => getStablePostShiftParamsKey(params), [
         params?.edit,
         params?.pharmacyId,
@@ -1236,35 +1238,104 @@ export default function PostShiftScreen() {
 
     const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff, showNotifyFavoriteStaff, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform }, slotsModified: areSlotsModified(), ratesModified: areRatesModified() });
 
+    const recoveredShiftRef = React.useRef<{ id: number; scope: string; payload: Record<string, unknown> } | null>(null);
+    if (recoveredShiftRef.current?.scope !== postingScopeRef.current) recoveredShiftRef.current = null;
+
+    const anotherPost = async () => {
+        if (user?.id == null) return;
+        const store = mobilePendingIntentStore(getApiConfig?.()?.baseURL ?? '', user?.id, 'shift.create');
+        const actionScope = postingScopeRef.current;
+        let intent;
+        try { intent = await store.load(); } catch {
+            if (postingScopeRef.current !== actionScope) return;
+            Alert.alert('Review your shifts', 'Review your posted shifts first, then confirm to clear the unreadable saved request.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Confirm', onPress: () => { if (postingScopeRef.current === actionScope) void store.recoverCorruptAfterReview().then(() => { if (postingScopeRef.current === actionScope) setError(''); }).catch(() => { if (postingScopeRef.current === actionScope) setError('Unable to clear the saved request.'); }); } },
+            ]);
+            return;
+        }
+        if (intent && !intent.resultId && !(intent as typeof intent & { rejected?: boolean }).rejected) { setError('Recover the previous shift before posting another.'); return; }
+        if (intent) await store.clear(intent.key);
+        resetForm();
+        recoveredShiftRef.current = null;
+        postSuccessDestinationRef.current = null;
+        setToast('');
+    };
+
     const handleSubmit = async () => {
+        const callbackScope = `${surface.scopeKey}:${editingId ?? 'new'}`;
+        if (postingScopeRef.current !== callbackScope) return;
         // State alone cannot prevent two taps before React renders the loading flag.
         // A second create POST may publish a duplicate shift, so lock synchronously.
         if (postingBusyRef.current || postSuccessDestinationRef.current || !hasAccess || hydrating) return;
         setError('');
-        const draft = postingDraft();
-        const validation = validateShiftPostingDraft(draft);
-        if (validation) { setError(validation); return; }
-        if (!editingId && draft.slots.some((slot) => {
-            const dates = [slot.date, ...(slot.isRecurring ? [slot.recurringEndDate || ''] : [])];
-            return splitPostableDates(dates, pharmacyToday()).valid.length !== new Set(dates).size;
-        })) {
-            setError('That date has passed. Pick today or later.');
-            return;
-        }
         const scope = postingScopeRef.current;
         const stillCurrent = () => scope === postingScopeRef.current;
         postingBusyRef.current = true;
         setLoading(true);
         try {
+            const draft = postingDraft();
+            const store = !editingId && !recoveredShiftRef.current && user?.id != null
+                ? mobilePendingIntentStore(getApiConfig?.()?.baseURL ?? '', user.id, 'shift.create') : null;
+            let pending = store ? await store.load() : null;
+            if (!stillCurrent()) return;
+            if (pending?.resultId && store) {
+                await store.clear(pending.key);
+                if (!stillCurrent()) return;
+                pending = null;
+            }
+            if ((pending as typeof pending & { rejected?: boolean })?.rejected) { setError('Start another post before submitting again.'); return; }
+            if (!pending || pending.resultId) {
+                const validation = validateShiftPostingDraft(draft);
+                if (validation) { setError(validation); return; }
+                if (!editingId && draft.slots.some((slot) => {
+                    const dates = [slot.date, ...(slot.isRecurring ? [slot.recurringEndDate || ''] : [])];
+                    return splitPostableDates(dates, pharmacyToday()).valid.length !== new Set(dates).size;
+                })) {
+                    setError('That date has passed. Pick today or later.');
+                    return;
+                }
+            }
             const payload = buildShiftPostingPayload(draft);
-            if (editingId) {
+            if (recoveredShiftRef.current) {
+                const recovered = recoveredShiftRef.current;
+                const edit = buildShiftPostingPayload({ ...draft, editingShiftId: recovered.id, slotsModified: true, ratesModified: true });
+                const changes = Object.fromEntries(Object.entries(edit).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(recovered.payload[key])));
+                if (Object.keys(changes).length) await updateOwnerShiftService(recovered.id, changes);
+                if (!stillCurrent()) return;
+                recovered.payload = payload;
+                setToast('Shift updated successfully!');
+            } else if (editingId) {
                 await updateOwnerShiftService(editingId, payload);
                 if (!stillCurrent()) return;
                 setToast('Shift updated successfully!');
             } else {
-                await createOwnerShiftService(payload);
+                if (user?.id == null) throw new Error('Sign in to post a shift.');
+                if (!store) throw new Error('Sign in to post a shift.');
+                const intent = pending ?? await store.acquire(payload as Record<string, unknown>);
                 if (!stillCurrent()) return;
-                resetForm();
+                let resultId = intent.resultId;
+                if (!resultId) {
+                    let result;
+                    try { result = await createOwnerShiftService(intent.exactPayload, intent.key); }
+                    catch (error) { if (stillCurrent() && isTerminalIntentError?.(error)) await store.reject(intent.key); throw error; }
+                    if (!stillCurrent()) return;
+                    await store.settle(intent.key, result.id);
+                    resultId = result.id;
+                }
+                if (!stillCurrent()) return;
+                await store.clear(intent.key);
+                if (!stillCurrent()) return;
+                if (pending) {
+                    recoveredShiftRef.current = { id: resultId, scope, payload: intent.exactPayload };
+                    const validation = validateShiftPostingDraft(draft);
+                    if (validation) { setError(validation); return; }
+                    const edit = buildShiftPostingPayload({ ...draft, editingShiftId: resultId, slotsModified: true, ratesModified: true });
+                    const changes = Object.fromEntries(Object.entries(edit).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(intent.exactPayload[key])));
+                    if (Object.keys(changes).length) await updateOwnerShiftService(resultId, changes);
+                    if (!stillCurrent()) return;
+                    recoveredShiftRef.current.payload = payload;
+                }
                 setToast('Shift posted successfully!');
                 // A successful new post starts a fresh form without inventing a backend draft state.
                 touchedRef.current = false;
@@ -1587,10 +1658,11 @@ export default function PostShiftScreen() {
                 </View>
             </KeyboardAvoidingView>
 
+            {!editingId && <Button onPress={anotherPost} disabled={loading}>Post another</Button>}
             <Snackbar
                 visible={!!toast}
                 onDismiss={dismissToast}
-                action={showingPostSuccess ? { label: 'View shifts', onPress: dismissToast } : undefined}
+                action={showingPostSuccess && !editingId ? { label: 'Post another', onPress: anotherPost } : showingPostSuccess ? { label: 'View shifts', onPress: dismissToast } : undefined}
                 duration={2500}
             >
                 {toast}

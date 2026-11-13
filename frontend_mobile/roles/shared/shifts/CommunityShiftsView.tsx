@@ -288,9 +288,9 @@ function CommunityShiftsBoard({
         }
     };
 
-    const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload) => {
+    const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload, key?: string) => {
         try {
-            await submitShiftCounterOfferService(payload);
+            return await submitShiftCounterOfferService(payload, key);
         } catch (err) {
             console.error('Failed to submit counter offer', err);
             throw new Error(errorMessage(err, 'Failed to submit counter offer.'));

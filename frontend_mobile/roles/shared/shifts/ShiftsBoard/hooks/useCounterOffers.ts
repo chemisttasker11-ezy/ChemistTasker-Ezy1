@@ -2,6 +2,8 @@
 // Exact logic from web with AsyncStorage adaptation for mobile
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { getApiConfig } from '@chemisttasker/shared-core';
+import { confirmCorruptIntentReview, isTerminalIntentError, mobilePendingIntentStore } from '../../../talent-board/pendingPitch';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     Shift,
@@ -55,7 +57,7 @@ type UseCounterOffersParams = {
     userRole?: string | null;
     pharmacistRatePref?: RatePreference;
     hideCounterOffer?: boolean;
-    onSubmitCounterOffer?: (payload: ShiftCounterOfferPayload) => Promise<void> | void;
+    onSubmitCounterOffer?: (payload: ShiftCounterOfferPayload, key?: string) => Promise<{ id: number }> | { id: number };
     onPageChange?: (page: number) => void;
     page?: number;
     clearSelection: (shiftId: number) => void;
@@ -85,6 +87,8 @@ export const useCounterOffers = ({
     const [counterOffers, setCounterOffers] = useState<Record<number, CounterOfferTrack>>({});
     const [counterSubmitting, setCounterSubmitting] = useState(false);
     const pendingCounterOffers = useRef<Set<number>>(new Set());
+    const pendingIntentKeys = useRef<Set<string>>(new Set());
+    const lastOfferShiftId = useRef<number | null>(null);
     const [reviewOfferShiftId, setReviewOfferShiftId] = useState<number | null>(null);
     const [reviewOffers, setReviewOffers] = useState<any[]>([]);
     const [reviewLoading, setReviewLoading] = useState(false);
@@ -276,6 +280,7 @@ export const useCounterOffers = ({
 
     const openCounterOffer = async (shift: Shift, selectedSlots?: Set<number>) => {
         if (!onSubmitCounterOffer || hideCounterOffer) return;
+        lastOfferShiftId.current = shift.id;
         let ratePref = pharmacistRatePref;
         setCounterOfferTravelLocation(EMPTY_TRAVEL_LOCATION);
         if (userRole?.toUpperCase() === 'PHARMACIST') {
@@ -393,105 +398,147 @@ export const useCounterOffers = ({
         );
     };
 
+    const scopeRef = useRef(`${scopeKey}:${currentUserId}`);
+    scopeRef.current = `${scopeKey}:${currentUserId}`;
+    useEffect(() => () => { scopeRef.current = 'disposed'; }, []);
+    const anotherCounterOffer = async () => {
+        if (currentUserId == null || lastOfferShiftId.current == null) return;
+        const store = mobilePendingIntentStore(getApiConfig?.()?.baseURL ?? '', currentUserId, `shift.counter_offer.create:${lastOfferShiftId.current}`);
+        const actionScope = scopeRef.current;
+        let intent;
+        try { intent = await store.load(); } catch {
+            if (scopeRef.current !== actionScope) return;
+            confirmCorruptIntentReview('offers', () => { if (scopeRef.current === actionScope) void store.recoverCorruptAfterReview().then(() => { if (scopeRef.current === actionScope) setCounterOfferError(null); }).catch(() => { if (scopeRef.current === actionScope) setCounterOfferError('Unable to clear the saved request.'); }); });
+            return;
+        }
+        if (intent?.resultId || (intent as typeof intent & { rejected?: boolean })?.rejected) { await store.clear(intent!.key); setCounterOfferError(null); }
+        else if (intent) setCounterOfferError('Recover the previous offer before starting another.');
+    };
     const handleSubmitCounterOffer = async () => {
+        const callbackScope = `${scopeKey}:${currentUserId}`;
+        if (scopeRef.current !== callbackScope || currentUserId == null) return;
         if (!counterOfferShift || !onSubmitCounterOffer) return;
         if (pendingCounterOffers.current.has(counterOfferShift.id)) return;
-        const canNegotiateRate = getShiftNegotiable(counterOfferShift);
-        const slotOfferMap: Record<number, { rate: string; start: string; end: string }> = {};
-        const hasRealSlots = (counterOfferShift.slots?.length ?? 0) > 0;
-        const slotsToSendRaw = hasRealSlots
-            ? counterOfferSlots.filter((slot) => slot.slotId != null)
-            : counterOfferSlots;
-        const slotsToSend = slotsToSendRaw;
-
-        if (slotsToSend.length === 0) {
-            setCounterOfferError('This shift has no slots to attach a counter offer. Please contact the poster.');
-            return;
-        }
-
-        // Deduplicate (slotId, slotDate) pairs to avoid backend duplicate validation errors.
-        const dedupedSlots: CounterOfferFormSlot[] = [];
-        const seenPairs = new Set<string>();
-        slotsToSend.forEach((slot) => {
-            const normalizedDate = slot.dateValue || '';
-            const key = `${slot.slotId ?? 'none'}|${normalizedDate}`;
-            if (seenPairs.has(key)) return;
-            seenPairs.add(key);
-            dedupedSlots.push({ ...slot, dateValue: normalizedDate || undefined });
-        });
-
-        if (slotsToSend.some((s) => !s.startTime || !s.endTime)) {
-            setCounterOfferError('Start and end time are required.');
-            return;
-        }
-        const payload: ShiftCounterOfferPayload = {
-            shiftId: counterOfferShift.id,
-            requestTravel: counterOfferTravel,
-            travelOrigin: counterOfferTravel ? formatTravelLocation(counterOfferTravelLocation) : undefined,
-            slots: dedupedSlots.map(
-                (slot): ShiftCounterOfferSlotPayloadWithDate => ({
-                    slotId: slot.slotId != null ? (slot.slotId as number) : undefined,
-                    slotDate: slot.dateValue || undefined,
-                    proposedStartTime: slot.startTime,
-                    proposedEndTime: slot.endTime,
-                    proposedRate: canNegotiateRate && slot.rate ? Number(slot.rate) : null,
-                })
-            ),
-        };
-        if (__DEV__) {
-            console.log('[ShiftsBoard] submit counter offer payload', payload);
-        }
-
-        setCounterOfferError(null);
         pendingCounterOffers.current.add(counterOfferShift.id);
         setCounterSubmitting(true);
         try {
-            await onSubmitCounterOffer(payload);
+            const store = mobilePendingIntentStore(getApiConfig?.()?.baseURL ?? '', currentUserId, `shift.counter_offer.create:${counterOfferShift.id}`);
+            const existingIntent = await store.load();
+            if (scopeRef.current !== callbackScope) return;
+            const canNegotiateRate = getShiftNegotiable(counterOfferShift);
+            const slotOfferMap: Record<number, { rate: string; start: string; end: string }> = {};
+            const hasRealSlots = (counterOfferShift.slots?.length ?? 0) > 0;
+            const slotsToSendRaw = hasRealSlots
+                ? counterOfferSlots.filter((slot) => slot.slotId != null)
+                : counterOfferSlots;
+            const slotsToSend = slotsToSendRaw;
+
+            if (!existingIntent && slotsToSend.length === 0) {
+                setCounterOfferError('This shift has no slots to attach a counter offer. Please contact the poster.');
+                return;
+            }
+
+            // Deduplicate (slotId, slotDate) pairs to avoid backend duplicate validation errors.
+            const dedupedSlots: CounterOfferFormSlot[] = [];
+            const seenPairs = new Set<string>();
+            slotsToSend.forEach((slot) => {
+                const normalizedDate = slot.dateValue || '';
+                const key = `${slot.slotId ?? 'none'}|${normalizedDate}`;
+                if (seenPairs.has(key)) return;
+                seenPairs.add(key);
+                dedupedSlots.push({ ...slot, dateValue: normalizedDate || undefined });
+            });
+
+            if (!existingIntent && slotsToSend.some((s) => !s.startTime || !s.endTime)) {
+                setCounterOfferError('Start and end time are required.');
+                return;
+            }
+            const payload: ShiftCounterOfferPayload = {
+                shiftId: counterOfferShift.id,
+                requestTravel: counterOfferTravel,
+                travelOrigin: counterOfferTravel ? formatTravelLocation(counterOfferTravelLocation) : undefined,
+                slots: dedupedSlots.map(
+                    (slot): ShiftCounterOfferSlotPayloadWithDate => ({
+                        slotId: slot.slotId != null ? (slot.slotId as number) : undefined,
+                        slotDate: slot.dateValue || undefined,
+                        proposedStartTime: slot.startTime,
+                        proposedEndTime: slot.endTime,
+                        proposedRate: canNegotiateRate && slot.rate ? Number(slot.rate) : null,
+                    })
+                ),
+            };
+            if (__DEV__) {
+                console.log('[ShiftsBoard] submit counter offer payload', payload);
+            }
+
+            setCounterOfferError(null);
+            let sentPayload = payload;
+            const intent = existingIntent ?? await store.acquire(payload as unknown as Record<string, unknown>);
+            if (scopeRef.current !== callbackScope) return;
+            if (intent.resultId || (intent as typeof intent & { rejected?: boolean }).rejected) {
+                setCounterOfferError('Start another offer before sending again.');
+                setCounterSubmitting(false);
+                return;
+            }
+            if (pendingIntentKeys.current.has(intent.key)) {
+                setCounterOfferError('A previous offer is still being submitted.');
+                return;
+            }
+            pendingIntentKeys.current.add(intent.key);
+            sentPayload = intent.exactPayload as unknown as ShiftCounterOfferPayload;
+            try {
+                let result;
+                try { result = await onSubmitCounterOffer(intent.exactPayload as unknown as ShiftCounterOfferPayload, intent.key); }
+                catch (error) { if (scopeRef.current === callbackScope && isTerminalIntentError?.(error)) await store.reject(intent.key); throw error; }
+                if (scopeRef.current !== callbackScope) return;
+                await store.settle(intent.key, result.id);
+            } finally {
+                pendingIntentKeys.current.delete(intent.key);
+            }
+            if (scopeRef.current !== callbackScope) return;
+
+            sentPayload.slots.forEach((slot) => {
+                if (slot.slotId != null) {
+                    slotOfferMap[slot.slotId] = { rate: String(slot.proposedRate ?? ''), start: slot.proposedStartTime, end: slot.proposedEndTime };
+                }
+            });
+            const sentCount = Object.keys(slotOfferMap).length;
+            const updated = {
+                ...counterOffers,
+                [sentPayload.shiftId]: {
+                    slots: slotOfferMap,
+                    summary: sentCount > 0 ? `Counter offer sent (${sentCount} slot${sentCount > 1 ? 's' : ''})` : 'Counter offer sent',
+                },
+            };
+            setCounterOffers(updated);
+            persistCounterOffers(updated);
+
+            // Treat countered slots as applied locally so they stay disabled and show chips immediately.
+            const targetedSlotIds = sentPayload.slots
+                .map((slot) => slot.slotId)
+                .filter((id): id is number => id != null);
+            if (targetedSlotIds.length > 0) {
+                setAppliedSlotIds((prev) => {
+                    const next = new Set(prev);
+                    targetedSlotIds.forEach((id) => next.add(id));
+                    return next;
+                });
+            } else {
+                setAppliedShiftIds((prev) => {
+                    const next = new Set(prev);
+                    next.add(sentPayload.shiftId);
+                    return next;
+                });
+            }
+
+            closeCounterOffer();
+            await refreshShifts();
         } catch (err) {
-            setCounterOfferError(err instanceof Error && err.message.trim().length > 0 ? err.message : 'Failed to submit counter offer.');
-            setCounterSubmitting(false);
-            return;
+            if (scopeRef.current === callbackScope) setCounterOfferError(err instanceof Error && err.message.trim().length > 0 ? err.message : 'Failed to submit counter offer.');
         } finally {
             pendingCounterOffers.current.delete(counterOfferShift.id);
+            if (scopeRef.current === callbackScope) setCounterSubmitting(false);
         }
-
-        slotsToSend.forEach((slot) => {
-            if (slot.slotId != null) {
-                slotOfferMap[slot.slotId] = { rate: slot.rate, start: slot.startTime, end: slot.endTime };
-            }
-        });
-        const sentCount = Object.keys(slotOfferMap).length;
-        const updated = {
-            ...counterOffers,
-            [counterOfferShift.id]: {
-                slots: slotOfferMap,
-                summary: sentCount > 0 ? `Counter offer sent (${sentCount} slot${sentCount > 1 ? 's' : ''})` : 'Counter offer sent',
-            },
-        };
-        setCounterOffers(updated);
-        persistCounterOffers(updated);
-
-        // Treat countered slots as applied locally so they stay disabled and show chips immediately.
-        const targetedSlotIds = slotsToSend
-            .map((slot) => slot.slotId)
-            .filter((id): id is number => id != null);
-        if (targetedSlotIds.length > 0) {
-            setAppliedSlotIds((prev) => {
-                const next = new Set(prev);
-                targetedSlotIds.forEach((id) => next.add(id));
-                return next;
-            });
-        } else {
-            setAppliedShiftIds((prev) => {
-                const next = new Set(prev);
-                next.add(counterOfferShift.id);
-                return next;
-            });
-        }
-
-        closeCounterOffer();
-        await refreshShifts();
-        setCounterSubmitting(false);
     };
 
     return {
@@ -512,6 +559,7 @@ export const useCounterOffers = ({
         clearCounterOfferTravelLocation,
         handleCounterSlotChange,
         handleSubmitCounterOffer,
+        anotherCounterOffer,
         reviewOfferShiftId,
         setReviewOfferShiftId,
         reviewOffers,

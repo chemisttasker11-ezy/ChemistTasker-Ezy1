@@ -43,7 +43,7 @@ const paper = { Button: 'Button', Checkbox: 'Checkbox', Chip: 'Chip', Surface: '
 const native = { TouchableOpacity: 'TouchableOpacity', View: 'View', ScrollView: 'ScrollView',
   KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: {}, Alert: {},
   StyleSheet: { create: styles => styles } };
-const common = { react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+const common = { '../talent-board/pendingPitch': { mobilePendingIntentStore: () => ({ load: async () => null }) }, react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
   'react-native': native, 'react-native-paper': paper, '@/constants/tokens': tokens,
   'lucide-react-native': {}, './PostShiftScreen.styles': { styles: {} },
   './PostShiftScreen.helpers': { formatAuDate: x => x, formatLongSlotDate: x => x } };
@@ -100,7 +100,10 @@ test('R window_range: mounted posting screen passes the window to its multiple p
   const hooks = { ...react, useMemo: fn => fn(), useState: value => [typeof value === 'function' ? value() : value, () => {}] };
   hooks.default = hooks;
   const components = Object.fromEntries(['NativeShiftBoardPreview', 'PostShiftDetailsStep', 'PostShiftSkillsStep', 'PostShiftVisibilityStep', 'PostShiftProgress', 'PostShiftPayRateStep', 'PostShiftTimetableStep'].map(name => [`./${name}`, { default: name }]));
-  const imports = { ...common, ...components, react: hooks, '@chemisttasker/shared-core': core,
+  let intent = null;
+  const store = { load: async () => intent, acquire: async payload => intent ??= { key: 'test-key', exactPayload: payload }, settle: async (_key, id) => { intent.resultId = id; }, clear: async () => { intent = null; } };
+  const imports = { ...common, ...components, react: hooks,
+    '../talent-board/pendingPitch': { mobilePendingIntentStore: () => store }, '@chemisttasker/shared-core': core,
     '@chemisttasker/shared-core/skills_registry.json': { default: {} },
     './PostShiftScreen.helpers': helpers,
     '@/components/security/GuardedModal': { GuardedDatePickerModal: 'DatePickerModal', GuardedTimePickerModal: 'TimePickerModal' },
@@ -157,7 +160,10 @@ test('R midnight rollover: mounted Post Shift picker must advance its minimum da
     ['NativeShiftBoardPreview', 'PostShiftDetailsStep', 'PostShiftSkillsStep', 'PostShiftVisibilityStep',
       'PostShiftProgress', 'PostShiftPayRateStep', 'PostShiftTimetableStep']
       .map(name => [`./${name}`, { default: name }]));
-  const imports = { ...common, ...components, react: hooks, '@chemisttasker/shared-core': core,
+  let intent = null;
+  const store = { load: async () => intent, acquire: async payload => intent ??= { key: 'test-key', exactPayload: payload }, settle: async (_key, id) => { intent.resultId = id; }, clear: async () => { intent = null; } };
+  const imports = { ...common, ...components, react: hooks,
+    '../talent-board/pendingPitch': { mobilePendingIntentStore: () => store }, '@chemisttasker/shared-core': core,
     '@chemisttasker/shared-core/skills_registry.json': { default: {} },
     './PostShiftScreen.helpers': helpers,
     '@/components/security/GuardedModal': { GuardedDatePickerModal: 'DatePickerModal', GuardedTimePickerModal: 'TimePickerModal' },
@@ -261,7 +267,10 @@ function mountPostShift(DateImpl = Date, opts = {}) {
     normalizeWorkloadTags: (_registry, tags) => tags, mergeSoftwareDefaults: current => current,
     ...opts.api,
   };
+  let intent = null;
+  const store = { load: async () => intent, acquire: async payload => intent ??= { key: 'test-key', exactPayload: payload }, settle: async (_key, id) => { intent.resultId = id; }, clear: async () => { intent = null; } };
   const imports = { ...common, ...components, react: hooks,
+    '../talent-board/pendingPitch': { mobilePendingIntentStore: () => store },
     'react-native': { ...native, Platform: opts.platform ?? native.Platform, Alert: { alert: (...args) => alerts.push(args) } },
     '@chemisttasker/shared-core': api,
     '@chemisttasker/shared-core/skills_registry.json': { default: {} },
@@ -274,7 +283,7 @@ function mountPostShift(DateImpl = Date, opts = {}) {
       useRouter: () => router,
     },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
-    '@/context/AuthContext': { useAuth: () => ({ hasCapability: opts.hasCapability ?? (() => true) }) },
+    '@/context/AuthContext': { useAuth: () => ({ user: { id: 1 }, hasCapability: opts.hasCapability ?? (() => true) }) },
     '@/components/ui': { ContentState: 'ContentState' },
     './useShiftSurface': {
       useShiftSurface: () => ({
@@ -431,6 +440,7 @@ test('C posting: two presses of Post from the same render send one create; a val
   hydrateReview(slots, isoDayFromNow(5));
   const post = postButton(render());
   const first = post.props.onPress(), second = post.props.onPress();
+  for (let i = 0; i < 10; i++) await Promise.resolve();
   assert.equal(submissions.length, 1, 'same-render double press is single-flight');
   finish({ id: 97 });
   await Promise.all([first, second]);

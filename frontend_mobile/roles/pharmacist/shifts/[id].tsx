@@ -313,9 +313,9 @@ function ScopedWorkerShiftDetail({ id, offerParam, surface }: { id?: string; off
         }
     };
 
-    const handleSubmitCounterOffer = async (payload: any) => {
+    const handleSubmitCounterOffer = async (payload: any, key?: string) => {
         try {
-            await submitShiftCounterOfferService(payload);
+            return await submitShiftCounterOfferService(payload, key);
         } catch (err) {
             setSnackbar({
                 open: true,

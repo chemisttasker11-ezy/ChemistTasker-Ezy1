@@ -1,9 +1,75 @@
+// Replay contract: optional Idempotency-Key; unique (user, operation, key) receipt;
+// 409 payload mismatch includes existing shift_id; replay rechecks current authorization.
 import { afterEach, expect, it, vi } from 'vitest';
+import { createPendingIntentStore } from '../talent/pendingPitch';
+import { createOwnerShift, createOwnerShiftService, createShiftCounterOffer, submitShiftCounterOfferService } from './api';
 import { configureApi } from '../../transport/application';
 import { deleteShiftDescriptionTemplate } from './descriptionTemplates';
 import { getActiveShiftDetail, getCommunityShiftDetail, getPublicShiftDetail, getActiveShiftsPage, getConfirmedShiftsPage, fetchAllActiveShifts, fetchAllConfirmedShifts, acceptShiftOfferService, fetchDeferredPayrollOffersService } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
+
+const replayKey = '165416cf-c485-4aad-8914-d7580f831843';
+const shiftBody = { pharmacy: 7, slots: [{ date: '2026-12-01', start_time: '09:00', end_time: '17:00' }] };
+const offerBody = { shiftId: 42, slots: [{ slotId: 17, slotDate: '2026-12-01', proposedRate: 75 }] };
+// Extra optional arguments are valid JavaScript today: failures must be behavior assertions.
+const keyedOwner = createOwnerShift as (body: unknown, key?: string) => Promise<unknown>;
+const keyedOwnerService = createOwnerShiftService as (body: unknown, key?: string) => Promise<unknown>;
+const keyedOffer = createShiftCounterOffer as (id: number, body: unknown, key?: string) => Promise<unknown>;
+const keyedOfferService = submitShiftCounterOfferService as (body: typeof offerBody, key?: string) => Promise<unknown>;
+
+it.each([
+    ['owner transport', (body: any, key?: string) => keyedOwner(body, key), shiftBody],
+    ['owner service', (body: any, key?: string) => keyedOwnerService(body, key), shiftBody],
+    ['offer transport', (body: any, key?: string) => keyedOffer(body.shiftId, body, key), offerBody],
+    ['offer service', (body: any, key?: string) => keyedOfferService(body, key), offerBody],
+] as const)('REPLAY %s resends persisted key and exact slots after commit + lost response', async (_label, send, body) => {
+    const records = new Map<string, string>();
+    const storage = { getItem: async (k: string) => records.get(k) ?? null,
+        setItem: async (k: string, v: string) => { records.set(k, v); }, removeItem: async (k: string) => { records.delete(k); } };
+    const store = () => createPendingIntentStore({ storage, lock: async (_k, run) => run(),
+        environment: 'test', userId: 1, operation: _label.includes('owner') ? 'shift.create' : 'shift.counter_offer.create', newKey: () => replayKey });
+    const intent = await store().acquire(body);
+    const receipts = new Map<string, number>();
+    const requests: Array<{ key: string | null; body: string }> = [];
+    let outcomes = 0;
+    configureApi({ baseURL: 'https://example.test/api/v1', getToken: async () => 'account-1',
+        fetchImpl: (async (_url: unknown, init?: RequestInit) => {
+            const key = new Headers(init?.headers).get('Idempotency-Key');
+            requests.push({ key, body: String(init?.body) });
+            const id = key && receipts.get(key) || ++outcomes;
+            if (key) receipts.set(key, id);
+            if (requests.length === 1) throw Error('response lost AFTER server commit');
+            return new Response(JSON.stringify({ id, slots: [] }), { status: 201, headers: { 'content-type': 'application/json' } });
+        }) as typeof fetch });
+    await expect(send(intent.exactPayload as any, intent.key)).rejects.toThrow();
+    expect(outcomes).toBe(1); // The first request committed; no rollback simulation.
+    const restored = await store().load(); // New store instance, same durable bytes.
+    await send(restored!.exactPayload as any, restored!.key);
+    expect(outcomes, 'retry created a second shift/offer because the header was dropped').toBe(1);
+    expect(requests[1]).toEqual(requests[0]);
+    expect(requests[0].key).toBe(replayKey);
+});
+
+it('REPLAY owner service returns the committed ID so recovery can edit the original shift', async () => {
+    configureApi({ baseURL: 'https://example.test/api/v1', getToken: async () => null,
+        fetchImpl: (async () => new Response(JSON.stringify({ id: 42 }), {
+            status: 201, headers: { 'content-type': 'application/json' },
+        })) as typeof fetch });
+    expect(await keyedOwnerService(shiftBody, replayKey)).toMatchObject({ id: 42 });
+});
+
+it('REPLAY unkeyed web owner creates remain independent', async () => {
+    const keys: Array<string | null> = [];
+    configureApi({ baseURL: 'https://example.test/api/v1', getToken: async () => null,
+        fetchImpl: (async (_url: unknown, init?: RequestInit) => {
+            keys.push(new Headers(init?.headers).get('Idempotency-Key'));
+            return new Response(JSON.stringify({ id: keys.length }), { status: 201, headers: { 'content-type': 'application/json' } });
+        }) as typeof fetch });
+    await createOwnerShift(shiftBody);
+    await createOwnerShift(shiftBody);
+    expect(keys).toEqual([null, null]);
+});
 
 it.each([
     ['active', getActiveShiftDetail, 'shifts/active'],

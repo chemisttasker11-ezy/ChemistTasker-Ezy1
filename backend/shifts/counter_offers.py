@@ -39,10 +39,6 @@ def visible_counter_offers_for_shift(*, shift, user, can_manage_pharmacy: bool):
 
 def announce_counter_offer(*, shift, user, offer):
     """After a worker submits a counter offer: record their interest and tell the shift's managers."""
-    # Ensure the user is marked as interested in the targeted slots (or shift-level) without triggering the
-    # express_interest email/notification path. This keeps counter-offer slots disabled and visible in interests.
-    ensure_interest_for_counter_offer(shift=shift, user=user, offer=offer)
-
     # Notify shift managers in-app; keep email limited to owner/creator.
     offer_slot_ids = list(offer.slots.values_list('slot_id', flat=True))
     primary_slot_id = offer_slot_ids[0] if offer_slot_ids else None

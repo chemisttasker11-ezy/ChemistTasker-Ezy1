@@ -70,9 +70,10 @@ export function getShiftCounterOffersBatch(shiftIds: number[]) {
     const query = encodeURIComponent(ids.join(','));
     return fetchApi<Record<string, ShiftCounterOfferApi[]>>(`/shifts/counter-offers-batch/?shift_ids=${query}`);
 }
-export function createShiftCounterOffer(shiftId: number | string, data: unknown) {
+export function createShiftCounterOffer(shiftId: number | string, data: unknown, key?: string) {
     return fetchApi<ShiftCounterOfferApi>(`/shifts/${shiftId}/counter-offers/`, {
         method: 'POST',
+        headers: key ? { 'Idempotency-Key': key } : undefined,
         body: JSON.stringify(data),
     });
 }
@@ -212,8 +213,8 @@ export function getOwnerShifts(params?: Record<string, unknown>) {
     const query = buildQuery(params);
     return fetchApi<Collection<OwnerShiftSummaryApi>>(`/shifts/owner/${query}`);
 }
-export function createOwnerShift(data: unknown) {
-    return fetchApi<ShiftApi>('/shifts/', { method: 'POST', body: JSON.stringify(data) });
+export function createOwnerShift(data: unknown, key?: string) {
+    return fetchApi<ShiftApi>('/shifts/', { method: 'POST', headers: key ? { 'Idempotency-Key': key } : undefined, body: JSON.stringify(data) });
 }
 export function updateOwnerShift(id: number | string, data: unknown) {
     return fetchApi<ShiftApi>(`/shifts/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
@@ -374,7 +375,7 @@ export async function fetchShiftCounterOffersService(shiftId: number | string) {
 }
 export async function submitShiftCounterOfferService(payload: ShiftCounterOfferPayload & {
     travel_origin?: string;
-}) {
+}, key?: string) {
     const body = {
         request_travel: payload.requestTravel ?? false,
         travel_origin_input: payload.travelOrigin ?? payload.travel_origin ?? '',
@@ -387,7 +388,7 @@ export async function submitShiftCounterOfferService(payload: ShiftCounterOfferP
             proposed_rate: slot.proposedRate ?? null,
         })),
     };
-    const data = await createShiftCounterOffer(payload.shiftId, body);
+    const data = await createShiftCounterOffer(payload.shiftId, body, key);
     return mapShiftCounterOffer(data);
 }
 export async function acceptShiftCounterOfferService(payload: {
@@ -505,8 +506,8 @@ export async function fetchOwnerShiftsService(filters?: Record<string, unknown>)
     const data = await getOwnerShifts(toOwnerShiftParams(filters));
     return asList(data).map(mapOwnerShiftSummary);
 }
-export async function createOwnerShiftService(payload: unknown) {
-    await createOwnerShift(payload);
+export async function createOwnerShiftService(payload: unknown, key?: string) {
+    return createOwnerShift(payload, key);
 }
 export async function updateOwnerShiftService(shiftId: number | string, payload: unknown) {
     await updateOwnerShift(shiftId, payload);

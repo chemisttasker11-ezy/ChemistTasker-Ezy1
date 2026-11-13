@@ -1,5 +1,10 @@
 """Base viewset shared by the shift viewsets."""
 import logging
+import json
+
+from infrastructure.request_fingerprint import request_fingerprint
+from rest_framework.renderers import JSONRenderer
+from client_profile.models import ShiftSubmissionReceipt
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +36,7 @@ from shifts.models import (
 )
 from rest_framework.response import Response
 from rest_framework.permissions import SAFE_METHODS
-from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.exceptions import MethodNotAllowed, NotFound, PermissionDenied, ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
 from organizations.access import managed_pharmacies, user_can_manage_pharmacy
@@ -114,6 +119,76 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     queryset = Shift.objects.all()
     serializer_class = ShiftSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def _receipt(self, request, operation, payload):
+        key = request.headers.get('Idempotency-Key')
+        if not key:
+            return None, None
+        if len(key) > 255:
+            raise ValidationError({'detail': 'Idempotency key is too long.'})
+        request.user = type(request.user).objects.select_for_update(no_key=True).get(pk=request.user.pk)
+        if not request.user.is_active:
+            raise PermissionDenied()
+        if operation == 'shift.counter_offer.create':
+            self._check_counter_offer_membership(request.user, Shift.objects.get(pk=payload['shift_id']))
+        fingerprint = request_fingerprint(payload)
+        receipt, created = ShiftSubmissionReceipt.objects.get_or_create(
+            user=request.user, operation=operation, key=key, defaults={'fingerprint': fingerprint})
+        if created:
+            return receipt, None
+        receipt = ShiftSubmissionReceipt.objects.select_for_update().get(pk=receipt.pk)
+        if receipt.shift_id:
+            original = Shift.objects.select_related('pharmacy').get(pk=receipt.shift_id)
+            if operation == 'shift.create':
+                if not user_can_manage_pharmacy(request.user, original.pharmacy):
+                    raise PermissionDenied()
+            else:
+                self._check_counter_offer_membership(request.user, original)
+                if not self.filter_queryset(self.get_queryset()).filter(pk=original.pk).exists():
+                    raise NotFound()
+                from onboarding.verification.state import require_public_ahpra
+                require_public_ahpra(request.user, original)
+                if not _user_can_perform_shift_role(request.user, original.role_needed):
+                    raise PermissionDenied()
+        if receipt.fingerprint != fingerprint:
+            return receipt, Response({'code': 'IDEMPOTENCY_PAYLOAD_MISMATCH', 'shift_id': receipt.original_shift_id}, status=409)
+        if receipt.shift_id is None or (operation == 'shift.counter_offer.create' and receipt.offer_id is None):
+            return receipt, Response({'code': 'SUBMISSION_DELETED', 'shift_id': receipt.original_shift_id}, status=410)
+        return receipt, Response(receipt.response_body, status=receipt.response_status, headers=receipt.response_headers)
+
+    @staticmethod
+    def _check_counter_offer_membership(user, shift):
+        if shift.visibility in COMMUNITY_LEVELS and shift.dedicated_user_id != user.pk:
+            from shifts.browse import community_membership_q
+            if not Shift.objects.filter(community_membership_q(user), pk=shift.pk).exists():
+                raise NotFound()
+
+    @staticmethod
+    def _save_receipt(receipt, response, shift_id, offer_id=None):
+        if receipt is None:
+            return
+        receipt.shift_id = receipt.original_shift_id = shift_id
+        receipt.offer_id = offer_id
+        receipt.response_body = json.loads(JSONRenderer().render(response.data))
+        receipt.response_status = response.status_code
+        receipt.response_headers = {name: value for name, value in response.items() if name.lower() == 'location'}
+        receipt.save()
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        if getattr(self, 'read_only_create', False):
+            raise MethodNotAllowed('POST')
+        receipt, replay = self._receipt(request, 'shift.create', request.data)
+        if receipt:
+            self.check_permissions(request)
+        if replay is not None:
+            return replay
+        response = super().create(request, *args, **kwargs)
+        if response.status_code == 201:
+            self._save_receipt(receipt, response, response.data['id'])
+        elif receipt:
+            receipt.delete()
+        return response
 
     def destroy(self, request, *args, **kwargs):
         with transaction.atomic():
@@ -344,13 +419,24 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             )
             return Response(serializer.data)
 
-        serializer = ShiftCounterOfferSerializer(data=request.data, context={'request': request, 'shift': shift})
-        serializer.is_valid(raise_exception=True)
-        offer = serializer.save()
-
-        announce_counter_offer(shift=shift, user=request.user, offer=offer)
-        output = ShiftCounterOfferSerializer(offer, context={'request': request, 'shift': shift})
-        return Response(output.data, status=status.HTTP_201_CREATED)
+        with transaction.atomic():
+            receipt, replay = self._receipt(request, 'shift.counter_offer.create', {'shift_id': shift.pk, 'payload': request.data})
+            if receipt:
+                shift = self.get_object()
+                require_public_ahpra(request.user, shift)
+                if not _user_can_perform_shift_role(request.user, shift.role_needed):
+                    raise ValidationError('Your role does not cover this shift.')
+            if replay is not None:
+                return replay
+            serializer = ShiftCounterOfferSerializer(data=request.data, context={'request': request, 'shift': shift})
+            serializer.is_valid(raise_exception=True)
+            offer = serializer.save()
+            ensure_interest_for_counter_offer(shift=shift, user=request.user, offer=offer)
+            transaction.on_commit(lambda: announce_counter_offer(shift=shift, user=request.user, offer=offer))
+            output = ShiftCounterOfferSerializer(offer, context={'request': request, 'shift': shift})
+            response = Response(output.data, status=status.HTTP_201_CREATED)
+            self._save_receipt(receipt, response, shift.pk, offer.pk)
+            return response
 
     # Historical entry point: owned by shifts.counter_offers.
     _ensure_interest_for_counter_offer = staticmethod(ensure_interest_for_counter_offer)

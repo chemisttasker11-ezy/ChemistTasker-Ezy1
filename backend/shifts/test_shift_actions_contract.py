@@ -372,7 +372,10 @@ class CounterOfferTests(ShiftActionFixture):
             "slot_id": slot.id, "slot_date": str(slot.date), "proposed_start_time": "09:00:00",
             "proposed_end_time": "17:00:00", "proposed_rate": rate,
         }], "message": "Can do"}
-        return self.post(worker, f"shifts/{shift.id}/counter-offers/", payload)
+        # intentional (replay plan task 2): counter-offer notifications are sent on commit
+        with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+            response = client_for(worker).post(f"{API}shifts/{shift.id}/counter-offers/", payload, format="json")
+        return response, sent
 
     def test_public_counteroffer_preserves_onboarding_outcomes_with_enforcement_on_or_off(self):
         for enforcement in (True, False):
