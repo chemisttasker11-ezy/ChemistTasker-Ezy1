@@ -54,7 +54,7 @@ function intentStore<T extends PendingIntent>(storage: PitchIntentStorage, lock:
     const raw = JSON.stringify(intent);
     if (kind === 'pitch' && !isValid(JSON.parse(raw) as T)) return corrupt() as never;
     await storage.setItem(scope, raw);
-    if (await storage.getItem(scope) !== raw) throw new Error('Your pending pitch could not be saved safely. Please retry.');
+    if (await storage.getItem(scope) !== raw) throw new Error(`Your pending ${kind === 'pitch' ? 'pitch' : 'change'} could not be saved safely. Please retry.`);
     return JSON.parse(raw) as T;
   }
   async function update(key: string, changes: Partial<T>) {
@@ -76,7 +76,10 @@ function intentStore<T extends PendingIntent>(storage: PitchIntentStorage, lock:
     recoverCorruptAfterReview: () => lock(scope, async () => {
       // The caller must reconcile saved results first.
       let corrupt = false;
-      try { await read(); } catch { corrupt = true; }
+      const raw = await storage.getItem(scope).catch(() => { throw new Error('Storage could not be read. Please retry.'); });
+      if (raw !== null) {
+        try { const value = JSON.parse(raw) as T; corrupt = !isValid(value); } catch { corrupt = true; }
+      }
       if (!corrupt) throw new Error(`Resolve the saved pending ${kind} before clearing it.`);
       await storage.removeItem(scope);
     }),

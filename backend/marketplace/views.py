@@ -1,5 +1,9 @@
 import io
 import uuid
+from functools import wraps
+from contextlib import contextmanager
+
+from infrastructure.request_fingerprint import request_fingerprint
 
 from django.conf import settings
 from django.db import transaction
@@ -23,6 +27,63 @@ from .models import (ListingEscalationStep, MarketplaceAuditEvent, MarketplaceCa
 from .policy import CURRENT_TERMS_VERSION, evaluate_marketplace_access, owns_pharmacy
 from .serializers import ExchangeSerializer, ListingWriteSerializer, MessageSerializer, PublicCategorySerializer, PublicListingSerializer, repair_blank_listing_slug
 from .services import accept_exchange, assert_listing_manager, buyer_can_contact, request_receipt
+
+
+@contextmanager
+def cleanup_written_files():
+    files = []
+    try:
+        yield files
+    except Exception:
+        for storage, name in files:
+            storage.delete(name)
+        raise
+
+
+def replayable(action):
+    def decorate(method):
+        @wraps(method)
+        def wrapped(self, request, pk, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return Response({"detail": "Authentication credentials were not provided."}, status=401)
+            listing = MarketplaceListing.objects.select_related("pharmacy").filter(pk=pk).first()
+            if listing:
+                assert_listing_manager(request.user, listing)
+            key = request.headers.get("Idempotency-Key")
+            if key:
+                try:
+                    key = uuid.UUID(key)
+                except ValueError:
+                    raise ValidationError({"Idempotency-Key": "Enter a valid UUID."})
+            receipt_action = action if action != "LISTING_ACTION" else ("LISTING_SUBMIT" if (args[0] if args else kwargs.get("action")) == "submit" else None)
+            with cleanup_written_files() as written, transaction.atomic():
+                request._marketplace_written_files = written
+                existing, payload_hash = None, None
+                if key and receipt_action:
+                    fingerprint = request_fingerprint(request.data)
+                    try:
+                        existing, payload_hash = request_receipt(request.user, receipt_action, key, {"listing": str(pk), "fingerprint": fingerprint})
+                    except ValidationError:
+                        return Response({"code": "IDEMPOTENCY_PAYLOAD_MISMATCH"}, status=409)
+                else:
+                    request.user.__class__.objects.select_for_update().get(pk=request.user.pk)
+                listing = MarketplaceListing.objects.select_for_update(of=("self",)).select_related("pharmacy").filter(pk=pk).first()
+                if not listing:
+                    if existing:
+                        return Response({"code": "LISTING_DELETED"}, status=410)
+                    raise Http404
+                assert_listing_manager(request.user, listing)
+                if existing:
+                    if receipt_action == "IMAGE_UPLOAD" and not MarketplaceImage.objects.filter(pk=existing.outcome["body"]["id"], listing=listing).exists():
+                        return Response({"code": "IMAGE_DELETED"}, status=410)
+                    return Response(existing.outcome["body"], status=existing.outcome["status"])
+                response = method(self, request, pk, *args, **kwargs)
+                if key and receipt_action and 200 <= response.status_code < 300:
+                    MarketplaceRequestReceipt.objects.create(actor=request.user, action=receipt_action, client_request_id=key,
+                        payload_hash=payload_hash, outcome={"body": dict(response.data), "status": response.status_code})
+                return response
+        return wrapped
+    return decorate
 
 
 def public_listings():
@@ -86,6 +147,8 @@ class Listings(APIView):
         if request_id:
             existing, payload_hash = request_receipt(request.user, "LISTING_CREATE", request_id, payload)
             if existing:
+                if not MarketplaceListing.objects.filter(pk=existing.outcome["id"]).exists():
+                    return Response({"code": "LISTING_DELETED"}, status=410)
                 return Response(existing.outcome)
         serializer = ListingWriteSerializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -109,6 +172,7 @@ class ListingDetail(APIView):
         listing = get_object_or_404(public_listings(), pk=pk)
         return Response(PublicListingSerializer(listing, context={"request": request}).data)
 
+    @replayable("LISTING_UPDATE")
     def patch(self, request, pk):
         if not request.user.is_authenticated:
             return Response({"detail": "Authentication credentials were not provided."}, status=401)
@@ -173,6 +237,7 @@ class MyListings(APIView):
 
 class ListingAction(APIView):
     permission_classes = (IsAuthenticated,)
+    @replayable("LISTING_ACTION")
     def post(self, request, pk, action):
         listing = get_object_or_404(MarketplaceListing.objects.select_related("pharmacy", "category", "audience", "delivery"), pk=pk)
         assert_listing_manager(request.user, listing)
@@ -198,9 +263,9 @@ class ListingAction(APIView):
 
 class ListingAudience(APIView):
     permission_classes = (IsAuthenticated,)
-    @transaction.atomic
+    @replayable("LISTING_AUDIENCE")
     def post(self, request, pk):
-        listing = get_object_or_404(MarketplaceListing.objects.select_for_update(of=("self",)).select_related("pharmacy", "audience"), pk=pk)
+        listing = get_object_or_404(MarketplaceListing.objects.select_related("pharmacy", "audience"), pk=pk)
         assert_listing_manager(request.user, listing)
         if request.data.get("expected_version") != listing.version:
             return Response({"code": "STALE_VERSION"}, status=409)
@@ -232,6 +297,7 @@ class ListingAudience(APIView):
 class ListingImages(APIView):
     permission_classes = (IsAuthenticated,)
     parser_classes = (MultiPartParser, FormParser)
+    @replayable("IMAGE_UPLOAD")
     def post(self, request, pk):
         listing = get_object_or_404(MarketplaceListing.objects.select_related("pharmacy"), pk=pk)
         assert_listing_manager(request.user, listing)
@@ -254,8 +320,17 @@ class ListingImages(APIView):
         except (UnidentifiedImageError, OSError, ValueError):
             raise ValidationError({"image": "Upload a valid, safe raster image."})
         from django.core.files.base import ContentFile
-        row = MarketplaceImage.objects.create(listing=listing, uploader=request.user, original=upload, position=listing.images.count(), width=safe.width, height=safe.height)
-        row.derivative.save(f"{uuid.uuid4().hex}.jpg", ContentFile(buffer.getvalue()), save=True)
+        row = MarketplaceImage(listing=listing, uploader=request.user, original=upload, position=listing.images.count(), width=safe.width, height=safe.height)
+        try:
+            row.save()
+            row.derivative.save(f"{uuid.uuid4().hex}.jpg", ContentFile(buffer.getvalue()), save=True)
+            request._marketplace_written_files.extend([(row.original.storage, row.original.name), (row.derivative.storage, row.derivative.name)])
+        except Exception:
+            if row.original and row.original._committed:
+                row.original.storage.delete(row.original.name)
+            if row.derivative and row.derivative._committed:
+                row.derivative.storage.delete(row.derivative.name)
+            raise
         return Response({"id": row.pk, "moderation_status": row.moderation_status}, status=201)
 
 
