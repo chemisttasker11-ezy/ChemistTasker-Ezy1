@@ -309,7 +309,8 @@ class ListingImages(APIView):
     def post(self, request, pk):
         listing = get_object_or_404(MarketplaceListing.objects.select_related("pharmacy"), pk=pk)
         assert_listing_manager(request.user, listing)
-        if listing.images.count() >= 6:
+        positions = set(listing.images.values_list("position", flat=True))
+        if len(positions) >= 6:
             raise ValidationError({"image": "A listing can have at most six images."})
         upload = request.FILES.get("image")
         if not upload or upload.size > 4 * 1024 * 1024:
@@ -328,7 +329,7 @@ class ListingImages(APIView):
         except (UnidentifiedImageError, OSError, ValueError):
             raise ValidationError({"image": "Upload a valid, safe raster image."})
         from django.core.files.base import ContentFile
-        row = MarketplaceImage(listing=listing, uploader=request.user, original=upload, position=listing.images.count(), width=safe.width, height=safe.height)
+        row = MarketplaceImage(listing=listing, uploader=request.user, original=upload, position=next(i for i in range(6) if i not in positions), width=safe.width, height=safe.height)
         try:
             row.save()
             row.derivative.save(f"{uuid.uuid4().hex}.jpg", ContentFile(buffer.getvalue()), save=True)
