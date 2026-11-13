@@ -444,3 +444,98 @@ class MarketplaceReplayConcurrency(ReplayFixture, TransactionTestCase):
         self.assertEqual(MarketplaceImage.objects.filter(listing_id=listing_id).count(), 6)
         self.assertEqual(len(media_files(self.media)), 2, 'the refused upload leaves no file')
         self.assertEqual(MarketplaceRequestReceipt.objects.filter(action='IMAGE_UPLOAD').count(), 1)
+
+@override_settings(MARKETPLACE_NEW_LISTINGS_ENABLED=True, MARKETPLACE_ALL_WRITES_ENABLED=True)
+class MarketplaceReplayRevokedDuringLock(ReplayFixture, TestCase):
+    def test_replay_rechecks_user_flags_after_receipt_lock(self):
+        listing_id, key = self.listing_for(), uuid4()
+        self.assertEqual(self.patch_listing(listing_id, key).status_code, 200)
+        original = views.request_receipt
+        for field in ('is_active', 'is_mobile_verified', 'is_otp_verified'):
+            with self.subTest(field=field):
+                User.objects.filter(pk=self.tom.pk).update(**{field: True})
+                setattr(self.tom, field, True)
+                def revoke(*args, **kwargs):
+                    User.objects.filter(pk=self.tom.pk).update(**{field: False})
+                    return original(*args, **kwargs)
+                with patch.object(views, 'request_receipt', side_effect=revoke):
+                    response = self.patch_listing(listing_id, key)
+                self.assertEqual(response.status_code, 403, response.content)
+                self.assertNotIn('title', response.json())
+                User.objects.filter(pk=self.tom.pk).update(**{field: True})
+                setattr(self.tom, field, True)
+
+    def test_create_retry_rechecks_user_after_receipt_lock(self):
+        payload = self.create_payload()
+        self.assertEqual(self.client_for(self.tom).post(API + 'listings/', payload, format='json').status_code, 201)
+        original = views.request_receipt
+        def revoke(*args, **kwargs):
+            User.objects.filter(pk=self.tom.pk).update(is_mobile_verified=False)
+            return original(*args, **kwargs)
+        with patch.object(views, 'request_receipt', side_effect=revoke):
+            response = self.client_for(self.tom).post(API + 'listings/', payload, format='json')
+        self.assertEqual(response.status_code, 403, response.content)
+        self.assertNotIn('id', response.json())
+
+
+@skipUnless(connection.vendor == 'postgresql', 'PostgreSQL row locks required.')
+@override_settings(MARKETPLACE_NEW_LISTINGS_ENABLED=True, MARKETPLACE_ALL_WRITES_ENABLED=True, MARKETPLACE_ESCALATION_ENABLED=True)
+class MarketplaceReplayGateRaces(ReplayFixture, TransactionTestCase):
+    def test_revoked_user_waiting_for_receipt_lock_cannot_replay(self):
+        from django.db import transaction
+        listing_id, key = self.listing_for(), uuid4()
+        self.assertEqual(self.patch_listing(listing_id, key).status_code, 200)
+        reached, result = threading.Event(), Queue()
+        original = views.request_receipt
+        def waiting(*args, **kwargs):
+            reached.set()
+            return original(*args, **kwargs)
+        def retry():
+            close_old_connections()
+            try:
+                response = self.patch_listing(listing_id, key)
+                result.put((response.status_code, response.json()))
+            finally:
+                close_old_connections()
+        with patch.object(views, 'request_receipt', side_effect=waiting):
+            with transaction.atomic():
+                User.objects.select_for_update().get(pk=self.tom.pk)
+                thread = Thread(target=retry)
+                thread.start()
+                self.assertTrue(reached.wait(10))
+                User.objects.filter(pk=self.tom.pk).update(is_active=False)
+            thread.join(20)
+        self.assertFalse(thread.is_alive())
+        status, body = result.get(timeout=5)
+        self.assertEqual(status, 403, body)
+        self.assertNotIn('title', body)
+
+    def test_escalation_and_keyed_audience_finish_without_deadlock(self):
+        from marketplace import tasks
+        from types import SimpleNamespace
+        listing_id = self.listing_for()
+        listing = MarketplaceListing.objects.get(pk=listing_id)
+        listing.publication_status = 'PUBLISHED'
+        listing.save(update_fields=['publication_status'])
+        ListingEscalationStep.objects.create(listing=listing, target_circle='ORGANISATION', due_at=timezone.now(), schedule_version=listing.version)
+        def escalate():
+            count = tasks.process_goods_escalations()
+            return SimpleNamespace(status_code=200, content=True, json=lambda: {'processed': count})
+        view_patch, service_patch = both_checked_before_writing()
+        with view_patch, service_patch:
+            with patch.object(tasks, 'assert_listing_manager', services.assert_listing_manager):
+                results = run_parallel(self, [escalate, lambda: self.audience(listing_id, uuid4())])
+        self.assertEqual([status for status, _ in results], [200, 200], results)
+
+    def test_delete_and_upload_at_six_photos_leave_consistent_count(self):
+        listing_id = self.listing_for()
+        listing = MarketplaceListing.objects.get(pk=listing_id)
+        images = [MarketplaceImage.objects.create(listing=listing, uploader=self.tom, position=i, original=f'seed-{i}.jpg') for i in range(6)]
+        def delete():
+            return self.client_for(self.tom).delete(API + f'images/{images[0].pk}/')
+        view_patch, service_patch = both_checked_before_writing()
+        with view_patch, service_patch:
+            results = run_parallel(self, [delete, lambda: self.upload(listing_id, uuid4())])
+        self.assertEqual(results[0][0], 204, results)
+        self.assertIn(results[1][0], (201, 400), results)
+        self.assertEqual(MarketplaceImage.objects.filter(listing_id=listing_id).count(), 6 if results[1][0] == 201 else 5)

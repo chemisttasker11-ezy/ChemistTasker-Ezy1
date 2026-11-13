@@ -67,6 +67,7 @@ def replayable(action):
                         return Response({"code": "IDEMPOTENCY_PAYLOAD_MISMATCH"}, status=409)
                 else:
                     request.user.__class__.objects.select_for_update().get(pk=request.user.pk)
+                    request.user.refresh_from_db()
                 listing = MarketplaceListing.objects.select_for_update(of=("self",)).select_related("pharmacy").filter(pk=pk).first()
                 if not listing:
                     if existing:
@@ -146,6 +147,13 @@ class Listings(APIView):
         payload = dict(data)
         if request_id:
             existing, payload_hash = request_receipt(request.user, "LISTING_CREATE", request_id, payload)
+            decision = evaluate_marketplace_access(request.user)
+            if decision.blockers:
+                raise PermissionDenied({"code": decision.blockers[0]["code"], "detail": decision.blockers[0]["message"]})
+            if pharmacy:
+                pharmacy.refresh_from_db()
+            if pharmacy and not owns_pharmacy(request.user, pharmacy):
+                raise PermissionDenied("Verified current ownership is required.")
             if existing:
                 if not MarketplaceListing.objects.filter(pk=existing.outcome["id"]).exists():
                     return Response({"code": "LISTING_DELETED"}, status=410)
@@ -350,9 +358,14 @@ class ImageDetail(APIView):
             raise Http404("Listing image is unavailable.") from exc
         response["Cache-Control"] = "public, max-age=300" if public else "private, no-store"
         return response
+    @transaction.atomic
     def delete(self, request, pk):
         image = get_object_or_404(MarketplaceImage.objects.select_related("listing", "listing__pharmacy"), pk=pk)
         assert_listing_manager(request.user, image.listing)
+        user = request.user.__class__.objects.select_for_update().get(pk=request.user.pk)
+        listing = get_object_or_404(MarketplaceListing.objects.select_for_update(of=("self",)).select_related("pharmacy"), pk=image.listing_id)
+        assert_listing_manager(user, listing)
+        image = get_object_or_404(MarketplaceImage, pk=pk, listing=listing)
         image.delete()
         return Response(status=204)
 
