@@ -77,7 +77,12 @@ function runtime(w, h) {
   const shared = {
     ApiError: Error,
     createOwnerShiftService: (payload, key) => w.send('shift.create', payload, key),
-    updateOwnerShiftService: async (id, payload) => { w.edits.push({ id, payload: clone(payload) }); return { id }; },
+    updateOwnerShiftService: async (id, payload) => {
+      w.edits.push({ id, payload: clone(payload) });
+      const row = w.rows.find(value => value.id === id);
+      if (row?.slotIds && 'slots' in payload) { row.slotIds = [999]; row.counterOffers = []; }
+      return { id };
+    },
     fetchPharmaciesService: async () => [], listShiftDescriptionTemplates: async () => [],
     calculateShiftRates: async () => [], fetchShiftCounterOffersService: async () => [],
     getPharmacyHoursForDate: () => ({ startTime: '09:00', endTime: '17:00' }),

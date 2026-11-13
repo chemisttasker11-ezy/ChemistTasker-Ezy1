@@ -306,3 +306,24 @@ class CounterOfferSubmissionReplayTests(TransactionTestCase):
                 posting.ShiftPostingFixture.payload(self), format='json', HTTP_IDEMPOTENCY_KEY=KEY)
         self.assertEqual(created.status_code, 201, created.data)
         self.assertEqual(self.send().status_code, 201)
+
+    def test_revoked_membership_on_primary_route_is_not_replayed(self):
+        self.lost_response()
+        Membership.objects.filter(user=self.candidate).update(is_active=False)
+        response = self.send()
+        self.assertIn(response.status_code, (403, 404), response.data)
+        self.assertEqual(ShiftCounterOffer.objects.count(), 1)
+
+    def test_deactivation_after_authentication_refuses_replay_and_new_offer(self):
+        self.lost_response()
+        from onboarding.verification.state import require_public_ahpra
+        for key in (KEY, NEW_KEY):
+            with self.subTest(key=key):
+                type(self.candidate).objects.filter(pk=self.candidate.pk).update(is_active=True)
+                def deactivate(user, shift):
+                    require_public_ahpra(user, shift)
+                    type(user).objects.filter(pk=user.pk).update(is_active=False)
+                with mock.patch('onboarding.verification.state.require_public_ahpra', side_effect=deactivate):
+                    response = self.send(key=key)
+                self.assertIn(response.status_code, (401, 403), response.data)
+                self.assertEqual(ShiftCounterOffer.objects.count(), 1)

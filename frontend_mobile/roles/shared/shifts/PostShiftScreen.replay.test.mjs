@@ -111,3 +111,33 @@ test('a queued submit callback from the previous account cannot send under the n
   await oldSubmit();
   assert.equal(w.calls.length, 0, 'previous account draft was sent using the new account');
 });
+
+test('recovery saves the edits made after the lost response before success', async () => {
+  const w = world(), first = await postScreen(w);
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w);
+  retry.current.setDescription('Changed during recovery'); retry.render();
+  await retry.current.handleSubmit();
+  assert.equal(w.edits.at(-1)?.payload.description, 'Changed during recovery');
+});
+
+test('description-only edit after recovery does not replace slots', async () => {
+  const w = world(); w.env.lost = false; const first = await postScreen(w);
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w);
+  retry.current.setDescription('Only description changed'); retry.render();
+  await retry.current.handleSubmit();
+  assert.ok(w.edits.length);
+  assert.equal('slots' in w.edits.at(-1).payload, false, 'unchanged slots would be deleted and recreated');
+});
+
+test('description-only recovery keeps existing slot ids and counter-offers', async () => {
+  const w = world(); w.env.lost = false; const first = await postScreen(w);
+  await first.current.handleSubmit(); first.unmount();
+  w.rows[0].slotIds = [17]; w.rows[0].counterOffers = [{ id: 23, slotId: 17 }];
+  const retry = await postScreen(w);
+  retry.current.setDescription('Only the description'); retry.render();
+  await retry.current.handleSubmit();
+  assert.deepEqual(w.rows[0].slotIds, [17]);
+  assert.deepEqual(w.rows[0].counterOffers, [{ id: 23, slotId: 17 }]);
+});

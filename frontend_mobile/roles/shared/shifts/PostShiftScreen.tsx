@@ -1287,12 +1287,23 @@ export default function PostShiftScreen() {
                 if (!store) throw new Error('Sign in to post a shift.');
                 const intent = pending ?? await store.acquire(payload as Record<string, unknown>);
                 if (!stillCurrent()) return;
-                if (intent.resultId) {
-                    await updateOwnerShiftService(intent.resultId, payload);
-                } else {
+                let resultId = intent.resultId;
+                if (!resultId) {
                     const result = await createOwnerShiftService(intent.exactPayload, intent.key);
                     if (!stillCurrent()) return;
                     await store.settle(intent.key, result.id);
+                    resultId = result.id;
+                }
+                if (!stillCurrent()) return;
+                if (JSON.stringify(payload) !== JSON.stringify(intent.exactPayload)) {
+                    const original = intent.exactPayload;
+                    const ratesModified = Object.keys(payload).some((key) =>
+                        (key.startsWith('rate_') || key === 'owner_adjusted_rate') && JSON.stringify(payload[key]) !== JSON.stringify(original[key]));
+                    const editPayload = buildShiftPostingPayload({
+                        ...draft, editingShiftId: resultId,
+                        slotsModified: JSON.stringify(payload.slots) !== JSON.stringify(original.slots), ratesModified,
+                    });
+                    await updateOwnerShiftService(resultId, editPayload);
                 }
                 if (!stillCurrent()) return;
                 setToast('Shift posted successfully!');

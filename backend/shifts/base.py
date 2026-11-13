@@ -126,7 +126,11 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             return None, None
         if len(key) > 255:
             raise ValidationError({'detail': 'Idempotency key is too long.'})
-        request.user = type(request.user).objects.select_for_update().get(pk=request.user.pk)
+        request.user = type(request.user).objects.select_for_update(no_key=True).get(pk=request.user.pk)
+        if not request.user.is_active:
+            raise PermissionDenied()
+        if operation == 'shift.counter_offer.create':
+            self._check_counter_offer_membership(request.user, Shift.objects.get(pk=payload['shift_id']))
         fingerprint = request_fingerprint(payload)
         receipt, created = ShiftSubmissionReceipt.objects.get_or_create(
             user=request.user, operation=operation, key=key, defaults={'fingerprint': fingerprint})
@@ -139,6 +143,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
                 if not user_can_manage_pharmacy(request.user, original.pharmacy):
                     raise PermissionDenied()
             else:
+                self._check_counter_offer_membership(request.user, original)
                 if not self.filter_queryset(self.get_queryset()).filter(pk=original.pk).exists():
                     raise NotFound()
                 from onboarding.verification.state import require_public_ahpra
@@ -150,6 +155,13 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         if receipt.shift_id is None or (operation == 'shift.counter_offer.create' and receipt.offer_id is None):
             return receipt, Response({'code': 'SUBMISSION_DELETED', 'shift_id': receipt.original_shift_id}, status=410)
         return receipt, Response(receipt.response_body, status=receipt.response_status, headers=receipt.response_headers)
+
+    @staticmethod
+    def _check_counter_offer_membership(user, shift):
+        if shift.visibility in COMMUNITY_LEVELS and shift.dedicated_user_id != user.pk:
+            from shifts.browse import community_membership_q
+            if not Shift.objects.filter(community_membership_q(user), pk=shift.pk).exists():
+                raise NotFound()
 
     @staticmethod
     def _save_receipt(receipt, response, shift_id, offer_id=None):

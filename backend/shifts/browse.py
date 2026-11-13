@@ -57,6 +57,70 @@ def _claim_refused(request, shift, reason, detail, code, status_code=status.HTTP
     return Response({"detail": detail, "code": code}, status=status_code)
 
 
+def community_membership_q(user):
+    return (
+        # 1. Full/part time at this pharmacy
+        Q(
+            visibility='FULL_PART_TIME',
+            pharmacy__memberships__user=user,
+            pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+            pharmacy__memberships__is_active=True,
+            pharmacy__memberships__status=Membership.Status.ACCEPTED,
+        )
+        |
+        # 2. Any active member at this pharmacy (for locum_casual)
+        Q(
+            visibility='LOCUM_CASUAL',
+            pharmacy__memberships__user=user,
+            pharmacy__memberships__employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES,
+            pharmacy__memberships__is_active=True,
+            pharmacy__memberships__status=Membership.Status.ACCEPTED,
+        )
+        |
+        Q(
+            visibility='LOCUM_CASUAL',
+            post_anonymously=False,
+            pharmacy__memberships__user=user,
+            pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+            pharmacy__memberships__is_active=True,
+            pharmacy__memberships__status=Membership.Status.ACCEPTED,
+        )
+        |
+        Q(
+            visibility=PUBLIC_LEVEL,
+            post_anonymously=False,
+            pharmacy__memberships__user=user,
+            pharmacy__memberships__employment_type__in=(
+                PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES
+            ),
+            pharmacy__memberships__is_active=True,
+            pharmacy__memberships__status=Membership.Status.ACCEPTED,
+        )
+        |
+        # 3. Any active member at any pharmacy with the same owner as the shift’s pharmacy
+        Q(
+            visibility='OWNER_CHAIN',
+            pharmacy__owner__in=Pharmacy.objects.filter(
+                memberships__user=user,
+                memberships__is_active=True,
+                memberships__status=Membership.Status.ACCEPTED,
+                memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+            ).values_list('owner', flat=True)
+        )
+        |
+        # 4. Any active member at any pharmacy in the same organization as the shift’s pharmacy
+        Q(
+            visibility='ORG_CHAIN',
+            pharmacy__organization__in=Pharmacy.objects.filter(
+                memberships__user=user,
+                memberships__is_active=True,
+                memberships__status=Membership.Status.ACCEPTED,
+                memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+            ).values_list('organization', flat=True)
+        )
+    )
+
+
 class CommunityShiftViewSet(BaseShiftViewSet):
     """Community‐level shifts, only for users who are active members of that pharmacy."""
     def get_queryset(self):
@@ -110,67 +174,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
             qs = qs.annotate(assigned_slot_count=Count('slots__assignments', distinct=True)).filter(assigned_slot_count=0)
 
         # Q filters for all escalation levels:
-        eligible_q = (
-            # 1. Full/part time at this pharmacy
-            Q(
-                visibility='FULL_PART_TIME',
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            # 2. Any active member at this pharmacy (for locum_casual)
-            Q(
-                visibility='LOCUM_CASUAL',
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES,
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            Q(
-                visibility='LOCUM_CASUAL',
-                post_anonymously=False,
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            Q(
-                visibility=PUBLIC_LEVEL,
-                post_anonymously=False,
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=(
-                    PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES
-                ),
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            # 3. Any active member at any pharmacy with the same owner as the shift’s pharmacy
-            Q(
-                visibility='OWNER_CHAIN',
-                pharmacy__owner__in=Pharmacy.objects.filter(
-                    memberships__user=user,
-                    memberships__is_active=True,
-                    memberships__status=Membership.Status.ACCEPTED,
-                    memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                ).values_list('owner', flat=True)
-            )
-            |
-            # 4. Any active member at any pharmacy in the same organization as the shift’s pharmacy
-            Q(
-                visibility='ORG_CHAIN',
-                pharmacy__organization__in=Pharmacy.objects.filter(
-                    memberships__user=user,
-                    memberships__is_active=True,
-                    memberships__status=Membership.Status.ACCEPTED,
-                    memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                ).values_list('organization', flat=True)
-            )
-        )
+        eligible_q = community_membership_q(user)
 
         qs = qs.filter(eligible_q).distinct()
 
