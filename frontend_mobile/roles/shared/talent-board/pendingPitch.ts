@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createPendingPitchStore, pitchIntentScope, sendPendingPitch, type PendingPitch, type PitchIntentLock } from '@chemisttasker/shared-core';
+import { createPendingPitchStore, createPendingIntentStore, pitchIntentScope, sendPendingPitch, type PendingPitch, type PitchIntentLock } from '@chemisttasker/shared-core';
 import { idempotencyKey } from '@/features/parity/utils';
 
 const locks = new Map<string, Promise<void>>();
@@ -33,3 +33,6 @@ export async function submitPendingPitch(store: ReturnType<typeof mobilePendingP
     throw error;
   }
 }
+
+export const mobilePendingIntentStore = (environment: string, userId: string | number, operation: string) =>
+  createPendingIntentStore({ storage: AsyncStorage, lock, environment, userId, operation, newKey: idempotencyKey });

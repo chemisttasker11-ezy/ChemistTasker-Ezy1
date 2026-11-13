@@ -4,6 +4,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { world, offerHook, savedIntents, deferred, flush } from '../../submissionReplay.test-support.mjs';
 
+test('restart reconciles independent pending offers for two shifts with their own keys', async () => {
+  const w = world(), first = await offerHook(w);
+  await first.open(42, 17); await first.current.handleSubmitCounterOffer();
+  w.env.lost = true;
+  await first.open(43, 18); await first.current.handleSubmitCounterOffer();
+  assert.equal(w.calls.length, 2);
+  assert.notEqual(w.calls[0].key, w.calls[1].key);
+  first.unmount();
+  const restarted = await offerHook(w);
+  await restarted.open(42, 17); await restarted.current.handleSubmitCounterOffer();
+  await restarted.open(43, 18); await restarted.current.handleSubmitCounterOffer();
+  assert.equal(w.rows.length, 2);
+  assert.equal(w.calls.length, 4);
+  assert.equal(w.calls[2].key, w.calls[0].key);
+  assert.equal(w.calls[3].key, w.calls[1].key);
+  assert.deepEqual(w.calls[2].payload, w.calls[0].payload);
+  assert.deepEqual(w.calls[3].payload, w.calls[1].payload);
+});
+
 test('restart after committed lost response resends exact target and slots without second offer', async () => {
   const w = world(), first = await offerHook(w);
   await first.open(); await first.current.handleSubmitCounterOffer();
@@ -81,4 +100,16 @@ test('a queued offer callback cannot dispatch previous-account payload after a s
   w.env.userId = 2; hook.params.currentUserId = 2; hook.params.scopeKey = 'worker:2'; hook.render();
   await oldSubmit();
   assert.equal(w.calls.length, 0, 'previous account offer was sent using the new account');
+});
+
+test('an invalid form still reconciles the pending original offer', async () => {
+  const w = world(), first = await offerHook(w);
+  await first.open(); await first.current.handleSubmitCounterOffer(); first.unmount();
+  const restarted = await offerHook(w);
+  await restarted.open();
+  restarted.current.handleCounterSlotChange(0, 'startTime', ''); restarted.render();
+  await restarted.current.handleSubmitCounterOffer();
+  assert.equal(w.calls.length, 2);
+  assert.deepEqual(w.calls[1].payload, w.calls[0].payload);
+  assert.equal(w.rows.length, 1);
 });

@@ -26,6 +26,7 @@ type CounterOfferDialogProps = {
     setCounterOfferTravelLocation: React.Dispatch<React.SetStateAction<TravelLocation>>;
     onClearTravelLocation: () => void;
     onSubmit: () => void;
+    onAnother: () => void;
 };
 
 const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
@@ -43,6 +44,7 @@ const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
     setCounterOfferTravelLocation,
     onClearTravelLocation,
     onSubmit,
+    onAnother,
 }) => (
     <BottomSheet
         open={visible}
@@ -57,6 +59,7 @@ const CounterOfferDialog: React.FC<CounterOfferDialogProps> = ({
         }
     >
                 <View style={styles.content}>
+                    <Button label="Start another offer" variant="outlined" onPress={onAnother} disabled={counterSubmitting} />
                     {counterOfferShift && (
                         <Text style={styles.pharmacy}>
                             {getShiftPharmacyName(counterOfferShift)}

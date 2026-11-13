@@ -266,6 +266,7 @@ const ScopedShiftsBoard: React.FC<BoardPresentationProps & { scopeKey: string }>
         clearCounterOfferTravelLocation,
         handleCounterSlotChange,
         handleSubmitCounterOffer,
+        anotherCounterOffer,
         reviewOfferShiftId,
         setReviewOfferShiftId,
         reviewOffers,
@@ -629,6 +630,7 @@ const ScopedShiftsBoard: React.FC<BoardPresentationProps & { scopeKey: string }>
                 setCounterOfferTravelLocation={setCounterOfferTravelLocation}
                 onClearTravelLocation={clearCounterOfferTravelLocation}
                 onSubmit={handleSubmitCounterOffer}
+                onAnother={anotherCounterOffer}
             />
 
             <ReviewCounterOfferDialog
