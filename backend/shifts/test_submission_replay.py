@@ -19,8 +19,10 @@ from shifts import test_shift_actions_contract as actions
 
 ROUTES = (
     'shifts/', 'community-shifts/', 'public-shifts/', 'shifts/active/',
-    'shifts/confirmed/', 'shifts/history/', 'my-confirmed-shifts/', 'my-history-shifts/',
+    'shifts/confirmed/', 'shifts/history/',
 )
+# intentional (orchestrator D122): read-only worker lists; no client creates through them, create returns 405
+READ_ONLY_ROUTES = ('my-confirmed-shifts/', 'my-history-shifts/')
 KEY = '165416cf-c485-4aad-8914-d7580f831843'
 NEW_KEY = '265416cf-c485-4aad-8914-d7580f831843'
 
@@ -137,6 +139,13 @@ class ShiftSubmissionReplayTests(TransactionTestCase):
                     response = self.send(route, key=None)
                     self.assertEqual(response.status_code, 201, getattr(response, 'data', response.reason_phrase))
                 self.assertEqual(Shift.objects.count() - before, 2)
+        for route in READ_ONLY_ROUTES:
+            for key in (None, route.replace('/', '-') + KEY):
+                with self.subTest(route=route, key=key):
+                    before = Shift.objects.count()
+                    response = self.send(route, key=key)
+                    self.assertEqual(response.status_code, 405, getattr(response, 'data', response.reason_phrase))
+                    self.assertEqual(Shift.objects.count(), before)
 
     def test_new_key_allows_second_intent_with_identical_payload(self):
         self.lost_response()
