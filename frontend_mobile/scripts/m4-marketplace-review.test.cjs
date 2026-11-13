@@ -48,6 +48,9 @@ test('R actual keyed unmount invalidates attempt while blob conversion is pendin
 
 test('R durable receipt-store await may complete for old account but may not launch later side effects', async () => {
   const h = await ready({ seller_context: 'PHARMACY', pharmacy: 11 });
+  // Changed (gate fix 3): the create intent is now durable before create is sent, so the first write
+  // passes and the pause holds the create receipt write that follows it.
+  h.pauseNextWrite().resolve();
   const saving = h.pauseNextWrite();
   h.click('Submit for review');
   await settle(h);

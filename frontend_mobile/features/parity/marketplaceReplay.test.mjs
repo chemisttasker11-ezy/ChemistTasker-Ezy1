@@ -194,3 +194,224 @@ test('listing switch: a pending intent for one listing is never sent against ano
   }
   h2.unmount();
 });
+
+// Gate round 3 (fixes 3-6). Errors carry the transport's status and payload code.
+const httpError = (status, code) => Object.assign(Error(code), { status, payload: { code } });
+const screenError = h => String(h.currentNodes().find(node => node.type === 'ParityPage')?.props.error ?? '');
+// The stored intent record (not the draft) holding `key`.
+const intentName = (map, key) => [...map].find(([name, value]) => name !== DRAFT + 1001 && String(value).includes(key))?.[0];
+const row = (version, publication_status = 'DRAFT') => ({ id: L1, publication_status, version });
+async function lostSubmit(patch = {}) {
+  const h = await ready({ image_uris: [], ...patch });
+  h.queue('submit', lost());
+  h.click('Submit for review'); await settled(h);
+  const [first] = h.callsOf('submit');
+  assert.equal(first.version, 1);
+  return { h, first };
+}
+
+test('create: a crash before its frozen body is durable cannot produce a second create', async () => {
+  const h = await ready({ image_uris: [], title: 'Frozen title' });
+  h.pauseNextWrite(); // the app dies before this write lands
+  h.click('Submit for review'); await settled(h);
+  assert.equal(h.callsOf('create').length, 0, 'create must not leave before its intent is durable');
+
+  const h2 = h.restart();
+  await h2.draftModule.patchMarketplaceDraft('1001', { title: 'Edited after crash' });
+  await h2.render();
+  h2.click('Submit for review'); await settled(h2);
+  const creates = [...h.callsOf('create'), ...h2.callsOf('create')];
+  assert.equal(creates.length, 1, 'one create in total');
+  assert.equal(creates[0].body.title, 'Edited after crash');
+  const frozen = creates[0].persisted.storage.get(intentName(creates[0].persisted.storage, creates[0].body.client_request_id));
+  assert.ok(frozen?.includes('Edited after crash'), 'the exact create body is durable before it is sent');
+  assert.equal(h2.callsOf('submit').length, 1);
+  h2.unmount();
+});
+
+test('a corrupt saved upload intent blocks the submission and never duplicates the upload', async () => {
+  const h = await ready({ image_uris: ['file:///photo-1'] });
+  h.queue('upload', lost());
+  h.click('Submit for review'); await settled(h);
+  const [first] = h.callsOf('upload');
+  const name = intentName(h.storage, first.key);
+  assert.ok(name, 'the upload intent is stored');
+  h.storage.set(name, '{broken');
+
+  const h2 = h.restart();
+  await h2.render();
+  h2.click('Submit for review'); await settled(h2);
+  assert.deepEqual(mutating(h2), [], 'nothing is sent while the saved change is unreadable');
+  assert.match(screenError(h2), /review|check/i);
+  assert.equal(h2.storage.get(name), '{broken', 'the record is kept for review');
+  assert.equal(durable(h2.files).length, 1, 'the photo copy is kept');
+  h2.click('Submit for review'); await settled(h2);
+  assert.deepEqual(mutating(h2), [], 'a second press is still blocked');
+
+  // Positive control (D104 review-first recovery): only an explicit clear after review unblocks it.
+  h2.click('Clear unreadable saved change'); await settled(h2);
+  assert.equal(h2.storage.has(name), false);
+  h2.click('Submit for review'); await settled(h2);
+  assert.equal(h2.callsOf('upload').length, 1);
+  assert.equal(h2.callsOf('submit').length, 1);
+  h2.unmount();
+});
+
+test('an unreadable saved intent blocks the submission, is kept, and replays its own key once readable', async () => {
+  const h = await ready({ image_uris: ['file:///photo-1'] });
+  h.queue('upload', lost());
+  h.click('Submit for review'); await settled(h);
+  const [first] = h.callsOf('upload');
+  const name = intentName(h.storage, first.key);
+  const saved = h.storage.get(name);
+  h.failReads(name);
+
+  const h2 = h.restart();
+  await h2.render();
+  h2.click('Submit for review'); await settled(h2);
+  assert.deepEqual(mutating(h2), [], 'no upload while the intent cannot be read');
+  assert.notEqual(screenError(h2), '');
+  assert.equal(h2.storage.get(name), saved, 'the record is kept');
+
+  h2.failingReads.delete(name);
+  h2.click('Submit for review'); await settled(h2);
+  const uploads = h2.callsOf('upload');
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].key, first.key, 'the same key, never a fresh one');
+  assert.equal(h2.callsOf('submit').length, 1);
+  h2.unmount();
+});
+
+test('D125 dashboard: a submitted listing completes without resending', async () => {
+  const { h } = await lostSubmit();
+  const h2 = h.restart();
+  h2.queue('dashboard', [row(2, 'PENDING_REVIEW')]);
+  await h2.render();
+  h2.click('Submit for review'); await settled(h2);
+  assert.deepEqual(mutating(h2), []);
+  assert.equal(h2.nav.filter(x => x[0] === 'replace').length, 1);
+  assert.equal((await h2.getDraft(1001)).created_listing_id, null);
+  h2.unmount();
+});
+
+test('D125 dashboard: an unchanged DRAFT at the frozen version resends the same submit', async () => {
+  const { h, first } = await lostSubmit();
+  const h2 = h.restart();
+  h2.queue('dashboard', [row(1)]);
+  await h2.render();
+  h2.click('Submit for review'); await settled(h2);
+  assert.deepEqual(mutating(h2).map(call => [call.step, call.key, call.version]), [['submit', first.key, 1]]);
+  assert.equal(h2.nav.filter(x => x[0] === 'replace').length, 1);
+  h2.unmount();
+});
+
+test('D125 dashboard: an edited DRAFT at the frozen version saves the edit, then submits with a new key', async () => {
+  const { h, first } = await lostSubmit();
+  const h2 = h.restart();
+  h2.queue('dashboard', [row(1)]);
+  await h2.draftModule.patchMarketplaceDraft('1001', { title: 'Edited after send' });
+  await h2.render();
+  h2.click('Submit for review'); await settled(h2);
+  assert.deepEqual(mutating(h2).map(call => call.step), ['update', 'submit']);
+  assert.equal(h2.callsOf('update')[0].body.title, 'Edited after send');
+  assert.equal(h2.callsOf('update')[0].body.expected_version, 1);
+  assert.notEqual(h2.callsOf('submit')[0].key, first.key);
+  assert.equal(h2.callsOf('submit')[0].version, 2);
+  h2.unmount();
+});
+
+test('D125 dashboard: a DRAFT at another version is a conflict: reload, keep the edit, submit with a new key', async () => {
+  const { h, first } = await lostSubmit();
+  const h2 = h.restart();
+  h2.server.set(L1, { id: L1, owner: 1001, publication_status: 'DRAFT', version: 3 });
+  await h2.draftModule.patchMarketplaceDraft('1001', { title: 'Edited locally' });
+  await h2.render();
+  h2.click('Submit for review'); await settled(h2);
+  assert.deepEqual(mutating(h2), [], 'a conflict is shown, not resolved silently');
+  assert.match(screenError(h2), /changed/i);
+  const saved = await h2.getDraft(1001);
+  assert.equal(saved.created_listing_id, L1, 'the draft is not cleared');
+  assert.equal(saved.created_listing_version, 3, 'the listing version is reloaded');
+  assert.equal(saved.title, 'Edited locally', 'the user edit is kept');
+
+  h2.click('Submit for review'); await settled(h2);
+  assert.deepEqual(mutating(h2).map(call => call.step), ['update', 'submit']);
+  assert.equal(h2.callsOf('update')[0].body.expected_version, 3);
+  assert.equal(h2.callsOf('update')[0].body.title, 'Edited locally');
+  assert.notEqual(h2.callsOf('submit')[0].key, first.key);
+  assert.equal(h2.callsOf('submit')[0].version, 4);
+  h2.unmount();
+});
+
+test('D125 dashboard: a missing listing is terminal and nothing is resent', async () => {
+  const { h } = await lostSubmit();
+  const h2 = h.restart();
+  h2.queue('dashboard', []);
+  await h2.render();
+  h2.click('Submit for review'); await settled(h2);
+  assert.deepEqual(mutating(h2), []);
+  assert.match(screenError(h2), /no longer exists/i);
+  assert.equal((await h2.getDraft(1001)).created_listing_id, L1, 'kept until the user resolves it');
+  h2.click('Submit for review'); await settled(h2);
+  assert.deepEqual(mutating(h2), [], 'still not resent');
+  assert.match(screenError(h2), /no longer exists/i);
+  h2.unmount();
+});
+
+test('409 STALE_VERSION on an update reloads the version and keeps the edit (not silent)', async () => {
+  const h = await ready({ created_listing_id: L1, created_listing_version: 5, image_uris: [], title: 'My edit' });
+  h.server.set(L1, { id: L1, owner: 1001, publication_status: 'DRAFT', version: 7 });
+  h.queue('update', httpError(409, 'STALE_VERSION'));
+  h.click('Submit for review'); await settled(h);
+  assert.equal(h.callsOf('update').length, 1);
+  assert.equal(h.callsOf('submit').length, 0);
+  assert.match(screenError(h), /changed/i);
+  const saved = await h.getDraft(1001);
+  assert.equal(saved.title, 'My edit');
+  assert.equal(saved.created_listing_version, 7);
+
+  h.click('Submit for review'); await settled(h);
+  const updates = h.callsOf('update');
+  assert.equal(updates.length, 2);
+  assert.equal(updates[1].body.expected_version, 7);
+  assert.equal(updates[1].body.title, 'My edit');
+  assert.notEqual(updates[1].key, updates[0].key);
+  assert.equal(h.callsOf('submit')[0].version, 8);
+  h.unmount();
+});
+
+test('409 payload mismatch on create is terminal: shown, kept, never resent', async () => {
+  const h = await ready({ image_uris: [] });
+  h.queue('create', httpError(409, 'IDEMPOTENCY_PAYLOAD_MISMATCH'));
+  h.click('Submit for review'); await settled(h);
+  const [first] = h.callsOf('create');
+  assert.notEqual(screenError(h), '');
+  assert.ok(intentName(h.storage, first.body.client_request_id), 'the create intent is kept');
+  h.click('Submit for review'); await settled(h);
+  assert.equal(h.callsOf('create').length, 1, 'not resent, under any key');
+  assert.notEqual(screenError(h), '');
+  h.unmount();
+});
+
+test('410 on an upload is terminal: shown, kept with its photo copy, never re-uploaded under a new key', async () => {
+  const h = await ready({ image_uris: ['file:///photo-1'] });
+  h.queue('upload', httpError(410, 'IMAGE_DELETED'));
+  h.click('Submit for review'); await settled(h);
+  const [first] = h.callsOf('upload');
+  assert.notEqual(screenError(h), '');
+  assert.ok(intentName(h.storage, first.key), 'the upload intent is kept');
+  assert.equal(durable(h.files).length, 1, 'the photo copy is kept');
+  h.click('Submit for review'); await settled(h);
+  assert.equal(h.callsOf('upload').length, 1, 'never re-uploaded automatically');
+  assert.equal(h.callsOf('submit').length, 0);
+
+  // Positive control: the user resolves it explicitly; only then does a new upload go out.
+  h.click('Discard saved change'); await settled(h);
+  assert.equal(intentName(h.storage, first.key), undefined);
+  assert.deepEqual(durable(h.files), []);
+  h.click('Submit for review'); await settled(h);
+  assert.equal(h.callsOf('upload').length, 2);
+  assert.notEqual(h.callsOf('upload')[1].key, first.key);
+  assert.equal(h.callsOf('submit').length, 1);
+  h.unmount();
+});

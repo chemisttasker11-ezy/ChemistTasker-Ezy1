@@ -103,7 +103,8 @@ function createScheduler() {
   }
   async function flush() {
     while (effects.length) effects.shift()();
-    for (let i = 0; i < 12; i++) await Promise.resolve();
+    // Microtask budget per flush: every mutation now waits for its durable intent (lock, write, read-back) first.
+    for (let i = 0; i < 40; i++) await Promise.resolve();
   }
   async function settled(Component, props) {
     for (let i = 0; i < 6; i++) { render(Component, props); await flush(); }
@@ -122,22 +123,29 @@ function createMarketplace(shared = {}) {
   const scheduler = createScheduler();
   const env = { user: { id: 1001, role: 'OWNER' }, params: {}, screen: 'review' };
   const storage = shared.storage ?? new Map(), files = shared.files ?? new Map(), purged = shared.purged ?? new Set();
+  // Listings the mock server committed (successful responses only); the default dashboard read returns them.
+  const server = shared.server ?? new Map(), failingReads = shared.failingReads ?? new Set();
   const calls = [], nav = [], fetchQueue = new Map(), responses = new Map();
   const serverImages = new Set();
   const writeBarriers = [], readBarriers = [], photoQueue = [];
   const store = {
-    async getItem(key) { const value = storage.get(key) ?? null; const gate = readBarriers.shift(); if (gate) await gate.promise; return value; },
+    async getItem(key) {
+      if ([...failingReads].some(part => key.includes(part))) throw Error('EIO: storage read failed');
+      const value = storage.get(key) ?? null; const gate = readBarriers.shift(); if (gate) await gate.promise; return value;
+    },
     async setItem(key, value) { const gate = writeBarriers.shift(); if (gate) await gate.promise; storage.set(key, value); },
     async removeItem(key) { storage.delete(key); },
   };
   const utils = load('frontend_mobile/features/parity/utils.ts', {});
+  const policy = load('shared-core/src/policy/marketplacePolicy.ts', {});
+  const pendingIntent = load('shared-core/src/domains/talent/pendingPitch.ts', { './api': {} }, { crypto: globalThis.crypto });
+  const sharedCore = { ...policy, ...pendingIntent, getApiConfig: () => ({ baseURL: 'https://api.test/api' }) };
   const draftModule = load('frontend_mobile/features/parity/marketplaceDraft.ts', {
     '@react-native-async-storage/async-storage': { __esModule: true, default: store },
+    '@chemisttasker/shared-core': sharedCore,
     './utils': utils,
   });
   const model = load('frontend_mobile/features/parity/marketplaceBrowseModel.ts', {});
-  const policy = load('shared-core/src/policy/marketplacePolicy.ts', {});
-  const pendingIntent = load('shared-core/src/domains/talent/pendingPitch.ts', { './api': {} }, { crypto: globalThis.crypto });
   // Snapshot of durable state when a request leaves the app (persist-before-send checks).
   const persisted = () => ({ storage: new Map(storage), files: new Map(files) });
   const uriOf = parts => parts.map(part => typeof part === 'string' ? part : part.uri).join('/').replace(/([^:/])\/+/g, '$1/'); // keep the three slashes of file:///
@@ -202,15 +210,15 @@ function createMarketplace(shared = {}) {
     }),
     createListing: async body => {
       calls.push({ step: 'create', owner: env.user?.id, body, persisted: persisted() });
-      return take('create', { id: 'a1111111-1111-4111-8111-111111111111', version: 1 });
+      return commit(await take('create', { id: 'a1111111-1111-4111-8111-111111111111', version: 1 }));
     },
     updateListing: async (id, body, key) => {
       calls.push({ step: 'update', owner: env.user?.id, id, body, key, persisted: persisted() });
-      return take('update', { id, version: body.expected_version + 1 });
+      return commit(await take('update', { id, version: body.expected_version + 1 }), id);
     },
     updateAudience: async (id, body, key) => {
       calls.push({ step: 'audience', owner: env.user?.id, id, body, key, persisted: persisted() });
-      return take('audience', { version: body.expected_version + 1 });
+      return commit(await take('audience', { version: body.expected_version + 1 }), id);
     },
     uploadImage: async (id, body, key) => {
       calls.push({ step: 'upload', owner: env.user?.id, id, form: body, key, persisted: persisted(), bytes: bytesOf(body?.get?.('image')) }); // promise: keeps the original await timing
@@ -219,13 +227,24 @@ function createMarketplace(shared = {}) {
       return image;
     },
     // Non-mutating read of the seller's listings (a pending submit is read back before any resend).
-    getDashboard: async () => { calls.push({ step: 'dashboard', owner: env.user?.id }); return take('dashboard', []); },
+    // Default: the committed listings of this account (queue 'dashboard' rows, or edit `server`, to override).
+    getDashboard: async () => {
+      calls.push({ step: 'dashboard', owner: env.user?.id });
+      return take('dashboard', [...server.values()].filter(row => row.owner === env.user?.id).map(({ owner, ...row }) => row));
+    },
     deleteImage: async id => { calls.push({ step: 'delete', id }); const result = await take('delete', undefined); serverImages.delete(id); return result; },
     actOnListing: async (id, action, version, key) => {
       calls.push({ step: 'submit', owner: env.user?.id, id, action, version, key, persisted: persisted(), images: [...serverImages] });
-      return take('submit', { publication_status: 'PENDING_REVIEW', version: version + 1 });
+      return commit(await take('submit', { publication_status: 'PENDING_REVIEW', version: version + 1 }), id);
     },
   };
+  function commit(result, id = result?.id) {
+    if (id == null || !result) return result;
+    const row = server.get(String(id)) ?? { id: String(id), owner: env.user?.id, publication_status: 'DRAFT' };
+    server.set(String(id), { ...row, ...(result.version != null ? { version: result.version } : {}),
+      ...(result.publication_status ? { publication_status: result.publication_status } : {}) });
+    return result;
+  }
   const widgets = Object.fromEntries(
     ['ActionButtons', 'ChoiceChips', 'DataRow', 'EmptyState', 'Field', 'InfoNote',
       'MetricGrid', 'ParityPage', 'Section'].map(name => [name, name]));
@@ -266,7 +285,7 @@ function createMarketplace(shared = {}) {
     } },
     '@/config/api': { chemistTaskerApi: { marketplace: api } },
     '@/context/AuthContext': { useAuth: () => ({ user: env.user }) },
-    '@chemisttasker/shared-core': { ...policy, ...pendingIntent },
+    '@chemisttasker/shared-core': sharedCore,
     'expo-file-system': fileSystem,
     './ParityUI': widgets,
     './utils': utils,
@@ -311,8 +330,10 @@ function createMarketplace(shared = {}) {
   const queuePhoto = next => photoQueue.push(next);
   // The OS cleared the picker's temporary file: only a durable app copy remains readable.
   const purgeLocal = uri => purged.add(uri);
-  const restart = () => { scheduler.unmount(); return createMarketplace({ storage, files, purged }); };
-  return { scheduler, env, storage, calls, nav, queue, queueLocal, pauseNextWrite, api,
+  const restart = () => { scheduler.unmount(); return createMarketplace({ storage, files, purged, server, failingReads }); };
+  // Storage reads of any key containing `part` throw until `failingReads.delete(part)`.
+  const failReads = part => failingReads.add(part);
+  return { scheduler, env, storage, calls, nav, queue, queueLocal, pauseNextWrite, api, server, failReads, failingReads,
     render, currentNodes, button, click, clickSameRender, setDraft, getDraft, callsOf, deferred, queuePhoto,
     pauseNextRead, draftModule, files, purgeLocal, restart, bytesOf,
     unmount: scheduler.unmount, flush: scheduler.flush };
