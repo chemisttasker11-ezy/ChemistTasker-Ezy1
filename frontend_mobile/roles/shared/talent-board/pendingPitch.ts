@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 import { createPendingPitchStore, createPendingIntentStore, pitchIntentScope, sendPendingPitch, type PendingPitch, type PitchIntentLock } from '@chemisttasker/shared-core';
 import { idempotencyKey } from '@/features/parity/utils';
 
@@ -34,5 +35,35 @@ export async function submitPendingPitch(store: ReturnType<typeof mobilePendingP
   }
 }
 
-export const mobilePendingIntentStore = (environment: string, userId: string | number, operation: string) =>
-  createPendingIntentStore({ storage: AsyncStorage, lock, environment, userId, operation, newKey: idempotencyKey });
+export const mobilePendingIntentStore = (environment: string, userId: string | number, operation: string) => {
+  const store = createPendingIntentStore({ storage: AsyncStorage, lock, environment, userId, operation, newKey: idempotencyKey });
+  return {
+    ...store,
+    reject: (key: string) => lock(store.scope, async () => {
+      const intent = await store.load();
+      if (!intent || intent.key !== key || intent.resultId) throw new Error('The pending intent changed.');
+      await AsyncStorage.setItem(store.scope, JSON.stringify({ ...intent, rejected: true }));
+    }),
+    clear: async (key: string) => {
+      const intent = await store.load() as (Awaited<ReturnType<typeof store.load>> & { rejected?: boolean });
+      if (!intent?.rejected) return store.clear(key);
+      return lock(store.scope, async () => {
+        const current = await store.load() as (Awaited<ReturnType<typeof store.load>> & { rejected?: boolean });
+        if (!current || current.key !== key || !current.rejected) throw new Error('The pending intent changed.');
+        await AsyncStorage.removeItem(store.scope);
+      });
+    },
+  };
+};
+
+export const isTerminalIntentError = (error: any) => {
+  const status = error?.status ?? error?.response?.status;
+  const code = (error?.payload ?? error?.response?.data ?? error?.data)?.code;
+  return status === 409 || status === 410 || (status === 400 && code !== 'IDEMPOTENCY_KEY_REQUIRED');
+};
+
+export function confirmCorruptIntentReview(kind: string, onConfirm: () => void) {
+  Alert.alert(`Review your ${kind}`, `Review your ${kind} first, then confirm to clear the unreadable saved request.`, [
+    { text: 'Cancel', style: 'cancel' }, { text: 'Confirm', onPress: onConfirm },
+  ]);
+}

@@ -113,3 +113,24 @@ test('an invalid form still reconciles the pending original offer', async () => 
   assert.deepEqual(w.calls[1].payload, w.calls[0].payload);
   assert.equal(w.rows.length, 1);
 });
+
+for (const status of [400, 409, 410]) test(`another offer unblocks after ${status}`, async () => {
+  const w = world(); w.env.status = status;
+  const hook = await offerHook(w); await hook.open();
+  await hook.current.handleSubmitCounterOffer(); hook.render();
+  await hook.current.anotherCounterOffer();
+  w.env.status = null; w.env.lost = false;
+  await hook.open(); await hook.current.handleSubmitCounterOffer();
+  assert.equal(w.rows.length, 1);
+  assert.notEqual(w.calls.at(-1).key, w.calls[0].key);
+});
+
+test('user can clear a corrupt offer intent after review', async () => {
+  const w = world(), hook = await offerHook(w); await hook.open();
+  await hook.current.handleSubmitCounterOffer(); hook.render();
+  const key = [...w.data.keys()].find(k => k.startsWith('shift.counter_offer.create:'));
+  w.data.set(key, '{bad');
+  await hook.current.anotherCounterOffer();
+  w.env.alertButtons.find(button => button.text === 'Confirm').onPress(); await flush();
+  assert.equal(w.data.has(key), false);
+});

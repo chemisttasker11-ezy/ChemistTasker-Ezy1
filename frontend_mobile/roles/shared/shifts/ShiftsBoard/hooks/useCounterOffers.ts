@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getApiConfig } from '@chemisttasker/shared-core';
-import { mobilePendingIntentStore } from '../../../talent-board/pendingPitch';
+import { confirmCorruptIntentReview, isTerminalIntentError, mobilePendingIntentStore } from '../../../talent-board/pendingPitch';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     Shift,
@@ -404,8 +404,14 @@ export const useCounterOffers = ({
     const anotherCounterOffer = async () => {
         if (currentUserId == null || lastOfferShiftId.current == null) return;
         const store = mobilePendingIntentStore(getApiConfig?.()?.baseURL ?? '', currentUserId, `shift.counter_offer.create:${lastOfferShiftId.current}`);
-        const intent = await store.load();
-        if (intent?.resultId) { await store.clear(intent.key); setCounterOfferError(null); }
+        const actionScope = scopeRef.current;
+        let intent;
+        try { intent = await store.load(); } catch {
+            if (scopeRef.current !== actionScope) return;
+            confirmCorruptIntentReview('offers', () => { if (scopeRef.current === actionScope) void store.recoverCorruptAfterReview().then(() => { if (scopeRef.current === actionScope) setCounterOfferError(null); }).catch(() => { if (scopeRef.current === actionScope) setCounterOfferError('Unable to clear the saved request.'); }); });
+            return;
+        }
+        if (intent?.resultId || (intent as typeof intent & { rejected?: boolean })?.rejected) { await store.clear(intent!.key); setCounterOfferError(null); }
         else if (intent) setCounterOfferError('Recover the previous offer before starting another.');
     };
     const handleSubmitCounterOffer = async () => {
@@ -469,7 +475,7 @@ export const useCounterOffers = ({
             let sentPayload = payload;
             const intent = existingIntent ?? await store.acquire(payload as unknown as Record<string, unknown>);
             if (scopeRef.current !== callbackScope) return;
-            if (intent.resultId) {
+            if (intent.resultId || (intent as typeof intent & { rejected?: boolean }).rejected) {
                 setCounterOfferError('Start another offer before sending again.');
                 setCounterSubmitting(false);
                 return;
@@ -481,7 +487,9 @@ export const useCounterOffers = ({
             pendingIntentKeys.current.add(intent.key);
             sentPayload = intent.exactPayload as unknown as ShiftCounterOfferPayload;
             try {
-                const result = await onSubmitCounterOffer(intent.exactPayload as unknown as ShiftCounterOfferPayload, intent.key);
+                let result;
+                try { result = await onSubmitCounterOffer(intent.exactPayload as unknown as ShiftCounterOfferPayload, intent.key); }
+                catch (error) { if (scopeRef.current === callbackScope && isTerminalIntentError?.(error)) await store.reject(intent.key); throw error; }
                 if (scopeRef.current !== callbackScope) return;
                 await store.settle(intent.key, result.id);
             } finally {

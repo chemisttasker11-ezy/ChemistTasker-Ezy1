@@ -61,6 +61,7 @@ export function world() {
   };
   async function send(operation, payload, key) {
     calls.push({ operation, payload: clone(payload), key, userId: env.userId, stored: [...data.entries()] });
+    if (env.status) { const error = new Error('Rejected'); error.status = env.status; error.payload = {}; throw error; }
     const scope = JSON.stringify([env.userId, operation, key]);
     let row = key && receipts.get(scope);
     if (!row) { row = { id: rows.length + 1, userId: env.userId, operation, payload: clone(payload) }; rows.push(row); }
@@ -119,8 +120,8 @@ function runtime(w, h) {
         if (name === '@react-native-async-storage/async-storage') return { __esModule: true, default: w.storage };
         if (name === '@/features/parity/utils') return { idempotencyKey: randomUUID };
         if (name === '@/context/AuthContext') return { useAuth: () => ({ user: { id: w.env.userId }, hasCapability: () => true }) };
-        if (name === 'expo-router') return { useRouter: () => ({ replace() {} }), useLocalSearchParams: () => ({}), useFocusEffect() {} };
-        if (name === 'react-native') return { Platform: { OS: 'ios' }, Alert: { alert() {} } };
+        if (name === 'expo-router') return { useRouter: () => ({ replace(route) { w.env.route = route; } }), useLocalSearchParams: () => ({}), useFocusEffect() {} };
+        if (name === 'react-native') return { Platform: { OS: 'ios' }, Alert: { alert(_title, _message, buttons) { w.env.alertButtons = buttons; } } };
         if (name === './useShiftSurface') return { useShiftSurface: () => ({ scopeKey: `owner:${w.env.userId}`, userId: w.env.userId, persona: 'owner', scopedPharmacyId: 7 }) };
         if (name === './shiftSurface') return { shiftRoute: () => '/shifts' };
         if (name.includes('useUnsavedChangesGuard')) return { useUnsavedChangesGuard: () => ({ markClean() {} }) };
@@ -148,7 +149,7 @@ function runtime(w, h) {
   return { load, shared };
 }
 
-export async function postScreen(w) {
+export async function postScreen(w, { fill = false } = {}) {
   const h = hooks(), r = runtime(w, h);
   const Component = r.load(resolve(here, 'PostShiftScreen.tsx'), true).default;
   let current;
@@ -157,16 +158,21 @@ export async function postScreen(w) {
   // Supply a loaded pharmacy/form through actual setters; isolate network initialization.
   current.setPharmacies([{ id: 7, name: 'Replay Pharmacy', allowed_escalation_levels: ['LOCUM_CASUAL'] }]);
   current.setPharmaciesLoaded(true);
-  current.setPharmacyId(7);
-  current.setInitialAudience('LOCUM_CASUAL');
-  current.setSlots([{ date: '2026-12-01', startTime: '09:00', endTime: '17:00', isRecurring: false }]);
-  current.setDescription('Original');
+  if (fill) {
+    current.setPharmacyId(7);
+    current.setInitialAudience('LOCUM_CASUAL');
+    current.setSlots([{ date: '2026-12-01', startTime: '09:00', endTime: '17:00', isRecurring: false }]);
+    current.setDescription('Original');
+  }
   render();
   // Effects for durable intents still run; the screen's real initialization can finish first.
   await h.effects();
-  current.setPharmaciesLoaded(true); current.setPharmacyId(7);
-  current.setSlots([{ date: '2026-12-01', startTime: '09:00', endTime: '17:00', isRecurring: false }]);
-  current.setDescription('Original'); current.setInitialAudience('LOCUM_CASUAL');
+  current.setPharmaciesLoaded(true);
+  if (fill) {
+    current.setPharmacyId(7);
+    current.setSlots([{ date: '2026-12-01', startTime: '09:00', endTime: '17:00', isRecurring: false }]);
+    current.setDescription('Original'); current.setInitialAudience('LOCUM_CASUAL');
+  }
   render();
   return { render, unmount: h.unmount, effects: h.effects, get current() { return current; } };
 }

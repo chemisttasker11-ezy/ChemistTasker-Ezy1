@@ -6,11 +6,11 @@ import { world, postScreen, savedIntents, deferred, flush } from './submissionRe
 
 test('restart after committed lost response replays one shift with exact key and slots', async () => {
   const w = world();
-  const first = await postScreen(w);
+  const first = await postScreen(w, { fill: true });
   await first.current.handleSubmit();
   assert.equal(w.rows.length, 1, 'first request really committed');
   first.unmount();
-  const restarted = await postScreen(w);
+  const restarted = await postScreen(w, { fill: true });
   await restarted.current.handleSubmit();
   assert.equal(w.rows.length, 1, 'restart created a second shift');
   assert.equal(w.calls[1].key, w.calls[0].key);
@@ -19,7 +19,7 @@ test('restart after committed lost response replays one shift with exact key and
 });
 
 test('key and exact payload are durable per account BEFORE create dispatch', async () => {
-  const w = world(), screen = await postScreen(w);
+  const w = world(), screen = await postScreen(w, { fill: true });
   await screen.current.handleSubmit();
   assert.equal(w.calls.length, 1);
   const intents = savedIntents(w.calls[0].stored);
@@ -28,15 +28,15 @@ test('key and exact payload are durable per account BEFORE create dispatch', asy
   assert.deepEqual(intents[0].exactPayload, w.calls[0].payload);
   screen.unmount();
   w.env.userId = 2;
-  const other = await postScreen(w);
+  const other = await postScreen(w, { fill: true });
   await other.current.handleSubmit();
   assert.notEqual(w.calls[1].key, w.calls[0].key);
 });
 
 test('ambiguous post is recovered before edited draft uses existing shift edit path', async () => {
-  const w = world(), first = await postScreen(w);
+  const w = world(), first = await postScreen(w, { fill: true });
   await first.current.handleSubmit(); first.unmount();
-  const restarted = await postScreen(w);
+  const restarted = await postScreen(w, { fill: true });
   restarted.current.setDescription('Edited after timeout'); restarted.render();
   await restarted.current.handleSubmit();
   assert.equal(w.rows.length, 1, 'ambiguous edit created a second shift');
@@ -50,29 +50,30 @@ test('ambiguous post is recovered before edited draft uses existing shift edit p
   assert.equal(w.edits.at(-1)?.payload.description, 'Later correction');
 });
 
-test('acknowledged create remains an edit intent until explicit post-another action', async () => {
+// intentional (orchestrator D135): an acknowledged success clears the intent
+test('fresh form after an acknowledged success creates a second shift', async () => {
   const w = world(); w.env.lost = false;
-  const first = await postScreen(w);
+  const first = await postScreen(w, { fill: true });
   await first.current.handleSubmit(); first.unmount();
-  const reopened = await postScreen(w);
-  reopened.current.setDescription('Correction'); reopened.render();
-  await reopened.current.handleSubmit();
-  assert.equal(w.rows.length, 1, 'ordinary reopen silently started another create intent');
-  assert.equal(w.edits.at(-1)?.id, w.rows[0].id);
+  const next = await postScreen(w, { fill: true });
+  next.current.setSlots([{ date: '2026-12-09', startTime: '10:00', endTime: '14:00', isRecurring: false }]);
+  next.current.setDescription('A different shift next week'); next.render();
+  await next.current.handleSubmit();
+  assert.equal(w.rows.length, 2, 'new form silently PATCHed the previous shift');
 });
 
 test('same-render duplicate taps retain the existing synchronous lock', async () => {
   const w = world(); w.env.gate = deferred(); w.env.lost = false;
-  const screen = await postScreen(w), submit = screen.current.handleSubmit;
+  const screen = await postScreen(w, { fill: true }), submit = screen.current.handleSubmit;
   const a = submit(), b = submit(); await flush();
   assert.equal(w.calls.length, 1);
   w.env.gate.resolve(); await Promise.all([a, b]);
 });
 
 test('explicit post-another starts a new key after recovery', async () => {
-  const w = world(), first = await postScreen(w);
+  const w = world(), first = await postScreen(w, { fill: true });
   await first.current.handleSubmit(); first.unmount();
-  const screen = await postScreen(w);
+  const screen = await postScreen(w, { fill: true });
   await screen.current.handleSubmit(); screen.render();
   const action = Object.values(screen.current.explicitActions).find(value => typeof value === 'function');
   assert.ok(action, 'no explicit post-another action is available after recovery');
@@ -87,25 +88,25 @@ test('explicit post-another starts a new key after recovery', async () => {
 
 test('account switch during pending request cannot replay old account intent after restart', async () => {
   const w = world(); w.env.gate = deferred();
-  const old = await postScreen(w);
+  const old = await postScreen(w, { fill: true });
   const request = old.current.handleSubmit(); await flush();
   assert.equal(w.rows.length, 1);
   old.unmount(); w.env.userId = 2;
   w.env.gate.resolve(); await request;
-  const other = await postScreen(w);
+  const other = await postScreen(w, { fill: true });
   other.current.setDescription('Other account'); other.render();
   await other.current.handleSubmit();
   assert.equal(w.calls[1].userId, 2);
   assert.notEqual(w.calls[1].key, w.calls[0].key, 'accounts shared an unscoped/missing create key');
   other.unmount(); w.env.userId = 1;
-  const restored = await postScreen(w);
+  const restored = await postScreen(w, { fill: true });
   await restored.current.handleSubmit();
   assert.equal(w.rows.filter(row => row.userId === 1).length, 1);
   assert.equal(w.calls.at(-1).key, w.calls[0].key);
 });
 
 test('a queued submit callback from the previous account cannot send under the new account', async () => {
-  const w = world(), screen = await postScreen(w);
+  const w = world(), screen = await postScreen(w, { fill: true });
   const oldSubmit = screen.current.handleSubmit;
   w.env.userId = 2; screen.render();
   await oldSubmit();
@@ -113,18 +114,19 @@ test('a queued submit callback from the previous account cannot send under the n
 });
 
 test('recovery saves the edits made after the lost response before success', async () => {
-  const w = world(), first = await postScreen(w);
+  const w = world(), first = await postScreen(w, { fill: true });
   await first.current.handleSubmit(); first.unmount();
-  const retry = await postScreen(w);
+  const retry = await postScreen(w, { fill: true });
   retry.current.setDescription('Changed during recovery'); retry.render();
   await retry.current.handleSubmit();
   assert.equal(w.edits.at(-1)?.payload.description, 'Changed during recovery');
 });
 
 test('description-only edit after recovery does not replace slots', async () => {
-  const w = world(); w.env.lost = false; const first = await postScreen(w);
+  // intentional (orchestrator D136): recovery path, not an acknowledged success
+  const w = world(); const first = await postScreen(w, { fill: true });
   await first.current.handleSubmit(); first.unmount();
-  const retry = await postScreen(w);
+  const retry = await postScreen(w, { fill: true });
   retry.current.setDescription('Only description changed'); retry.render();
   await retry.current.handleSubmit();
   assert.ok(w.edits.length);
@@ -132,12 +134,51 @@ test('description-only edit after recovery does not replace slots', async () => 
 });
 
 test('description-only recovery keeps existing slot ids and counter-offers', async () => {
-  const w = world(); w.env.lost = false; const first = await postScreen(w);
+  // intentional (orchestrator D136): recovery path, not an acknowledged success
+  const w = world(); const first = await postScreen(w, { fill: true });
   await first.current.handleSubmit(); first.unmount();
   w.rows[0].slotIds = [17]; w.rows[0].counterOffers = [{ id: 23, slotId: 17 }];
-  const retry = await postScreen(w);
+  const retry = await postScreen(w, { fill: true });
   retry.current.setDescription('Only the description'); retry.render();
   await retry.current.handleSubmit();
   assert.deepEqual(w.rows[0].slotIds, [17]);
   assert.deepEqual(w.rows[0].counterOffers, [{ id: 23, slotId: 17 }]);
+});
+
+for (const status of [400, 409, 410]) test(`post another unblocks after ${status}`, async () => {
+  const w = world(); w.env.status = status;
+  const screen = await postScreen(w, { fill: true });
+  await screen.current.handleSubmit(); screen.render();
+  await screen.current.explicitActions.anotherPost(); screen.render();
+  w.env.status = null; w.env.lost = false;
+  screen.current.setPharmacyId(7);
+  screen.current.setSlots([{ date: '2026-12-02', startTime: '10:00', endTime: '18:00', isRecurring: false }]);
+  screen.current.setDescription('Another shift'); screen.render();
+  await screen.current.handleSubmit();
+  assert.equal(w.rows.length, 1);
+  assert.notEqual(w.calls.at(-1).key, w.calls[0].key);
+});
+
+test('invalid visible form is never sent as a recovery edit', async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const screen = await postScreen(w, { fill: true });
+  screen.current.setSlots([]); screen.current.setDescription('Invalid edit'); screen.render();
+  await screen.current.handleSubmit(); screen.render();
+  assert.equal(w.edits.length, 0);
+  assert.match(screen.current.error, /date|slot/i);
+  screen.current.setSlots([{ date: '2026-12-02', startTime: '10:00', endTime: '18:00', isRecurring: false }]); screen.render();
+  await screen.current.handleSubmit();
+  assert.equal(w.edits.at(-1)?.id, w.rows[0].id);
+  assert.equal(w.edits.at(-1)?.payload.description, 'Invalid edit');
+});
+
+test('user can clear a corrupt post intent after review', async () => {
+  const w = world(), screen = await postScreen(w, { fill: true });
+  await screen.current.handleSubmit(); screen.render();
+  const key = [...w.data.keys()].find(k => k.startsWith('shift.create:'));
+  w.data.set(key, '{bad');
+  await screen.current.explicitActions.anotherPost();
+  w.env.alertButtons.find(button => button.text === 'Confirm').onPress(); await flush();
+  assert.equal(w.data.has(key), false);
 });
