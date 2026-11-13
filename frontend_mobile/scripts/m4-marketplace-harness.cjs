@@ -140,7 +140,7 @@ function createMarketplace(shared = {}) {
   const pendingIntent = load('shared-core/src/domains/talent/pendingPitch.ts', { './api': {} }, { crypto: globalThis.crypto });
   // Snapshot of durable state when a request leaves the app (persist-before-send checks).
   const persisted = () => ({ storage: new Map(storage), files: new Map(files) });
-  const uriOf = parts => parts.map(part => typeof part === 'string' ? part : part.uri).join('/').replace(/([^:])\/+/g, '$1/');
+  const uriOf = parts => parts.map(part => typeof part === 'string' ? part : part.uri).join('/').replace(/([^:/])\/+/g, '$1/'); // keep the three slashes of file:///
   class HarnessFile {
     constructor(...parts) { this.uri = uriOf(parts); }
     get exists() { return files.has(this.uri) || (!this.uri.startsWith('file:///document/') && !purged.has(this.uri)); }
