@@ -413,6 +413,7 @@ export default function LocumManager({
             const token = response.token;
             const url = `${baseInviteUrl}/membership/apply/${token}`;
             setLinkValue(url);
+            setShowInviteQr(false); setInviteQr(null); // a QR of the previous link must not stay on screen
             setToast({ message: 'Invite link generated', severity: 'success' });
         } catch (error: any) {
             setToast({

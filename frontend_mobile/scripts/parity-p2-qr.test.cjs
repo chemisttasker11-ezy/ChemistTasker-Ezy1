@@ -30,6 +30,30 @@ test('invite QR handlers reject malformed links and show valid links', () => {
   else {assert.equal(find(tree,n=>n.type==='ShareQr'),undefined); assert.ok(state.some(x=>x?.message==='Invitation link is not valid for QR sharing.'));}
  }
 });
+test('generating a new invite link hides the QR of the previous link', async () => {
+ for (const manager of ['LocumManager', 'StaffManager']) {
+  const source = fs.readFileSync(path.join(__dirname, `../roles/shared/pharmacies/${manager}.tsx`), 'utf8');
+  const code = ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS, jsx:ts.JsxEmit.React, esModuleInterop:true}}).outputText;
+  const state = []; let index = 0;
+  const react = {createElement:(type,props,...children)=>({type,props:{...props,children}}), useState:init=>{const i=index++; if (!(i in state)) state[i]=i===15?'https://example.com/membership/apply/tokenAAAA':init; return [state[i],v=>{state[i]=typeof v==='function'?v(state[i]):v}];},useMemo:fn=>fn(),useCallback:fn=>fn,useEffect:()=>{}};
+  const component = new Proxy(function(){}, {get:()=>component});
+  const paper = new Proxy({}, {get:(_,key)=>key});
+  const mod={exports:{}};
+  vm.runInNewContext(code,{module:mod,exports:mod.exports,process,URL,require:id=>id==='react'?react:id==='react-native'?{FlatList:'FlatList',View:'View',ScrollView:'ScrollView',StyleSheet:{create:x=>x}}:id==='react-native-paper'?paper:id==='./types'?{surfaceTokens:{}}:id==='./inviteUtils'?{formatExistingUserRole:()=>'',normalizeEmail:x=>x||''}:id.includes('AuthContext')?{useAuth:()=>({})}:id==='expo-router'?{useRouter:()=>({})}:id==='@chemisttasker/shared-core'?{createMembershipInviteLinkService:async()=>({token:'tokenBBBB'})}:{__esModule:true,default:component,ShareQr:'ShareQr'}});
+  const render=()=>{index=0; return mod.exports.default({pharmacyId:1,memberships:[],onMembershipsChanged:()=>{}})};
+  const find=(node,predicate)=>{if (!node || typeof node!=='object') return; if(predicate(node)) return node; for(const child of (node.props?.children||[]).flat(Infinity)){const result=find(child,predicate); if(result)return result;}};
+  let tree=render();
+  find(tree,n=>n.type==='Button' && n.props.children.includes('Show invite QR')).props.onPress();
+  tree=render();
+  assert.equal(find(tree,n=>n.type==='ShareQr').props.value,'tokenAAAA', manager);
+  await find(tree,n=>n.type==='Button' && n.props.mode==='contained' && n.props.loading!==undefined && typeof n.props.onPress==='function' && n.props.onPress.length===0 && /Generate/.test(String(n.props.children))).props.onPress();
+  tree=render();
+  assert.ok(state.includes('https://www.chemisttasker.com/membership/apply/tokenBBBB') || state.some(x=>typeof x==='string' && x.endsWith('/membership/apply/tokenBBBB')), manager+' new link');
+  const qr=find(tree,n=>n.type==='ShareQr');
+  assert.ok(!qr || qr.props.value==='tokenBBBB', manager+' stale QR still shows the previous token');
+ }
+});
+
 test('QR encodes the web URL for each kind and renders a matrix', () => {
  const source = fs.readFileSync(path.join(__dirname, '../features/parity/ShareQr.tsx'), 'utf8');
  const code = ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS, jsx:ts.JsxEmit.ReactJSX, esModuleInterop:true}}).outputText;
