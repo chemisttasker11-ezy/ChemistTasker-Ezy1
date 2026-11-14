@@ -254,6 +254,7 @@ export default function StaffManager({
 
     // Toast
     const [toast, setToast] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
+    const [inviteQr, setInviteQr] = useState<{ token: string; origin: string } | null>(null);
     const handleApplicationsNotification = useCallback(
         (message: string, severity: 'success' | 'error') => {
             setToast({ message, severity });
@@ -808,6 +809,7 @@ export default function StaffManager({
                     onDismiss={() => setLinkOpen(false)}
                     contentContainerStyle={styles.modal}
                 >
+                    <ScrollView>
                     <Text style={styles.modalTitle}>Generate Invite Link</Text>
                     <TextInput
                         label="Expiry (days)"
@@ -826,7 +828,7 @@ export default function StaffManager({
                             style={styles.input}
                         />
                     )}
-                    {showInviteQr && linkValue ? <ShareQr kind="pharmacy-invite" value={linkValue.match(/\/membership\/apply\/([A-Za-z0-9_-]{8,200})(?:$|[?#])/i)?.[1] || ''} origin={new URL(linkValue).origin} /> : null}
+                    {showInviteQr && inviteQr ? <ShareQr kind="pharmacy-invite" value={inviteQr.token} origin={inviteQr.origin} /> : null}
                     <View style={styles.modalActions}>
                         <Button mode="outlined" onPress={() => setLinkOpen(false)} style={styles.modalActionButton}>
                             Close
@@ -843,7 +845,12 @@ export default function StaffManager({
                         <Button mode="outlined" disabled={!linkValue} onPress={() => {
                             const token = linkValue.match(/\/membership\/apply\/([A-Za-z0-9_-]{8,200})(?:$|[?#])/i)?.[1];
                             if (!token) { setToast({ message: 'Invitation link is not valid for QR sharing.', severity: 'error' }); return; }
-                            setShowInviteQr(true);
+                            try {
+                                const origin = new URL(linkValue).origin;
+                                if (origin === 'null') throw new Error('Invalid origin');
+                                setInviteQr({ token, origin });
+                                setShowInviteQr(true);
+                            } catch { setToast({ message: 'Invitation link is not valid for QR sharing.', severity: 'error' }); }
                         }} style={styles.modalActionButton}>
                             Show invite QR
                         </Button>
@@ -851,6 +858,7 @@ export default function StaffManager({
                             Copy & Close
                         </Button>
                     </View>
+                    </ScrollView>
                 </Modal>
 
                 {/* Delete Confirmation */}

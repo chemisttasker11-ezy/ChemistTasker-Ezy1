@@ -5,6 +5,7 @@ import { Button, Card, Chip, Text } from 'react-native-paper';
 import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { rosterV2 } from '@chemisttasker/shared-core';
 import { ContentState } from '@/components/ui/ContentState';
+import { isPendingPublishedRoster } from '@/features/parity/PublishedRosterNotice';
 import { colors, radius, space, touch } from '@/constants/tokens';
 
 type PublishedShift = {
@@ -68,7 +69,7 @@ export default function WorkerPublishedRosterScreen() {
   };
   const actionablePeriods = new Set<number>();
   for (const shift of shifts) {
-    if (shift.period_id != null && shift.can_acknowledge && !shift.is_acknowledged) actionablePeriods.add(shift.period_id);
+    if (isPendingPublishedRoster(shift) && shift.period_id != null) actionablePeriods.add(shift.period_id);
   }
   const seenPeriods = new Set<number>();
 

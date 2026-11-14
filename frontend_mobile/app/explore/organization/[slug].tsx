@@ -53,7 +53,7 @@ export default function PublicOrganizationScreen() {
           <Text style={styles.body}>{organization.about || 'This organisation will share more details soon.'}</Text>
         </Card.Content></Card>
         <Button mode="contained" onPress={() => router.push({ pathname: '/shifts/public-board', params: { organization: String(organization.id) } } as any)}>See public shifts</Button>
-        <Button mode="outlined" accessibilityLabel="Show organisation QR code" contentStyle={{ minHeight: 44 }} onPress={() => setShowQr(!showQr)}>Show organisation QR code</Button>
+        <Button mode="outlined" accessibilityLabel={showQr ? 'Hide organisation QR code' : 'Show organisation QR code'} contentStyle={{ minHeight: 44 }} onPress={() => setShowQr(!showQr)}>{showQr ? 'Hide organisation QR code' : 'Show organisation QR code'}</Button>
         {showQr ? <ShareQr kind="organization" value={organization.slug} origin={publicWebOrigin()} /> : null}
         <Button mode="outlined" onPress={() => void Share.share({ message: publicWebUrl('/organization/' + encodeURIComponent(organization.slug)) }).catch(() => {})}>Share organisation profile</Button>
       </>}

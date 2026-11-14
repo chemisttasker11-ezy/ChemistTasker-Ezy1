@@ -10,7 +10,9 @@ test('worker roster shows server-published shifts and acknowledges each period t
   const entry = read('features/parity/attendance.tsx');
   assert.match(screen, /rosterV2\.getWorkerRoster\(\{\}\)/);
   assert.match(screen, /rosterV2\.acknowledge\(\{ period_id: periodId/);
-  assert.match(screen, /!shift\.is_acknowledged/);
+  // D144: the acknowledged filter moved to the shared predicate (truth table in parity-p2-roster.test.cjs).
+  assert.match(screen, /isPendingPublishedRoster\(shift\)/);
+  assert.match(read('features/parity/PublishedRosterNotice.tsx'), /!shift\.is_acknowledged/);
   assert.match(screen, /showAction && period != null/);
   assert.match(entry, /\/attendance\/published-roster/);
 });

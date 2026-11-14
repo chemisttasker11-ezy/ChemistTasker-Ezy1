@@ -70,7 +70,7 @@ export default function ShareWorkerQr() {
         <Text variant="titleMedium">{post.role_title || post.headline || 'Pharmacy worker'}</Text>
         <Text style={styles.muted}>{[post.location_suburb,post.location_state].filter(Boolean).join(', ')}</Text>
         <Text selectable style={styles.muted}>{profileLink}</Text>
-        <Button mode="contained" icon="qrcode" accessibilityLabel="Show my QR code" contentStyle={{ minHeight: 44 }} onPress={() => setShowQr(!showQr)}>Show my QR code</Button>
+        <Button mode="contained" icon="qrcode" accessibilityLabel={showQr ? 'Hide my QR code' : 'Show my QR code'} contentStyle={{ minHeight: 44 }} onPress={() => setShowQr(!showQr)}>{showQr ? 'Hide my QR code' : 'Show my QR code'}</Button>
         {showQr ? <ShareQr kind="worker" value={code} origin={publicWebOrigin()} /> : null}
         <Button mode="outlined" icon="share-variant" onPress={() => void share()}>Share public link</Button>
       </Card.Content></Card> : <>
