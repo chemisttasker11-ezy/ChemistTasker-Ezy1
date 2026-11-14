@@ -8,6 +8,7 @@ import {
   CalendarPlus,
   CalendarRange,
   Clock,
+  ClipboardCheck,
   Gift,
   GraduationCap,
   HardHat,
@@ -101,7 +102,7 @@ export function useWorkerShell(persona: 'pharmacist' | 'otherstaff') {
         title: 'Manage',
         tone: 'blue',
         items: [
-          { label: 'Timesheets', icon: Clock, route: '/workforce-timesheets', hidden: !canRoster },
+          { label: 'Timesheets', icon: ClipboardCheck, route: '/workforce-timesheets', hidden: !canRoster },
           { label: 'Team roster', icon: CalendarRange, route: '/manager/roster', hidden: !canRoster },
           { label: 'Employment terms', icon: HardHat, route: '/workforce/employment-engagements', hidden: !canStaff },
         ],

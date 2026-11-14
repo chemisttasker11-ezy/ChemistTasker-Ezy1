@@ -237,7 +237,7 @@ for (const [file, component, handler, kind] of [
           fetch: async () => ({ blob: async () => { if (phase === 'blob') await gate.promise; return new Blob(['private']); } }),
           finance: { uploadReceipt: upload }, api: { uploadImport: upload, uploadTransferDocument: upload },
           expense: { id: 2 }, row: { id: 3 }, pharmacyId: 4, router: { push() {} }, onReload: async () => {},
-          setBusy() {}, setError() {}, setLocalError() {}, errorMessage: e => e.message };
+          setBusy() {}, setError() {}, setLocalError() {}, errorMessage: e => e.message, uploadInFlight: { current: false } };
         const pending = closure(file, component, handler, globals)();
         await flush();
         if (stale) generation++;

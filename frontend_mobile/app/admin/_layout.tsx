@@ -5,6 +5,7 @@ import { Text } from 'react-native-paper';
 import {
   ArrowLeftRight,
   CalendarCheck,
+  CalendarOff,
   CalendarClock,
   CalendarDays,
   ClipboardCheck,
@@ -136,7 +137,7 @@ function AdminLayoutInner() {
           { label: 'Attendance approvals', icon: UserCheck, route: '/attendance/reviews', hidden: !canManageRoster },
           { label: 'Roster', icon: CalendarCheck, route: '/manager/roster', hidden: !canManageRoster },
           { label: 'Timesheets', icon: ClipboardCheck, route: '/workforce-timesheets', hidden: !canManageRoster },
-          { label: 'Leave', icon: CalendarCheck, route: '/workforce/leave-requests', hidden: !canManageRoster },
+          { label: 'Leave', icon: CalendarOff, route: '/workforce/leave-requests', hidden: !canManageRoster },
           { label: 'Calendar', icon: CalendarDays, route: '/admin/calendar', hidden: !canManageCommunications },
         ],
       },

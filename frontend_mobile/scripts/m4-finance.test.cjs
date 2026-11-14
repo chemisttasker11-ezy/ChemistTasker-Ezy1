@@ -28,7 +28,7 @@ function compile(relative, modules) {
   const module = { exports: {} };
   vm.runInNewContext(output, {
     module, exports: module.exports, Date, URL, URLSearchParams, Blob, console,
-    TextEncoder, Uint8Array, setTimeout, clearTimeout, process,
+    TextEncoder, Uint8Array, setTimeout, clearTimeout, process, fetch: async () => ({ blob: async () => new Blob(["receipt"]) }),
     require(name) {
       if (!Object.prototype.hasOwnProperty.call(modules, name)) {
         throw Error('Unmocked finance import: ' + name + ' from ' + relative);
@@ -906,4 +906,27 @@ test('invoice alias sends an explorer home even with an invoice workspace select
   assert.ok(redirects.length > 0);
   assert.ok(redirects.every(path => path === '/explorer/dashboard'));
   h.unmount();
+});
+
+for (const second of ['camera', 'attach']) test(`receipt upload serializes attach and ${second} and cleans the temporary file`, async () => {
+    const h = createHooks(), pending = later(), uploads = [], deleted = [];
+    const widgets = Object.fromEntries(['ActionButtons','ChoiceChips','DataRow','EmptyState','Field','InfoNote','MetricGrid','ParityPage','Section'].map(n => [n,n]));
+    const mod = compile('frontend_mobile/features/parity/finance.tsx', {
+      '@/utils/authSession': { getSessionGeneration: () => 0 }, react: h.react, 'react/jsx-runtime': {jsx,jsxs:jsx},
+      '@/context/AuthContext': {useAuth: () => ({user:{id:1}})}, './receiptShare': {ReceiptShareSession:class{}},
+      'react-native-paper': {Button:'Button',Chip:'Chip',IconButton:'IconButton'},
+      'expo-router': {useLocalSearchParams:()=>({id:'1'}),useRouter:()=>({})},
+      'expo-image-picker': {requestCameraPermissionsAsync:async()=>({granted:true}),launchCameraAsync:async()=>({canceled:false,assets:[{uri:'file://camera'}]})},
+      'expo-document-picker': {getDocumentAsync:()=>pending.promise}, 'expo-sharing':{},
+      'expo-file-system': {File:class {constructor(uri){this.uri=uri} delete(){deleted.push(this.uri)}},Paths:{}},
+      './nativeFileBytes': {}, '@chemisttasker/shared-core': {finance:{expenses:async()=>[expense(1)], uploadReceipt:async (...args)=>uploads.push(args)}},
+      '@/roles/shared/invoices/FinanceWorkspace': {default:'FinanceWorkspace'}, './ParityUI':widgets,
+      './utils': {toNumber:Number,money:String,dateLabel:String,errorMessage:e=>e.message},
+    });
+    const nodes = await h.settled(mod.FinanceParityScreen,{screen:'expense-receipt'});
+    const attach = button(nodes,'Attach PDF or image'), camera = button(nodes,'Capture / add receipt');
+    attach.props.onPress(); (second === 'camera' ? camera : attach).props.onPress();
+    pending.resolve({canceled:false,assets:[{uri:'file://receipt',name:'receipt.pdf'}]});
+    await new Promise(resolve=>setTimeout(resolve,0)); await h.flush();
+    assert.equal(uploads.length,1,second); assert.deepEqual(deleted,['file://receipt']);
 });

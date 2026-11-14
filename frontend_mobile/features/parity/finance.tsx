@@ -222,8 +222,9 @@ function ExpenseEditor({expense,loading,error,onSaved}:{expense?:FinanceExpense;
 function ExpenseReceipt({expense,loading,error,onReload}:{expense?:FinanceExpense;loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const router=useRouter();
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
+  const uploadInFlight=useRef(false);
   const upload=async()=>{
-    if(!expense)return;setBusy(true);setLocalError('');
+    if(!expense || uploadInFlight.current)return;uploadInFlight.current=true;setBusy(true);setLocalError('');
     const generation=getSessionGeneration();let assetUri:string|undefined;
     try{
       const permission=await ImagePicker.requestCameraPermissionsAsync();
@@ -233,10 +234,10 @@ function ExpenseReceipt({expense,loading,error,onReload}:{expense?:FinanceExpens
       if(generation!==getSessionGeneration())return;
       await finance.uploadReceipt(expense.id,blob,asset.fileName||`receipt-${Date.now()}.jpg`);
       await onReload();
-    }catch(e){setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}setBusy(false);}
+    }catch(e){setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}uploadInFlight.current=false;setBusy(false);}
   };
   const attachFile=async()=>{
-    if(!expense || busy)return;setBusy(true);setLocalError('');
+    if(!expense || uploadInFlight.current)return;uploadInFlight.current=true;setBusy(true);setLocalError('');
     const generation=getSessionGeneration();let assetUri:string|undefined;
     try{
       const result=await DocumentPicker.getDocumentAsync({type:['application/pdf','image/png','image/jpeg'],copyToCacheDirectory:true});
@@ -245,12 +246,12 @@ function ExpenseReceipt({expense,loading,error,onReload}:{expense?:FinanceExpens
       if(generation!==getSessionGeneration())return;
       await finance.uploadReceipt(expense.id,blob,asset.name);
       await onReload();
-    }catch(e){setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}setBusy(false);}
+    }catch(e){setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}uploadInFlight.current=false;setBusy(false);}
   };
   return <ParityPage title="Expense receipt" subtitle="Capture or attach evidence to this expense." loading={loading} error={error||localError}>
     {!expense?<EmptyState title="Expense not found" body="The requested expense is unavailable."/>:<>
       <DataRow title={expense.supplier} subtitle={`${expense.description} · ${money(expense.amount)}`} status={expense.evidence_confirmed?'Evidence confirmed':'Evidence pending'}/>
-      <Button mode="contained" icon="camera" loading={busy} onPress={()=>void upload()}>Capture / add receipt</Button>
+      <Button mode="contained" icon="camera" loading={busy} disabled={busy} onPress={()=>void upload()}>Capture / add receipt</Button>
       <Button mode="outlined" accessibilityLabel="Attach receipt file" contentStyle={{minHeight:44}} disabled={busy} onPress={()=>void attachFile()}>Attach PDF or image</Button>
       <Section title="Receipts">{expense.receipts?.length?expense.receipts.map(r=><DataRow key={r.id} title={r.filename} subtitle={`${Math.ceil(r.size/1024)} KB · ${dateLabel(r.created_at)}`} onPress={()=>router.push(`/finance/receipts/${r.id}` as any)}/>):<EmptyState title="No receipts" body="Add at least one receipt when evidence is required."/>}</Section>
     </>}

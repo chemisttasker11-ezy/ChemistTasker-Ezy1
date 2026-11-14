@@ -4,6 +4,7 @@ import { Tabs, usePathname, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
   CalendarCheck,
+  CalendarOff,
   BookOpen,
   Building2,
   CalendarClock,
@@ -233,7 +234,7 @@ export default function OrganizationLayout() {
           { label: 'Post shift', icon: Plus, route: '/organization/post-shift', hidden: !can.roster },
           { label: 'Roster', icon: CalendarCheck, route: '/manager/roster', hidden: !can.rosterScreen },
           { label: 'Timesheets', icon: ClipboardCheck, route: '/workforce-timesheets', hidden: !can.roster },
-          { label: 'Leave', icon: CalendarCheck, route: '/workforce/leave-requests', hidden: !can.roster },
+          { label: 'Leave', icon: CalendarOff, route: '/workforce/leave-requests', hidden: !can.roster },
           { label: 'Attendance approvals', icon: UserCheck, route: '/attendance/reviews', hidden: !can.attendance },
           // Mobile-only clock and kiosk keep their earlier tools guard (roster rights) as well as web's attendance guard.
           { label: 'Clock & kiosk', icon: Clock, route: '/attendance', hidden: !(can.attendance || can.roster) },

@@ -6,6 +6,7 @@ import {
   BookOpen,
   Building2,
   CalendarCheck,
+  CalendarOff,
   CalendarClock,
   CalendarDays,
   ClipboardCheck,
@@ -82,7 +83,7 @@ const more: MoreGroup[] = [
     items: [
       { label: 'Roster', icon: CalendarCheck, route: '/manager/roster' },
       { label: 'Timesheets', icon: ClipboardCheck, route: '/workforce-timesheets' },
-          { label: 'Leave', icon: CalendarCheck, route: '/workforce/leave-requests' },
+      { label: 'Leave', icon: CalendarOff, route: '/workforce/leave-requests' },
       { label: 'Attendance approvals', icon: UserCheck, route: '/attendance/reviews' },
       { label: 'Clock & kiosk', icon: Clock, route: '/attendance' },
       { label: 'Calendar', icon: CalendarDays, route: '/owner/calendar' },
