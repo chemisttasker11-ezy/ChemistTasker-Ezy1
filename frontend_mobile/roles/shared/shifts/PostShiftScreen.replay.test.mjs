@@ -24,6 +24,18 @@ test('recovery keeps posted rates after pharmacy effects', async () => {
   assert.equal('rate_weekday' in w.edits.at(-1).payload, false);
 });
 
+test('recovery does not replace a cleared rate with a pharmacy default', async () => {
+  const w = await recoveryWithDefaults();
+  const [key, raw] = [...w.data].find(([, value]) => JSON.parse(value)?.exactPayload);
+  const intent = JSON.parse(raw);
+  intent.exactPayload.rate_weekday = null;
+  intent.pendingEdit.rate_weekday = null;
+  w.data.set(key, JSON.stringify(intent));
+  const restarted = await postScreen(w, { fill: true });
+  await restarted.current.handleSubmit();
+  assert.notEqual(w.edits.at(-1).payload.rate_weekday, '70');
+});
+
 test('recovery keeps posted software preferences after pharmacy effects', async () => {
   const w = await recoveryWithDefaults();
   const restarted = await postScreen(w, { fill: true });

@@ -30,7 +30,7 @@ function hooks() {
     useState(initial) {
       const i = index++;
       if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial;
-      return [slots[i], value => { const next = typeof value === 'function' ? value(slots[i]) : value; if (JSON.stringify(next) !== JSON.stringify(slots[i])) changed = true; slots[i] = next; }];
+      return [slots[i], value => { const next = typeof value === 'function' ? value(slots[i]) : value; if (!Object.is(next, slots[i])) changed = true; slots[i] = next; }];
     },
     useRef(initial) { const i = index++; return slots[i] ??= { current: initial }; },
     useMemo(fn, deps) {

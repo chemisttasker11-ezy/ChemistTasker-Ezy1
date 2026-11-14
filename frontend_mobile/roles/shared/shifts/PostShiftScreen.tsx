@@ -451,7 +451,7 @@ export default function PostShiftScreen() {
         }
     }, [allowedVis, pharmacyId, editingId]);
 
-    const hydrateShift = useCallback((data: any, currentPharmacies: PharmacyOption[], gen: number) => {
+    const hydrateShift = useCallback((data: any, currentPharmacies: PharmacyOption[], gen: number, options?: { rateDefaults?: boolean }) => {
         if (gen !== loadGenRef.current) return;
         const pharmacyValue =
             data.pharmacy_detail?.id ??
@@ -517,17 +517,18 @@ export default function PostShiftScreen() {
         } else {
             setRateType('FLEXIBLE');
         }
-        const initWeekday = toRateInputString(firstPresent(data.rate_weekday, data.rateWeekday, (pharmacyDefaults as any)?.rate_weekday, (pharmacyDefaults as any)?.rateWeekday));
+        const rateDefaults = options?.rateDefaults === false ? undefined : pharmacyDefaults as any;
+        const initWeekday = toRateInputString(firstPresent(data.rate_weekday, data.rateWeekday, rateDefaults?.rate_weekday, rateDefaults?.rateWeekday));
         setRateWeekday(initWeekday);
-        const initSaturday = toRateInputString(firstPresent(data.rate_saturday, data.rateSaturday, (pharmacyDefaults as any)?.rate_saturday, (pharmacyDefaults as any)?.rate_saturday));
+        const initSaturday = toRateInputString(firstPresent(data.rate_saturday, data.rateSaturday, rateDefaults?.rate_saturday, rateDefaults?.rate_saturday));
         setRateSaturday(initSaturday);
-        const initSunday = toRateInputString(firstPresent(data.rate_sunday, data.rateSunday, (pharmacyDefaults as any)?.rate_sunday, (pharmacyDefaults as any)?.rateSunday));
+        const initSunday = toRateInputString(firstPresent(data.rate_sunday, data.rateSunday, rateDefaults?.rate_sunday, rateDefaults?.rateSunday));
         setRateSunday(initSunday);
-        const initPublicHoliday = toRateInputString(firstPresent(data.rate_public_holiday, data.ratePublicHoliday, (pharmacyDefaults as any)?.rate_public_holiday, (pharmacyDefaults as any)?.ratePublicHoliday));
+        const initPublicHoliday = toRateInputString(firstPresent(data.rate_public_holiday, data.ratePublicHoliday, rateDefaults?.rate_public_holiday, rateDefaults?.ratePublicHoliday));
         setRatePublicHoliday(initPublicHoliday);
-        const initEarlyMorning = toRateInputString(firstPresent(data.rate_early_morning, data.rateEarlyMorning, (pharmacyDefaults as any)?.rate_early_morning, (pharmacyDefaults as any)?.rateEarlyMorning));
+        const initEarlyMorning = toRateInputString(firstPresent(data.rate_early_morning, data.rateEarlyMorning, rateDefaults?.rate_early_morning, rateDefaults?.rateEarlyMorning));
         setRateEarlyMorning(initEarlyMorning);
-        const initLateNight = toRateInputString(firstPresent(data.rate_late_night, data.rateLateNight, (pharmacyDefaults as any)?.rate_late_night, (pharmacyDefaults as any)?.rateLateNight));
+        const initLateNight = toRateInputString(firstPresent(data.rate_late_night, data.rateLateNight, rateDefaults?.rate_late_night, rateDefaults?.rateLateNight));
         setRateLateNight(initLateNight);
         setPaymentPreference((data.payment_preference ?? data.paymentPreference ?? 'ABN') === 'TFN' ? 'TFN' : 'ABN');
         const detailSuper = data.super_percent ?? data.superPercent;
@@ -688,7 +689,7 @@ export default function PostShiftScreen() {
                         manualRateEdits.current = { pharmacyId: hydratedPharmacyId, fields: new Set(['rateType', 'rateWeekday', 'rateSaturday', 'rateSunday', 'ratePublicHoliday', 'rateEarlyMorning', 'rateLateNight']) };
                         recoverySoftwarePharmacy.current = hydratedPharmacyId;
                         recoveryAudience.current = String(values.visibility ?? '');
-                        hydrateShift(values, pharmacyList, gen);
+                        hydrateShift(values, pharmacyList, gen, { rateDefaults: false });
                         setFtptPayMode(values.min_annual_salary != null || values.max_annual_salary != null ? 'ANNUAL' : 'HOURLY');
                         setMinHourly(toRateInputString(values.min_hourly_rate));
                         setMaxHourly(toRateInputString(values.max_hourly_rate));
