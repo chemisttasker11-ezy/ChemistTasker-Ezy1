@@ -180,6 +180,7 @@ function createRosterHarness({
           }),
         };
       }
+      if (id === '@/features/parity/PublishedRosterNotice') return { PublishedRosterNotice: () => null };
       if (id === '@/components/ui') return { ContentState: (p) => ({ type: 'ContentState', props: p }) };
       if (id === '@/roles/shared/dashboard/workerHomeLogic') return { ownRosterAssignments: (arr) => arr };
       if (id === '@/features/parity/utils') {

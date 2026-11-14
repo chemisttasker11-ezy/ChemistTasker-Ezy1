@@ -35,6 +35,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useUnsavedChangesGuard } from '@/roles/shared/forms/useUnsavedChangesGuard';
 import { ContentState } from '@/components/ui';
+import { PublishedRosterNotice } from '@/features/parity/PublishedRosterNotice';
 import { ownRosterAssignments } from '@/roles/shared/dashboard/workerHomeLogic';
 
 const addDays = (value: string, days: number) => {
@@ -490,6 +491,7 @@ function MyRosterScreenInner({
         <InfoNote title="Pharmacy">{pharmacyNameOf(selectedPharmacy)}</InfoNote>
       ) : null}
 
+      <PublishedRosterNotice />
       <Section title="Week" description="The same weekly roster window used by the web workspace.">
         <DatePickerInput
           locale="en-AU"

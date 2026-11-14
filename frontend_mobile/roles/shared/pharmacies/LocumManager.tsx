@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import * as WebBrowser from 'expo-web-browser';
+import { ShareQr } from '@/features/parity/ShareQr';
 import {
   Card,
   Text,
@@ -176,6 +176,7 @@ export default function LocumManager({
     const [inviteSubmitting, setInviteSubmitting] = useState(false);
 
     const [linkOpen, setLinkOpen] = useState(false);
+    const [showInviteQr, setShowInviteQr] = useState(false);
     const [linkExpiry, setLinkExpiry] = useState('14');
     const [linkValue, setLinkValue] = useState('');
     const [linkSubmitting, setLinkSubmitting] = useState(false);
@@ -206,6 +207,7 @@ export default function LocumManager({
     const openLinkDialog = () => {
         setLinkExpiry('14');
         setLinkValue('');
+        setShowInviteQr(false);
         setLinkOpen(true);
     };
 
@@ -739,6 +741,7 @@ export default function LocumManager({
                             style={styles.input}
                         />
                     )}
+                    {showInviteQr && linkValue ? <ShareQr kind="pharmacy-invite" value={linkValue.match(/\/membership\/apply\/([A-Za-z0-9_-]{8,200})(?:$|[?#])/i)?.[1] || ''} origin={new URL(linkValue).origin} /> : null}
                     <View style={styles.modalActions}>
                         <Button mode="outlined" onPress={() => setLinkOpen(false)} style={styles.modalActionButton}>
                             Close
@@ -755,9 +758,7 @@ export default function LocumManager({
                         <Button mode="outlined" disabled={!linkValue} onPress={() => {
                             const token = linkValue.match(/\/membership\/apply\/([A-Za-z0-9_-]{8,200})(?:$|[?#])/i)?.[1];
                             if (!token) { setToast({ message: 'Invitation link is not valid for QR sharing.', severity: 'error' }); return; }
-                            const base = new URL(linkValue).origin;
-                            void WebBrowser.openBrowserAsync(base + '/share/qr?kind=pharmacy-invite&token=' + encodeURIComponent(token))
-                              .catch(() => setToast({ message: 'Unable to open the invitation QR.', severity: 'error' }));
+                            setShowInviteQr(true);
                         }} style={styles.modalActionButton}>
                             Show invite QR
                         </Button>

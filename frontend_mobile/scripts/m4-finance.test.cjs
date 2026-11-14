@@ -601,7 +601,7 @@ test('R: parity native customer editor renders ABN evidence, then hides it when 
     'react-native-paper': { Button: 'Button', Chip: 'Chip', IconButton: 'IconButton' },
     'expo-router': { useLocalSearchParams: () => state,
       useRouter: () => ({ push() {}, replace() {}, back() {} }) },
-    'expo-image-picker': {}, 'expo-sharing': {},
+    'expo-image-picker': {}, 'expo-document-picker': {}, 'expo-sharing': {},
     'expo-file-system': { File: class {}, Paths: { cache: '' } },
     './nativeFileBytes': { nativeFileBytes: async () => new Uint8Array() },
     '@chemisttasker/shared-core': {
@@ -718,7 +718,7 @@ async function parityBas(worksheetCall) {
     'react-native-paper': { Button: 'Button', Chip: 'Chip', IconButton: 'IconButton' },
     'expo-router': { useLocalSearchParams: () => state,
       useRouter: () => ({ push() {}, replace() {}, back() {} }) },
-    'expo-image-picker': {}, 'expo-sharing': {},
+    'expo-image-picker': {}, 'expo-document-picker': {}, 'expo-sharing': {},
     'expo-file-system': { File: class {}, Paths: { cache: '' } },
     './nativeFileBytes': { nativeFileBytes: async () => new Uint8Array() },
     '@chemisttasker/shared-core': {

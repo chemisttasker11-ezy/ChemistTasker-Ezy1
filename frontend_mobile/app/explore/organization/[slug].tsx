@@ -5,8 +5,9 @@ import { Button, Card, Text } from 'react-native-paper';
 import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getPublicOrganization } from '@chemisttasker/shared-core';
+import { ShareQr } from '@/features/parity/ShareQr';
 import { colors, radius, space } from '@/constants/tokens';
-import { publicWebUrl, safePublicUrl } from '@/features/explore/webLinks';
+import { publicWebOrigin, publicWebUrl, safePublicUrl } from '@/features/explore/webLinks';
 
 type PublicOrganization = { id: number; name: string; slug: string; about?: string | null; cover_image_url?: string | null };
 
@@ -18,6 +19,7 @@ export default function PublicOrganizationScreen() {
   const [organization, setOrganization] = useState<PublicOrganization | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showQr, setShowQr] = useState(false);
 
   const load = useCallback(async () => {
     const request = ++generation.current;
@@ -51,6 +53,8 @@ export default function PublicOrganizationScreen() {
           <Text style={styles.body}>{organization.about || 'This organisation will share more details soon.'}</Text>
         </Card.Content></Card>
         <Button mode="contained" onPress={() => router.push({ pathname: '/shifts/public-board', params: { organization: String(organization.id) } } as any)}>See public shifts</Button>
+        <Button mode="outlined" accessibilityLabel="Show organisation QR code" contentStyle={{ minHeight: 44 }} onPress={() => setShowQr(!showQr)}>Show organisation QR code</Button>
+        {showQr ? <ShareQr kind="organization" value={organization.slug} origin={publicWebOrigin()} /> : null}
         <Button mode="outlined" onPress={() => void Share.share({ message: publicWebUrl('/organization/' + encodeURIComponent(organization.slug)) }).catch(() => {})}>Share organisation profile</Button>
       </>}
     </ScrollView>

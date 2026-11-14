@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, Text } from 'react-native-paper';
 import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
-import * as WebBrowser from 'expo-web-browser';
+import { ShareQr } from '@/features/parity/ShareQr';
 import { getPublicTalentFeed, type ExplorerPostApi } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
 import { colors, radius, space } from '@/constants/tokens';
@@ -23,6 +23,7 @@ export default function ShareWorkerQr() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [showQr, setShowQr] = useState(false);
   const requestRef = useRef(0);
   const userId = Number(user?.id);
   const load = useCallback(async () => {
@@ -52,12 +53,6 @@ export default function ShareWorkerQr() {
 
   const code = post?.reference_code || '';
   const profileLink = code ? publicWebOrigin() + '/talent/public-board?reference_code=' + encodeURIComponent(code) : '';
-  const qrLink = code ? publicWebOrigin() + '/share/qr?kind=worker&reference_code=' + encodeURIComponent(code) : '';
-  const showQr = async () => {
-    if (!qrLink) return;
-    try { await WebBrowser.openBrowserAsync(qrLink); }
-    catch { setNotice('The QR view could not open. Use Share link instead.'); }
-  };
   const share = async () => {
     if (!profileLink) return;
     try { await Share.share({ message: profileLink }); }
@@ -75,7 +70,8 @@ export default function ShareWorkerQr() {
         <Text variant="titleMedium">{post.role_title || post.headline || 'Pharmacy worker'}</Text>
         <Text style={styles.muted}>{[post.location_suburb,post.location_state].filter(Boolean).join(', ')}</Text>
         <Text selectable style={styles.muted}>{profileLink}</Text>
-        <Button mode="contained" icon="qrcode" onPress={() => void showQr()}>Show my QR code</Button>
+        <Button mode="contained" icon="qrcode" accessibilityLabel="Show my QR code" contentStyle={{ minHeight: 44 }} onPress={() => setShowQr(!showQr)}>Show my QR code</Button>
+        {showQr ? <ShareQr kind="worker" value={code} origin={publicWebOrigin()} /> : null}
         <Button mode="outlined" icon="share-variant" onPress={() => void share()}>Share public link</Button>
       </Card.Content></Card> : <>
         <Text style={styles.muted}>No shareable public listing was found for this account. Publish a talent listing first and refresh. Anonymous or unpublished profiles cannot be shared by QR.</Text>

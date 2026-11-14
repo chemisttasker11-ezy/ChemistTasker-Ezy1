@@ -5,6 +5,7 @@ import { ReceiptShareSession } from './receiptShare';
 import { Button, Chip, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import { nativeFileBytes } from './nativeFileBytes';
@@ -234,10 +235,23 @@ function ExpenseReceipt({expense,loading,error,onReload}:{expense?:FinanceExpens
       await onReload();
     }catch(e){setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}setBusy(false);}
   };
+  const attachFile=async()=>{
+    if(!expense || busy)return;setBusy(true);setLocalError('');
+    const generation=getSessionGeneration();let assetUri:string|undefined;
+    try{
+      const result=await DocumentPicker.getDocumentAsync({type:['application/pdf','image/png','image/jpeg'],copyToCacheDirectory:true});
+      if(result.canceled)return;
+      const asset=result.assets[0];assetUri=asset.uri;const blob=await (await fetch(asset.uri)).blob();
+      if(generation!==getSessionGeneration())return;
+      await finance.uploadReceipt(expense.id,blob,asset.name);
+      await onReload();
+    }catch(e){setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}setBusy(false);}
+  };
   return <ParityPage title="Expense receipt" subtitle="Capture or attach evidence to this expense." loading={loading} error={error||localError}>
     {!expense?<EmptyState title="Expense not found" body="The requested expense is unavailable."/>:<>
       <DataRow title={expense.supplier} subtitle={`${expense.description} · ${money(expense.amount)}`} status={expense.evidence_confirmed?'Evidence confirmed':'Evidence pending'}/>
       <Button mode="contained" icon="camera" loading={busy} onPress={()=>void upload()}>Capture / add receipt</Button>
+      <Button mode="outlined" accessibilityLabel="Attach receipt file" contentStyle={{minHeight:44}} disabled={busy} onPress={()=>void attachFile()}>Attach PDF or image</Button>
       <Section title="Receipts">{expense.receipts?.length?expense.receipts.map(r=><DataRow key={r.id} title={r.filename} subtitle={`${Math.ceil(r.size/1024)} KB · ${dateLabel(r.created_at)}`} onPress={()=>router.push(`/finance/receipts/${r.id}` as any)}/>):<EmptyState title="No receipts" body="Add at least one receipt when evidence is required."/>}</Section>
     </>}
   </ParityPage>;

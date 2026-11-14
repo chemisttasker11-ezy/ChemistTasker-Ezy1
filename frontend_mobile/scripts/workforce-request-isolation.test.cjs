@@ -218,6 +218,7 @@ test('my-roster production: scope transition does not deadlock, ignores stale co
         replaceUnderscore: s => String(s || '').replaceAll('_', ' '),
         startOfWeek: () => '2026-11-02',
       };
+      if (id === '@/features/parity/PublishedRosterNotice') return { PublishedRosterNotice: () => null };
       if (id === '@/features/parity/ParityUI') return {
         ActionButtons: 'ActionButtons', ChoiceChips: 'ChoiceChips', DataRow: 'DataRow', EmptyState: 'EmptyState', Field: 'Field', InfoNote: 'InfoNote', MetricGrid: 'MetricGrid', ParityPage: 'ParityPage', Section: 'Section',
       };
