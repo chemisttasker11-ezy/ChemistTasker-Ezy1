@@ -16,7 +16,12 @@ def validate_admin_user(user, *, assignment=None, changes=None):
             stored = type(assignment)._default_manager.using(assignment._state.db).filter(
                 pk=assignment.pk,
             ).values(*proposed).first()
-            if stored is not None and all(
+            scope = changes.get("pharmacy_ids", changes.get("pharmacies"))
+            scope_added = scope is not None and bool(
+                {getattr(item, "pk", item) for item in scope}
+                - set(assignment.pharmacies.values_list("pk", flat=True))
+            )
+            if stored is not None and not scope_added and all(
                 value == stored[name] or (name == "is_active" and not value)
                 for name, value in proposed.items()
             ):

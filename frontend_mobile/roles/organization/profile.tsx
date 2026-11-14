@@ -1,4 +1,5 @@
 import { createFriendPillReferralService } from '@chemisttasker/shared-core';
+import { getSessionGeneration } from '@/utils/authSession';
 import { fetchPillBalanceService } from '@chemisttasker/shared-core';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, Share, StyleSheet, View } from 'react-native';
@@ -89,7 +90,8 @@ export default function OrganizationProfileScreen() {
 
   const shareFriendReferral = async () => {
     const lifetime = referralLifetime.current;
-    const current = () => referralLifetime.current === lifetime;
+    const sessionGeneration = getSessionGeneration();
+    const current = () => referralLifetime.current === lifetime && sessionGeneration === getSessionGeneration();
     setReferralLoading(true);
     try {
       const data = await createFriendPillReferralService({});

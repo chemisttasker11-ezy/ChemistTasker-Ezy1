@@ -172,6 +172,13 @@ class InviteOrgUserView(generics.CreateAPIView):
         return Response({'detail': 'Invitation sent.'}, status=status.HTTP_201_CREATED)
 
 
+def _scope_change(pharmacy_ids):
+    # Only well-formed id lists reach the early guard; anything else is rejected by the serializer (which re-runs the guard).
+    if isinstance(pharmacy_ids, list) and all(str(item).isdigit() for item in pharmacy_ids):
+        return {"pharmacy_ids": [int(item) for item in pharmacy_ids]}
+    return {}
+
+
 class OrganizationMembershipViewSet(mixins.ListModelMixin,
                                     mixins.RetrieveModelMixin,
                                     mixins.UpdateModelMixin,
@@ -184,7 +191,7 @@ class OrganizationMembershipViewSet(mixins.ListModelMixin,
         membership = self.get_object()
         validate_admin_user_for_api(membership.user, assignment=membership, changes={
             field: request.data[field] for field in ("role", "admin_level") if field in request.data
-        })
+        } | _scope_change(request.data.get("pharmacy_ids")))
         return super().update(request, *args, **kwargs)
 
     def _management_memberships(self, user):

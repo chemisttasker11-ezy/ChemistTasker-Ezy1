@@ -134,6 +134,22 @@ test('legacy bearer invite migrates to SecureStore before plaintext is purged',a
  assert.doesNotMatch(h.plain.get('ct.mobile.qr.saved.v1.7'),/abcdefghijk/);
  assert.match(h.protectedStore.get('ct.mobile.qr.invites.v1.7'),/abcdefghijk/);
 });
+test('contact writes and migration stop when the session changes during the local reload',async()=>{
+ const url='https://chemisttasker.com.au/talent/public-board?reference_code=ABCDE1';
+ for(const action of ['save','remove','migrate']){
+  const h=savedContactHarness(action==='migrate'?{plainRows:[{url:'https://chemisttasker.com.au/membership/apply/abcdefghijk'}]}:{});
+  let release,started; const waiting=new Promise(resolve=>{started=resolve;});
+  let count=0;
+  h.modules['@chemisttasker/shared-core'].listSavedProfessionalContacts=()=>{
+   if(action==='remove' && ++count===1)return Promise.resolve([]);
+   return new Promise(resolve=>{release=resolve;started();});
+  };
+  const pending=action==='save'?h.api.saveContact(7,parse(url)):action==='remove'?h.api.removeContact(7,url):h.api.listSavedContacts(7);
+  await waiting; h.switchSession(); release([]);
+  await assert.rejects(pending,/Session changed/);
+  assert.deepEqual(h.mutations,[]);
+ }
+});
 test('online list honours cloud deletion while offline keeps last synced bookmark',async()=>{
  const workerUrl='https://chemisttasker.com.au/talent/public-board?reference_code=ABCDE1';
  const h=savedContactHarness({plainRows:[{url:workerUrl,savedAt:'2026-11-05T00:00:00Z',synced:true}]});

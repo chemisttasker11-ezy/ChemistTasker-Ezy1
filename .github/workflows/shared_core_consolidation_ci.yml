@@ -226,7 +226,7 @@ jobs:
         run: node --test scripts/m5-post-shift.test.cjs features/parity/marketplaceReviewAccountRace.test.mjs features/parity/marketplaceReviewSubmission.test.mjs scripts/m4-marketplace-step-races.test.cjs roles/shared/shifts/PostShiftScreen.replay.test.mjs roles/shared/shifts/ShiftsBoard/hooks/useCounterOffers.replay.test.mjs features/parity/marketplaceReplay.test.mjs
         working-directory: frontend_mobile
       - name: Mobile install, QR, security and next-shift regression contracts
-        run: node --test features/nextShift/nextShiftModel.test.mjs features/share/shareCode.test.mjs utils/appLock.test.mjs scripts/mobile-settings.test.cjs scripts/notification-push-preferences.test.cjs scripts/saved-contact-sync.test.cjs scripts/app-lock-settings.test.cjs scripts/next-shifts-access.test.cjs scripts/public-worker-qr.test.cjs scripts/public-articles.test.cjs scripts/public-community.test.cjs scripts/w8-legal-and-editorial.test.cjs
+        run: node --test features/nextShift/nextShiftModel.test.mjs features/share/shareCode.test.mjs utils/appLock.test.mjs scripts/mobile-settings.test.cjs scripts/notification-push-preferences.test.cjs scripts/saved-contact-sync.test.cjs scripts/app-lock-settings.test.cjs scripts/next-shifts-access.test.cjs scripts/public-worker-qr.test.cjs scripts/public-articles.test.cjs scripts/public-community.test.cjs scripts/w8-legal-and-editorial.test.cjs scripts/parity-p2-navigation.test.cjs scripts/parity-p2-qr.test.cjs scripts/parity-p2-roster.test.cjs
         working-directory: frontend_mobile
       - name: Verify patched runtime dependencies and reject new advisories
         run: npm run security:dependencies

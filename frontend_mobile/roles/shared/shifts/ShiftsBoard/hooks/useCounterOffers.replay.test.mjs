@@ -2,7 +2,25 @@
 // 409 payload mismatch includes existing shift_id; replay rechecks current authorization.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { world, offerHook, savedIntents, deferred, flush } from '../../submissionReplay.test-support.mjs';
+import { world, offerHook, boardHandler, savedIntents, deferred, flush } from '../../submissionReplay.test-support.mjs';
+
+for (const file of ['PublicShiftsView.tsx', 'CommunityShiftsView.tsx']) test(`${file} preserves refusal status through the board handler`, async () => {
+  const w=world(); w.env.status=409;
+  const hook=await offerHook(w, 1, boardHandler(w,file)); await hook.open();
+  await hook.current.handleSubmitCounterOffer(); hook.render();
+  await hook.current.anotherCounterOffer();
+  w.env.status=null; w.env.lost=false;
+  await hook.open(); await hook.current.handleSubmitCounterOffer();
+  assert.notEqual(w.calls[0].key,w.calls.at(-1).key);
+});
+
+test('unverified public board does not save an unsent offer', async () => {
+  const w=world(), hook=await offerHook(w,1,boardHandler(w,'PublicShiftsView.tsx',false));
+  hook.params.counterOfferGuard=()=>false; hook.render(); await hook.open();
+  await hook.current.handleSubmitCounterOffer();
+  assert.equal(w.calls.length,0);
+  assert.equal(savedIntents([...w.data.entries()]).length,0);
+});
 
 test('restart reconciles independent pending offers for two shifts with their own keys', async () => {
   const w = world(), first = await offerHook(w);
@@ -114,7 +132,7 @@ test('an invalid form still reconciles the pending original offer', async () => 
   assert.equal(w.rows.length, 1);
 });
 
-for (const status of [400, 409, 410]) test(`another offer unblocks after ${status}`, async () => {
+for (const status of [400, 403, 404, 409, 410]) test(`another offer unblocks after ${status}`, async () => {
   const w = world(); w.env.status = status;
   const hook = await offerHook(w); await hook.open();
   await hook.current.handleSubmitCounterOffer(); hook.render();
@@ -133,4 +151,11 @@ test('user can clear a corrupt offer intent after review', async () => {
   await hook.current.anotherCounterOffer();
   w.env.alertButtons.find(button => button.text === 'Confirm').onPress(); await flush();
   assert.equal(w.data.has(key), false);
+});
+test('both public shift boards pass the verified counter-offer guard', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../../PublicShiftsView.tsx', import.meta.url), 'utf8');
+  const boards = [...source.matchAll(/<ShiftsBoard\b[\s\S]*?\/>/g)];
+  assert.equal(boards.length, 2);
+  for (const [board] of boards) assert.match(board, /counterOfferGuard=\{guardVerified\}/);
 });

@@ -122,6 +122,91 @@ test('recovery saves the edits made after the lost response before success', asy
   assert.equal(w.edits.at(-1)?.payload.description, 'Changed during recovery');
 });
 
+test('failed recovered edit survives restart and patches the same shift', async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w, { fill: true });
+  retry.current.setDescription('Durable recovery edit'); retry.render();
+  w.env.editFailure = true; await retry.current.handleSubmit(); retry.unmount();
+  w.env.editFailure = false;
+  const restarted = await postScreen(w, { fill: true });
+  await restarted.current.handleSubmit();
+  assert.equal(w.rows.length, 1);
+  assert.equal(w.edits.at(-1)?.id, w.rows[0].id);
+  assert.equal(w.edits.at(-1)?.payload.description, 'Durable recovery edit');
+});
+
+test('later corrections replace a failed recovered edit before retry', async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w, { fill: true });
+  retry.current.setDescription('First edit'); retry.render();
+  w.env.editFailure = true; await retry.current.handleSubmit();
+  retry.current.setDescription('Corrected edit'); retry.render();
+  w.env.editFailure = false; await retry.current.handleSubmit();
+  assert.equal(w.edits.at(-1)?.payload.description, 'Corrected edit');
+  assert.equal(savedIntents(w.edits.at(-1).stored)[0].pendingEdit.description, 'Corrected edit');
+});
+
+test('correction after restart is persisted before recovery PATCH', async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w, { fill: true });
+  retry.current.setDescription('First edit'); retry.render();
+  w.env.editFailure = true; await retry.current.handleSubmit(); retry.unmount();
+  const restarted = await postScreen(w, { fill: true });
+  restarted.current.markTouched(); restarted.current.setDescription('After restart'); restarted.render();
+  w.env.editFailure = false; await restarted.current.handleSubmit();
+  assert.equal(w.edits.at(-1).payload.description, 'After restart');
+  assert.equal(savedIntents(w.edits.at(-1).stored)[0].pendingEdit.description, 'After restart');
+});
+
+test('post another can discard an unsaved recovered edit after confirmation', async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w, { fill: true });
+  retry.current.setDescription('edit'); retry.render();
+  w.env.editFailure = true; await retry.current.handleSubmit(); retry.render();
+  await retry.current.explicitActions.anotherPost();
+  assert.ok(w.env.alertButtons?.some(button => button.text === 'Discard'));
+  w.env.alertButtons.find(button => button.text === 'Discard').onPress(); await flush();
+  assert.equal(savedIntents([...w.data]).length, 0);
+});
+
+for (const status of [400, 403, 404]) test(`terminal recovery PATCH ${status} releases the saved intent`, async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w, { fill: true });
+  retry.current.setDescription('edit'); retry.render();
+  w.env.editFailure = status; await retry.current.handleSubmit(); retry.render();
+  assert.equal(savedIntents([...w.data]).length, 0);
+  await retry.current.explicitActions.anotherPost(); retry.render();
+  assert.notEqual(retry.current.error, 'Recover the previous shift before posting another.');
+});
+
+test('retry after terminal recovery refusal does not create a duplicate shift', async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w, { fill: true });
+  retry.current.setDescription('edit'); retry.render();
+  w.env.editFailure = true; await retry.current.handleSubmit(); retry.unmount();
+  const restarted = await postScreen(w, { fill: true });
+  w.env.editFailure = 403; await restarted.current.handleSubmit(); restarted.render();
+  w.env.editFailure = false; await restarted.current.handleSubmit();
+  assert.equal(w.rows.length, 1);
+});
+
+test('reverting a failed recovery edit to the original does not resend the stale edit', async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w, { fill: true });
+  retry.current.setDescription('First edit'); retry.render();
+  w.env.editFailure = true; await retry.current.handleSubmit();
+  retry.current.markTouched(); retry.current.setDescription('Original'); retry.render();
+  w.env.editFailure = false; await retry.current.handleSubmit();
+  assert.equal(w.edits.length, 1);
+});
+
 test('description-only edit after recovery does not replace slots', async () => {
   // intentional (orchestrator D136): recovery path, not an acknowledged success
   const w = world(); const first = await postScreen(w, { fill: true });
@@ -145,7 +230,7 @@ test('description-only recovery keeps existing slot ids and counter-offers', asy
   assert.deepEqual(w.rows[0].counterOffers, [{ id: 23, slotId: 17 }]);
 });
 
-for (const status of [400, 409, 410]) test(`post another unblocks after ${status}`, async () => {
+for (const status of [400, 403, 404, 409, 410]) test(`post another unblocks after ${status}`, async () => {
   const w = world(); w.env.status = status;
   const screen = await postScreen(w, { fill: true });
   await screen.current.handleSubmit(); screen.render();

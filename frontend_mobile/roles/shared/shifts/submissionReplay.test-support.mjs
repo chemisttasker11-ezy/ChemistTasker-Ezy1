@@ -79,7 +79,8 @@ function runtime(w, h) {
     ApiError: Error,
     createOwnerShiftService: (payload, key) => w.send('shift.create', payload, key),
     updateOwnerShiftService: async (id, payload) => {
-      w.edits.push({ id, payload: clone(payload) });
+      w.edits.push({ id, payload: clone(payload), stored: [...w.data] });
+      if (w.env.editFailure) { const error = Error('PATCH failed'); if (typeof w.env.editFailure === 'number') error.status = w.env.editFailure; throw error; }
       const row = w.rows.find(value => value.id === id);
       if (row?.slotIds && 'slots' in payload) { row.slotIds = [999]; row.counterOffers = []; }
       return { id };
@@ -102,7 +103,7 @@ function runtime(w, h) {
         ? node.declarationList.declarations.map(d => d.name.getText(ast)).filter(name => /another/i.test(name)) : []);
       // Replace JSX-only tail with a probe. All state, effects and save callbacks run unchanged.
       source = source.slice(0, source.indexOf('    const chipStyle =')) + `
-        return { handleSubmit, dismissToast, setDescription, setSlots, setPharmacyId,
+        return { handleSubmit, dismissToast, setDescription, setSlots, setPharmacyId, markTouched,
           setPharmacies, setPharmaciesLoaded, initialSlotsJsonRef, setInitialAudience, error, toast,
           explicitActions: { ${actions.join(',')} } };
       }`;
@@ -177,12 +178,28 @@ export async function postScreen(w, { fill = false } = {}) {
   return { render, unmount: h.unmount, effects: h.effects, get current() { return current; } };
 }
 
-export async function offerHook(w, userId = w.env.userId) {
+export function boardHandler(w, file, verified = true) {
+  const source = readFileSync(resolve(here, file), 'utf8');
+  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let initializer;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'handleSubmitCounterOffer') initializer = node.initializer.getText(ast);
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  const js = ts.transpileModule(`exports.handler = ${initializer}`, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+  const box = { exports: {}, console, Error, guardVerified: () => verified, errorMessage: e => e.message,
+    submitShiftCounterOfferService: (payload, key) => w.send('shift.counter_offer.create', payload, key) };
+  vm.runInNewContext(js, box);
+  return box.exports.handler;
+}
+
+export async function offerHook(w, userId = w.env.userId, handler) {
   const h = hooks(), r = runtime(w, h);
   const useCounterOffers = r.load(resolve(here, 'ShiftsBoard/hooks/useCounterOffers.ts')).useCounterOffers;
   const params = { shifts: [], scopeKey: `worker:${userId}`, currentUserId: userId,
     clearSelection() {}, setAppliedShiftIds() {}, setAppliedSlotIds() {}, refreshShifts: async () => {},
-    onSubmitCounterOffer: (payload, key) => w.send('shift.counter_offer.create', payload, key) };
+    onSubmitCounterOffer: handler ?? ((payload, key) => w.send('shift.counter_offer.create', payload, key)) };
   let current;
   const render = () => { h.begin(); current = useCounterOffers(params); return current; };
   render(); await h.effects(); render();

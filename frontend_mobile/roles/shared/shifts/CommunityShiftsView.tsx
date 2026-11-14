@@ -293,7 +293,7 @@ function CommunityShiftsBoard({
             return await submitShiftCounterOfferService(payload, key);
         } catch (err) {
             console.error('Failed to submit counter offer', err);
-            throw new Error(errorMessage(err, 'Failed to submit counter offer.'));
+            throw err;
         }
     };
 

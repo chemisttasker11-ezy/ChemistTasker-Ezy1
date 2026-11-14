@@ -1255,6 +1255,13 @@ export default function PostShiftScreen() {
             return;
         }
         if (intent && !intent.resultId && !(intent as typeof intent & { rejected?: boolean }).rejected) { setError('Recover the previous shift before posting another.'); return; }
+        if (intent?.resultId && (intent as typeof intent & { recovery?: boolean }).recovery) {
+            Alert.alert('Discard unsaved changes?', 'The shift was posted, but your changes were not saved.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Discard', style: 'destructive', onPress: () => { if (postingScopeRef.current === actionScope) void store.clear(intent.key).then(() => { if (postingScopeRef.current === actionScope) { resetForm(); recoveredShiftRef.current = null; postSuccessDestinationRef.current = null; setError(''); setToast(''); } }).catch(() => { if (postingScopeRef.current === actionScope) setError('Unable to clear the saved request.'); }); } },
+            ]);
+            return;
+        }
         if (intent) await store.clear(intent.key);
         resetForm();
         recoveredShiftRef.current = null;
@@ -1275,14 +1282,34 @@ export default function PostShiftScreen() {
         setLoading(true);
         try {
             const draft = postingDraft();
-            const store = !editingId && !recoveredShiftRef.current && user?.id != null
+            const store = !editingId && user?.id != null
                 ? mobilePendingIntentStore(getApiConfig?.()?.baseURL ?? '', user.id, 'shift.create') : null;
             let pending = store ? await store.load() : null;
             if (!stillCurrent()) return;
-            if (pending?.resultId && store) {
+            const recovery = pending as (typeof pending & { recovery?: boolean; pendingEdit?: Record<string, unknown> | null });
+            if (pending?.resultId && store && !recovery?.recovery) {
                 await store.clear(pending.key);
                 if (!stillCurrent()) return;
                 pending = null;
+            }
+            if (recovery?.recovery && recovery.resultId && recovery.pendingEdit && store) {
+                const validation = validateShiftPostingDraft(draft);
+                if (validation) { setError(validation); return; }
+                const edit = buildShiftPostingPayload({ ...draft, editingShiftId: recovery.resultId, slotsModified: true, ratesModified: true });
+                const currentChanges = Object.fromEntries(Object.entries(edit).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(recovery.exactPayload[key])));
+                const changes = touchedRef.current || Object.keys(currentChanges).length ? currentChanges : recovery.pendingEdit;
+                await store.saveRecovery(recovery.key, recovery.resultId, changes);
+                if (!stillCurrent()) return;
+                recoveredShiftRef.current = { id: recovery.resultId, scope, payload: recovery.exactPayload };
+                try { if (Object.keys(changes).length) await updateOwnerShiftService(recovery.resultId, changes); }
+                catch (error) { if (stillCurrent() && isTerminalIntentError?.(error)) await store.clear(recovery.key); throw error; }
+                if (!stillCurrent()) return;
+                await store.clear(recovery.key);
+                if (!stillCurrent()) return;
+                recoveredShiftRef.current = { id: recovery.resultId, scope, payload: { ...recovery.exactPayload, ...changes } };
+                setToast('Shift updated successfully!');
+                if (JSON.stringify(currentChanges) === JSON.stringify(changes)) unsaved.markClean();
+                return;
             }
             if ((pending as typeof pending & { rejected?: boolean })?.rejected) { setError('Start another post before submitting again.'); return; }
             if (!pending || pending.resultId) {
@@ -1301,7 +1328,12 @@ export default function PostShiftScreen() {
                 const recovered = recoveredShiftRef.current;
                 const edit = buildShiftPostingPayload({ ...draft, editingShiftId: recovered.id, slotsModified: true, ratesModified: true });
                 const changes = Object.fromEntries(Object.entries(edit).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(recovered.payload[key])));
-                if (Object.keys(changes).length) await updateOwnerShiftService(recovered.id, changes);
+                if (pending && store) await store.saveRecovery(pending.key, recovered.id, changes);
+                if (!stillCurrent()) return;
+                try { if (Object.keys(changes).length) await updateOwnerShiftService(recovered.id, changes); }
+                catch (error) { if (pending && store && stillCurrent() && isTerminalIntentError?.(error)) await store.clear(pending.key); throw error; }
+                if (!stillCurrent()) return;
+                if (pending && store) await store.clear(pending.key);
                 if (!stillCurrent()) return;
                 recovered.payload = payload;
                 setToast('Shift updated successfully!');
@@ -1320,11 +1352,14 @@ export default function PostShiftScreen() {
                     try { result = await createOwnerShiftService(intent.exactPayload, intent.key); }
                     catch (error) { if (stillCurrent() && isTerminalIntentError?.(error)) await store.reject(intent.key); throw error; }
                     if (!stillCurrent()) return;
-                    await store.settle(intent.key, result.id);
+                    if (pending) {
+                        const validation = validateShiftPostingDraft(draft);
+                        const edit = validation ? null : buildShiftPostingPayload({ ...draft, editingShiftId: result.id, slotsModified: true, ratesModified: true });
+                        const changes = edit && Object.fromEntries(Object.entries(edit).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(intent.exactPayload[key])));
+                        await store.saveRecovery(intent.key, result.id, changes);
+                    } else await store.settle(intent.key, result.id);
                     resultId = result.id;
                 }
-                if (!stillCurrent()) return;
-                await store.clear(intent.key);
                 if (!stillCurrent()) return;
                 if (pending) {
                     recoveredShiftRef.current = { id: resultId, scope, payload: intent.exactPayload };
@@ -1332,10 +1367,15 @@ export default function PostShiftScreen() {
                     if (validation) { setError(validation); return; }
                     const edit = buildShiftPostingPayload({ ...draft, editingShiftId: resultId, slotsModified: true, ratesModified: true });
                     const changes = Object.fromEntries(Object.entries(edit).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(intent.exactPayload[key])));
-                    if (Object.keys(changes).length) await updateOwnerShiftService(resultId, changes);
+                    await store.saveRecovery(intent.key, resultId, changes);
+                    if (!stillCurrent()) return;
+                    try { if (Object.keys(changes).length) await updateOwnerShiftService(resultId, changes); }
+                    catch (error) { if (stillCurrent() && isTerminalIntentError?.(error)) await store.clear(intent.key); throw error; }
                     if (!stillCurrent()) return;
                     recoveredShiftRef.current.payload = payload;
                 }
+                await store.clear(intent.key);
+                if (!stillCurrent()) return;
                 setToast('Shift posted successfully!');
                 // A successful new post starts a fresh form without inventing a backend draft state.
                 touchedRef.current = false;

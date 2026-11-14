@@ -15,6 +15,7 @@ import { colors, font, radius, space, touch } from '@/constants/tokens';
 import { useAuth } from '@/context/AuthContext';
 import { SegmentTabs, tabPanelProps } from '@/components/ui/SegmentTabs';
 import { ResponsiveSegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
+import { getSessionGeneration } from '@/utils/authSession';
 
 const money = (value: string | number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(Number(value));
 // Idempotency identity only; no secrets or authentication use.
@@ -139,7 +140,8 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
   const sharePdf = async (invoice: FinanceInvoice, received = false, version?: number) => {
     const requestedScope = ownerScope;
     const generation = pdfGeneration.current;
-    const current = () => scopeRef.current === requestedScope && pdfGeneration.current === generation;
+    const sessionGeneration = getSessionGeneration();
+    const current = () => scopeRef.current === requestedScope && pdfGeneration.current === generation && sessionGeneration === getSessionGeneration();
     if (!current()) return;
     if (!(await Sharing.isAvailableAsync())) throw new Error('PDF sharing is not available on this device.');
     if (!current()) return;
@@ -176,7 +178,8 @@ export default function FinanceWorkspace({ existingTools, receivedMode = false }
     if (csvPending.current || !user?.id || loading) return;
     const capturedScope = ownerScope;
     const request = ++csvGeneration.current;
-    const current = () => scopeRef.current === capturedScope && csvGeneration.current === request;
+    const sessionGeneration = getSessionGeneration();
+    const current = () => scopeRef.current === capturedScope && csvGeneration.current === request && sessionGeneration === getSessionGeneration();
     csvPending.current = true;
     setCsvBusy(true);
     setError('');

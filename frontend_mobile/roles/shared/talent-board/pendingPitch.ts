@@ -39,6 +39,13 @@ export const mobilePendingIntentStore = (environment: string, userId: string | n
   const store = createPendingIntentStore({ storage: AsyncStorage, lock, environment, userId, operation, newKey: idempotencyKey });
   return {
     ...store,
+    saveRecovery: (key: string, resultId: number, pendingEdit: Record<string, unknown> | null) => lock(store.scope, async () => {
+      const intent = await store.load();
+      if (!intent || intent.key !== key) throw new Error('The pending intent changed.');
+      const raw = JSON.stringify({ ...intent, resultId, recovery: true, pendingEdit });
+      await AsyncStorage.setItem(store.scope, raw);
+      if (await AsyncStorage.getItem(store.scope) !== raw) throw new Error('Your pending change could not be saved safely. Please retry.');
+    }),
     reject: (key: string) => lock(store.scope, async () => {
       const intent = await store.load();
       if (!intent || intent.key !== key || intent.resultId) throw new Error('The pending intent changed.');
@@ -59,7 +66,7 @@ export const mobilePendingIntentStore = (environment: string, userId: string | n
 export const isTerminalIntentError = (error: any) => {
   const status = error?.status ?? error?.response?.status;
   const code = (error?.payload ?? error?.response?.data ?? error?.data)?.code;
-  return status === 409 || status === 410 || (status === 400 && code !== 'IDEMPOTENCY_KEY_REQUIRED');
+  return status === 403 || status === 404 || status === 409 || status === 410 || (status === 400 && code !== 'IDEMPOTENCY_KEY_REQUIRED');
 };
 
 export function confirmCorruptIntentReview(kind: string, onConfirm: () => void) {

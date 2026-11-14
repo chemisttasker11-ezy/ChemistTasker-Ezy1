@@ -2,6 +2,10 @@
 export type SessionUser={id:number;email:string;first_name?:string;last_name?:string;role:string;admin_assignments?:{id?:number|null;pharmacy_id?:number|null;admin_level?:string|null}[];content_capabilities?:{administrator:boolean;areas:Record<string,string>}};
 export const SESSION_EVENT='ct:session-changed';
 const EVENT_KEY='ct:session-event';
+let sessionGeneration=0;
+let claimedUser:string|undefined;
+if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('storage',(event:StorageEvent)=>{if(event.key===EVENT_KEY&&event.newValue)sessionGeneration++;});
+export const getSessionGeneration=()=>sessionGeneration;
 // Kept on sign-out: auth mode, theme/layout prefs, kiosk activation, return path, and browser-only data scoped by user id
 // (each user reads only their own key). Server-backed caches and unscoped legacy copies are wiped.
 const DEVICE_KEY=/^(ct_auth_storage|ct-theme-mode|toolpad-mode|mui-.*|ct-dashboard-sidebar-collapsed|ct:session-event|ct:refresh-lease|ct:return-to|ct:last-login-redirect|ctk_kiosk_.*|ct:shift-skill-preset:.*|active_shift_slot_seen_v2:.*|ct:(?:hub|comment)-draft:\d+:.+|saved_shift_ids:\d+|talent\.pitch\.create:v1:.+)$/;
@@ -15,9 +19,12 @@ export function clearUserBrowserStorage() {
 export function claimUserBrowserStorage(userId:unknown) {
  if(userId==null)return;
  const id=String(userId);
+ if(claimedUser!==undefined&&claimedUser!==id)sessionGeneration++;
+ claimedUser=id;
  try{for(const store of [localStorage,sessionStorage]){if(store.getItem(OWNER_KEY)!==id)clearStore(store);store.setItem(OWNER_KEY,id);}}catch{}
 }
 export function announceSession(action:'login'|'logout') {
+ sessionGeneration++;
  if(action==='logout')clearUserBrowserStorage();
  window.dispatchEvent(new CustomEvent(SESSION_EVENT,{detail:action}));
  localStorage.setItem(EVENT_KEY,JSON.stringify({action,at:Date.now()}));
@@ -91,6 +98,7 @@ export async function browserRequest<T>(url:string,method='GET',body?:unknown,re
 }
 export function logoutSession(root='/api/v1'):Promise<void> {
  if(signingOut)return signingOut;
+ sessionGeneration++;
  const clear=async()=>{await decode(await fetch(`${root}/users/logout/`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json','X-CSRFToken':await csrfToken(root),'X-Client-Platform':'web'},body:'{}'}));announceSession('logout');};
  signingOut=(async()=>{if(pending)await pending.catch(()=>{});if(navigator.locks)await navigator.locks.request('chemisttasker-refresh',clear);else await refreshWithLease(clear);})().finally(()=>{signingOut=undefined;});
  return signingOut;

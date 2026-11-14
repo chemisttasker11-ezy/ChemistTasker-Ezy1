@@ -7,6 +7,13 @@ const vm = require('node:vm');
 const ts = require('../node_modules/typescript');
 
 const repo = path.resolve(__dirname, '../..');
+test('receipt uploads recheck session before reload and state updates', () => {
+ const source=fs.readFileSync(path.join(repo,'frontend_mobile/features/parity/finance.tsx'),'utf8');
+ const part=source.slice(source.indexOf('function ExpenseReceipt('),source.indexOf('function ReceiptScreen('));
+ assert.equal((part.match(/await finance\.uploadReceipt\([^;]+;\s*if\(generation!==getSessionGeneration\(\)\)return;\s*await onReload\(\)/g)||[]).length,2);
+ assert.equal((part.match(/if\(generation===getSessionGeneration\(\)\)setLocalError/g)||[]).length,2);
+ assert.equal((part.match(/if\(generation===getSessionGeneration\(\)\)setBusy\(false\)/g)||[]).length,2);
+});
 const jsx = (type, props) => ({ type, props: props || {} });
 const later = () => {
   let resolve, reject;
@@ -30,6 +37,7 @@ function compile(relative, modules) {
     module, exports: module.exports, Date, URL, URLSearchParams, Blob, console,
     TextEncoder, Uint8Array, setTimeout, clearTimeout, process, fetch: async () => ({ blob: async () => new Blob(["receipt"]) }),
     require(name) {
+      if (name === '@/utils/authSession' && !Object.prototype.hasOwnProperty.call(modules, name)) return { getSessionGeneration: () => 0 };
       if (!Object.prototype.hasOwnProperty.call(modules, name)) {
         throw Error('Unmocked finance import: ' + name + ' from ' + relative);
       }

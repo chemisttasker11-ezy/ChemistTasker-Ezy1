@@ -1,5 +1,5 @@
 """Deterministic edit/booking interleaving against a disposable database."""
-from datetime import date, time
+from datetime import date, time, timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -22,9 +22,9 @@ class ShiftPostingLockTests(TestCase):
             pharmacy=self.pharmacy, created_by=self.owner, role_needed="PHARMACIST", description="Original",
         )
         self.slot = ShiftSlot.objects.create(
-            shift=self.shift, date=date(2026, 11, 2), start_time=time(9), end_time=time(17),
+            shift=self.shift, date=date.today() + timedelta(days=7), start_time=time(9), end_time=time(17),
         )
-        self.payload = [{"date": date(2026, 11, 3), "start_time": time(10), "end_time": time(18), "rate": "95"}]
+        self.payload = [{"date": date.today() + timedelta(days=8), "start_time": time(10), "end_time": time(18), "rate": "95"}]
 
     def book(self):
         return ShiftSlotAssignment.objects.create(
@@ -61,7 +61,7 @@ class ShiftPostingLockTests(TestCase):
         self.shift.refresh_from_db()
         self.assertEqual(self.shift.description, "Changed")
         slot = self.shift.slots.get()
-        self.assertEqual((slot.date, slot.start_time, str(slot.rate)), (date(2026, 11, 3), time(10), "95.00"))
+        self.assertEqual((slot.date, slot.start_time, str(slot.rate)), (date.today() + timedelta(days=8), time(10), "95.00"))
 
     def test_text_edit_keeps_confirmed_booking(self):
         booking = self.book()

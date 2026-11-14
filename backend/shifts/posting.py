@@ -4,6 +4,7 @@ The serializer validates and translates the request; these functions apply the b
 level, public limit, dedicated offers, pharmacy rate defaults) and schedule the after-commit announcements.
 """
 from calendar import monthrange
+from collections import Counter
 from datetime import date
 from decimal import Decimal
 
@@ -205,6 +206,26 @@ def revise_shift(
             raise serializers.ValidationError({
                 "slots": "Use the roster editor to update existing roster slots in place."
             })
+        if slots_data is not None:
+            existing = list(instance.slots.values('date', 'is_recurring', 'recurring_end_date'))
+            date_field = serializers.DateField()
+            changed_dates = []
+            for field in ('date', 'recurring_end_date'):
+                old = Counter(slot[field] for slot in existing if slot[field] is not None and
+                              (field == 'date' or slot['is_recurring']))
+                for slot in slots_data:
+                    value = slot.get(field) if field == 'date' or slot.get('is_recurring') else None
+                    if value is None:
+                        continue
+                    try:
+                        value = date_field.run_validation(value)
+                    except serializers.ValidationError as exc:
+                        raise serializers.ValidationError({'slots': exc.detail}) from exc
+                    if old[value]:
+                        old[value] -= 1
+                    else:
+                        changed_dates.append({'date': value})
+            validate_posting_window(target or instance.pharmacy, changed_dates)
         # If visibility is changing, recalc escalation_level
         if 'visibility' in validated_data:
             new_vis = validated_data['visibility']

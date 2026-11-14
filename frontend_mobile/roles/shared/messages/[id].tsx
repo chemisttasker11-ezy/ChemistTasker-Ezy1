@@ -22,6 +22,7 @@ import {
     type ChatMessage,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '../../../context/AuthContext';
+import { getSessionGeneration } from '@/utils/authSession';
 import { useLiveMessages } from './useLiveMessages';
 import debounce from 'lodash.debounce';
 import { triggerUnreadBump } from '@/utils/pushNotifications';
@@ -736,7 +737,8 @@ const pinnedMessage = useMemo(() => {
             const accountId = user?.id ?? null;
             const roomId = parseRoomId();
             const generation = roomGenerationRef.current;
-            const current = () => generation === roomGenerationRef.current && accountId != null && accountRef.current === accountId && parseRoomId() === roomId;
+            const sessionGeneration = getSessionGeneration();
+            const current = () => generation === roomGenerationRef.current && sessionGeneration === getSessionGeneration() && accountId != null && accountRef.current === accountId && parseRoomId() === roomId;
             if (!current()) return;
             let file: File | null = null;
             try {

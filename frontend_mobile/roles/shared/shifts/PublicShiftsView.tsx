@@ -329,7 +329,7 @@ function PublicShiftsBoard({
             return await submitShiftCounterOfferService(payload, key);
         } catch (err) {
             console.error('Failed to submit counter offer', err);
-            throw new Error(errorMessage(err, 'Failed to submit counter offer.'));
+            throw err;
         }
     };
 
@@ -701,6 +701,7 @@ function PublicShiftsBoard({
                                     onApplyAll={handleConfirmOfferShift}
                                     onApplySlot={handleConfirmOfferSlot}
                                     onSubmitCounterOffer={handleSubmitCounterOffer}
+                                    counterOfferGuard={guardVerified}
                                     onRejectShift={handleDeclineOfferShift}
                                     onRejectSlot={undefined}
                                     enableSaved={false}
@@ -751,6 +752,7 @@ function PublicShiftsBoard({
                     onApplySlot={handleApplySlot}
                     onApplySlots={handleApplySlots}
                     onSubmitCounterOffer={handleSubmitCounterOffer}
+                    counterOfferGuard={guardVerified}
                     savedShiftIds={Array.from(savedShiftIds)}
                     onToggleSave={handleToggleSave}
                     initialAppliedShiftIds={appliedShiftIds}

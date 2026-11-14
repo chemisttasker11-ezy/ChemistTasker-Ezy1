@@ -152,6 +152,44 @@ class ExplorerOrganizationAdminTests(TestCase):
         self.assertEqual(member.job_title, "API title")
         self.assertEqual(member.user_id, self.explorer.pk)
 
+    def test_historical_scope_additions_refused_by_api_and_admin(self):
+        member = self.legacy_membership()
+        OrganizationMembership.objects.filter(pk=member.pk).update(role='REGION_ADMIN', region='North')
+        member.refresh_from_db()
+        response = client_for(self.actor).patch(
+            f'/api/v1/users/organization-memberships/{member.pk}/',
+            {'pharmacy_ids': [self.pharmacy.pk]}, format='json')
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(response.json()['detail'], MESSAGE)
+        form = admin.site._registry[OrganizationMembership].get_form(
+            SimpleNamespace(user=self.actor), member)(data={
+                'user': self.explorer.pk, 'organization': self.org.pk, 'role': member.role,
+                'admin_level': member.admin_level, 'job_title': '', 'region': 'North',
+                'pharmacies': [self.pharmacy.pk],
+            }, instance=member)
+        self.assertFalse(form.is_valid())
+        self.assertIn(MESSAGE, str(form.errors))
+        self.assertFalse(member.pharmacies.exists())
+
+    def test_historical_region_scope_can_be_reduced_with_string_ids(self):
+        member = self.legacy_membership()
+        OrganizationMembership.objects.filter(pk=member.pk).update(role='REGION_ADMIN', region='North', job_title='Regional lead')
+        other = Pharmacy.objects.create(name='Second pharmacy', organization=self.org)
+        member.pharmacies.add(self.pharmacy, other)
+        response = client_for(self.actor).patch(
+            f'/api/v1/users/organization-memberships/{member.pk}/',
+            {'pharmacy_ids': [str(self.pharmacy.pk)]}, format='json')
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(list(member.pharmacies.values_list('pk', flat=True)), [self.pharmacy.pk])
+
+    def test_historical_scope_malformed_nested_ids_return_400(self):
+        member = self.legacy_membership()
+        OrganizationMembership.objects.filter(pk=member.pk).update(role='REGION_ADMIN', region='North')
+        response = client_for(self.actor).patch(
+            f'/api/v1/users/organization-memberships/{member.pk}/',
+            {'pharmacy_ids': [[self.pharmacy.pk]]}, format='json')
+        self.assertEqual(response.status_code, 400, response.content)
+
     def test_historical_role_and_level_changes_refused_without_writes(self):
         member = self.legacy_membership()
         before = OrganizationMembership.objects.values().get(pk=member.pk)

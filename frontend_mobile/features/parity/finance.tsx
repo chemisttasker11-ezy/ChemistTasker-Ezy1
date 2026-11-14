@@ -233,8 +233,9 @@ function ExpenseReceipt({expense,loading,error,onReload}:{expense?:FinanceExpens
       const asset=result.assets[0];assetUri=asset.uri;const blob=await (await fetch(asset.uri)).blob();
       if(generation!==getSessionGeneration())return;
       await finance.uploadReceipt(expense.id,blob,asset.fileName||`receipt-${Date.now()}.jpg`);
+      if(generation!==getSessionGeneration())return;
       await onReload();
-    }catch(e){setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}uploadInFlight.current=false;setBusy(false);}
+    }catch(e){if(generation===getSessionGeneration())setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}uploadInFlight.current=false;if(generation===getSessionGeneration())setBusy(false);}
   };
   const attachFile=async()=>{
     if(!expense || uploadInFlight.current)return;uploadInFlight.current=true;setBusy(true);setLocalError('');
@@ -245,8 +246,9 @@ function ExpenseReceipt({expense,loading,error,onReload}:{expense?:FinanceExpens
       const asset=result.assets[0];assetUri=asset.uri;const blob=await (await fetch(asset.uri)).blob();
       if(generation!==getSessionGeneration())return;
       await finance.uploadReceipt(expense.id,blob,asset.name);
+      if(generation!==getSessionGeneration())return;
       await onReload();
-    }catch(e){setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}uploadInFlight.current=false;setBusy(false);}
+    }catch(e){if(generation===getSessionGeneration())setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}uploadInFlight.current=false;if(generation===getSessionGeneration())setBusy(false);}
   };
   return <ParityPage title="Expense receipt" subtitle="Capture or attach evidence to this expense." loading={loading} error={error||localError}>
     {!expense?<EmptyState title="Expense not found" body="The requested expense is unavailable."/>:<>

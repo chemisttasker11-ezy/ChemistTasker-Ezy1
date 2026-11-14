@@ -58,6 +58,7 @@ type UseCounterOffersParams = {
     pharmacistRatePref?: RatePreference;
     hideCounterOffer?: boolean;
     onSubmitCounterOffer?: (payload: ShiftCounterOfferPayload, key?: string) => Promise<{ id: number }> | { id: number };
+    counterOfferGuard?: () => boolean;
     onPageChange?: (page: number) => void;
     page?: number;
     clearSelection: (shiftId: number) => void;
@@ -75,6 +76,7 @@ export const useCounterOffers = ({
     pharmacistRatePref,
     hideCounterOffer,
     onSubmitCounterOffer,
+    counterOfferGuard,
     onPageChange,
     page,
     clearSelection,
@@ -418,6 +420,7 @@ export const useCounterOffers = ({
         const callbackScope = `${scopeKey}:${currentUserId}`;
         if (scopeRef.current !== callbackScope || currentUserId == null) return;
         if (!counterOfferShift || !onSubmitCounterOffer) return;
+        if (counterOfferGuard && !counterOfferGuard()) return;
         if (pendingCounterOffers.current.has(counterOfferShift.id)) return;
         pendingCounterOffers.current.add(counterOfferShift.id);
         setCounterSubmitting(true);

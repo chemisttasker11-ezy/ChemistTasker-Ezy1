@@ -2,6 +2,7 @@ import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import { finance } from '@chemisttasker/shared-core';
 import { nativeFileBytes } from './nativeFileBytes';
+import { getSessionGeneration } from '@/utils/authSession';
 
 export interface ReceiptFileHandle {
   uri: string;
@@ -71,7 +72,8 @@ export class ReceiptShareSession {
     }
     this.busy = true;
     const attempt = ++this.generation;
-    const isCurrent = () => this.currentScope === scope && this.generation === attempt;
+    const sessionGeneration = getSessionGeneration();
+    const isCurrent = () => this.currentScope === scope && this.generation === attempt && sessionGeneration === getSessionGeneration();
 
     let file: ReceiptFileHandle | null = null;
     try {
@@ -113,7 +115,7 @@ export class ReceiptShareSession {
           // Do not mask primary failure
         }
       }
-      if (isCurrent()) {
+      if (this.currentScope === scope && this.generation === attempt) {
         this.busy = false;
       }
     }

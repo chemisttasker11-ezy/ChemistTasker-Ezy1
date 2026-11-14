@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Share } from 'react-native';
 import { Shift, generateShiftShareLinkService } from '@chemisttasker/shared-core';
 import apiClient from '@/utils/apiClient';
+import { getSessionGeneration } from '@/utils/authSession';
 
 export function useShareShift(showSnackbar: (msg: string) => void) {
     const { user } = useAuth();
@@ -22,7 +23,8 @@ export function useShareShift(showSnackbar: (msg: string) => void) {
             setSharingShiftId(shift.id);
             const account = user?.id;
             const attempt = generation.current;
-            const current = () => account != null && accountRef.current === account && generation.current === attempt;
+            const sessionGeneration = getSessionGeneration();
+            const current = () => account != null && accountRef.current === account && generation.current === attempt && sessionGeneration === getSessionGeneration();
             try {
                 const link: any = await generateShiftShareLinkService(shift.id);
                 if (!current()) return;

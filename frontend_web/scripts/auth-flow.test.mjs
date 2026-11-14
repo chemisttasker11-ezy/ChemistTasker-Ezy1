@@ -7,6 +7,46 @@ import { bearerBelongsToDifferentUser, safeNext, loginHref, refreshBrowserSessio
 import { canAccessRoute } from '../src/components/routeAccess.ts';
 import { safeHubAttachmentUrl } from '../landing_next/lib/safe-hub-attachment.ts';
 import { resolveDashboardPath } from '../src/utils/dashboardPath.ts';
+import * as browserSession from '../landing_next/shared/browser-session.ts';
+
+test('Next API fences a session change during CSRF lookup', async () => {
+  const ts = createRequire(import.meta.url)('typescript');
+  const source = fs.readFileSync(new URL('../landing_next/lib/chemisttasker-api.ts', import.meta.url), 'utf8');
+  let generation = 1, release, config, sent = 0;
+  const csrf = new Promise(resolve => { release = resolve; });
+  const module = { exports: {} };
+  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
+    module, exports: module.exports, Headers, fetch: async () => { sent++; return new Response(); },
+    require: id => id.includes('shared-core') ? { createChemistTaskerApi: value => { config = value; return {}; } } : {
+      csrfToken: () => csrf, refreshBrowserSession: async () => ({ access: 'token' }), getSessionGeneration: () => generation,
+    },
+  });
+  assert.equal(config.getSessionGeneration(), 1);
+  const request = config.fetchImpl('/post', { method: 'POST' });
+  generation++; release('csrf');
+  await assert.rejects(request);
+  assert.equal(sent, 0);
+});
+
+test('web transports track session generation before logout awaits and on login', async () => {
+  assert.equal(typeof browserSession.getSessionGeneration, 'function');
+  for (const file of ['../src/config/api.ts', '../landing_next/migrated/config/api.ts']) {
+    assert.match(fs.readFileSync(new URL(file, import.meta.url), 'utf8'), /getSessionGeneration\s*[,}]/);
+  }
+  const oldWindow = globalThis.window, oldStorage = globalThis.localStorage, oldFetch = globalThis.fetch;
+  globalThis.window = new EventTarget();
+  globalThis.localStorage = { setItem() {} };
+  globalThis.fetch = async () => { throw Error('offline'); };
+  try {
+    const before = browserSession.getSessionGeneration();
+    const leaving = logoutSession();
+    assert.ok(browserSession.getSessionGeneration() > before);
+    await assert.rejects(leaving);
+    const after = browserSession.getSessionGeneration();
+    browserSession.announceSession('login');
+    assert.ok(browserSession.getSessionGeneration() > after);
+  } finally { globalThis.window = oldWindow; globalThis.localStorage = oldStorage; globalThis.fetch = oldFetch; }
+});
 
 function sessionProviderHarness() {
   const require = createRequire(import.meta.url);

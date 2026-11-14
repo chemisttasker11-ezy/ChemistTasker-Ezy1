@@ -8,6 +8,7 @@ import * as Sharing from 'expo-sharing';
 import { workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useAuth } from '@/context/AuthContext';
+import { getSessionGeneration } from '@/utils/authSession';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
 import { dateFromIso, errorMessage, isoDate, money, replaceUnderscore, toNumber } from './utils';
 
@@ -200,7 +201,8 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
       setBusy(true);
       setError('');
       const generation = shareGeneration.current;
-      const current = () => user?.id != null && shareScopeRef.current === shareScope && generation === shareGeneration.current;
+      const sessionGeneration = getSessionGeneration();
+      const current = () => user?.id != null && shareScopeRef.current === shareScope && generation === shareGeneration.current && sessionGeneration === getSessionGeneration();
       let file: File | null = null;
       try {
         const rows = await workforce.listTimesheets(selectedPeriodId);

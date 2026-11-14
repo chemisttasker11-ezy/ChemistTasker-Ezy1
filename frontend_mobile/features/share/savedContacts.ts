@@ -36,6 +36,7 @@ function cloudIdentity(code:ShareCode):Pick<SavedProfessionalContact,'kind'|'ref
 
 /** Public cards sync through an authenticated user-only API; bearer invite tokens never leave OS SecureStore. */
 export async function listSavedContacts(accountId:number|string):Promise<SavedContact[]>{
+ const generation=getSessionGeneration();
  const [plain,protectedData,cloud]=await Promise.all([
   AsyncStorage.getItem(key(accountId)),
   SecureStore.getItemAsync(secureKey(accountId)),
@@ -46,11 +47,13 @@ export async function listSavedContacts(accountId:number|string):Promise<SavedCo
  const publicLocal=saved.filter(row=>row.kind!=='pharmacy-invitation');
  let protectedContacts=parseRows(protectedData).filter(row=>row.kind==='pharmacy-invitation');
  if(invitations.length){
+  if(generation!==getSessionGeneration())throw new Error('Session changed during contact migration');
   // Migrate legacy bearer links into encrypted OS storage BEFORE deleting the plaintext copy.
   const migrated=new Map<string,(typeof protectedContacts)[number]>();
   for(const row of [...invitations,...protectedContacts])migrated.set(row.url,row);
   protectedContacts=[...migrated.values()].slice(-5);
   await SecureStore.setItemAsync(secureKey(accountId),JSON.stringify(protectedContacts));
+  if(generation!==getSessionGeneration())throw new Error('Session changed during contact migration');
   await AsyncStorage.setItem(key(accountId),JSON.stringify(publicLocal));
  }
  const merged=new Map<string,SavedContact>();
@@ -77,6 +80,7 @@ export async function saveContact(accountId:number|string,contact:ShareCode):Pro
  }
  if(generation!==getSessionGeneration())throw new Error('Session changed during contact sync');
  const existing=await listSavedContacts(accountId);
+ if(generation!==getSessionGeneration())throw new Error('Session changed during contact sync');
  const next:SavedContact={...contact,savedAt:new Date().toISOString(),synced};
  if(contact.kind==='pharmacy-invitation'){
   const protectedContacts=[next,...existing.filter(row=>row.kind==='pharmacy-invitation'&&row.url!==contact.url)].slice(0,5);
@@ -103,6 +107,7 @@ export async function removeContact(accountId:number|string,url:string):Promise<
  }
  if(generation!==getSessionGeneration())throw new Error('Session changed during contact removal');
  const next=(await listSavedContacts(accountId)).filter(row=>row.url!==url);
+ if(generation!==getSessionGeneration())throw new Error('Session changed during contact removal');
  await Promise.all([
   AsyncStorage.setItem(key(accountId),JSON.stringify(next.filter(row=>row.kind!=='pharmacy-invitation'))),
   SecureStore.setItemAsync(secureKey(accountId),JSON.stringify(next.filter(row=>row.kind==='pharmacy-invitation').slice(0,5))),
