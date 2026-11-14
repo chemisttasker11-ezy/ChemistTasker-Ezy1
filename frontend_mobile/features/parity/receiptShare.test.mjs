@@ -16,6 +16,7 @@ function loadSession() {
       if (id === 'expo-file-system') return { File: class {}, Paths: { cache: '/tmp' } };
       if (id === '@chemisttasker/shared-core') return { finance: {} };
       if (id === './nativeFileBytes') return { nativeFileBytes: async () => new Uint8Array() };
+      if (id === '@/utils/authSession') return { getSessionGeneration: () => 1 };
       throw new Error(`Unexpected import: ${id}`);
     },
     Date, Math, String, Promise, Error,

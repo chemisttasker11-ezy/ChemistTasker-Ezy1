@@ -4,6 +4,47 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { world, postScreen, savedIntents, deferred, flush } from './submissionReplay.test-support.mjs';
 
+async function recoveryWithDefaults() {
+  const w = world();
+  w.env.pharmacies = [{ id: 7, name: 'Replay Pharmacy', rate_weekday: '70', software: ['software'], allowed_escalation_levels: ['LOCUM_CASUAL', 'PLATFORM'] }];
+  const first = await postScreen(w, { fill: true });
+  first.current.setRateWeekday('50'); first.current.setNiceToHave([]);
+  first.current.setEscalationDates({ platform: '2026-11-20T09:00:00+10:00' }); first.render();
+  await first.current.handleSubmit(); first.unmount();
+  const [key, raw] = [...w.data].find(([, value]) => JSON.parse(value)?.exactPayload);
+  w.data.set(key, JSON.stringify({ ...JSON.parse(raw), resultId: w.rows[0].id, recovery: true, pendingEdit: { description: 'Saved correction' } }));
+  return w;
+}
+
+test('recovery keeps posted rates after pharmacy effects', async () => {
+  const w = await recoveryWithDefaults();
+  assert.equal(w.calls[0].payload.rate_weekday, '50');
+  const restarted = await postScreen(w, { fill: true });
+  await restarted.current.handleSubmit();
+  assert.equal('rate_weekday' in w.edits.at(-1).payload, false);
+});
+
+test('recovery keeps posted software preferences after pharmacy effects', async () => {
+  const w = await recoveryWithDefaults();
+  const restarted = await postScreen(w, { fill: true });
+  await restarted.current.handleSubmit();
+  assert.equal('nice_to_have' in w.edits.at(-1).payload, false);
+});
+
+test('recovery preserves escalation dates but a later audience change clears them', async () => {
+  const w = await recoveryWithDefaults();
+  assert.ok(w.calls[0].payload.escalate_to_platform);
+  const restarted = await postScreen(w, { fill: true });
+  await restarted.current.handleSubmit();
+  assert.equal('escalate_to_platform' in w.edits.at(-1).payload, false);
+  const next = await recoveryWithDefaults();
+  const screen = await postScreen(next, { fill: true });
+  screen.current.setInitialAudience('PLATFORM'); screen.render();
+  await screen.effects(); screen.render();
+  await screen.current.handleSubmit();
+  assert.equal(next.edits.at(-1).payload.escalate_to_platform, null);
+});
+
 test('restart after committed lost response replays one shift with exact key and slots', async () => {
   const w = world();
   const first = await postScreen(w, { fill: true });
@@ -196,15 +237,80 @@ test('retry after terminal recovery refusal does not create a duplicate shift', 
   assert.equal(w.rows.length, 1);
 });
 
-test('reverting a failed recovery edit to the original does not resend the stale edit', async () => {
+test('reverting a possibly committed recovery edit sends the original before clearing', async () => {
   const w = world(), first = await postScreen(w, { fill: true });
   await first.current.handleSubmit(); first.unmount();
   const retry = await postScreen(w, { fill: true });
   retry.current.setDescription('First edit'); retry.render();
-  w.env.editFailure = true; await retry.current.handleSubmit();
-  retry.current.markTouched(); retry.current.setDescription('Original'); retry.render();
-  w.env.editFailure = false; await retry.current.handleSubmit();
+  w.env.editCommitThenFail = true; w.env.editFailure = true; await retry.current.handleSubmit();
+  assert.equal(w.rows[0].payload.description, 'First edit');
+  retry.unmount();
+  const restarted = await postScreen(w, { fill: true });
+  restarted.current.markTouched(); restarted.current.setDescription('Original'); restarted.render();
+  w.env.editCommitThenFail = false;
+  w.env.editFailure = true; await restarted.current.handleSubmit();
+  assert.equal(w.edits.at(-1).payload.description, 'Original');
+  assert.equal(savedIntents([...w.data]).length, 1);
+  w.env.editFailure = false; await restarted.current.handleSubmit();
+  assert.equal(w.edits.at(-1).payload.description, 'Original');
+  assert.equal(savedIntents([...w.data]).length, 0);
+});
+
+test('restart prefills recovery and preserves the saved description when only slots change', async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w, { fill: true });
+  retry.current.setDescription('Saved correction'); retry.render();
+  w.env.editFailure = true; await retry.current.handleSubmit(); retry.unmount();
+  const restarted = await postScreen(w, { fill: true });
+  assert.equal(restarted.current.description, 'Saved correction');
+  assert.equal(restarted.current.toast, 'Your last shift was posted but your changes did not save. Post saves them to that shift; Post another discards them.');
+  restarted.current.markTouched();
+  restarted.current.setSlots([{ date: '2026-12-02', startTime: '10:00', endTime: '18:00', isRecurring: false }]); restarted.render();
+  w.env.editFailure = false; await restarted.current.handleSubmit();
+  assert.equal(w.edits.at(-1).payload.description, 'Saved correction');
+  assert.ok(w.edits.at(-1).payload.slots);
+});
+
+test('terminal PATCH after restart releases the stored recovery edit', async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w, { fill: true });
+  retry.current.setDescription('edit'); retry.render();
+  w.env.editFailure = true; await retry.current.handleSubmit(); retry.unmount();
+  assert.equal(savedIntents([...w.data]).length, 1);
+  const restarted = await postScreen(w, { fill: true });
+  w.env.editFailure = 403; await restarted.current.handleSubmit();
+  assert.equal(savedIntents([...w.data]).length, 0);
+});
+
+test('a stale stored edit sent during a newer user edit does not mark the form clean', async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w, { fill: true });
+  retry.current.setDescription('Saved correction'); retry.render();
+  w.env.editFailure = true; await retry.current.handleSubmit(); retry.unmount();
+  const restarted = await postScreen(w, { fill: true });
+  w.env.editFailure = false; w.env.editGate = deferred();
+  const before = w.env.cleanCalls.length;
+  const saving = restarted.current.handleSubmit(); await flush();
+  restarted.current.markTouched(); restarted.current.setDescription('Newer correction'); restarted.render();
+  w.env.editGate.resolve(); await saving;
+  assert.equal(w.edits.at(-1).payload.description, 'Saved correction');
+  assert.equal(w.env.cleanCalls.length, before);
+});
+
+test('terminal PATCH without pendingEdit releases recovery intent', async () => {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const s = await postScreen(w, { fill: true });
+  s.current.setSlots([]); s.current.setDescription('x'); s.render();
+  await s.current.handleSubmit(); s.render();
+  assert.equal(savedIntents([...w.data]).length, 1);
+  s.current.setSlots([{ date: '2026-12-02', startTime: '10:00', endTime: '18:00', isRecurring: false }]); s.render();
+  w.env.editFailure = 404; await s.current.handleSubmit();
   assert.equal(w.edits.length, 1);
+  assert.equal(savedIntents([...w.data]).length, 0);
 });
 
 test('description-only edit after recovery does not replace slots', async () => {

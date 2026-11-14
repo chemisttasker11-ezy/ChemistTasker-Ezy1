@@ -303,11 +303,17 @@ export default function PostShiftScreen() {
 
     // Reset escalation dates when the initial audience changes, mirroring web behaviour
     const hasInitialAudienceRun = React.useRef(false);
+    const recoveryAudience = React.useRef<string | null>(null);
     useEffect(() => {
         // Skip the first run so preloaded escalation dates are kept when editing
         if (!hasInitialAudienceRun.current) {
             hasInitialAudienceRun.current = true;
             return;
+        }
+        if (recoveryAudience.current !== null) {
+            const hydratedAudience = recoveryAudience.current;
+            recoveryAudience.current = null;
+            if (initialAudience === hydratedAudience) return;
         }
         setEscalationDates({});
     }, [initialAudience]);
@@ -384,11 +390,17 @@ export default function PostShiftScreen() {
 
     // New shifts start with the pharmacy's own software (one per category) as preferred experience, by registry ID.
     const softwareDefaults = React.useRef<string[]>([]);
+    const recoverySoftwarePharmacy = React.useRef<number | null>(null);
     useEffect(() => {
         if (editingId || !selectedPharmacy || !roleNeeded) return;
         const next = pharmacySoftwareDefaults(skillsRegistry as any, roleNeeded as any, (selectedPharmacy as any).software || []);
         const previous = softwareDefaults.current;
         softwareDefaults.current = next;
+        if (recoverySoftwarePharmacy.current === Number(pharmacyId)) {
+            recoverySoftwarePharmacy.current = null;
+            return;
+        }
+        recoverySoftwarePharmacy.current = null;
         setNiceToHave(current => mergeSoftwareDefaults(current, mustHave, previous, next));
     }, [selectedPharmacy, roleNeeded, editingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -664,6 +676,33 @@ export default function PostShiftScreen() {
         }
 
         if (result.status === 'pharmacies_loaded') {
+            if (!editingId && user?.id != null) {
+                try {
+                    const store = mobilePendingIntentStore(getApiConfig?.()?.baseURL ?? '', user.id, 'shift.create');
+                    const saved = await store.load();
+                    if (gen !== loadGenRef.current) return;
+                    const recovery = saved as typeof saved & { recovery?: boolean; pendingEdit?: Record<string, unknown> | null };
+                    if (recovery?.recovery && recovery.resultId) {
+                        const values = { ...recovery.exactPayload, ...recovery.pendingEdit };
+                        const hydratedPharmacyId = Number(values.pharmacy ?? values.pharmacy_id);
+                        manualRateEdits.current = { pharmacyId: hydratedPharmacyId, fields: new Set(['rateType', 'rateWeekday', 'rateSaturday', 'rateSunday', 'ratePublicHoliday', 'rateEarlyMorning', 'rateLateNight']) };
+                        recoverySoftwarePharmacy.current = hydratedPharmacyId;
+                        recoveryAudience.current = String(values.visibility ?? '');
+                        hydrateShift(values, pharmacyList, gen);
+                        setFtptPayMode(values.min_annual_salary != null || values.max_annual_salary != null ? 'ANNUAL' : 'HOURLY');
+                        setMinHourly(toRateInputString(values.min_hourly_rate));
+                        setMaxHourly(toRateInputString(values.max_hourly_rate));
+                        setMinAnnual(toRateInputString(values.min_annual_salary));
+                        setMaxAnnual(toRateInputString(values.max_annual_salary));
+                        setNotifyPharmacyStaff(Boolean(values.notify_pharmacy_staff));
+                        setNotifyFavoriteStaff(Boolean(values.notify_favorite_staff));
+                        setNotifyChainMembers(Boolean(values.notify_chain_members));
+                        setToast('Your last shift was posted but your changes did not save. Post saves them to that shift; Post another discards them.');
+                        setLoading(false);
+                        return;
+                    }
+                } catch { /* Submission reports unreadable recovery state. */ }
+            }
             const nextPharmacy = pickScopedPharmacyId({
                 routePharmacyId,
                 scopedPharmacyId: surface.scopedPharmacyId,
@@ -681,7 +720,7 @@ export default function PostShiftScreen() {
             hydrateShift(result.shift, pharmacyList, gen);
             setLoading(false);
         }
-    }, [applyBookingPrefillFromParams, editingId, hydrateShift, resetForm, routePharmacyId, surface.scopedPharmacyId]);
+    }, [applyBookingPrefillFromParams, editingId, hydrateShift, resetForm, routePharmacyId, surface.scopedPharmacyId, user?.id]);
 
     const currentInitScope = useMemo<PostShiftInitScope>(() => ({
         editingId,
@@ -1209,6 +1248,8 @@ export default function PostShiftScreen() {
         // Server-calculated slot rates are not edits; only rates the user typed count.
         slotRates: slotRateRows.map((row) => (row.dirty ? row.rate : '')),
     };
+    const draftSnapshotRef = React.useRef('');
+    draftSnapshotRef.current = JSON.stringify(draftSnapshot);
     const unsaved = useUnsavedChangesGuard(draftSnapshot, { saving: loading });
     // Loads, prefills and pharmacy defaults fill the form in a cascade of effects; until the user's first edit after
     // loading, the baseline follows them, so only the user's own edits make the draft dirty.
@@ -1297,7 +1338,11 @@ export default function PostShiftScreen() {
                 if (validation) { setError(validation); return; }
                 const edit = buildShiftPostingPayload({ ...draft, editingShiftId: recovery.resultId, slotsModified: true, ratesModified: true });
                 const currentChanges = Object.fromEntries(Object.entries(edit).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(recovery.exactPayload[key])));
-                const changes = touchedRef.current || Object.keys(currentChanges).length ? currentChanges : recovery.pendingEdit;
+                const changes = { ...currentChanges };
+                for (const key of Object.keys(recovery.pendingEdit)) {
+                    if (key in edit) changes[key] = edit[key];
+                }
+                const submittedSnapshot = draftSnapshotRef.current;
                 await store.saveRecovery(recovery.key, recovery.resultId, changes);
                 if (!stillCurrent()) return;
                 recoveredShiftRef.current = { id: recovery.resultId, scope, payload: recovery.exactPayload };
@@ -1308,7 +1353,7 @@ export default function PostShiftScreen() {
                 if (!stillCurrent()) return;
                 recoveredShiftRef.current = { id: recovery.resultId, scope, payload: { ...recovery.exactPayload, ...changes } };
                 setToast('Shift updated successfully!');
-                if (JSON.stringify(currentChanges) === JSON.stringify(changes)) unsaved.markClean();
+                if (submittedSnapshot === draftSnapshotRef.current) unsaved.markClean();
                 return;
             }
             if ((pending as typeof pending & { rejected?: boolean })?.rejected) { setError('Start another post before submitting again.'); return; }

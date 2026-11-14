@@ -23,13 +23,14 @@ export function deferred() {
 
 function hooks() {
   let index = 0;
+  let changed = false;
   const slots = [], effects = [], cleanups = [];
   const equal = (a, b) => a && b && a.length === b.length && a.every((v, i) => v === b[i]);
   const react = {
     useState(initial) {
       const i = index++;
       if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial;
-      return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }];
+      return [slots[i], value => { const next = typeof value === 'function' ? value(slots[i]) : value; if (JSON.stringify(next) !== JSON.stringify(slots[i])) changed = true; slots[i] = next; }];
     },
     useRef(initial) { const i = index++; return slots[i] ??= { current: initial }; },
     useMemo(fn, deps) {
@@ -46,14 +47,14 @@ function hooks() {
       }
     },
   };
-  return { react, begin: () => { index = 0; },
+  return { react, begin: () => { index = 0; }, resetChanged: () => { changed = false; }, changed: () => changed,
     effects: async () => { while (effects.length) effects.shift()(); await flush(); },
     unmount: () => cleanups.forEach(fn => fn?.()) };
 }
 
 export function world() {
   const data = new Map(), rows = [], calls = [], edits = [], receipts = new Map();
-  const env = { userId: 1, lost: true, gate: null };
+  const env = { userId: 1, lost: true, gate: null, cleanCalls: [] };
   const storage = {
     getItem: async key => data.get(key) ?? null,
     setItem: async (key, value) => { data.set(key, value); },
@@ -80,16 +81,20 @@ function runtime(w, h) {
     createOwnerShiftService: (payload, key) => w.send('shift.create', payload, key),
     updateOwnerShiftService: async (id, payload) => {
       w.edits.push({ id, payload: clone(payload), stored: [...w.data] });
-      if (w.env.editFailure) { const error = Error('PATCH failed'); if (typeof w.env.editFailure === 'number') error.status = w.env.editFailure; throw error; }
+      if (w.env.editGate) await w.env.editGate.promise;
       const row = w.rows.find(value => value.id === id);
+      if (w.env.editCommitThenFail && row) Object.assign(row.payload, clone(payload));
+      if (w.env.editFailure) { const error = Error('PATCH failed'); if (typeof w.env.editFailure === 'number') error.status = w.env.editFailure; throw error; }
+      if (row) Object.assign(row.payload, clone(payload));
       if (row?.slotIds && 'slots' in payload) { row.slotIds = [999]; row.counterOffers = []; }
       return { id };
     },
-    fetchPharmaciesService: async () => [], listShiftDescriptionTemplates: async () => [],
+    fetchPharmaciesService: async () => w.env.pharmacies || [], listShiftDescriptionTemplates: async () => [],
     calculateShiftRates: async () => [], fetchShiftCounterOffersService: async () => [],
     getPharmacyHoursForDate: () => ({ startTime: '09:00', endTime: '17:00' }),
-    normalizeWorkloadTags: value => value || [], pharmacySoftwareDefaults: () => [], mergeSoftwareDefaults: value => value,
-    normalizeShiftRequirements: () => ({ mustHave: [], niceToHave: [] }),
+    normalizeWorkloadTags: (_registry, value) => value || [], pharmacySoftwareDefaults: (_registry, _role, software) => software,
+    mergeSoftwareDefaults: (value, _must, previous, next) => [...value.filter(item => !previous.includes(item)), ...next.filter(item => !value.includes(item))],
+    normalizeShiftRequirements: (_registry, value) => value || [],
     canNotifyShiftChainMembers: () => false, isPrivateShiftBooking: () => false,
     automaticShiftEscalationDates: () => ({}),
   };
@@ -103,8 +108,8 @@ function runtime(w, h) {
         ? node.declarationList.declarations.map(d => d.name.getText(ast)).filter(name => /another/i.test(name)) : []);
       // Replace JSX-only tail with a probe. All state, effects and save callbacks run unchanged.
       source = source.slice(0, source.indexOf('    const chipStyle =')) + `
-        return { handleSubmit, dismissToast, setDescription, setSlots, setPharmacyId, markTouched,
-          setPharmacies, setPharmaciesLoaded, initialSlotsJsonRef, setInitialAudience, error, toast,
+        return { handleSubmit, dismissToast, setDescription, setSlots, setPharmacyId, markTouched, description,
+          setPharmacies, setPharmaciesLoaded, initialSlotsJsonRef, setInitialAudience, setEscalationDates, setRateWeekday, setNiceToHave, error, toast,
           explicitActions: { ${actions.join(',')} } };
       }`;
     }
@@ -125,7 +130,7 @@ function runtime(w, h) {
         if (name === 'react-native') return { Platform: { OS: 'ios' }, Alert: { alert(_title, _message, buttons) { w.env.alertButtons = buttons; } } };
         if (name === './useShiftSurface') return { useShiftSurface: () => ({ scopeKey: `owner:${w.env.userId}`, userId: w.env.userId, persona: 'owner', scopedPharmacyId: 7 }) };
         if (name === './shiftSurface') return { shiftRoute: () => '/shifts' };
-        if (name.includes('useUnsavedChangesGuard')) return { useUnsavedChangesGuard: () => ({ markClean() {} }) };
+        if (name.includes('useUnsavedChangesGuard')) return { useUnsavedChangesGuard: () => ({ markClean(...args) { w.env.cleanCalls.push(args); } }) };
         if (name.endsWith('PostShiftScreen.styles')) return { styles: {} };
         if (name.endsWith('/utils/counterOffers')) return { normalizeCounterOffers: value => value };
         if (name.endsWith('/utils/date')) return { formatDateLong: value => value };
@@ -157,9 +162,9 @@ export async function postScreen(w, { fill = false } = {}) {
   const render = () => { h.begin(); current = Component(); return current; };
   render();
   // Supply a loaded pharmacy/form through actual setters; isolate network initialization.
-  current.setPharmacies([{ id: 7, name: 'Replay Pharmacy', allowed_escalation_levels: ['LOCUM_CASUAL'] }]);
+  current.setPharmacies(w.env.pharmacies || [{ id: 7, name: 'Replay Pharmacy', allowed_escalation_levels: ['LOCUM_CASUAL'] }]);
   current.setPharmaciesLoaded(true);
-  if (fill) {
+  if (fill && !savedIntents([...w.data]).some(intent => intent.recovery && intent.resultId)) {
     current.setPharmacyId(7);
     current.setInitialAudience('LOCUM_CASUAL');
     current.setSlots([{ date: '2026-12-01', startTime: '09:00', endTime: '17:00', isRecurring: false }]);
@@ -169,12 +174,18 @@ export async function postScreen(w, { fill = false } = {}) {
   // Effects for durable intents still run; the screen's real initialization can finish first.
   await h.effects();
   current.setPharmaciesLoaded(true);
-  if (fill) {
+  if (fill && !savedIntents([...w.data]).some(intent => intent.recovery && intent.resultId)) {
     current.setPharmacyId(7);
     current.setSlots([{ date: '2026-12-01', startTime: '09:00', endTime: '17:00', isRecurring: false }]);
     current.setDescription('Original'); current.setInitialAudience('LOCUM_CASUAL');
   }
   render();
+  for (let i = 0; ; i++) {
+    if (i === 50) throw Error('PostShiftScreen effects did not stabilize');
+    h.resetChanged(); await h.effects();
+    if (!h.changed()) break;
+    render();
+  }
   return { render, unmount: h.unmount, effects: h.effects, get current() { return current; } };
 }
 

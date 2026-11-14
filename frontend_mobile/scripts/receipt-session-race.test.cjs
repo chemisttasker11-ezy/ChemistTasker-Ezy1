@@ -3,12 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require('typescript');
+const path = require('node:path');
 
 for (const switched of [false, true]) test(`receipt share after deferred fetch, session switched: ${switched}`, async () => {
   let generation = 1, resolveFetch, shares = 0;
   const pending = new Promise(resolve => { resolveFetch = resolve; });
   const module = { exports: {} };
-  const source = fs.readFileSync('frontend_mobile/features/parity/receiptShare.ts', 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../features/parity/receiptShare.ts'), 'utf8');
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
     module, exports: module.exports, Uint8Array, Date, Math,
     require: id => id.includes('authSession') ? { getSessionGeneration: () => generation } : {},
@@ -30,7 +31,7 @@ for (const switched of [false, true]) test(`ethical import after deferred upload
   let generation = 1, resolveUpload, pushed = 0, started;
   const began = new Promise(resolve => { started = resolve; });
   const pending = new Promise(resolve => { resolveUpload = resolve; });
-  const source = fs.readFileSync('frontend_mobile/features/parity/ethicalMarketplace.tsx', 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../features/parity/ethicalMarketplace.tsx'), 'utf8');
   const start = source.indexOf('const pick=async()=>', source.indexOf('function ImportStock('));
   const end = source.indexOf(';return <ParityPage', start);
   const code = ts.transpileModule(source.slice(start, end) + ';pick;', { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
@@ -50,7 +51,7 @@ for (const switched of [false, true]) test(`finance PDF after deferred download,
   let generation = 1, resolvePdf, shares = 0, started;
   const began = new Promise(resolve => { started = resolve; });
   const pending = new Promise(resolve => { resolvePdf = resolve; });
-  const source = fs.readFileSync('frontend_mobile/roles/shared/invoices/FinanceWorkspace.tsx', 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../roles/shared/invoices/FinanceWorkspace.tsx'), 'utf8');
   const start = source.indexOf('  const sharePdf = async');
   const end = source.indexOf('  const shareCsv = async', start);
   const code = ts.transpileModule(source.slice(start, end) + '\nsharePdf;', { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
@@ -69,7 +70,7 @@ for (const switched of [false, true]) test(`finance PDF after deferred download,
 for (const switched of [false, true]) test(`chat attachment after deferred download, session switched: ${switched}`, async () => {
   let generation = 1, resolveDownload, shares = 0;
   const pending = new Promise(resolve => { resolveDownload = resolve; });
-  const source = fs.readFileSync('frontend_mobile/roles/shared/messages/[id].tsx', 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../roles/shared/messages/[id].tsx'), 'utf8');
   const start = source.indexOf('        const openAttachment = async () => {');
   const end = source.indexOf('        return (', start);
   const code = ts.transpileModule(source.slice(start, end) + '\nopenAttachment;', { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;

@@ -174,8 +174,11 @@ class InviteOrgUserView(generics.CreateAPIView):
 
 def _scope_change(pharmacy_ids):
     # Only well-formed id lists reach the early guard; anything else is rejected by the serializer (which re-runs the guard).
-    if isinstance(pharmacy_ids, list) and all(str(item).isdigit() for item in pharmacy_ids):
-        return {"pharmacy_ids": [int(item) for item in pharmacy_ids]}
+    if isinstance(pharmacy_ids, list) and all(str(item).isascii() and str(item).isdigit() for item in pharmacy_ids):
+        try:
+            return {"pharmacy_ids": [int(item) for item in pharmacy_ids]}
+        except ValueError:  # digit strings past Python's int-conversion limit
+            return {}
     return {}
 
 

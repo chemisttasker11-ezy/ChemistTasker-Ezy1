@@ -190,6 +190,24 @@ class ExplorerOrganizationAdminTests(TestCase):
             {'pharmacy_ids': [[self.pharmacy.pk]]}, format='json')
         self.assertEqual(response.status_code, 400, response.content)
 
+    def test_historical_scope_non_ascii_digit_returns_400(self):
+        member = self.legacy_membership()
+        OrganizationMembership.objects.filter(pk=member.pk).update(role='REGION_ADMIN', region='North')
+        response = client_for(self.actor).patch(
+            f'/api/v1/users/organization-memberships/{member.pk}/',
+            {'pharmacy_ids': ['²']}, format='json')
+        self.assertEqual(response.status_code, 400, response.content)
+
+    def test_historical_scope_oversized_ids_return_400(self):
+        member = self.legacy_membership()
+        OrganizationMembership.objects.filter(pk=member.pk).update(role='REGION_ADMIN', region='North')
+        for value in ('9' * 5000, '99999999999999999999'):
+            with self.subTest(length=len(value)):
+                response = client_for(self.actor).patch(
+                    f'/api/v1/users/organization-memberships/{member.pk}/',
+                    {'pharmacy_ids': [value]}, format='json')
+                self.assertEqual(response.status_code, 400, response.content)
+
     def test_historical_role_and_level_changes_refused_without_writes(self):
         member = self.legacy_membership()
         before = OrganizationMembership.objects.values().get(pk=member.pk)
