@@ -402,3 +402,96 @@ test('settled intent left by an interrupted settle does not turn a fresh form in
   assert.equal(w.edits.length, 0, `fresh form PATCHed shift ${w.edits[0]?.id} with ${JSON.stringify(Object.keys(w.edits[0]?.payload ?? {}))}`);
   assert.equal(w.rows.length, 2);
 });
+
+async function failedRecoveryEdit() {
+  const w = world(), first = await postScreen(w, { fill: true });
+  await first.current.handleSubmit(); first.unmount();
+  const retry = await postScreen(w, { fill: true });
+  retry.current.setDescription('edit'); retry.render();
+  w.env.editFailure = true; await retry.current.handleSubmit(); retry.render();
+  return { w, retry, committed: w.calls[0].payload };
+}
+
+test('failed recovery PATCH leaves the server row as committed until a later correction succeeds', async () => {
+  const { w, retry, committed } = await failedRecoveryEdit();
+  assert.equal(w.rows.length, 1);
+  assert.deepEqual(w.rows[0].payload, committed);
+  retry.current.setDescription('Corrected edit'); retry.render();
+  w.env.editFailure = true; await retry.current.handleSubmit();
+  assert.deepEqual(w.rows[0].payload, committed, 'a second failed PATCH changed the row');
+  w.env.editFailure = false; await retry.current.handleSubmit();
+  assert.deepEqual(w.rows[0].payload, { ...committed, description: 'Corrected edit' });
+});
+
+test('post another then Cancel keeps the saved recovery intent and the edited form', async () => {
+  const { w, retry } = await failedRecoveryEdit();
+  const before = JSON.stringify(savedIntents([...w.data]));
+  await retry.current.explicitActions.anotherPost(); retry.render();
+  const cancel = w.env.alertButtons?.find(button => button.text === 'Cancel');
+  assert.ok(cancel, 'no Cancel choice in the discard dialog');
+  cancel.onPress?.(); await flush(); await retry.effects(); retry.render();
+  assert.equal(JSON.stringify(savedIntents([...w.data])), before);
+  assert.equal(savedIntents([...w.data])[0].pendingEdit.description, 'edit');
+  assert.equal(retry.current.description, 'edit');
+  assert.equal(retry.current.pharmacyId, 7);
+  w.env.editFailure = false; await retry.current.handleSubmit();
+  assert.equal(w.edits.at(-1).id, w.rows[0].id);
+  assert.equal(w.edits.at(-1).payload.description, 'edit');
+});
+
+test('confirmed Discard resets the visible form and writes nothing to the server', async () => {
+  const { w, retry, committed } = await failedRecoveryEdit();
+  const calls = w.calls.length, edits = w.edits.length;
+  await retry.current.explicitActions.anotherPost(); retry.render();
+  w.env.alertButtons.find(button => button.text === 'Discard').onPress(); await flush();
+  await retry.effects(); retry.render();
+  assert.equal(retry.current.description, '');
+  assert.equal(retry.current.pharmacyId, '');
+  assert.equal(retry.current.slots.length, 0);
+  assert.equal(retry.current.error, '');
+  assert.equal(retry.current.toast, '');
+  assert.equal(w.calls.length, calls, 'Discard sent a create');
+  assert.equal(w.edits.length, edits, 'Discard sent a PATCH');
+  assert.deepEqual(w.rows[0].payload, committed);
+});
+
+test('post another is blocked while a create outcome is unresolved and unblocks after reconciliation', async () => {
+  const w = world(), screen = await postScreen(w, { fill: true });
+  await screen.current.handleSubmit(); screen.render();
+  const [unresolved] = savedIntents([...w.data]);
+  assert.ok(unresolved && !unresolved.resultId, 'lost response left no unresolved intent');
+  await screen.current.explicitActions.anotherPost(); screen.render();
+  assert.equal(screen.current.error, 'Recover the previous shift before posting another.');
+  assert.equal(w.calls.length, 1, 'blocked post-another sent a request');
+  assert.deepEqual(savedIntents([...w.data]).map(intent => intent.key), [unresolved.key], 'blocked post-another minted a new key');
+  await screen.current.handleSubmit(); screen.render();
+  assert.equal(w.rows.length, 1);
+  assert.equal(w.calls[1].key, unresolved.key);
+  await screen.current.explicitActions.anotherPost(); screen.render();
+  assert.notEqual(screen.current.error, 'Recover the previous shift before posting another.');
+  screen.current.setPharmacyId(7);
+  screen.current.setSlots([{ date: '2026-12-02', startTime: '10:00', endTime: '18:00', isRecurring: false }]);
+  screen.current.setDescription('Another shift'); screen.render();
+  await screen.current.handleSubmit();
+  assert.equal(w.rows.length, 2);
+  assert.notEqual(w.calls.at(-1).key, unresolved.key);
+});
+
+for (const status of [400, 403, 404]) {
+  test(`terminal recovery PATCH ${status} shows the refusal to the user`, async () => {
+    const w = world(), first = await postScreen(w, { fill: true });
+    await first.current.handleSubmit(); first.unmount();
+    const retry = await postScreen(w, { fill: true });
+    retry.current.setDescription('edit'); retry.render();
+    w.env.editFailure = status; await retry.current.handleSubmit(); await retry.effects(); retry.render();
+    assert.equal(retry.current.error, 'PATCH failed');
+    assert.doesNotMatch(retry.current.toast, /successfully/);
+  });
+  test(`terminal create ${status} shows the refusal to the user`, async () => {
+    const w = world(); w.env.status = status;
+    const screen = await postScreen(w, { fill: true });
+    await screen.current.handleSubmit(); await screen.effects(); screen.render();
+    assert.equal(screen.current.error, 'Rejected');
+    assert.doesNotMatch(screen.current.toast, /successfully/);
+  });
+}

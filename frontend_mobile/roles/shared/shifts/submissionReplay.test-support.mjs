@@ -108,7 +108,7 @@ function runtime(w, h) {
         ? node.declarationList.declarations.map(d => d.name.getText(ast)).filter(name => /another/i.test(name)) : []);
       // Replace JSX-only tail with a probe. All state, effects and save callbacks run unchanged.
       source = source.slice(0, source.indexOf('    const chipStyle =')) + `
-        return { handleSubmit, dismissToast, setDescription, setSlots, setPharmacyId, markTouched, description,
+        return { handleSubmit, dismissToast, setDescription, setSlots, setPharmacyId, markTouched, description, slots, pharmacyId,
           setPharmacies, setPharmaciesLoaded, initialSlotsJsonRef, setInitialAudience, setEscalationDates, setRateWeekday, setNiceToHave, error, toast,
           explicitActions: { ${actions.join(',')} } };
       }`;
