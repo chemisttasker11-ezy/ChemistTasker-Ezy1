@@ -15,12 +15,14 @@ function loadModule(relativePath, modules, globals = {}) {
   return exports;
 }
 
-async function bootstrap(currentUser, { baseURL = 'https://api.example.test', token = 'cached-access', refreshResponse, onBindSession, onReadStoredSession, onClearStoredSession } = {}) {
+async function bootstrap(currentUser, { baseURL = 'https://api.example.test', token = 'cached-access', refreshResponse, onBindSession, onReadStoredSession, onClearStoredSession, session } = {}) {
   const states = [];
   const effects = [];
+  const appStateListeners = [];
+  const netInfoListeners = [];
   let context;
   let generation = 0;
-  let stored = { access: 'cached-access', refresh: 'cached-refresh', user: { id: 7, username: 'cached', role: 'OWNER' } };
+  let stored = session || { access: 'cached-access', refresh: 'cached-refresh', user: { id: 7, username: 'cached', role: 'OWNER' } };
   const react = {
     createContext: () => ({ Provider: () => null }),
     useState: (initial) => {
@@ -35,8 +37,12 @@ async function bootstrap(currentUser, { baseURL = 'https://api.example.test', to
   };
   const modules = {
     react,
-    '@chemisttasker/shared-core': { getOnboarding: async () => ({}) },
-    'react-native': { Platform: { OS: 'ios' } },
+    '@chemisttasker/shared-core': { getOnboarding: async () => ({}), logoutSession: async () => {} },
+    'react-native': {
+      Platform: { OS: 'ios' },
+      AppState: { addEventListener: (_, listener) => { appStateListeners.push(listener); return { remove() {} }; } },
+    },
+    '@react-native-community/netinfo': { addEventListener: (listener) => { netInfoListeners.push(listener); return () => {}; } },
     '../utils/apiUrl': { resolveApiBaseUrl: () => baseURL },
     '../utils/nativeIdentityTransport': { nativeIdentityTransport: { currentUser } },
     '../utils/authSession': {
@@ -87,10 +93,34 @@ async function bootstrap(currentUser, { baseURL = 'https://api.example.test', to
   exports.AuthProvider({ children: null });
   effects[0]();
   await new Promise(setImmediate);
-  return { states, stored: refreshResponse ? modules['../utils/authSession'].readStoredSession : () => stored, context };
+  const emit = async (listeners, value) => {
+    assert.ok(listeners.length, 'no listener registered');
+    for (const listener of listeners) listener(value);
+    await new Promise(setImmediate);
+  };
+  return {
+    states,
+    stored: refreshResponse ? modules['../utils/authSession'].readStoredSession : () => stored,
+    context,
+    active: () => emit(appStateListeners, 'active'),
+    reconnect: () => emit(netInfoListeners, { isConnected: true }),
+  };
 }
 
-for (const status of [401, 403, 500, 'network']) {
+// Answers currentUser with each step in turn: an Error to throw, else the server user.
+function serverSteps(...steps) {
+  const fn = async () => {
+    const step = steps[Math.min(fn.calls++, steps.length - 1)];
+    if (step instanceof Error) throw step;
+    return { data: step };
+  };
+  fn.calls = 0;
+  return fn;
+}
+const networkError = () => new Error('Network Error');
+const roleChanged = { id: 7, username: 'verified', role: 'PHARMACIST' };
+
+for (const status of [401, 403]) {
   test(`startup does not trust cached identity after ${status}`, async () => {
     const env = await bootstrap(async () => { throw Object.assign(new Error('Unable to verify'), { response: { status } }); });
     assert.equal(env.states[0], null);
@@ -100,6 +130,84 @@ for (const status of [401, 403, 500, 'network']) {
     assert.equal(env.stored(), null);
   });
 }
+
+for (const [label, error] of [['500', { response: { status: 500 } }], ['network error', {}]]) {
+  test(`cold launch keeps the stored session and user after a ${label} from currentUser`, async () => {
+    const env = await bootstrap(async () => { throw Object.assign(new Error('Network Error'), error); });
+    assert.equal(env.states[0], 'cached-access');
+    assert.equal(env.states[1], 'cached-refresh');
+    assert.equal(env.states[2].username, 'cached');
+    assert.equal(env.states[3], false);
+    assert.equal(env.stored().refresh, 'cached-refresh');
+  });
+}
+
+for (const [label, refreshResponse] of [['503', async () => ({ status: 503, ok: false })], ['network error', async () => { throw new TypeError('Network request failed'); }]]) {
+  test(`cold launch keeps the stored session when its own refresh hits a ${label}`, async () => {
+    const env = await bootstrap(() => assert.fail('No access token, no currentUser call'), { refreshResponse });
+    assert.equal(env.states[1], 'cached-refresh');
+    assert.equal(env.states[2].username, 'cached');
+    assert.equal(env.states[3], false);
+    assert.equal((await env.stored()).refresh, 'cached-refresh');
+  });
+}
+
+test('offline start re-verifies on the next active and applies the changed server role', async () => {
+  const currentUser = serverSteps(networkError(), roleChanged);
+  const env = await bootstrap(currentUser);
+  assert.equal(env.states[2].role, 'OWNER');
+  await env.active();
+  assert.equal(currentUser.calls, 2);
+  assert.equal(env.states[2].role, 'PHARMACIST');
+  assert.equal(env.stored().user.role, 'PHARMACIST');
+  assert.equal(env.stored().refresh, 'cached-refresh');
+  await env.active();
+  assert.equal(currentUser.calls, 2, 'verified once, no more re-verification');
+});
+
+test('offline start then a 401 on the next active signs out and clears the session', async () => {
+  const env = await bootstrap(serverSteps(networkError(), Object.assign(new Error('Unauthorized'), { response: { status: 401 } })));
+  await env.active();
+  assert.deepEqual(env.states.slice(0, 4), [null, null, null, false]);
+  assert.equal(env.stored(), null);
+});
+
+test('offline start stays signed in through a failed re-verification and applies the next one', async () => {
+  const currentUser = serverSteps(networkError(), Object.assign(new Error('Bad gateway'), { response: { status: 502 } }), roleChanged);
+  const env = await bootstrap(currentUser);
+  await env.active();
+  assert.equal(currentUser.calls, 2);
+  assert.equal(env.states[2].role, 'OWNER');
+  assert.equal(env.stored().refresh, 'cached-refresh');
+  await env.active();
+  assert.equal(currentUser.calls, 3);
+  assert.equal(env.states[2].role, 'PHARMACIST');
+  assert.equal(env.stored().user.role, 'PHARMACIST');
+});
+
+test('sign-out after an offline start cancels the pending re-verification', async () => {
+  const currentUser = serverSteps(networkError(), roleChanged);
+  const env = await bootstrap(currentUser);
+  await env.context.logout();
+  await env.active();
+  assert.equal(currentUser.calls, 1);
+  assert.equal(env.states[2], null);
+  assert.equal(env.stored(), null);
+});
+
+test('offline start re-verifies when connectivity returns', async () => {
+  const currentUser = serverSteps(networkError(), roleChanged);
+  const env = await bootstrap(currentUser);
+  await env.reconnect();
+  assert.equal(env.states[2].role, 'PHARMACIST');
+});
+
+test('a session verified at startup is not re-verified on active', async () => {
+  const currentUser = serverSteps(roleChanged);
+  const env = await bootstrap(currentUser);
+  await env.active();
+  assert.equal(currentUser.calls, 1);
+});
 
 test('startup never exposes cached role while verification is pending', async () => {
   const env = await bootstrap(() => new Promise(() => {}));
@@ -116,7 +224,8 @@ test('startup accepts server-verified identity instead of cached role', async ()
 });
 
 test('startup clears cached identity if verification is unavailable', async () => {
-  for (const options of [{ baseURL: '' }, { token: null }]) {
+  // No refresh token to retry with: an expired session is not an offline one.
+  for (const options of [{ baseURL: '' }, { token: null, session: { access: 'cached-access', user: { id: 7, username: 'cached', role: 'OWNER' } } }]) {
     const env = await bootstrap(async () => ({ data: null }), options);
     assert.equal(env.states[2], null);
     assert.equal(env.stored(), null);
@@ -231,9 +340,9 @@ test('a newer login while final clearStoredSession is pending wins over stale cl
   let clearStarted = false;
 
   const env = await bootstrap(
-    // Throws status 500 without clearing session, so bootstrapId stays unchanged and reaches bottom clear
+    // Throws status 401 without clearing session, so bootstrapId stays unchanged and reaches bottom clear
     async () => {
-      throw Object.assign(new Error('Server error'), { response: { status: 500 } });
+      throw Object.assign(new Error('Unauthorized'), { response: { status: 401 } });
     },
     {
       onClearStoredSession: async () => {

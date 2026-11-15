@@ -54,7 +54,7 @@ const EMPTY_OFFERS: ShiftOffer[] = [];
 const keepEmpty = <T,>(next: T[]) => (prev: T[]) => (prev.length === 0 && next.length === 0 ? prev : next);
 
 const getErrorMessage = (error: unknown, fallback: string) => {
-    const detail = (error as any)?.payload?.detail ?? (error as any)?.response?.data?.detail;
+    const detail = (error as any)?.response?.data?.detail;
     if (typeof detail === 'string') return detail;
     if (error instanceof Error && error.message) return error.message;
     return fallback;

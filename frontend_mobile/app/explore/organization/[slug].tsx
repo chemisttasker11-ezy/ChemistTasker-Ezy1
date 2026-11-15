@@ -19,17 +19,18 @@ export default function PublicOrganizationScreen() {
   const [organization, setOrganization] = useState<PublicOrganization | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notFound, setNotFound] = useState(false);
   const [showQr, setShowQr] = useState(false);
 
   const load = useCallback(async () => {
     const request = ++generation.current;
-    setError(''); setLoading(true); setOrganization(null);
+    setError(''); setNotFound(false); setLoading(true); setOrganization(null);
     try {
       if (!slug) throw new Error('Organisation not specified.');
       const result = await getPublicOrganization(slug) as PublicOrganization;
       if (request === generation.current) setOrganization(result);
     } catch (failure: any) {
-      if (request === generation.current) setError(failure?.message || 'Public organisation could not load.');
+      if (request === generation.current) { setError(failure?.message || 'Public organisation could not load.'); setNotFound(failure?.status === 404); }
     } finally { if (request === generation.current) setLoading(false); }
   }, [slug]);
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function PublicOrganizationScreen() {
     <ScrollView contentContainerStyle={styles.content}>
       <Button mode="text" icon="arrow-left" onPress={() => router.canGoBack() ? router.back() : router.replace('/explore' as any)}>Explore</Button>
       {loading ? <ActivityIndicator /> : error ? <View style={styles.block}>
-        <Text accessibilityRole="alert" style={styles.error}>{error}</Text><Button onPress={() => void load()}>Retry</Button>
+        <Text accessibilityRole="alert" style={styles.error}>{error}</Text>{notFound ? null : <Button onPress={() => void load()}>Retry</Button>}
       </View> : !organization ? <Text>Organisation not found.</Text> : <>
         {photo ? <Image source={{ uri: photo }} accessibilityLabel={organization.name} resizeMode="cover" style={styles.cover} /> : null}
         <Text variant="headlineMedium" style={styles.title}>{organization.name}</Text>

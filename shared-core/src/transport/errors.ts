@@ -32,6 +32,9 @@ function firstMessage(value: unknown, depth = 0): string | undefined {
     }
     return undefined;
 }
+// DRF's default 404 names the model ("No Shift matches the given query."); users get plain copy.
+const DRF_NOT_FOUND = /^No \w+ matches the given query\.$/;
+const NOT_FOUND_MESSAGE = "This item isn't available. It may have been removed or you may not have access.";
 export async function responseError(response: Response): Promise<ApiError> {
     const fallback = `Request failed with status ${response.status}`;
     // Do not keep an HTML traceback/raw 5xx body in the error object either.
@@ -43,5 +46,5 @@ export async function responseError(response: Response): Promise<ApiError> {
     const message = (object?.code === 'ahpra_unreadable' ? AHPRA_UNREADABLE_MESSAGE : undefined) ?? (object?.code === 'ahpra_recheck_cooldown' && !object.detail
         ? 'Please wait before re-checking your AHPRA registration.' : undefined) ?? firstMessage(object?.detail) ?? firstMessage(object?.error) ??
         firstMessage(object?.message) ?? firstMessage(payload) ?? fallback;
-    return new ApiError(message, response.status, payload);
+    return new ApiError(response.status === 404 && DRF_NOT_FOUND.test(message) ? NOT_FOUND_MESSAGE : message, response.status, payload);
 }

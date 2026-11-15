@@ -981,6 +981,7 @@ const pinnedMessage = useMemo(() => {
                         right={
                             <TextInput.Icon
                                 icon="attachment"
+                                accessibilityLabel="Attach file"
                                 onPress={pickAttachment}
                                 disabled={sending}
                             />
@@ -988,6 +989,7 @@ const pinnedMessage = useMemo(() => {
                         left={
                             <TextInput.Icon
                                 icon={editingId ? 'check' : 'send'}
+                                accessibilityLabel={editingId ? 'Save edit' : 'Send message'}
                                 onPress={sendMessage}
                                 disabled={sending || !visibleNewMessage.trim()}
                                 color={visibleNewMessage.trim() ? '#6366F1' : '#9CA3AF'}

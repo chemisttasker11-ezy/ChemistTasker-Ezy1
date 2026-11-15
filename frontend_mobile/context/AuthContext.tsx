@@ -1,6 +1,7 @@
 import { AhpraProvider } from './AhpraContext';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert, AppState, Platform } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import {
   getOnboarding,
   hasAdminCapability,
@@ -114,11 +115,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [registeredPush, setRegisteredPush] = useState(false);
   const pushTokenRef = useRef<string | null>(null);
   const pushRegistrationRef = useRef<Promise<void> | null>(null);
+  // Session generation whose cached identity could not be verified (offline start); null once verified.
+  const unverifiedGenerationRef = useRef<number | null>(null);
 
   // Load user from cookie session at app startup
   useEffect(() => {
-    const loadStoredAuth = async () => {
+    const loadStoredAuth = async (reverify = false) => {
       const bootstrapId = getSessionGeneration();
+      if (reverify) {
+        // A sign-in or sign-out since the offline start owns the session; claiming the run stops overlaps.
+        if (unverifiedGenerationRef.current !== bootstrapId) return;
+        unverifiedGenerationRef.current = null;
+      }
       try {
         const baseURL = resolveApiBaseUrl();
         const session = await readStoredSession();
@@ -128,7 +136,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const nextUser = session?.user ? normalizeUser(session.user) : null;
         primeInMemorySession(session);
 
-        if ((nextAccess || nextRefresh) && nextUser) {
+        if (!reverify && (nextAccess || nextRefresh) && nextUser) {
           const [availability, biometricUser] = await Promise.all([
             getBiometricAvailability(),
             getSavedBiometricUser(),
@@ -155,6 +163,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         }
 
+        // Offline or server down (no response, 5xx, or a refresh that failed without being rejected)
+        // keeps the stored session; only a server rejection (401/403, refresh 400/401) signs out.
+        let offline = false;
         if (baseURL) {
           const token = await getValidAccessToken(baseURL);
           const refreshGeneration = getSessionGeneration();
@@ -173,7 +184,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
             return;
           }
           if (token) {
-            const meResponse = await nativeIdentityTransport.currentUser().catch(() => null);
+            const meResponse = await nativeIdentityTransport.currentUser().catch((err) => {
+              const status = err?.response?.status;
+              offline = !status || status >= 500;
+              return null;
+            });
             if (meResponse?.data) {
               const currentUser = normalizeUser(meResponse.data);
               const refreshedSession = await readStoredSession();
@@ -191,7 +206,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 return;
               }
             }
+          } else {
+            offline = !!nextRefresh;
           }
+        }
+        if (offline && nextUser && getSessionGeneration() === bootstrapId) {
+          // B52: the cached role is unverified; check again on the next foreground or reconnect.
+          unverifiedGenerationRef.current = bootstrapId;
+          if (reverify) return;
+          setAccess(nextAccess);
+          setRefresh(nextRefresh);
+          setUser(nextUser);
+          setIsLoading(false);
+          return;
         }
       } catch {
         // handled below
@@ -223,6 +250,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(false);
     };
     loadStoredAuth();
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void loadStoredAuth(true);
+    });
+    const unsubscribeNetInfo = NetInfo.addEventListener((state) => {
+      if (state.isConnected) void loadStoredAuth(true);
+    });
+    return () => {
+      appStateSubscription.remove();
+      unsubscribeNetInfo();
+    };
   }, []);
 
   useEffect(() => {

@@ -126,6 +126,7 @@ function CommunityShiftsBoard({
     const [rejectedShiftIds, setRejectedShiftIds] = useState<number[]>([]);
     const [rejectedSlotIds, setRejectedSlotIds] = useState<number[]>([]);
     const [filters, setFilters] = useState<FilterConfig>(DEFAULT_FILTERS);
+    const [debouncedFilters, setDebouncedFilters] = useState<FilterConfig>(DEFAULT_FILTERS);
     const [page, setPage] = useState(1);
     const pageSize = 10;
     const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
@@ -255,9 +256,14 @@ function CommunityShiftsBoard({
     }, [loadSaved, userId]);
 
     useEffect(() => {
+        const handle = setTimeout(() => setDebouncedFilters(filters), 350);
+        return () => clearTimeout(handle);
+    }, [filters]);
+
+    useEffect(() => {
         if (!userId) return;
-        loadShifts(filters, page);
-    }, [filters, page, loadShifts, userId]);
+        loadShifts(debouncedFilters, page);
+    }, [debouncedFilters, page, loadShifts, userId]);
 
     const handleApplyAll = async (shift: Shift) => {
         try {
@@ -629,7 +635,7 @@ function CommunityShiftsBoard({
                     kind="error"
                     title="Community shifts did not load"
                     description="Check your connection, then try again."
-                    onAction={() => void loadShifts(filters, page)}
+                    onAction={() => void loadShifts(debouncedFilters, page)}
                     style={styles.state}
                 /></ScrollView>
             ) : (
@@ -661,7 +667,7 @@ function CommunityShiftsBoard({
                     hideTabs
                     activeTabOverride={boardTabForBoard}
                     onActiveTabChange={(tab) => handleBoardTabChange(tab as any)}
-                    onRefresh={() => loadShifts(filters, page)}
+                    onRefresh={() => loadShifts(debouncedFilters, page)}
                     slotFilterMode={slotFilterMode}
                     onScroll={handleScroll}
                 />

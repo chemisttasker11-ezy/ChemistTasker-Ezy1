@@ -10,6 +10,11 @@ test('public organization reads the established source without exposing account-
   assert.match(src, /params: \{ organization: String\(organization\.id\) \}/);
   assert.doesNotMatch(src, /email|bank_details|phone_number/);
 });
+test('public organization 404 shows the message without a useless Retry', () => {
+  const src = read('app/explore/organization/[slug].tsx');
+  assert.match(src, /setNotFound\(failure\?\.status === 404\)/);
+  assert.match(src, /\{notFound \? null : <Button onPress=\{\(\) => void load\(\)\}>Retry<\/Button>\}/);
+});
 const {talentHarness,datum,collect} = require('./m4-discovery-behaviour.cjs');
 
 test('C native public talent browsing consumes all public pages, preserves QR scope and gates contact',async()=>{

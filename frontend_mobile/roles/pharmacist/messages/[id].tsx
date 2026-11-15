@@ -250,6 +250,7 @@ export default function PharmacistMessageDetailScreen() {
               right={
                 <TextInput.Icon
                   icon="send"
+                  accessibilityLabel="Send message"
                   onPress={sendMessage}
                   disabled={sending || !newMessage.trim()}
                   color={newMessage.trim() ? '#6366F1' : '#9CA3AF'}

@@ -130,6 +130,15 @@ export const useFilterSort = ({
         });
     };
 
+    // Sidebar edits (search, dates, min rate) must reach server-filtered boards like the toggles do.
+    const updateFilterConfig: React.Dispatch<React.SetStateAction<FilterConfig>> = (update) => {
+        setFilterConfig((prev) => {
+            const next = typeof update === 'function' ? update(prev) : update;
+            onFiltersChange?.(next);
+            return next;
+        });
+    };
+
     const toggleBooleanFilter = (key: keyof FilterConfig) => {
         setFilterConfig((prev) => {
             const next = { ...prev, [key]: !prev[key] };
@@ -380,7 +389,7 @@ export const useFilterSort = ({
 
     return {
         filterConfig,
-        setFilterConfig,
+        setFilterConfig: updateFilterConfig,
         sortConfig,
         setSortConfig,
         expandedStates,

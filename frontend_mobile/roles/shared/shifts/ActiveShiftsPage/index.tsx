@@ -784,7 +784,6 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
                 console.error('Failed to send confirmation reminder', error);
                 const message =
                     (error as any)?.response?.data?.detail ||
-                    (error as any)?.payload?.detail ||
                     (error as any)?.data?.detail ||
                     (error as any)?.message ||
                     'Failed to send confirmation reminder';

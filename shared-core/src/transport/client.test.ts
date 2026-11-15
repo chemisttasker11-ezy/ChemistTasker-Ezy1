@@ -271,4 +271,20 @@ describe('createApiClient', () => {
       message: 'Denied',
     });
   });
+
+  it('turns DRF default not-found details into plain copy and keeps other details', async () => {
+    const api = (status: number, detail: string) => createApiClient({
+      baseUrl: 'https://example.test/api/v1',
+      fetchImpl: (async () => new Response(JSON.stringify({ detail }), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch,
+    });
+    const friendly = "This item isn't available. It may have been removed or you may not have access.";
+    for (const model of ['Organization', 'Pharmacy', 'MarketplaceListing', 'Shift']) {
+      await expect(api(404, `No ${model} matches the given query.`).get('/x/')).rejects.toMatchObject({ status: 404, message: friendly });
+    }
+    await expect(api(404, 'Shift link expired.').get('/x/')).rejects.toMatchObject({ status: 404, message: 'Shift link expired.' });
+    await expect(api(400, 'No Shift matches the given query.').get('/x/')).rejects.toMatchObject({ message: 'No Shift matches the given query.' });
+  });
 });

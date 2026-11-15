@@ -23,3 +23,10 @@ test('shared endpoint and backend require positive message id and current member
  assert.match(source, /performApiRequest\(\`\/messages\/\$\{messageId\}\/attachment\/\`/);
  assert.match(source, /Invalid message ID/);
 });
+
+test('chat composer icon buttons have screen-reader labels', () => {
+ const shared = read('roles/shared/messages/[id].tsx');
+ assert.match(shared, /icon="attachment"[\s\S]{0,80}accessibilityLabel="Attach file"/);
+ assert.match(shared, /icon=\{editingId \? 'check' : 'send'\}[\s\S]{0,80}accessibilityLabel=\{editingId \? 'Save edit' : 'Send message'\}/);
+ assert.match(read('roles/pharmacist/messages/[id].tsx'), /icon="send"[\s\S]{0,80}accessibilityLabel="Send message"/);
+});
