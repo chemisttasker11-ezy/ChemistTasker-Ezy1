@@ -601,7 +601,8 @@ class ExpenseViewSet(OwnedViewSet):
 @permission_classes([IsAuthenticated, CanAccessFinance])
 def receipt_download(request, pk):
     receipt = get_object_or_404(Receipt, pk=pk, expense__owner=request.user)
-    response = HttpResponse(bytes(receipt.content), content_type='application/octet-stream')
+    # media_type was set from the file's sniffed signature at upload, never from the client.
+    response = HttpResponse(bytes(receipt.content), content_type=receipt.media_type)
     response['Content-Disposition'] = content_disposition_header(True, receipt.filename)
     response['Cache-Control'] = 'private, no-store'
     response['X-Content-Type-Options'] = 'nosniff'

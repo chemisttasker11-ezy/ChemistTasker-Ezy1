@@ -5,6 +5,7 @@ from django.utils import timezone
 from workforce.models import RosterAcknowledgement, RosterPeriod
 from workforce.roster.permissions import is_authorized_attendance_manager
 from workforce.roster.periods import get_roster_period_assignments
+from users.presentation import user_display_name
 
 
 @transaction.atomic
@@ -47,7 +48,7 @@ def get_roster_acknowledgement_status(roster_period, manager_user):
         if a.user_id not in worker_map:
             worker_map[a.user_id] = {
                 "id": a.user_id,
-                "name": a.user.get_full_name() or a.user.username,
+                "name": user_display_name(a.user),
                 "role": getattr(a.user, "role", ""),
                 "shift_count": 0,
             }

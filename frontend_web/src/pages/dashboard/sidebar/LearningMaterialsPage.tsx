@@ -209,7 +209,7 @@ export default function LearningMaterialsPage() {
     let active = true;
     setState('loading');
     chemistTaskerApi.publicContent
-      .listArticles({ topic: 'learning' })
+      .listArticles({ topic: 'career' })
       .then((data) => {
         if (!active) return;
         setArticles(data.results || []);
@@ -242,7 +242,7 @@ export default function LearningMaterialsPage() {
     setLoadingMore(true);
     setMoreError(false);
     try {
-      const data = await chemistTaskerApi.publicContent.listArticles({ topic: 'learning', page: more });
+      const data = await chemistTaskerApi.publicContent.listArticles({ topic: 'career', page: more });
       setArticles((prev) => {
         const seen = new Set(prev.map((a) => a.id));
         return [...prev, ...(data.results || []).filter((a) => !seen.has(a.id))];

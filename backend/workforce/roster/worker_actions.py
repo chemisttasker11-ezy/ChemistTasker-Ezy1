@@ -27,6 +27,7 @@ from organizations.models import (
     Pharmacy,
 )
 from workforce.models import RosterActionAudit
+from users.presentation import user_display_name
 
 
 def validate_worker_replacement_eligibility(
@@ -114,7 +115,7 @@ def request_direct_swap(
 
     with transaction.atomic():
         # Create WorkerShiftRequest linking to the existing assignment
-        target_name = target_user.get_full_name() or target_user.username
+        target_name = user_display_name(target_user)
         req = WorkerShiftRequest.objects.create(
             pharmacy=pharmacy,
             requested_by=requesting_user,

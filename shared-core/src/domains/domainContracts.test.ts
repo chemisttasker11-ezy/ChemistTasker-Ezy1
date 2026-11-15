@@ -122,6 +122,10 @@ describe('source-backed wire/domain contracts after extraction',()=>{
     const rows=[{organization_id:1,role:'ORG_ADMIN'},{pharmacy_id:1,role:'OWNER'},{id:3,pharmacy_id:2,role:'PHARMACIST',status:'ACCEPTED',is_active:true},{id:4,pharmacy_id:5,role:'PHARMACIST',status:'PENDING'}];
     expect(leaveRequestMemberships(rows as any)).toEqual([rows[2]]);
   });
+  it('offers leave for a pharmacy membership in the login payload shape',()=>{
+    const membership={id:3,pharmacy_id:2,pharmacy_name:'Example pharmacy',role:'PHARMACIST',employment_type:'CASUAL'};
+    expect(leaveRequestMemberships([membership])).toEqual([membership]);
+  });
   it('preserves role eligibility through public shift mapping',()=>{
     expect(mapShift({id:2,role_needed:'TECHNICIAN',can_apply:false})).toMatchObject({canApply:false});
     expect(mapShift({id:3,role_needed:'PHARMACIST',can_apply:true})).toMatchObject({canApply:true});

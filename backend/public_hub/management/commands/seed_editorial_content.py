@@ -274,13 +274,13 @@ class Command(BaseCommand):
             },
 
             # ==========================================
-            # LEARNING ARTICLES (topic='learning')
+            # LEARNING ARTICLES (topic='career', listed on the learning pages)
             # ==========================================
             {
                 'slug': 'paediatric-dosing-calculations-liquid-formulations-guide',
                 'title': "Paediatric Dosing Calculations: Weight-Based Titration, Liquid Suspensions & Clark's Rule",
                 'kind': 'blog',
-                'topic': 'learning',
+                'topic': 'career',
                 'author_user': u_basma,
                 'author_name': 'Basma Soliman, Clinical Hospital & Community Pharmacist',
                 'cover_url': 'http://localhost:3000/images/editorial/paediatric_dosing_calc.jpg',
@@ -320,7 +320,7 @@ class Command(BaseCommand):
                 'slug': 'ahpra-pharmacy-board-exam-prep-clinical-scenarios-apf26',
                 'title': 'AHPRA Board Exam Mastery: Clinical Problem-Solving, Forensic Scenarios & APF 26 Counseling',
                 'kind': 'blog',
-                'topic': 'learning',
+                'topic': 'career',
                 'author_user': u_exp,
                 'author_name': 'Alex Chen, Intern Pharmacist & Student Liaison',
                 'cover_url': 'http://localhost:3000/images/editorial/board_exam_prep.jpg',
@@ -357,7 +357,7 @@ class Command(BaseCommand):
                 'slug': 'schedule-8-safe-custody-cold-chain-compliance-sop',
                 'title': 'Schedule 8 Controlled Drugs & Cold Chain Integrity: Complete Australian Dispensary SOP',
                 'kind': 'blog',
-                'topic': 'learning',
+                'topic': 'career',
                 'author_user': u_zaheer,
                 'author_name': 'Zaheer Bassa, Operations & Quality Lead',
                 'cover_url': 'http://localhost:3000/images/editorial/s8_cold_chain_protocols.jpg',
@@ -394,7 +394,7 @@ class Command(BaseCommand):
                 'slug': 'dispensary-technician-training-pbs-authority-streamlined-codes',
                 'title': 'Dispensary Technician Training: PBS Streamlined Authorities, Brand Premiums & S4D Rules',
                 'kind': 'blog',
-                'topic': 'learning',
+                'topic': 'career',
                 'author_user': u_mia,
                 'author_name': 'Mia Brennan, Lead Dispensary Technician',
                 'cover_url': 'http://localhost:3000/images/editorial/dispensary_tech_training.jpg',

@@ -43,6 +43,7 @@ from shifts.base import BaseShiftViewSet
 from shifts.selectors import (
     _matching_shift_slot_exists,
     shifts_managed_by,
+    slot_occurrence_ended,
 )
 from shifts.candidates import assigned_profile
 import logging
@@ -81,9 +82,7 @@ class ActiveShiftViewSet(BaseShiftViewSet):
             slot_date = entry.get("date")
             if not slot or not slot_date:
                 continue
-            if slot_date < today:
-                continue
-            if slot_date == today and slot.end_time < now.time():
+            if slot_occurrence_ended(slot_date, slot.start_time, slot.end_time, today, now.time()):
                 continue
             key = (slot.id, slot_date)
             if key in assigned_pairs:

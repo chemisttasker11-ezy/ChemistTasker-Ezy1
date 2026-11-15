@@ -2,7 +2,9 @@
 
 The list views compose these instead of repeating the filters.
 """
-from django.db.models import Exists, OuterRef, Q
+from datetime import timedelta
+
+from django.db.models import Exists, F, OuterRef, Q
 
 from organizations.access import managed_pharmacies
 from organizations.models import Pharmacy
@@ -15,6 +17,22 @@ def shifts_managed_by(queryset, user):
     return queryset.filter(Q(created_by=user) | Q(pharmacy__in=managed_pharmacies(user)))
 
 
+def slot_occurrence_ended(slot_date, start_time, end_time, local_date, clock):
+    """True once the occurrence on slot_date has ended; one ending at or before its start ends the next day."""
+    end_date = slot_date + timedelta(days=1) if end_time <= start_time else slot_date
+    return (end_date, end_time) < (local_date, clock)
+
+
+def slot_not_ended_q(local_date, clock, *, date='date', start='start_time', end='end_time'):
+    """SQL form of `not slot_occurrence_ended` for the occurrence dated by the `date` field."""
+    overnight = Q(**{f'{end}__lte': F(start)})
+    return (
+        Q(**{f'{date}__gt': local_date})
+        | (Q(**{date: local_date}) & (Q(**{f'{end}__gte': clock}) | overnight))
+        | (Q(**{date: local_date - timedelta(days=1), f'{end}__gte': clock}) & overnight)
+    )
+
+
 def _future_or_current_slot_q(now, today, prefix=''):
     result = Q(pk__in=[])
     pharmacy_ids_by_zone = {}
@@ -25,11 +43,11 @@ def _future_or_current_slot_q(now, today, prefix=''):
         local_now = now.astimezone(zone)
         local_date = local_now.date()
         clock = local_now.time()
+        times = {'start': f'{prefix}start_time', 'end': f'{prefix}end_time'}
         result |= Q(**{f'{prefix}shift__pharmacy_id__in': pharmacy_ids}) & (
-            Q(**{f'{prefix}is_recurring': True, f'{prefix}recurring_end_date__gt': local_date}) |
-            Q(**{f'{prefix}is_recurring': True, f'{prefix}recurring_end_date': local_date, f'{prefix}end_time__gte': clock}) |
-            Q(**{f'{prefix}date__gt': local_date}) |
-            Q(**{f'{prefix}date': local_date, f'{prefix}end_time__gte': clock})
+            (Q(**{f'{prefix}is_recurring': True})
+             & slot_not_ended_q(local_date, clock, date=f'{prefix}recurring_end_date', **times)) |
+            slot_not_ended_q(local_date, clock, date=f'{prefix}date', **times)
         )
     return result
 

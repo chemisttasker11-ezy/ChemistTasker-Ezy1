@@ -6,7 +6,9 @@ from django.test import TestCase
 from django.utils import timezone
 
 from attendance.models import AttendanceEvent, AttendanceSession
-from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_staff_member
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_staff_member, make_user
+from notifications.models import Notification
+from organizations.models import PharmacyAdmin
 from workforce.models import ManagerAttendanceEventAudit, Timesheet, TimesheetComment, TimesheetPeriod
 
 BASE = "/api/v1/workforce/"
@@ -70,6 +72,26 @@ class M4WorkerCorrectionContracts(TestCase):
         self.assertEqual(client_for().post(
             self.url("comments"), {"body": body}, format="json",
         ).status_code, 401)
+
+    def test_worker_correction_request_notifies_the_pharmacy_managers_only(self):
+        roster_admin, comms_admin = make_user("OWNER"), make_user("OWNER")
+        for admin, level in ((roster_admin, PharmacyAdmin.AdminLevel.ROSTER_MANAGER),
+                             (comms_admin, PharmacyAdmin.AdminLevel.COMMUNICATION_MANAGER)):
+            PharmacyAdmin.objects.create(user=admin, pharmacy=self.pharmacy, admin_level=level, is_active=True)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = client_for(self.worker).post(self.url("comments"), {"body": "Clock out was 17:30."}, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        notices = Notification.objects.filter(payload__timesheet_id=self.timesheet.pk)
+        self.assertEqual({row.user_id for row in notices}, {self.tom.pk, roster_admin.pk})
+        for row in notices:
+            self.assertIn(str(self.timesheet.pk), row.action_url)
+            self.assertTrue(row.title and row.body)
+
+    def test_manager_comment_notifies_no_one(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            response = client_for(self.tom).post(self.url("comments"), {"body": "Please confirm."}, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertFalse(Notification.objects.exists())
 
     def test_worker_cannot_inject_attendance_event_even_on_own_timesheet(self):
         request = {

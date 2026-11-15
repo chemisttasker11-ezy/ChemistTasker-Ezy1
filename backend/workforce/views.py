@@ -51,6 +51,7 @@ from .permissions import can_manage_pharmacy, can_view_worker_timesheet, require
 from workforce.roster.revisions import serialize_workspace
 from workforce.roster.command_api import RosterPublishRevisionView, RosterValidateRevisionView
 from .tasks import rebuild_timesheet_period_task, rebuild_timesheet_task
+from users.presentation import user_display_name
 from .timesheets import (
     add_comment,
     approve_timesheet,
@@ -461,7 +462,7 @@ class MembershipWorkSettingsView(APIView):
                 rows.append({
                     "membership_id": membership.pk,
                     "worker_id": membership.user_id,
-                    "worker_name": membership.user.get_full_name() or membership.user.username,
+                    "worker_name": user_display_name(membership.user),
                     "role": membership.role,
                     "employment_type": membership.employment_type,
                     "employment_engagement_eligible": membership.employment_type in {"FULL_TIME", "PART_TIME", "CASUAL"},

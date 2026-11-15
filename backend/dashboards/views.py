@@ -32,6 +32,7 @@ from decimal import Decimal
 from urllib.parse import urlencode
 from users.org_roles import membership_visible_pharmacy_ids
 from shifts.access import _shift_roles_visible_to_user
+from shifts.selectors import slot_not_ended_q, slot_occurrence_ended
 from shifts.escalation import COMMUNITY_LEVELS
 from shifts.announcements import find_availability_matched_shifts
 
@@ -68,7 +69,7 @@ def _scope_pharmacies(pharmacies, pharmacy_id):
 
 
 def _future_shift_filter(today, now):
-    return Q(slots__date__gt=today) | Q(slots__date=today, slots__end_time__gt=now)
+    return slot_not_ended_q(today, now, date="slots__date", start="slots__start_time", end="slots__end_time")
 
 
 def _active_shift_filter(today, now):
@@ -196,21 +197,19 @@ def _dashboard_shift_box(shift):
 
 def _future_slot_date_filter(today, now):
     """Upcoming slots, including today's slots which have not ended."""
-    return Q(date__gt=today) | Q(date=today, end_time__gt=now)
+    return slot_not_ended_q(today, now)
 
 
 def _worker_upcoming_activity(user, today, now):
     """Match a worker's action to its own upcoming slot, not another shift slot."""
     assignments = ShiftSlotAssignment.objects.filter(user=user).filter(
-        Q(slot_date__gt=today)
-        | Q(slot_date=today, slot__end_time__gt=now)
-        | Q(slot_date__isnull=True, slot__date__gt=today)
-        | Q(slot_date__isnull=True, slot__date=today, slot__end_time__gt=now)
+        slot_not_ended_q(today, now, date="slot_date", start="slot__start_time", end="slot__end_time")
+        | (Q(slot_date__isnull=True)
+           & slot_not_ended_q(today, now, date="slot__date", start="slot__start_time", end="slot__end_time"))
     )
     interests = ShiftInterest.objects.filter(user=user).filter(
         Q(slot__isnull=True)
-        | Q(slot__date__gt=today)
-        | Q(slot__date=today, slot__end_time__gt=now)
+        | slot_not_ended_q(today, now, date="slot__date", start="slot__start_time", end="slot__end_time")
     )
     # Explicit offered dates supersede recurring/template slot dates.
     offer_still_open_today = (
@@ -497,7 +496,7 @@ def _dashboard_upcoming_stats(shifts_qs, today, now):
     week_end = today + timedelta(days=6)
     month_end = today + timedelta(days=30)
     return {
-        "today": shifts_qs.filter(slots__date=today, slots__end_time__gt=now).distinct().count(),
+        "today": shifts_qs.filter(Q(slots__date=today) & _future_shift_filter(today, now)).distinct().count(),
         "week": shifts_qs.filter(slots__date__gte=today, slots__date__lte=week_end).distinct().count(),
         "month": shifts_qs.filter(slots__date__gte=today, slots__date__lte=month_end).distinct().count(),
     }
@@ -733,13 +732,7 @@ class OwnerDashboard(APIView):
         personal_upcoming_shifts = personal_shift_scope.filter(_future_shift_filter(today, now)).distinct()
 
         # Upcoming shifts
-        upcoming_shifts = shifts_qs.filter(
-            slots__date__gt=today
-        ) | shifts_qs.filter(
-            slots__date=today,
-            slots__end_time__gt=now
-        )
-        upcoming_shifts = upcoming_shifts.distinct()
+        upcoming_shifts = shifts_qs.filter(_future_shift_filter(today, now)).distinct()
 
         # ---- Correct confirmed shifts logic ----
         # Confirmed shifts: at least one assignment
@@ -758,7 +751,7 @@ class OwnerDashboard(APIView):
         for shift in upcoming_shifts.select_related('pharmacy').prefetch_related('slots'):
             slots = sorted(shift.slots.all(), key=lambda s: (s.date, s.start_time))
             next_slot = next(
-                (s for s in slots if s.date > today or (s.date == today and s.end_time > now)),
+                (s for s in slots if not slot_occurrence_ended(s.date, s.start_time, s.end_time, today, now)),
                 None,
             )
             shift_boxes.append({

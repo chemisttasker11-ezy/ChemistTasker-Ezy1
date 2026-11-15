@@ -42,6 +42,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
+from users.presentation import user_display_name
 
 User = get_user_model()
 
@@ -98,7 +99,7 @@ class RosterPeriodDetailView(APIView):
                 "week_end": str(period.week_end),
                 "status": period.status,
                 "published_at": period.published_at.isoformat() if period.published_at else None,
-                "published_by": period.published_by.get_full_name() or period.published_by.username if period.published_by else None,
+                "published_by": user_display_name(period.published_by) if period.published_by else None,
                 "total_assignments": rostered_count,
                 "created": False,
                 "assignments": grid["assignments"],
@@ -152,7 +153,7 @@ class RosterPeriodDetailView(APIView):
                 "week_end": str(period.week_end),
                 "status": period.status,
                 "published_at": period.published_at.isoformat() if period.published_at else None,
-                "published_by": period.published_by.get_full_name() or period.published_by.username if period.published_by else None,
+                "published_by": user_display_name(period.published_by) if period.published_by else None,
                 "total_assignments": assignments.count(),
                 "created": created,
                 "assignments": grid["assignments"],
@@ -822,8 +823,8 @@ class RosterActionAuditListView(APIView):
             {
                 "id": a.id,
                 "action_type": a.action_type,
-                "performed_by": a.performed_by.get_full_name() or a.performed_by.username if a.performed_by else None,
-                "target_user": a.target_user.get_full_name() or a.target_user.username if a.target_user else None,
+                "performed_by": user_display_name(a.performed_by) if a.performed_by else None,
+                "target_user": user_display_name(a.target_user) if a.target_user else None,
                 "shift_assignment_id": a.shift_assignment_id,
                 "details": a.details,
                 "created_at": a.created_at.isoformat(),

@@ -257,6 +257,13 @@ test('R OTHER_STAFF technician receives a pathway from server role_code, not gen
   h.host.unmount();
 });
 
+test('learning requests a supported career topic',async()=>{
+  const h=learningHarness();
+  await h.render();
+  assert.equal(h.calls.find(c=>c[0]==='articles')[1].topic,'career');
+  h.host.unmount();
+});
+
 test('R blank public title remains selectable as Pharmacist on native', async()=>{
   const h=boardHarness();
   h.pages.push({count:1,next:null,results:[{...fixture(71,''),role_category:'PHARMACIST'}]});

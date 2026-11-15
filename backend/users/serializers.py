@@ -373,6 +373,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         pharm_payload = [
             {
+                'id':            pm.id,
                 'pharmacy_id':   pm.pharmacy_id,
                 'pharmacy_name': pm.pharmacy.name if pm.pharmacy else None,
                 'role':          pm.role,
@@ -446,6 +447,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
 
             pharm_payload = [
                 {
+                    'id': pm.id,
                     'pharmacy_id': pm.pharmacy_id,
                     'pharmacy_name': pm.pharmacy.name if pm.pharmacy else None,
                     'role': pm.role,

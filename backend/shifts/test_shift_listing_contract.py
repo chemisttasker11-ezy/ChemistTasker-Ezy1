@@ -509,6 +509,40 @@ class ShiftListingTimezoneTests(ShiftListingFixture):
         self.pharmacy.refresh_from_db()
         self.assertEqual(self.pharmacy.timezone, "invalid-zone")
 
+    def test_overnight_slot_stays_current_until_it_ends_the_next_morning(self):
+        from shifts.public_sitemap import active_public_shifts
+        work_date = date(2026, 1, 5)
+        self.pharmacy.timezone = "Australia/Brisbane"
+        self.pharmacy.save(update_fields=["timezone"])
+        ShiftSlot.objects.filter(shift__pharmacy=self.pharmacy).update(date=work_date, start_time=time(22), end_time=time(2))
+        ShiftSlotAssignment.objects.filter(shift__pharmacy=self.pharmacy).update(slot_date=work_date)
+        public = self.shifts["public"]
+        routes = (
+            ("community-shifts/", "staff", "public"),
+            ("public-shifts/", "outsider", "public"),
+            ("public-job-board/", "anonymous", "public"),
+            ("shifts/active/", "owner", "public"),
+            ("shifts/confirmed/", "owner", "confirmed"),
+            ("my-confirmed-shifts/", "staff", "confirmed"),
+        )
+        # Brisbane is UTC+10: 05:00 and 21:00 on the work date, 01:00 and 02:01 the next morning.
+        for utc_now, current in ((datetime(2026, 1, 4, 19, 0), True), (datetime(2026, 1, 5, 11, 0), True),
+                                 (datetime(2026, 1, 5, 15, 0), True), (datetime(2026, 1, 5, 16, 1), False)):
+            with mock.patch("django.utils.timezone.now", return_value=utc_now.replace(tzinfo=timezone.utc)):
+                for endpoint, viewer, label in routes:
+                    with self.subTest(now=utc_now, endpoint=endpoint):
+                        self.assertEqual(label in self.visible(endpoint, self.users[viewer]), current)
+                with self.subTest(now=utc_now, endpoint="active slots"):
+                    rows = client_for(self.owner).get(f"{API}shifts/active/").data
+                    rows = rows["results"] if isinstance(rows, dict) else rows
+                    slots = next((row["slots"] for row in rows if row["id"] == public.id), [])
+                    self.assertEqual(bool(slots), current)
+                with self.subTest(now=utc_now, endpoint="shared link"):
+                    shared = client_for(None).get(f"{API}view-shared-shift/?token={public.share_token}")
+                    self.assertEqual(shared.data["is_closed"], not current)
+                with self.subTest(now=utc_now, endpoint="sitemap"):
+                    self.assertEqual(active_public_shifts().filter(pk=public.pk).exists(), current)
+
     def test_valid_explicit_zone_wins_over_store_location_for_lists(self):
         self.pharmacy.timezone, self.pharmacy.state, self.pharmacy.postcode = "Australia/Perth", "NSW", "2880"
         self.pharmacy.save(update_fields=["timezone", "state", "postcode"])

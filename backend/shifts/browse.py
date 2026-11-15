@@ -24,7 +24,7 @@ from django.utils import timezone
 from shifts.pricing import get_locked_rate_for_slot
 from shifts.engagement import staff_assignment_defaults
 from shifts.assignment import slot_locked_for_shift_offer
-from shifts.selectors import _future_or_current_slot_q
+from shifts.selectors import _future_or_current_slot_q, slot_not_ended_q
 from shifts.access import staff_membership_can_claim_role
 from shifts.emails import build_roster_email_link, build_shift_email_context
 from users.task_dispatch import async_task
@@ -707,8 +707,7 @@ class SharedShiftDetailView(APIView):
         is_slotless_ftpt = shift.employment_type in ['FULL_TIME', 'PART_TIME'] and shift.slot_count == 0
         has_future_slots = shift.slots.filter(
             Q(is_recurring=True, recurring_end_date__gte=today)
-            | Q(date__gt=today)
-            | Q(date=today, end_time__gt=now_time)
+            | slot_not_ended_q(today, now_time)
         ).exists()
         has_open_slots = shift.slot_count > 0 and shift.assigned_count < shift.slot_count
         is_closed = not (is_slotless_ftpt or (has_future_slots and has_open_slots))

@@ -93,7 +93,7 @@ export default function LearningScreen() {
     setNextPage(null);
     try {
       const page = await chemistTaskerApi.publicContent.listArticles({
-        topic: 'learning', q: appliedQuery || undefined, kind: kind === 'all' ? undefined : kind,
+        topic: 'career', q: appliedQuery || undefined, kind: kind === 'all' ? undefined : kind,
       });
       if (request !== generation.current) return;
       setArticles(page.results ?? []);
@@ -117,7 +117,7 @@ export default function LearningScreen() {
     setMoreError(false);
     try {
       const page = await chemistTaskerApi.publicContent.listArticles({
-        topic: 'learning', page: nextPage, q: appliedQuery || undefined,
+        topic: 'career', page: nextPage, q: appliedQuery || undefined,
         kind: kind === 'all' ? undefined : kind,
       });
       if (request !== generation.current) return;

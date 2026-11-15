@@ -12,6 +12,7 @@ from workforce.models import (
     TimesheetPeriod,
 )
 from workforce.permissions import can_manage_pharmacy, can_view_worker_timesheet, require_manage_pharmacy
+from users.presentation import user_display_name
 from workforce.timesheet_builder import ensure_period_timesheets
 from workforce.timesheet_checks import _latest_revision, effective_open_checks
 from workforce.timesheet_core import _hash
@@ -130,12 +131,41 @@ def add_comment(timesheet, user, body: str, worker_visible=True):
     if not (body or "").strip():
         raise ValidationError("Comment cannot be empty.")
     revision = _latest_revision(timesheet)
-    return TimesheetComment.objects.create(
+    comment = TimesheetComment.objects.create(
         timesheet=timesheet,
         revision=revision,
         author=user,
         body=body.strip(),
         worker_visible=bool(worker_visible) if can_manage_pharmacy(user, timesheet.period.pharmacy) else True,
+    )
+    if user.pk == timesheet.user_id:
+        _notify_correction_request(timesheet, comment)
+    return comment
+
+
+def _notify_correction_request(timesheet, comment):
+    """A worker's comment is a correction request: tell the managers who can act on this timesheet."""
+    from notifications.services import notify_users
+    from workforce.leave_service import pharmacy_manager_users
+    period = timesheet.period
+    pharmacy = period.pharmacy
+    recipient_ids = [
+        manager.pk for manager in pharmacy_manager_users(pharmacy)
+        if manager.pk != comment.author_id and can_manage_pharmacy(manager, pharmacy)
+    ]
+    if not recipient_ids:
+        return
+    worker_name = user_display_name(comment.author)
+    transaction.on_commit(
+        lambda: notify_users(
+            recipient_ids,
+            title=f"Timesheet correction request: {pharmacy.name}",
+            body=f"{worker_name} asked for a correction to their timesheet for {period.start_date} to {period.end_date}.",
+            action_url=f"/dashboard/workforce/timesheets?timesheet={timesheet.pk}",
+            payload={"timesheet_id": timesheet.pk, "comment_id": comment.pk, "pharmacy_id": pharmacy.pk,
+                     "notification_kind": "timesheet_correction_request"},
+        ),
+        robust=True,
     )
 
 
