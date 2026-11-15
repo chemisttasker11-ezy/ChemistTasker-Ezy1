@@ -301,6 +301,34 @@ test('shift notification routes keep the incoming query, merging the offer param
   assert.equal(route({ actionUrl: '/dashboard/owner/shift-center/history?p=2', persona: 'owner' }), '/owner/shifts?p=2&section=history');
 });
 
+test('timesheet and leave notices open the workforce screens for pharmacy managers (O4 N1c)', () => {
+  const route = nav.resolveWorkforceNotificationRoute;
+  const manages = (id) => id === 3;
+  const correction = { actionUrl: '/dashboard/workforce/timesheets?timesheet=41', payload: { timesheet_id: 41, pharmacy_id: 3, notification_kind: 'timesheet_correction_request' } };
+  assert.equal(route({ ...correction, canManageRoster: manages }), '/workforce-timesheets/41');
+  assert.equal(route({ actionUrl: correction.actionUrl, payload: { pharmacy_id: 3 }, canManageRoster: manages }), '/workforce-timesheets/41');
+  // Another pharmacy's notice, or no roster right: handled (no calendar/membership fallback) but not opened.
+  assert.equal(route({ ...correction, canManageRoster: () => false }), null);
+  assert.equal(route({ ...correction }), null);
+  const leave = { payload: { leave_request_id: 8, pharmacy_id: 3 } };
+  assert.equal(route({ ...leave, canManageRoster: manages }), '/workforce/leave-requests?pharmacy_id=3');
+  assert.equal(route({ ...leave, canManageRoster: () => false }), '/my-leave');
+  // Not a workforce notice: the other resolvers decide.
+  assert.equal(route({ payload: { shift_id: 4, pharmacy_id: 3 }, canManageRoster: manages }), undefined);
+  assert.equal(route({ payload: { date: '2026-11-05', pharmacy_id: 3 }, canManageRoster: manages }), undefined);
+  // Every tap and push handler asks it before the calendar and membership resolvers (both catch pharmacy_id).
+  for (const file of ['../../../features/notifications/NotificationsScreen.tsx', ...['owner', 'organization', 'pharmacist', 'otherstaff'].map((p) => `../../../app/${p}/_layout.tsx`)]) {
+    const src = readFileSync(new URL(file, import.meta.url), 'utf8');
+    const at = src.indexOf('resolveWorkforceNotificationRoute({');
+    assert.ok(at > 0 && at < src.indexOf('resolveCalendarNotificationRoute({'), file);
+  }
+});
+
+test('the leave screen opens the linked pharmacy only when the user manages its roster', () => {
+  const src = readFileSync(new URL('../../../app/workforce/leave-requests.tsx', import.meta.url), 'utf8');
+  assert.match(src, /hasCapability\('MANAGE_ROSTER', linkedPharmacyId\)/);
+});
+
 test('slot rates: hourly employee contracts disclose each rate, annual packages do not', () => {
   const native = { StyleSheet: { create: (s) => s, hairlineWidth: 1 }, Platform: { OS: 'ios' } };
   const tokens = loadTs('../../../constants/tokens.ts', { 'react-native': native });

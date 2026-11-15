@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import {
     acceptShiftCounterOfferService,
+    fetchShiftCounterOffersBatchService,
     fetchShiftCounterOffersService,
     rejectShiftCounterOfferService,
 } from '@chemisttasker/shared-core';
@@ -59,6 +60,32 @@ export function useCounterOffers(scopeKey?: string) {
             if (isLatestGeneration(generationsRef.current, genKey, generation)) {
                 setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: false }));
             }
+        }
+    }, []);
+
+    // The visible shifts in one request per 100 ids (the server's batch cap): one request per shift exhausted the user throttle.
+    const loadCounterOffersBatch = useCallback(async (shiftIds: number[]) => {
+        const requests = shiftIds.map(id => ({ id, generation: getNextGeneration(generationsRef.current, String(id)) }));
+        const flag = (ids: number[], value: boolean) =>
+            setCounterOffersLoadingByShift(prev => ({ ...prev, ...Object.fromEntries(ids.map(id => [id, value])) }));
+        flag(shiftIds, true);
+        for (let start = 0; start < requests.length; start += 100) {
+            const chunk = requests.slice(start, start + 100);
+            let byShift: Record<number, any[]> = {};
+            let failure: string | null = null;
+            try {
+                byShift = await fetchShiftCounterOffersBatchService(chunk.map(item => item.id));
+            } catch (error: any) {
+                console.error('Failed to load counter offers', error);
+                failure = error?.message || 'Failed to load counter offers';
+            }
+            const current = chunk.filter(item => isLatestGeneration(generationsRef.current, String(item.id), item.generation)).map(item => item.id);
+            if (current.length === 0) continue;
+            // A shift the server leaves out has no offers this user may see.
+            setCounterOffersByShift(prev => ({ ...prev, ...Object.fromEntries(current.map(id => [id,
+                (byShift[id] || []).filter((offer: any) => String(offer?.status ?? '').toUpperCase() === 'PENDING')])) }));
+            setCounterOffersErrorByShift(prev => ({ ...prev, ...Object.fromEntries(current.map(id => [id, failure])) }));
+            flag(current, false);
         }
     }, []);
 
@@ -136,6 +163,7 @@ export function useCounterOffers(scopeKey?: string) {
         counterOffersLoadingByShift,
         counterOffersErrorByShift,
         loadCounterOffers,
+        loadCounterOffersBatch,
         acceptOffer,
         rejectOffer,
         counterActionLoading,

@@ -427,6 +427,32 @@ class CounterOfferTests(ShiftActionFixture):
         bad_batch = client_for(self.owner).get(f"{API}shifts/counter-offers-batch/?shift_ids=x")
         self.assertEqual(bad_batch.status_code, 400)
 
+    def test_batch_lists_only_counter_offers_the_caller_may_see(self):
+        # O4 N2: the Shift Centres load every visible shift's counter offers in one batch request.
+        worker = self.worker()
+        own = self.shift(single_user_only=False, slots=1, rate_type="FLEXIBLE")
+        own_offer = ShiftCounterOffer.objects.create(shift=own, user=worker)
+        ShiftCounterOfferSlot.objects.create(offer=own_offer, slot=own.slots.first(), proposed_start_time=time(9), proposed_end_time=time(17))
+        other_owner, other_pharmacy = make_owner_with_pharmacy("Other Pharmacy")
+        other = Shift.objects.create(pharmacy=other_pharmacy, created_by=other_owner, role_needed="PHARMACIST",
+                                     employment_type="LOCUM", visibility="LOCUM_CASUAL", single_user_only=False)
+        other_slot = ShiftSlot.objects.create(shift=other, date=DAY, start_time=time(9), end_time=time(17), rate=Decimal("60.00"))
+        other_offer = ShiftCounterOffer.objects.create(shift=other, user=worker)
+        ShiftCounterOfferSlot.objects.create(offer=other_offer, slot=other_slot, proposed_start_time=time(9), proposed_end_time=time(17))
+        url = f"{API}shifts/counter-offers-batch/?shift_ids={own.id},{other.id}"
+
+        batch = client_for(self.owner).get(url)
+        self.assertEqual(batch.status_code, 200, batch.data)
+        self.assertEqual([item["id"] for item in batch.data[str(own.id)]], [own_offer.id])
+        # Another owner's shift id in the list never returns its offers.
+        self.assertEqual(batch.data.get(str(other.id), []), [])
+        mirrored = client_for(other_owner).get(url).data
+        self.assertEqual([item["id"] for item in mirrored[str(other.id)]], [other_offer.id])
+        self.assertEqual(mirrored.get(str(own.id), []), [])
+        # The worker sees their own offers on both shifts.
+        mine = client_for(worker).get(url).data
+        self.assertEqual(([i["id"] for i in mine[str(own.id)]], [i["id"] for i in mine[str(other.id)]]), ([own_offer.id], [other_offer.id]))
+
     def test_accept_turns_the_counter_offer_into_a_worker_offer(self):
         worker = self.worker()
         shift = self.shift(single_user_only=False, slots=2, rate_type="FLEXIBLE")

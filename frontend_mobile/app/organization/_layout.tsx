@@ -35,6 +35,7 @@ import {
   resolveCalendarNotificationRoute,
   resolveChatNotificationRoomId,
   resolveShiftNotificationRoute,
+  resolveWorkforceNotificationRoute,
 } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
@@ -84,7 +85,7 @@ export default function OrganizationLayout() {
   const adminCan = useAdminCan();
   const unsavedRegistry = useUnsavedChangesRegistry();
   const guardedNavigation = useGuardedNavigation();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, hasCapability } = useAuth();
 
   const requestNavigation = useCallback(
     (action: () => void) => {
@@ -161,6 +162,15 @@ export default function OrganizationLayout() {
         guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId, persona) as any));
         return;
       }
+      const workforceRoute = resolveWorkforceNotificationRoute({
+        actionUrl: data.action_url ?? data.actionUrl ?? null,
+        payload: data,
+        canManageRoster: (pharmacyId) => hasCapability('MANAGE_ROSTER', pharmacyId),
+      });
+      if (workforceRoute !== undefined) {
+        if (workforceRoute) guardedNavigation(() => router.push(workforceRoute as any));
+        return;
+      }
       const calendarRoute = resolveCalendarNotificationRoute({
         actionUrl: data.action_url ?? data.actionUrl ?? null,
         payload: data,
@@ -185,7 +195,7 @@ export default function OrganizationLayout() {
       }
     });
     return () => sub.remove();
-  }, [adminCan, guardedNavigation, persona, router, user?.role]);
+  }, [adminCan, guardedNavigation, hasCapability, persona, router, user?.role]);
 
   const { backTarget, isPharmacyDetail } = useMemo(() => {
     if (!pathname) return { backTarget: null, isPharmacyDetail: false };

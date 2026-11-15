@@ -287,4 +287,15 @@ describe('createApiClient', () => {
     await expect(api(404, 'Shift link expired.').get('/x/')).rejects.toMatchObject({ status: 404, message: 'Shift link expired.' });
     await expect(api(400, 'No Shift matches the given query.').get('/x/')).rejects.toMatchObject({ message: 'No Shift matches the given query.' });
   });
+
+  it('maps the marketplace new-listings switch (503 NEW_LISTINGS_DISABLED) to plain copy and drops other 5xx bodies', async () => {
+    const api = (status: number, body: unknown) => createApiClient({
+      baseUrl: 'https://example.test/api/v1',
+      fetchImpl: (async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })) as typeof fetch,
+    });
+    await expect(api(503, { code: 'NEW_LISTINGS_DISABLED', detail: 'New listings are not enabled.' }).post('/marketplace/listings/', {}))
+      .rejects.toMatchObject({ status: 503, message: "New listings aren't open yet", payload: { code: 'NEW_LISTINGS_DISABLED' } });
+    await expect(api(503, { code: 'OTHER', detail: 'internal' }).get('/x/')).rejects.toMatchObject({ status: 503, message: 'Request failed with status 503', payload: null });
+    await expect(api(500, { code: 'NEW_LISTINGS_DISABLED' }).get('/x/')).rejects.toMatchObject({ message: 'Request failed with status 500', payload: null });
+  });
 });

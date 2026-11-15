@@ -112,7 +112,8 @@ export function BottomSheet({
             importantForAccessibility="no"
           />
         </Animated.View>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.dock}>
+        {/* Android modals draw edge to edge, so the window never resizes for the keyboard: shrink the dock here too. */}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.dock}>
           <Animated.View
             accessibilityViewIsModal
             onAccessibilityEscape={requestClose}
@@ -166,6 +167,8 @@ const styles = StyleSheet.create({
   scrim: { backgroundColor: colors.scrim },
   dock: { flex: 1, justifyContent: 'flex-end', pointerEvents: 'box-none' },
   sheet: {
+    // Fits a dock the keyboard shrank: the body scrolls, the footer stays visible.
+    flexShrink: 1,
     width: '100%',
     maxWidth: 640,
     alignSelf: 'center',

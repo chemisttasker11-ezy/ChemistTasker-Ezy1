@@ -282,6 +282,28 @@ export const getShiftPharmacyId = (shift: Shift | null | undefined): number | nu
     return toFiniteNumber(raw);
 };
 
+/** A linked shift's poster detail; a fully booked shift leaves the active list (404), so its confirmed detail. */
+export async function loadLinkedPosterShift(
+    shiftId: number,
+    active: (id: number) => Promise<Shift>,
+    confirmed: (id: number) => Promise<Shift>,
+): Promise<{ shift: Shift; booked: boolean }> {
+    try {
+        return { shift: await active(shiftId), booked: false };
+    } catch (error: any) {
+        if ((error?.status ?? error?.response?.status) !== 404) throw error;
+        return { shift: await confirmed(shiftId), booked: true };
+    }
+}
+
+/** The pharmacy to select for a linked shift, or null. The manager-scoped detail returned it, so the user manages it. */
+export const linkedShiftPharmacyToSelect = (shift: Shift, selectedPharmacyId: number | null, persona: string | null): number | null => {
+    // The admin scope is the admin assignment, not WorkspaceContext.
+    if (persona !== 'owner' && persona !== 'organization') return null;
+    const pharmacyId = getShiftPharmacyId(shift);
+    return pharmacyId != null && selectedPharmacyId != null && pharmacyId !== selectedPharmacyId ? pharmacyId : null;
+};
+
 export const filterShiftsByPharmacy = (shifts: Shift[], pharmacyId: number | null): Shift[] => {
     if (pharmacyId == null) return shifts;
     return shifts.filter((shift) => getShiftPharmacyId(shift) === pharmacyId);

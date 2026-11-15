@@ -122,6 +122,18 @@ class MarketplaceTestCase(TestCase):
         self.assertEqual(listing.delivery.postage_payer, "SELLER")
         self.assertEqual(listing.audience.allowed_buyer_roles, ["OWNER", "PHARMACIST"])
 
+    def test_listing_options_report_the_new_listings_switch(self):
+        # O4 N3: editors hide the form while saving would 503 NEW_LISTINGS_DISABLED.
+        client = APIClient(); client.force_authenticate(self.user)
+        url = "/api/v1/marketplace/me/listing-options/"
+        for new, writes, expected in ((False, True, False), (True, False, False), (True, True, True)):
+            with self.subTest(new=new, writes=writes), override_settings(MARKETPLACE_NEW_LISTINGS_ENABLED=new, MARKETPLACE_ALL_WRITES_ENABLED=writes):
+                response = client.get(url)
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertIs(response.data["new_listings_enabled"], expected)
+                created = client.post("/api/v1/marketplace/listings/", {}, format="json")
+                self.assertEqual(created.status_code == 503, not expected, created.status_code)
+
     def test_listing_options_mobile_gate_clears_after_verification(self):
         client = APIClient(); client.force_authenticate(self.user)
         self.user.is_mobile_verified = False

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { Button, Dialog, Portal, Text } from 'react-native-paper';
 import { workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
@@ -27,9 +28,11 @@ const statusOptions = [
 ];
 
 export default function ManagerLeaveScreen() {
-  const { user } = useAuth();
+  const { user, hasCapability } = useAuth();
   const workspace = useWorkspace();
-  const pharmacyId = workspace.selectedPharmacyId;
+  // A leave notice links its pharmacy; open it only for a manager of that roster.
+  const linkedPharmacyId = Number(useLocalSearchParams<{ pharmacy_id?: string }>().pharmacy_id) || null;
+  const pharmacyId = linkedPharmacyId && hasCapability('MANAGE_ROSTER', linkedPharmacyId) ? linkedPharmacyId : workspace.selectedPharmacyId;
   const accountKey = user ? String(user.id ?? user.email ?? '') : '';
   const [status, setStatus] = useState('PENDING');
 

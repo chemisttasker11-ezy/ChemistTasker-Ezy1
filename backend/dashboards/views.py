@@ -22,7 +22,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from organizations.access import pharmacies_user_admins
 from users.serializers import UserProfileSerializer
-from django.db.models import Q, Sum
+from django.db.models import F, Q, Sum
+from django.db.models.functions import Coalesce
 from billing.utils import user_can_manage_billing_for_pharmacy
 from django.utils import timezone
 from users.role_labels import other_staff_role_label
@@ -211,38 +212,30 @@ def _worker_upcoming_activity(user, today, now):
         Q(slot__isnull=True)
         | slot_not_ended_q(today, now, date="slot__date", start="slot__start_time", end="slot__end_time")
     )
-    # Explicit offered dates supersede recurring/template slot dates.
-    offer_still_open_today = (
-        Q(offered_end_time__gt=now)
-        | Q(offered_end_time__isnull=True, slot__end_time__gt=now)
-    )
+    # Explicit offered dates and times supersede recurring/template slot ones; overnight occurrences end the next day.
     offers = ShiftOffer.objects.filter(
         user=user, status__in=["PENDING", "ACCEPTED_AWAITING_PAYMENT", "ACCEPTED"],
+    ).annotate(
+        occurrence_date=Coalesce("offered_slot_date", "slot__date"),
+        occurrence_start=Coalesce("offered_start_time", "slot__start_time"),
+        occurrence_end=Coalesce("offered_end_time", "slot__end_time"),
     ).filter(
         Q(slot__isnull=True, offered_slot_date__isnull=True)
-        | Q(offered_slot_date__gt=today)
-        | (Q(offered_slot_date=today) & offer_still_open_today)
-        | Q(offered_slot_date__isnull=True, slot__date__gt=today)
-        | (
-            Q(offered_slot_date__isnull=True, slot__date=today)
-            & offer_still_open_today
-        )
+        | slot_not_ended_q(today, now, date="occurrence_date", start="occurrence_start", end="occurrence_end")
     )
     # An offer without slot selections is shift-wide; otherwise match the
-    # actual selected slot's proposed date and end time.
+    # actual selected slot's proposed date and times.
     counter_offers = ShiftCounterOffer.objects.filter(
         user=user, status__in=["PENDING", "ACCEPTED"],
+    ).annotate(
+        # One annotate call shares one join, so date and times come from the same selected slot.
+        occurrence_date=Coalesce("slots__slot_date", "slots__slot__date"),
+        occurrence_start=F("slots__proposed_start_time"),
+        occurrence_end=F("slots__proposed_end_time"),
     ).filter(
         Q(slots__isnull=True)
         | Q(slots__slot__isnull=True, slots__slot_date__isnull=True)
-        | Q(slots__slot_date__gt=today)
-        | Q(slots__slot_date=today, slots__proposed_end_time__gt=now)
-        | Q(slots__slot_date__isnull=True, slots__slot__date__gt=today)
-        | Q(
-            slots__slot_date__isnull=True,
-            slots__slot__date=today,
-            slots__proposed_end_time__gt=now,
-        )
+        | slot_not_ended_q(today, now, date="occurrence_date", start="occurrence_start", end="occurrence_end")
     ).distinct()
     return {
         "assignments": assignments,

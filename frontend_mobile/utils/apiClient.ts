@@ -1,4 +1,4 @@
-import { AHPRA_UNREADABLE_MESSAGE, API_ENDPOINTS, reportAhpraError } from '@chemisttasker/shared-core';
+import { AHPRA_UNREADABLE_MESSAGE, API_ENDPOINTS, plainNotFoundMessage, reportAhpraError } from '@chemisttasker/shared-core';
 // utils/apiClient.ts
 import axios from 'axios';
 import { Platform } from 'react-native';
@@ -105,6 +105,10 @@ apiClient.interceptors.response.use(
         if (error.response?.data?.code === 'ahpra_unreadable') {
           error.message = AHPRA_UNREADABLE_MESSAGE;
           error.response.data.detail = AHPRA_UNREADABLE_MESSAGE;
+        }
+        // Same plain copy as the shared transport for Django's default 404 ("No X matches the given query.").
+        if (typeof error.response?.data?.detail === 'string') {
+          error.response.data.detail = plainNotFoundMessage(error.response.status, error.response.data.detail);
         }
 
         // If 401 and we haven't retried yet, try to refresh token

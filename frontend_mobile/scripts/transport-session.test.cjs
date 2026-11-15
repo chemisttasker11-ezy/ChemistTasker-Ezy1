@@ -308,6 +308,32 @@ test('queued Axios resend may retry only once even when its refreshed token is r
   }
 });
 
+test('Axios 404s with DRF default text get the shared plain copy; other details are kept (O4 N5)', async () => {
+  const axios = require('axios');
+  const load = (file, imports) => {
+    const module = { exports: {} };
+    const code = ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
+    vm.runInNewContext(code, { module, exports: module.exports, console, require: id => imports[id] });
+    return module.exports;
+  };
+  const errors = load('../shared-core/src/transport/errors.ts', {
+    '../domains/onboarding/ahpra': { AHPRA_UNREADABLE_MESSAGE: '', reportAhpraError: () => null },
+  });
+  const client = load('utils/apiClient.ts', {
+    axios, 'react-native': { Platform: { OS: 'android' } },
+    '@chemisttasker/shared-core': { API_ENDPOINTS: {}, reportAhpraError() {}, plainNotFoundMessage: errors.plainNotFoundMessage },
+    './authSession': { getSessionGeneration: () => 0, getValidAccessToken: async () => 'token', clearStoredSession: async () => {}, refreshAccessToken: async () => null },
+    './browserAuth': {}, './apiUrl': { resolveApiBaseUrl: () => 'https://example.test/api/v1' },
+  }).default;
+  const reply = (status, detail) => { client.defaults.adapter = async config => {
+    throw new axios.AxiosError('failed', 'ERR_BAD_REQUEST', config, null, { status, data: { detail }, config, headers: {} });
+  }; return client.get('/referrals/x/').catch(error => error.response.data.detail); };
+  const plain = "This item isn't available. It may have been removed or you may not have access.";
+  assert.equal(await reply(404, 'No ShiftShare matches the given query.'), plain);
+  assert.equal(await reply(404, 'Shift link expired.'), 'Shift link expired.');
+  assert.equal(await reply(400, 'No Shift matches the given query.'), 'No Shift matches the given query.');
+});
+
 for (const kind of ['messages', 'ahpra poll', 'ahpra foreground']) {
   test(`${kind}: scheduled callback uses its original session; same session still refreshes`, async () => {
     for (const stale of [false, true]) {

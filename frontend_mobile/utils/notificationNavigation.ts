@@ -281,6 +281,33 @@ export const resolveShiftNotificationRoute = ({
   return link ? shiftRoute(target, { section: link.section, suffix }) : null;
 };
 
+/**
+ * Timesheet correction and leave notices (payload pharmacy_id + timesheet_id / leave_request_id). Managers of that
+ * pharmacy's roster open the manager screen; a worker's leave decision opens My leave. Undefined = not a workforce
+ * notice; null = a workforce notice this user cannot open (the calendar/membership resolvers must not take it).
+ */
+export const resolveWorkforceNotificationRoute = ({
+  actionUrl,
+  payload,
+  canManageRoster,
+}: ResolveRouteInput & { canManageRoster?: ((pharmacyId: number) => boolean) | null }): string | null | undefined => {
+  let timesheetId = Number(payload?.timesheet_id ?? payload?.timesheetId);
+  if (!(timesheetId > 0) && actionUrl) {
+    try {
+      const url = new URL(actionUrl, 'http://localhost');
+      if (url.pathname.includes('/workforce/timesheets')) timesheetId = Number(url.searchParams.get('timesheet'));
+    } catch {
+      // not a timesheet link
+    }
+  }
+  const leaveId = payload?.leave_request_id ?? payload?.leaveRequestId ?? null;
+  if (!(timesheetId > 0) && leaveId == null) return undefined;
+  const pharmacyId = Number(payload?.pharmacy_id ?? payload?.pharmacyId);
+  const manages = pharmacyId > 0 && Boolean(canManageRoster?.(pharmacyId));
+  if (timesheetId > 0) return manages ? `/workforce-timesheets/${timesheetId}` : null;
+  return manages ? `/workforce/leave-requests?pharmacy_id=${pharmacyId}` : '/my-leave';
+};
+
 export const resolveCalendarNotificationRoute = ({
   actionUrl,
   payload,

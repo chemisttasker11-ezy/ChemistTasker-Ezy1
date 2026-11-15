@@ -9,6 +9,7 @@ import {
     Shift,
     ShiftCounterOfferPayload,
     calculateShiftRates,
+    fetchShiftCounterOffersBatchService,
     fetchShiftCounterOffersService,
     getOnboardingDetail,
 } from '@chemisttasker/shared-core';
@@ -229,34 +230,40 @@ export const useCounterOffers = ({
 
         const fetchCounters = async () => {
             const updates: Record<number, CounterOfferTrack> = {};
+            // One request per 100 shifts (the server's batch cap), like web: one per shift exhausted the user throttle.
+            const remoteByShift: Record<number, any[]> = {};
+            try {
+                for (let start = 0; start < toFetch.length; start += 100) {
+                    Object.assign(remoteByShift, await fetchShiftCounterOffersBatchService(toFetch.slice(start, start + 100)));
+                }
+            } catch (err) {
+                console.warn('Failed to batch-load counter offers', err);
+                return;
+            }
             for (const shiftId of toFetch) {
-                try {
-                    const remote = await fetchShiftCounterOffersService(shiftId);
-                    const offers = currentUserId != null
-                        ? (remote || []).filter((offer: any) => getOfferUserId(offer) === currentUserId)
-                        : (remote || []);
-                    const validOffers = offers.filter(offerHasValidSlots);
-                    const slotsMap: Record<number, { rate: string; start: string; end: string }> = {};
-                    validOffers.forEach((offer: any) => {
-                        getOfferSlots(offer).forEach((slot: any) => {
-                            const slotId = getOfferSlotId(slot);
-                            if (slotId == null) return;
-                            slotsMap[slotId] = {
-                                rate: slot.proposedRate != null ? String(slot.proposedRate) : '',
-                                start: slot.proposedStartTime || slot.proposed_start_time || '',
-                                end: slot.proposedEndTime || slot.proposed_end_time || '',
-                            };
-                        });
-                    });
-                    const sentCount = Object.keys(slotsMap).length;
-                    if (sentCount > 0) {
-                        updates[shiftId] = {
-                            slots: { ...slotsMap },
-                            summary: `Counter offer sent (${sentCount} slot${sentCount > 1 ? 's' : ''})`,
+                const remote = remoteByShift[shiftId] || [];
+                const offers = currentUserId != null
+                    ? remote.filter((offer: any) => getOfferUserId(offer) === currentUserId)
+                    : remote;
+                const validOffers = offers.filter(offerHasValidSlots);
+                const slotsMap: Record<number, { rate: string; start: string; end: string }> = {};
+                validOffers.forEach((offer: any) => {
+                    getOfferSlots(offer).forEach((slot: any) => {
+                        const slotId = getOfferSlotId(slot);
+                        if (slotId == null) return;
+                        slotsMap[slotId] = {
+                            rate: slot.proposedRate != null ? String(slot.proposedRate) : '',
+                            start: slot.proposedStartTime || slot.proposed_start_time || '',
+                            end: slot.proposedEndTime || slot.proposed_end_time || '',
                         };
-                    }
-                } catch (err) {
-                    console.warn('Failed to fetch counter offers for shift', shiftId, err);
+                    });
+                });
+                const sentCount = Object.keys(slotsMap).length;
+                if (sentCount > 0) {
+                    updates[shiftId] = {
+                        slots: { ...slotsMap },
+                        summary: `Counter offer sent (${sentCount} slot${sentCount > 1 ? 's' : ''})`,
+                    };
                 }
             }
 

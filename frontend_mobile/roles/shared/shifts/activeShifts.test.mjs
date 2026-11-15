@@ -286,6 +286,36 @@ test('linked shift scroll offset is isolated by shift and workspace', () => {
   assert.equal(getLinkedShiftScrollY({ ...offset, y: NaN }, 41, 'pharmacy:7'), null);
 });
 
+test('a linked shift loads the confirmed detail when the active one 404s, and names the pharmacy to select (O4 N1)', async () => {
+  const { loadLinkedPosterShift, linkedShiftPharmacyToSelect } = runtime;
+  const notFound = Object.assign(new Error('gone'), { status: 404 });
+  const calls = [];
+  const active = async (id) => { calls.push(`active:${id}`); throw notFound; };
+  const confirmed = async (id) => { calls.push(`confirmed:${id}`); return { id, pharmacyDetail: { id: 9 } }; };
+  assert.deepEqual(plain(await loadLinkedPosterShift(78, active, confirmed)), { shift: { id: 78, pharmacyDetail: { id: 9 } }, booked: true });
+  assert.deepEqual(calls, ['active:78', 'confirmed:78']);
+  assert.deepEqual(plain(await loadLinkedPosterShift(78, async (id) => ({ id }), confirmed)), { shift: { id: 78 }, booked: false });
+  // Other failures are not a booked shift.
+  await assert.rejects(loadLinkedPosterShift(78, async () => { throw Object.assign(new Error('down'), { status: 500 }); }, confirmed), /down/);
+
+  const brisbane = { id: 78, pharmacyDetail: { id: 9 } };
+  assert.equal(linkedShiftPharmacyToSelect(brisbane, 4, 'owner'), 9);
+  assert.equal(linkedShiftPharmacyToSelect(brisbane, 4, 'organization'), 9);
+  assert.equal(linkedShiftPharmacyToSelect(brisbane, 9, 'owner'), null);
+  assert.equal(linkedShiftPharmacyToSelect(brisbane, null, 'owner'), null);
+  // The admin scope is the admin assignment, never switched from a link.
+  assert.equal(linkedShiftPharmacyToSelect(brisbane, 4, 'admin'), null);
+  assert.equal(linkedShiftPharmacyToSelect({ id: 78 }, 4, 'owner'), null);
+});
+
+test('the Shift Centre detail switches to the linked pharmacy and sends booked shifts to Confirmed', () => {
+  const src = readFileSync(new URL('./ActiveShiftsPage/index.tsx', import.meta.url), 'utf8');
+  const hook = readFileSync(new URL('./ActiveShiftsPage/hooks/useShiftsData.ts', import.meta.url), 'utf8');
+  assert.match(hook, /loadLinkedPosterShift\(shiftId, fetchPosterShiftDetailService, fetchConfirmedShiftDetailService\)/);
+  assert.match(src, /linkedShiftPharmacyToSelect\(linked\.shift, selectedPharmacyId, surface\.persona\)/);
+  assert.match(src, /router\.replace\(shiftRoute\(surface\.persona, \{ section: 'confirmed' \}\) as any\)/);
+});
+
 
 test('slot signature recomputation preserves state identity until values change', () => {
   const previous = { 1: { 2: true } };

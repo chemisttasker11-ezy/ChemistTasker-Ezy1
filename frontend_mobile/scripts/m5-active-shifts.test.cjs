@@ -331,10 +331,12 @@ function mountedActive(overrides = {}) {
     '@/utils/pushNotifications': { subscribeShiftSlotActivity: () => ({ remove() {} }) },
     '@chemisttasker/shared-core': core,
     '@/context/AuthContext': { useAuth: () => ({ user }) },
+    '@/context/WorkspaceContext': { useWorkspace: () => ({ setSelectedPharmacyId: async () => {}, setSelectedPharmacyName: async () => {} }) },
+    '../shiftSurface': load('roles/shared/shifts/shiftSurface.ts', {}),
     // overrides.fetchAll mounts the real data hook over mocked shared-core loaders.
     './hooks/useShiftsData': overrides.fetchAll ? load('roles/shared/shifts/ActiveShiftsPage/hooks/useShiftsData.ts', {
       react, '../utils/activeShiftRuntime': runtime,
-      '@chemisttasker/shared-core': { fetchAllActiveShifts: overrides.fetchAll, fetchPosterShiftDetailService: overrides.fetchDetail },
+      '@chemisttasker/shared-core': { fetchAllActiveShifts: overrides.fetchAll, fetchPosterShiftDetailService: overrides.fetchDetail, fetchConfirmedShiftDetailService: overrides.fetchConfirmed },
     }) : {
       useShiftsData: () => ({
         shifts: overrides.shifts ?? [card.shift],
@@ -362,7 +364,7 @@ function mountedActive(overrides = {}) {
     './hooks/useCounterOffers': {
       useCounterOffers: () => ({
         counterOffersByShift: { 12: [] }, counterOffersLoadingByShift: {},
-        counterOffersErrorByShift: {}, loadCounterOffers: async () => {},
+        counterOffersErrorByShift: {}, loadCounterOffers: async () => {}, loadCounterOffersBatch: async () => {},
         acceptOffer: async () => ({}), rejectOffer: async () => ({}),
         counterActionLoading: {}, updateOfferCache: () => {},
       }),

@@ -139,7 +139,8 @@ function createMarketplace(shared = {}) {
   const utils = load('frontend_mobile/features/parity/utils.ts', {});
   const policy = load('shared-core/src/policy/marketplacePolicy.ts', {});
   const pendingIntent = load('shared-core/src/domains/talent/pendingPitch.ts', { './api': {} }, { crypto: globalThis.crypto });
-  const sharedCore = { ...policy, ...pendingIntent, getApiConfig: () => ({ baseURL: 'https://api.test/api' }) };
+  const { NEW_LISTINGS_CLOSED } = load('shared-core/src/transport/errors.ts', { '../domains/onboarding/ahpra': { reportAhpraError: () => null } });
+  const sharedCore = { ...policy, ...pendingIntent, NEW_LISTINGS_CLOSED, getApiConfig: () => ({ baseURL: 'https://api.test/api' }) };
   const draftModule = load('frontend_mobile/features/parity/marketplaceDraft.ts', {
     '@react-native-async-storage/async-storage': { __esModule: true, default: store },
     '@chemisttasker/shared-core': sharedCore,

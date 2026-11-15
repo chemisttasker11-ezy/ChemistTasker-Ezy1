@@ -1,6 +1,6 @@
 import { apiUrl, assertAllowedPath } from './urls';
 import { responseError } from './errors';
-export { ApiError } from './errors';
+export { ApiError, NEW_LISTINGS_CLOSED, plainNotFoundMessage } from './errors';
 
 export type MaybePromise<T> = T | Promise<T>;
 export type ApiQueryValue = string | number | boolean | null | undefined;

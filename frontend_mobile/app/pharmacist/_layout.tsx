@@ -4,7 +4,7 @@ import { useGuardedNavigation, useUnsavedChangesRegistry } from '../../roles/sha
 import { View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '../../context/AuthContext';
-import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
+import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute, resolveWorkforceNotificationRoute } from '@/utils/notificationNavigation';
 import { triggerShiftSlotActivity } from '@/utils/pushNotifications';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
@@ -47,7 +47,7 @@ const titles: Record<string, string> = {
 };
 
 export default function PharmacistTabs() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, hasCapability } = useAuth();
   const router = useRouter();
   const unsavedRegistry = useUnsavedChangesRegistry();
   const guardedNavigation = useGuardedNavigation();
@@ -67,6 +67,15 @@ export default function PharmacistTabs() {
       });
       if (roomId) {
         guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId, persona) as any));
+        return;
+      }
+      const workforceRoute = resolveWorkforceNotificationRoute({
+        actionUrl: data.action_url ?? data.actionUrl ?? null,
+        payload: data,
+        canManageRoster: (pharmacyId) => hasCapability('MANAGE_ROSTER', pharmacyId),
+      });
+      if (workforceRoute !== undefined) {
+        if (workforceRoute) guardedNavigation(() => router.push(workforceRoute as any));
         return;
       }
       const calendarRoute = resolveCalendarNotificationRoute({
@@ -92,7 +101,7 @@ export default function PharmacistTabs() {
       }
     });
     return () => sub.remove();
-  }, [adminCan, guardedNavigation, persona, router, user?.role]);
+  }, [adminCan, guardedNavigation, hasCapability, persona, router, user?.role]);
 
   useEffect(() => {
     const sub = Notifications.addNotificationReceivedListener((notification) => {

@@ -7,7 +7,7 @@ import*as ImagePicker from'expo-image-picker';
 import{File,Paths}from'expo-file-system';
 import{chemistTaskerApi}from'@/config/api';
 import{useAuth}from'@/context/AuthContext';
-import{categoriesForSellerContext,clampMaximumAudience,nextMarketplaceAudience,permittedBuyerRolesForCategory,permittedModesForCategory,type MarketplaceCategory,type MarketplaceDashboardListing,type MarketplaceExchange,type MarketplaceListingOptions,type MarketplacePublicListing}from'@chemisttasker/shared-core';
+import{NEW_LISTINGS_CLOSED,categoriesForSellerContext,clampMaximumAudience,nextMarketplaceAudience,permittedBuyerRolesForCategory,permittedModesForCategory,type MarketplaceCategory,type MarketplaceDashboardListing,type MarketplaceExchange,type MarketplaceListingOptions,type MarketplacePublicListing}from'@chemisttasker/shared-core';
 import{ActionButtons,ChoiceChips,DataRow,EmptyState,Field,InfoNote,MetricGrid,ParityPage,Section,palette}from'./ParityUI';
 import{asArray,dateLabel,errorMessage,idempotencyKey,money,replaceUnderscore,toNumber}from'./utils';
 import{clearMarketplaceDraft,emptyMarketplaceDraft,loadMarketplaceDraft,loadSettledMarketplaceDraft,patchMarketplaceDraft,loadMarketplaceIntent,pendingMarketplaceIntent,saveMarketplaceIntent,releaseMarketplaceIntent,recoverMarketplaceIntent,UNREADABLE_INTENT,type MarketplaceMobileDraft,type MarketplacePendingIntent}from'./marketplaceDraft';
@@ -60,6 +60,8 @@ function MarketplaceParityContent({screen}:{screen:MarketplaceScreen}){
    finally{if(moreRequest===moreRequestRef.current){moreBusyRef.current=false;setLoadingMore(false);}}
  };
 
+ // The server's new-listings switch is off: no editor, since saving would only fail (503 NEW_LISTINGS_DISABLED).
+ if(['seller','category','details','photos','audience','review'].includes(screen)&&options?.new_listings_enabled===false)return <ParityPage title="Create listing" subtitle="Marketplace"><EmptyState title={NEW_LISTINGS_CLOSED} body="You can still browse listings. Check back soon to list your own."/></ParityPage>;
  if(screen==='seller')return <SellerStep draft={draft} options={options} loading={loading} error={error} onReload={load}/>;
  if(screen==='category')return <CategoryStep draft={draft} options={options} loading={loading} error={error}/>;
  if(screen==='details')return <DetailsStep draft={draft} options={options} loading={loading} error={error}/>;

@@ -13,6 +13,7 @@ import {
   resolveHubNotificationRoute,
   resolveMembershipNotificationRoute,
   resolveShiftNotificationRoute,
+  resolveWorkforceNotificationRoute,
 } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
@@ -32,7 +33,7 @@ type Notification = {
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, hasCapability } = useAuth();
   // /admin/notifications opens admin routes even though a delegated admin's role is PHARMACIST, OWNER etc.
   const persona = shiftPersonaFromPath(usePathname());
   const adminCan = useAdminCan();
@@ -235,6 +236,15 @@ export default function NotificationsScreen() {
     });
     if (route) {
       router.push(route as any);
+      return;
+    }
+    const workforceRoute = resolveWorkforceNotificationRoute({
+      actionUrl: item.actionUrl,
+      payload: item.payload,
+      canManageRoster: (pharmacyId) => hasCapability('MANAGE_ROSTER', pharmacyId),
+    });
+    if (workforceRoute !== undefined) {
+      if (workforceRoute) router.push(workforceRoute as any);
       return;
     }
     const calendarRoute = resolveCalendarNotificationRoute({

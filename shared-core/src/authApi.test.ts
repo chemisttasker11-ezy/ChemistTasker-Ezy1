@@ -55,7 +55,9 @@ function mobileProvider(os = 'ios') {
   const exports: any = {};
   const mocks: Record<string, any> = {
     react: { ...react, default: react },
-    'react-native': { Platform: { OS: os }, Alert: { alert: vi.fn() } },
+    'react-native': { Platform: { OS: os }, Alert: { alert: vi.fn() }, AppState: { addEventListener: () => ({ remove() {} }) } },
+    // AuthContext re-verifies an offline start on reconnect (172622e8).
+    '@react-native-community/netinfo': { default: { addEventListener: () => () => {} } },
     '@chemisttasker/shared-core': { getOnboarding: onboarding, logoutSession: logout },
     '../utils/authSession': env.session,
     '../utils/nativeIdentityTransport': { nativeIdentityTransport: { currentUser } },

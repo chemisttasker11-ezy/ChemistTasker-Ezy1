@@ -2,8 +2,8 @@
 // Mirrors web logic for loading active shifts
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { type Shift, fetchAllActiveShifts, fetchPosterShiftDetailService } from '@chemisttasker/shared-core';
-import { filterShiftsByPharmacy, getNextGeneration, isLatestGeneration } from '../utils/activeShiftRuntime';
+import { type Shift, fetchAllActiveShifts, fetchConfirmedShiftDetailService, fetchPosterShiftDetailService } from '@chemisttasker/shared-core';
+import { filterShiftsByPharmacy, getNextGeneration, isLatestGeneration, loadLinkedPosterShift } from '../utils/activeShiftRuntime';
 
 const EMPTY_SHIFTS: Shift[] = [];
 
@@ -19,6 +19,8 @@ export function useShiftsData({ selectedPharmacyId, shiftId, scopeKey, notificat
     const [shifts, setShifts] = useState<Shift[]>(EMPTY_SHIFTS);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // The linked shift (shiftId) as the server returned it, before the pharmacy filter.
+    const [linked, setLinked] = useState<{ shift: Shift; booked: boolean } | null>(null);
     const generationsRef = useRef<Record<string, number>>({});
 
     const loadShifts = useCallback(async () => {
@@ -29,9 +31,10 @@ export function useShiftsData({ selectedPharmacyId, shiftId, scopeKey, notificat
         setError(null);
         try {
             if (shiftId != null) {
-                const detail = await fetchPosterShiftDetailService(shiftId);
+                const found = await loadLinkedPosterShift(shiftId, fetchPosterShiftDetailService, fetchConfirmedShiftDetailService);
                 if (!isLatestGeneration(generationsRef.current, genKey, generation)) return;
-                const result = detail ? filterShiftsByPharmacy([detail], selectedPharmacyId) : EMPTY_SHIFTS;
+                setLinked(found);
+                const result = found.booked ? EMPTY_SHIFTS : filterShiftsByPharmacy([found.shift], selectedPharmacyId);
                 setShifts(result.length > 0 ? result : EMPTY_SHIFTS);
             } else {
                 const mapped = await fetchAllActiveShifts();
@@ -65,6 +68,7 @@ export function useShiftsData({ selectedPharmacyId, shiftId, scopeKey, notificat
         setShifts,
         loading,
         error,
+        linked,
         loadShifts,
     };
 }

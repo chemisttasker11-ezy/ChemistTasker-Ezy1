@@ -90,8 +90,7 @@ test('R candidate offers to separate dates remain independent while one request 
   assert.equal(h.notices.filter(x=>x.includes('Offer sent')).length,2);
 });
 
-function hookHarness(file,core){
-  const react={useState:v=>[v,()=>{}],useRef:v=>({current:v}),useCallback:fn=>fn,useEffect:()=>{}};
+function hookHarness(file,core,react={useState:v=>[v,()=>{}],useRef:v=>({current:v}),useCallback:fn=>fn,useEffect:()=>{}}){
   const source=path.resolve(__dirname,'../roles/shared/shifts/ActiveShiftsPage/hooks',file);
   const result=ts.transpileModule(fs.readFileSync(source,'utf8'),{
     compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,esModuleInterop:true}
@@ -115,6 +114,38 @@ function counterHarness(){
     rejectShiftCounterOfferService:reject.service,fetchShiftCounterOffersService:async()=>[]});
   return {accept,reject,offers:hook.useCounterOffers('owner:7')};
 }
+test('R counter offers for N visible shifts load in one batch request, 100 ids per request (O4 N2)',async()=>{
+  const batches=[],singles=[],state={};
+  // useState slots in call order: offers, loading, error by shift.
+  let slot=0;const react={useState:v=>{const key=slot++;state[key]=v;return [v,u=>{state[key]=typeof u==='function'?u(state[key]):u;}];},
+    useRef:v=>({current:v}),useCallback:fn=>fn,useEffect:()=>{}};
+  const hook=hookHarness('useCounterOffers.ts',{acceptShiftCounterOfferService:async()=>{},rejectShiftCounterOfferService:async()=>{},
+    fetchShiftCounterOffersService:async id=>{singles.push(id);return [];},
+    fetchShiftCounterOffersBatchService:async ids=>{batches.push(ids);
+      if(ids.includes(666))throw Error('throttled');
+      return Object.fromEntries(ids.filter(id=>id!==5).map(id=>[id,[{id:id*10,status:'PENDING'},{id:1,status:'ACCEPTED'}]]));}},react);
+  const offers=hook.useCounterOffers('owner:7');
+  const ids=Array.from({length:47},(_,i)=>i+1);
+  await offers.loadCounterOffersBatch(ids);
+  const plain=v=>JSON.parse(JSON.stringify(v));
+  assert.deepEqual(plain(batches),[ids]);
+  assert.deepEqual(singles,[]);
+  assert.deepEqual(plain(state[0][3]),[{id:30,status:'PENDING'}]);
+  // A shift the server left out (not visible to this user) shows no offers, not a spinner.
+  assert.deepEqual(plain(state[0][5]),[]);
+  assert.equal(state[1][3],false);
+  batches.length=0;
+  await offers.loadCounterOffersBatch(Array.from({length:150},(_,i)=>i+101));
+  assert.deepEqual(plain(batches.map(chunk=>chunk.length)),[100,50]);
+  await offers.loadCounterOffersBatch([666,667]);
+  assert.equal(state[2][667],'throttled');
+  assert.deepEqual(plain(state[0][667]),[]);
+  const centre=fs.readFileSync(path.resolve(__dirname,'../roles/shared/shifts/ActiveShiftsPage/index.tsx'),'utf8');
+  assert.match(centre,/loadCounterOffersBatch\(missing\)/);
+  assert.doesNotMatch(centre,/forEach\(\(shift\) => \{[^}]*loadCounterOffers\(shift\.id\)/);
+  const board=fs.readFileSync(path.resolve(__dirname,'../roles/shared/shifts/ShiftsBoard/hooks/useCounterOffers.ts'),'utf8');
+  assert.match(board,/fetchShiftCounterOffersBatchService\(toFetch\.slice\(start, start \+ 100\)\)/);
+});
 test('R counter-offer accept sends once on same-render taps, then permits a retry',async()=>{
   const h=counterHarness();
   const offer={id:555};

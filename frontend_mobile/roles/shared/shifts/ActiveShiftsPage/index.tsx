@@ -24,6 +24,7 @@ import {
     buzzShiftOffer,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
+import { useWorkspace } from '@/context/WorkspaceContext';
 
 // Hooks
 import { useShiftsData } from './hooks/useShiftsData';
@@ -36,6 +37,7 @@ import { useShareShift } from './hooks/useShareShift';
 
 // Components
 import { useShiftSurface } from '../useShiftSurface';
+import { shiftRoute } from '../shiftSurface';
 import { ContentState } from '@/components/ui/ContentState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import CounterOfferDialog from './components/Dialogs/CounterOfferDialog';
@@ -69,6 +71,7 @@ import {
     mergeSlotSignatures,
     unchangedSlotState,
     getLinkedShiftScrollY,
+    linkedShiftPharmacyToSelect,
 } from './utils/activeShiftRuntime';
 
 type ShiftSurface = ReturnType<typeof useShiftSurface>;
@@ -169,13 +172,24 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
         // Content-size and row-layout events can arrive in either order on Android/iOS.
         requestAnimationFrame(scrollToLinkedShift);
     }, [shiftId, surface.scopeKey, scrollToLinkedShift]);
-    const { shifts, setShifts, loading: shiftsLoading, error: shiftsError, loadShifts } = useShiftsData({
+    const { shifts, setShifts, loading: shiftsLoading, error: shiftsError, linked, loadShifts } = useShiftsData({
         selectedPharmacyId,
         shiftId,
         scopeKey: surface.scopeKey,
         notificationKey,
         enabled: surface.canManageShifts,
     });
+    const { setSelectedPharmacyId, setSelectedPharmacyName } = useWorkspace();
+    // A notification can link a shift at another pharmacy (select it) or a shift that is now fully booked (Confirmed).
+    useEffect(() => {
+        if (!linked || !surface.persona) return;
+        const switchTo = linkedShiftPharmacyToSelect(linked.shift, selectedPharmacyId, surface.persona);
+        if (switchTo != null) {
+            void setSelectedPharmacyId(switchTo);
+            void setSelectedPharmacyName((linked.shift as any).pharmacyDetail?.name ?? null);
+        }
+        if (linked.booked) router.replace(shiftRoute(surface.persona, { section: 'confirmed' }) as any);
+    }, [linked, router, selectedPharmacyId, setSelectedPharmacyId, setSelectedPharmacyName, surface.persona]);
     const { tabData, setTabData, loadTabDataForShift } = useTabData(shifts, selectedLevelByShift, getTabKey);
 
     // Notification links focus the exact shift and slot, without overriding later manual selection.
@@ -277,6 +291,7 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
         counterOffersLoadingByShift,
         counterOffersErrorByShift,
         loadCounterOffers,
+        loadCounterOffersBatch,
         acceptOffer,
         rejectOffer,
         counterActionLoading,
@@ -867,12 +882,10 @@ const ActiveShiftsCentre: React.FC<ActiveShiftsCentreProps> = ({ surface, shiftI
     }, []);
 
     useEffect(() => {
-        shifts.forEach((shift) => {
-            if (Object.prototype.hasOwnProperty.call(counterOffersByShift, shift.id)) return;
-            if (counterOffersLoadingByShift[shift.id]) return;
-            loadCounterOffers(shift.id);
-        });
-    }, [shifts, counterOffersByShift, counterOffersLoadingByShift, loadCounterOffers]);
+        const missing = shifts.map(shift => shift.id).filter(id =>
+            !Object.prototype.hasOwnProperty.call(counterOffersByShift, id) && !counterOffersLoadingByShift[id]);
+        if (missing.length) void loadCounterOffersBatch(missing);
+    }, [shifts, counterOffersByShift, counterOffersLoadingByShift, loadCounterOffersBatch]);
 
     useEffect(() => {
         if (!slotSeenReady) return;

@@ -32,7 +32,7 @@ import {
   Wallet,
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
-import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute } from '@/utils/notificationNavigation';
+import { resolveCalendarNotificationRoute, resolveChatNotificationRoomId, resolveShiftNotificationRoute, resolveWorkforceNotificationRoute } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
 import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
 import { useAdminCan } from '@/context/AdminWorkspaceContext';
@@ -131,7 +131,7 @@ export default function OwnerLayout() {
   const router = useRouter();
   const unsavedRegistry = useUnsavedChangesRegistry();
   const guardedNavigation = useGuardedNavigation();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, hasCapability } = useAuth();
   const pathname = usePathname();
   // Push taps open in the active shell (a delegated admin in /admin stays there), not the base role's.
   const persona = shiftPersonaFromPath(pathname) ?? 'owner';
@@ -215,6 +215,15 @@ export default function OwnerLayout() {
         guardedNavigation(() => router.push(getMessageDetailRoute(user?.role, roomId, persona) as any));
         return;
       }
+      const workforceRoute = resolveWorkforceNotificationRoute({
+        actionUrl: data.action_url ?? data.actionUrl ?? null,
+        payload: data,
+        canManageRoster: (pharmacyId) => hasCapability('MANAGE_ROSTER', pharmacyId),
+      });
+      if (workforceRoute !== undefined) {
+        if (workforceRoute) guardedNavigation(() => router.push(workforceRoute as any));
+        return;
+      }
       const calendarRoute = resolveCalendarNotificationRoute({
         actionUrl: data.action_url ?? data.actionUrl ?? null,
         payload: data,
@@ -240,7 +249,7 @@ export default function OwnerLayout() {
       }
     });
     return () => sub.remove();
-  }, [adminCan, guardedNavigation, persona, router, user?.role]);
+  }, [adminCan, guardedNavigation, hasCapability, persona, router, user?.role]);
 
   const { backTarget, isPharmacyDetail } = useMemo(() => {
     if (!pathname) return { backTarget: null, isPharmacyDetail: false };
