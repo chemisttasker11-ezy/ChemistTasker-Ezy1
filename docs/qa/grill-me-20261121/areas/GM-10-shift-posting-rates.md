@@ -44,6 +44,8 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM-10-Q10 | Web + Expo |
 | GM-10-Q11 | Web + Expo |
 | GM-10-Q12 | Web + Expo |
+| GM-10-OD-09 — The server refuses shift dates before today or more than 4 months ahead | Web + Expo |
+| GM-10-OD-10 — Reminder of your own decision: Expo Post shift has no separate draft/publish | Expo only |
 
 ## Bases (exact SHAs verified 2026-11-21)
 
@@ -355,3 +357,22 @@ Progress label (per Issue #250): **CURRENT FLOW TRACED**. It advances to OWNER D
 6. **Tests:** no posting/pricing tests were inspected in this trace; test coverage for the §1 matrix is unverified.
 
 *No code changes were made in this trace. No PR/issue/comment/branch created. No owner was notified.*
+
+## Added 2026-11-22: decisions the orchestrator made for you
+From the orchestrator's decision logs (`DECISIONS_FOR_OWNER.md`, `DECISIONS_2026-11-11.md`, `DECISIONS_2026-11-12.md`). Code: `origin/agent/pr257-int` `47506e67`. "Yes" keeps the recommendation. Nothing is built from your answer until the whole grill ends.
+
+### GM-10-OD-09: The server refuses shift dates before today or more than 4 months ahead (OD-09, D64/D147)
+**Platforms:** Web + Expo
+**What happens today:** New posts, recurring end dates and date edits are refused unless the date is between today and the end of the 4th month ahead, in the pharmacy's time zone. Before, only the screens checked this. (Roster planning is W-01, asked separately.)
+**Already implemented:** pr257, `backend/shifts/posting.py:66`, `:228`
+**Recommendation:** Keep.
+**Other option:** A different window, or past dates allowed for record-keeping.
+**Status:** OPEN, confirm or change.
+
+### GM-10-OD-10: Reminder of your own decision: Expo Post shift has no separate draft/publish (OD-10, your D36 (4 Nov))
+**Platforms:** Expo only
+**What happens today:** Web lets an owner save a draft and publish later (GM-10-Q09). Expo posts straight away. Templates are on Expo now. You decided on 4 Nov that the Shifts, Shift Centre and Post shift redesign (web look plus every web feature) happens in a separate pass at the end.
+**Code:** not built yet
+**Recommendation:** Keep your D36: do it in the end pass, after the grill.
+**Other option:** Build draft/publish on Expo before launch.
+**Status:** OPEN, confirm or change.

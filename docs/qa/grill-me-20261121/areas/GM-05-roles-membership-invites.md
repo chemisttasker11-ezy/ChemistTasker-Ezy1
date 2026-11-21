@@ -49,6 +49,10 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Q-17 | Web + Expo |
 | Q-18 | Web + Expo |
 | Q-19 | Web + Expo |
+| GM-05-OD-03 — Attendance approvals and the roster need both staff and roster rights | Web + Expo |
+| GM-05-OD-04 — Organisation tabs are hidden when Lina lacks the right | Web + Expo |
+| GM-05-OD-05 — A new invitee with no name shows as their email address | Web + Expo |
+| GM-05-OD-06 — When Ali is removed, what happens to his future roster shifts? | Web + Expo |
 
 ## ⚠️ Verification limits (read this first)
 
@@ -469,3 +473,38 @@ Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + new
 
 ### GM-05-W02: Explorers can never hold an admin role: answered (D96)
 **Answered:** owner, 13 Nov (D96): "block explorer be an admin". Built as one shared guard, `pr257:backend/access_control/admin_roles.py`, on every grant path (D107, D114). It blocks new grants and widening of access; ending or maintaining a historical assignment is still allowed. **On the Expo branch only:** deployed main (`8ccf8f77`) doesn't have the guard yet; it ships with the PR #257 release. Not re-asked. The production clean-up question is GM-24-W01.
+
+## Added 2026-11-22: decisions the orchestrator made for you
+From the orchestrator's decision logs (`DECISIONS_FOR_OWNER.md`, `DECISIONS_2026-11-11.md`, `DECISIONS_2026-11-12.md`). Code: `origin/agent/pr257-int` `47506e67`. "Yes" keeps the recommendation. Nothing is built from your answer until the whole grill ends.
+
+### GM-05-OD-03: Attendance approvals and the roster need both staff and roster rights (OD-03, decisions-for-owner 6h)
+**Platforms:** Web + Expo
+**What happens today:** On Expo, as on web, an admin sees attendance approvals and the roster only with both staff and roster rights. Argon suggested roster rights alone; I kept the web rule.
+**Already implemented:** pr257, same rule as web
+**Recommendation:** Keep the web rule.
+**Other option:** Roster rights alone are enough.
+**Status:** OPEN, confirm or change.
+
+### GM-05-OD-04: Organisation tabs are hidden when Lina lacks the right (OD-04, decisions-for-owner 6g)
+**Platforms:** Web + Expo
+**What happens today:** An organisation tab Lina may not use is hidden (as on web), not shown with a "not allowed" message.
+**Already implemented:** pr257
+**Recommendation:** Keep.
+**Other option:** Show the tab with a "not allowed" note.
+**Status:** OPEN, confirm or change.
+
+### GM-05-OD-05: A new invitee with no name shows as their email address (OD-05, D162)
+**Platforms:** Web + Expo
+**What happens today:** An invite to a new email creates an account with no name. Rosters, leave and timesheets used to crash on that (HTTP 500 for the whole roster). They now show the email address until the person sets a name.
+**Already implemented:** commit 7855bbd8
+**Recommendation:** Keep.
+**Other option:** Require a name when inviting.
+**Status:** OPEN, confirm or change.
+
+### GM-05-OD-06: When Ali is removed, what happens to his future roster shifts? (OD-06, D181 (five-user run A6), extends Q-09)
+**Platforms:** Web + Expo
+**What happens today:** After removal Ali can no longer clock in or open the workspace roster, but his own roster still lists a future Southport shift (24 Nov), and that slot still counts as filled.
+**Code:** not a choice I made: found in the five-user run
+**Recommendation:** Take him off future roster shifts at removal and tell the manager those shifts need cover.
+**Other option:** Hide them from Ali only, leaving the slots for the manager to fix; or leave them as they are.
+**Status:** OPEN, confirm or change.

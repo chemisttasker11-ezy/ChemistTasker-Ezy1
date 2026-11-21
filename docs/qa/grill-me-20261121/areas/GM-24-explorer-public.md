@@ -64,6 +64,9 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM-24-Q30 — Who can rate, and when? | Web + Expo |
 | GM-24-Q31 — Accepted terms don't include the cancellation table or terms version. | Web + Expo |
 | GM-24-Q32 — Must every onboarding step work on mobile at launch? | Web + Expo |
+| GM-24-OD-15 — Learning pages show the "Careers & learning" articles | Web + Expo |
+| GM-24-OD-16 — Public shift links and the signed-out shift board are on Expo too | Expo only |
+| GM-24-OD-17 — Referee forms stay web-only (intended) | Web only |
 
 ## 1. Traced flow — ACTUAL TODAY
 
@@ -648,3 +651,30 @@ Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + new
 
 ### Answered, not re-asked: role conversion to Explorer (owner, 13 Nov, D93)
 "Explorer will not get invoices and owner or pharmacist will not change to explorer." Any question about a pharmacist or owner becoming an Explorer, or about Explorer invoices, is answered: it doesn't happen. The Explorer-to-Pharmacist upgrade (section 1.4) stays in scope.
+
+## Added 2026-11-22: decisions the orchestrator made for you
+From the orchestrator's decision logs (`DECISIONS_FOR_OWNER.md`, `DECISIONS_2026-11-11.md`, `DECISIONS_2026-11-12.md`). Code: `origin/agent/pr257-int` `47506e67`. "Yes" keeps the recommendation. Nothing is built from your answer until the whole grill ends.
+
+### GM-24-OD-15: Learning pages show the "Careers & learning" articles (OD-15, D155/D184)
+**Platforms:** Web + Expo
+**What happens today:** The learning pages (Vite web, Next, Expo) asked for a topic called "learning" that does not exist, so articles written in the editor never appeared. They now show the existing "Careers & learning" topic. Rows the seed wrote with the old topic need a one-off data fix in production.
+**Already implemented:** commits 7855bbd8 and 22ceb013, `frontend_mobile/features/explore/ArticleFeed.tsx:40`, `frontend_web/src/pages/dashboard/sidebar/LearningMaterialsPage.tsx:212`, `frontend_web/landing_next/app/(public)/learning/page.tsx:47`
+**Recommendation:** Keep. Run the data fix at the production release.
+**Other option:** A separate "Learning" topic in the editor.
+**Status:** OPEN, confirm or change.
+
+### GM-24-OD-16: Public shift links and the signed-out shift board are on Expo too (OD-16, decisions-for-owner 23)
+**Platforms:** Expo only
+**What happens today:** Web had a public share link for a shift and a signed-out shift board. Expo now has both, so a shared link works on a phone.
+**Already implemented:** pr257, `frontend_mobile/app/shifts/public-board.tsx`
+**Recommendation:** Keep.
+**Other option:** Web only.
+**Status:** OPEN, confirm or change.
+
+### GM-24-OD-17: Referee forms stay web-only (intended) (OD-17, D76f)
+**Platforms:** Web only
+**What happens today:** Referees are outside people who open an emailed link, so their questionnaire and decline pages stay on the web. The app has no referee screens.
+**Already implemented:** pr257
+**Recommendation:** Keep web-only.
+**Other option:** Add them to the app.
+**Status:** OPEN, confirm or change.

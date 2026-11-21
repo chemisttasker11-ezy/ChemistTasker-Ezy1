@@ -48,6 +48,7 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM17-Q17 | Web + Expo |
 | GM17-Q18 | Web + Expo |
 | GM-17-W01 | Web + Expo |
+| GM-17-OD-12 — Organisation Invoices are on Expo but not in web's organisation menu | Web + Expo |
 
 ## 0. The one fact that frames everything: there are TWO money systems
 
@@ -348,3 +349,14 @@ Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + new
 
 ### GM-17-W01: Must companion or super invoices be approved before payment? (W-14, register item 1): answered
 **Answered:** R1 (carried owner decision): an owner may record an invoice payment without approval, because pharmacies often pay through other channels. Register item 1 is closed by R1; not re-asked. If the platform ever takes invoice payments itself (not today), ask again then.
+
+## Added 2026-11-22: decisions the orchestrator made for you
+From the orchestrator's decision logs (`DECISIONS_FOR_OWNER.md`, `DECISIONS_2026-11-11.md`, `DECISIONS_2026-11-12.md`). Code: `origin/agent/pr257-int` `47506e67`. "Yes" keeps the recommendation. Nothing is built from your answer until the whole grill ends.
+
+### GM-17-OD-12: Organisation Invoices are on Expo but not in web's organisation menu (OD-12, decisions-for-owner 5)
+**Platforms:** Web + Expo
+**What happens today:** Expo keeps an Invoices entry for organisations. Web's organisation menu has none. We never drop features, so I kept it on Expo.
+**Already implemented:** pr257
+**Recommendation:** Keep it on Expo and add the same link to web's organisation menu later.
+**Other option:** Remove it from Expo to match web.
+**Status:** OPEN, confirm or change.

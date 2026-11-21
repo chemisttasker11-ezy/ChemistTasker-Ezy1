@@ -90,6 +90,8 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM-26-W02: Dependabot pull requests | Web + Expo |
 | GM-26-W03: Keep the node-forge 1.4.1 RSA patch? | Web + Expo |
 | GM-26-W04: When does the minimatch 3.1.5 exception end? | Web + Expo |
+| GM-26-OD-23 — Resend-protection records are kept forever | Web + Expo |
+| GM-26-OD-24 — Three small risks I accepted | Web + Expo |
 
 ## §0 — Verification status (read this first)
 
@@ -861,3 +863,22 @@ Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + new
 **What happens today:** the gate accepts only the fingerprinted root copy, which lacks the vulnerable function.
 **Recommendation first:** remove it when Expo / React Native leave glob 7 or the advisory range is corrected; re-check at every Expo SDK upgrade. Technical sign-off.
 **Status:** OPEN (technical sign-off)
+
+## Added 2026-11-22: decisions the orchestrator made for you
+From the orchestrator's decision logs (`DECISIONS_FOR_OWNER.md`, `DECISIONS_2026-11-11.md`, `DECISIONS_2026-11-12.md`). Code: `origin/agent/pr257-int` `47506e67`. "Yes" keeps the recommendation. Nothing is built from your answer until the whole grill ends.
+
+### GM-26-OD-23: Resend-protection records are kept forever (OD-23, D68)
+**Platforms:** Web + Expo
+**What happens today:** To stop duplicates, the server keeps a small record for each protected request (shift posts, marketplace and ethical-marketplace saves, talent pitches). There is no clean-up job.
+**Already implemented:** pr257, `backend/shifts/models.py:892`, `backend/marketplace/models.py:321`, `backend/ethical_marketplace/models.py:320`
+**Recommendation:** Keep at launch; add a clean-up later (for example after 12 months).
+**Other option:** Delete them after a set time from launch.
+**Status:** OPEN, confirm or change.
+
+### GM-26-OD-24: Three small risks I accepted (OD-24, D103, D115, D137)
+**Platforms:** Web + Expo
+**What happens today:** (a) After switching accounts, the app may still read public data without signing in (no identity crosses). (b) The explorer-admin guard trusts the stored role, which matters only if a role changes to or from Explorer (you said that never happens, D93). (c) A counter-offer resend fails with an error if the worker's onboarding record was deleted in between.
+**Already implemented:** pr257
+**Recommendation:** Accept all three.
+**Other option:** Reopen any of them as work.
+**Status:** OPEN, confirm or change.

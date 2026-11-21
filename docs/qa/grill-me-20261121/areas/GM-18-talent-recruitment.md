@@ -24,7 +24,7 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
 | Authenticated talent board browsing | Renders talent cards with client-side role and category filters (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:41`; Next has migrated copy `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:75`). | Renders talent cards with identical filters (`frontend_mobile/roles/shared/talent-board/index.tsx:94`). | Yes | - |
-| Public talent board browsing | Public route serves masked cards to logged-out visitors (`frontend_web/src/pages/PublicTalentBoardPage.tsx:18`; Next dynamic import `frontend_web/landing_next/public/runtime.tsx:26`). | Mobile route enforces authenticated session (`frontend_mobile/app/explore/talent-board.tsx:22`). | No | parity question (public discovery is web-first for SEO/marketing, whereas mobile app expects sign-in) |
+| Public talent board browsing | Signed-out visitors browse the public talent feed. | Signed-out visitors browse the same public feed at /explore/talent-board; every `explore` route is public (`frontend_mobile/app/explore/talent-board.tsx`, `frontend_mobile/app/_layout.tsx:315-317`). | Yes | Corrected 22 Nov (orchestrator review): the earlier row said Expo needs sign-in; it does not. |
 | Worker creates / edits talent profile | Worker writes pitch and copies availability via pitch dialog (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:264`). | Worker writes pitch and copies availability via pitch modal (`frontend_mobile/roles/shared/talent-board/index.tsx:210`). | Yes | - |
 | Request booking modal / route | Tapping "Request booking" opens embedded post-shift modal prefilled with worker (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:271`). | Tapping "Request booking" navigates to mobile post-shift screen (`frontend_mobile/roles/shared/talent-board/index.tsx:315`). | Yes | - |
 | Role gating on "Request booking" | Restricted to 9 hiring roles; `PHARMACY_MANAGER` is excluded (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:195`). | Permits any non-worker role; `PHARMACY_MANAGER` is allowed (`frontend_mobile/roles/shared/talent-board/index.tsx:180`). | No | Verified 21 Nov: real drift. Web allows a fixed role list or an admin (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:208-226`); Expo allows any role except Explorer, pharmacist and other staff (`frontend_mobile/roles/shared/talent-board/index.tsx:322-326`). Owner choice: one hiring-role policy (GM-18 Q15, GM-05 Q-17); then align both (BL-24). |
@@ -60,6 +60,7 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM-18-Q24 | Web + Expo |
 | GM-18-Q25 | Web + Expo |
 | GM-18-Q26 | Web + Expo |
+| GM-18-OD-13 — Resending a talent pitch never creates a duplicate | Web + Expo |
 
 ## 0. Reconstruction note — read this first
 
@@ -672,3 +673,14 @@ Plain English: today, anyone who signs in can see everyone. A locum posts "open 
 - **Not traced in this area (owned elsewhere, cited as adopted):** the matching engine internals (GM-19), the AHPRA desktop verifier's staging trial (GM-02), the terms snapshot fields (GM-15), the fee table and GST (GM-17), the posting/acceptance view layer and its role gates (GM-10/GM-12), chat/enquiry surfaces (GM-20), the Next launch scope (GM-25), legal review of charges (GM-26).
 - **Not verified:** the content diff between the two mobile `useTalentFeed` copies (sizes differ: 3,041 vs 2,948 bytes); the `charge_penalty` view-level eligibility guard (function verified, wrapper not re-read); whether the public talent-board page is linked/indexed; the exact recipient cap in match emails (GM-19, verified to exist, not quoted).
 - **No 429s, no drift:** PR #249 head verified live as `97c4543e…`; PR #267 head `25248b70e785`; main `8ccf8f7` per task (search index ref matches).
+
+## Added 2026-11-22: decisions the orchestrator made for you
+From the orchestrator's decision logs (`DECISIONS_FOR_OWNER.md`, `DECISIONS_2026-11-11.md`, `DECISIONS_2026-11-12.md`). Code: `origin/agent/pr257-int` `47506e67`. "Yes" keeps the recommendation. Nothing is built from your answer until the whole grill ends.
+
+### GM-18-OD-13: Resending a talent pitch never creates a duplicate (OD-13, O1 (7 Nov))
+**Platforms:** Web + Expo
+**What happens today:** A resend within 30 days returns the first result. After 30 days it is refused as expired, never duplicated. Resending a deleted pitch says it was deleted and does not restore it. Old app versions without this protection cannot create public pitches (they need the updated app; there are no such versions in the stores yet).
+**Already implemented:** pr257, `backend/talent/test_pitch_idempotency.py:110`
+**Recommendation:** Keep.
+**Other option:** A shorter or longer window.
+**Status:** OPEN, confirm or change.

@@ -5,7 +5,7 @@ This is the one page Tom (the owner) goes through. It sits on top of the 27 area
 **How we go through it (grilling method):** one area at a time. Each area is a design tree. Every round asks the whole current **frontier**: the numbered questions whose prerequisites are already settled, each with the recommendation, worded so that "yes" accepts it. A question that depends on one still open waits for a later round. Facts are looked up in the code, never asked of you. An area is done only when its frontier is empty and you confirm we share the same understanding; then the next area starts. Answers are **recorded only, not built**: building starts after the whole grill. Where an answer is already live in code, the question says "already implemented: <file:line>". Settled terms go into the root [`GLOSSARY.md`](../../../GLOSSARY.md); an ADR is offered only for hard-to-reverse, surprising trade-offs. Answers are written under the question in the area file and in [`OWNER_DECISION_LEDGER.md`](OWNER_DECISION_LEDGER.md).
 
 **Code the answers rest on (checked 21 Nov):**
-- **Web and Expo together: `origin/agent/pr257-int` at `21add924`.** This branch changed the web too (sessions, Explorer rules, posting window and more) and is what merges to main, so it is the "today" for both. Every area file has a "Web and Expo today, side by side" table (pr257 refs in every cell, 361 of 364 refs checked to exist, 3 corrected) and a "Platforms per question" table (Web + Expo, Web only, Expo only). Of 175 flows, 19 differ, and each is marked intended (web only / Expo only), a parity question, or a possible defect. 7 rows were flagged as possible defects and checked in code (2 confirmed, BL-24 and BL-25; 1 confirmed as BL-08; 1 refuted; 2 intended; 1 a parity question).
+- **Web and Expo together: `origin/agent/pr257-int` at `21add924`.** This branch changed the web too (sessions, Explorer rules, posting window and more) and is what merges to main, so it is the "today" for both. Every area file has a "Web and Expo today, side by side" table (pr257 refs in every cell, 361 of 364 refs checked to exist, 3 corrected) and a "Platforms per question" table (Web + Expo, Web only, Expo only). Of 175 flows, 19 differ, and each is marked intended (web only / Expo only), a parity question, or a possible defect. 7 rows were flagged as possible defects and checked in code (2 confirmed, BL-26 and BL-25; 1 confirmed as BL-08; 1 refuted; 2 intended; 1 a parity question). **Second review (orchestrator, 22 Nov, replacing the Claude B review that could not run):** I checked the 12 differing rows not yet verified and 6 sampled "same" rows in code. 2 differences were wrong and are corrected: Expo does have a signed-out talent board (GM-18), and web does have the travel radius (GM-19). 1 "parity question" is an intended storage difference (GM-01 session refresh). The 6 sampled "same" rows were right, but their file:line refs often point near the code rather than at it (one corrected, GM-23); treat the refs as a pointer to the file.
 - Deployed today: `origin/main` at `8ccf8f77` (PR #247, 3 Nov). Where main still differs, the area says "(main today: ...; changes at the PR #257 merge)".
 - The original area traces were made at PR #249 head `97c4543e`, 333 commits behind pr257, so every claim on a changed file was re-checked (section 4).
 
@@ -92,6 +92,43 @@ This is the one page Tom (the owner) goes through. It sits on top of the 27 area
 | W-16 | Install the i-have-adhd skill | Not a product question: tooling, outside this grill |
 | W-17 | Planner two versions | GM-23-W01 (deferred by the owner) |
 
+## 3b. Decisions I made for you: confirm or change (added 22 Nov)
+
+The 17 waiting decisions above were only the ones I had parked for you. My decision logs also hold the calls I made myself while you were away. Most are engineering (who reviewed what, commits, test fixes) and need nothing from you. The 24 below change what users see or what is stored, so each one is now a question in its area. "Yes" keeps my call.
+
+| ID | Area | Platforms | Decision | Built? |
+|---|---|---|---|---|
+| GM-27-OD-01 | GM-27 | Expo only | Opening the app with no network keeps you signed in | yes: commit 172622e8 |
+| GM-27-OD-02 | GM-27 | Expo only | A saved, unsent change that the phone cannot read is never overwritten silently | yes: `frontend_mobile/features/parity/marketplace.tsx:518` and the shared saved-request store |
+| GM-05-OD-03 | GM-05 | Web + Expo | Attendance approvals and the roster need both staff and roster rights | yes: pr257 |
+| GM-05-OD-04 | GM-05 | Web + Expo | Organisation tabs are hidden when Lina lacks the right | yes: pr257 |
+| GM-05-OD-05 | GM-05 | Web + Expo | A new invitee with no name shows as their email address | yes: commit 7855bbd8 |
+| GM-05-OD-06 | GM-05 | Web + Expo | When Ali is removed, what happens to his future roster shifts? | open question |
+| GM-09-OD-07 | GM-09 | Web + Expo | A worker's correction request notifies the managers | yes: commit 7855bbd8 |
+| GM-09-OD-08 | GM-09 | Web + Expo | May a removed worker still raise a correction on a past timesheet? | open question |
+| GM-10-OD-09 | GM-10 | Web + Expo | The server refuses shift dates before today or more than 4 months ahead | yes: pr257 |
+| GM-10-OD-10 | GM-10 | Expo only | Reminder of your own decision: Expo Post shift has no separate draft/publish | your call, not built |
+| GM-16-OD-11 | GM-16 | Expo only | Both Pills entries and Pill rewards stay on Expo | yes: pr257 |
+| GM-17-OD-12 | GM-17 | Web + Expo | Organisation Invoices are on Expo but not in web's organisation menu | yes: pr257 |
+| GM-18-OD-13 | GM-18 | Web + Expo | Resending a talent pitch never creates a duplicate | yes: pr257 |
+| GM-22-OD-14 | GM-22 | Expo only | A notice about a shift at your other pharmacy opens that pharmacy | yes: commit cc5f2787 |
+| GM-24-OD-15 | GM-24 | Web + Expo | Learning pages show the "Careers & learning" articles | yes: commits 7855bbd8 and 22ceb013 |
+| GM-24-OD-16 | GM-24 | Expo only | Public shift links and the signed-out shift board are on Expo too | yes: pr257 |
+| GM-24-OD-17 | GM-24 | Web only | Referee forms stay web-only (intended) | yes: pr257 |
+| GM-25-OD-18 | GM-25 | Web only | Owner and organisation "public" and "community" shift boards: web pages with no menu links | yes: pr257 |
+| GM-25-OD-19 | GM-25 | Expo only | iPhones older than iOS 16.4 cannot install the app | yes: pr257 (SDK 58) |
+| GM-25-OD-20 | GM-25 | Expo only | App landing: no auto-rotating carousel; picking a persona preselects the role | yes: pr257 |
+| GM-25-OD-21 | GM-25 | Web + Expo | Tab rows and stronger grey text | yes: pr257 (mobile) |
+| GM-25-OD-22 | GM-25 | Web + Expo | Error wording | yes: commits 172622e8 and cc5f2787 |
+| GM-26-OD-23 | GM-26 | Web + Expo | Resend-protection records are kept forever | yes: pr257 |
+| GM-26-OD-24 | GM-26 | Web + Expo | Three small risks I accepted | yes: pr257 |
+
+Already covered by an existing question, so not added again: no payment countdown on Home cards (no deadline exists yet) = GM13-Q03; no "Ben and 2 others are free" line (nobody can see others' availability) = GM-19-Q04.
+Built only to match web (parity, not a choice): roster acknowledgement notice in My Roster, Timesheets link for roster delegates, manager Leave entry, on-screen QR for invites, receipt attach from Finance (D76 a-e).
+Not asked (process or tooling, no effect on users): commit grouping, reviewer routing, SDK upgrade steps, lint rules set to warn, the deepmerge security override, security pins, Android build folder, memory guard.
+
+**Count:** 463 open questions + 24 = 487.
+
 ## 4. Claims corrected against current code
 
 Codex A checked 292 claims across all 26 original areas, at both refs (read-only, file:line evidence for each). **203 hold; 89 needed a correction.** Each area file now opens with its own correction table, and the full evidence is in [`followup/claim-check-2026-11-21.md`](followup/claim-check-2026-11-21.md). Corrections per area: GM-01 5, GM-02 3, GM-03 5, GM-04 2, GM-05 4, GM-06 3, GM-07 2, GM-08 1, GM-09 3, GM-10 4, GM-11 3, GM-12 3, GM-13 6, GM-14 4, GM-15 3, GM-16 1, GM-17 2, GM-18 4, GM-19 3, GM-20 1, GM-21 2, GM-22 5, GM-23 3, GM-24 2, GM-25 6, GM-26 9.
@@ -117,4 +154,4 @@ Corrections that touched this review's own additions (GM-05, GM-07, GM-13, GM-24
 
 ## 6. Engineering backlog (not owner questions)
 
-Defects and carried rules the code does not yet follow are in [`ENGINEERING_BACKLOG.md`](ENGINEERING_BACKLOG.md), BL-01 to BL-24. The area files keep their own code-gap notes. BL-07 links the existing O4 fix in `local/o4-fixes`.
+Defects and carried rules the code does not yet follow are in [`ENGINEERING_BACKLOG.md`](ENGINEERING_BACKLOG.md), BL-01 to BL-33. The area files keep their own code-gap notes. BL-07 links the existing O4 fix in `local/o4-fixes`.

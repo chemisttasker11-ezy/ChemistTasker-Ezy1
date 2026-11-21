@@ -27,6 +27,8 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM27-Q05 — Should an invitation from a worker's QR be single-use? | Expo only |
 | GM27-Q06 — Can Sara use calendar and map links from a cached shift? | Expo only |
 | GM27-Q07 — Should public QR contacts sync and when should private invitation codes clear? | Expo only |
+| GM-27-OD-01 — Opening the app with no network keeps you signed in | Expo only |
+| GM-27-OD-02 — A saved, unsent change that the phone cannot read is never overwritten silently | Expo only |
 
 ## Current-flow matrix
 
@@ -118,3 +120,22 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 ## Engineering backlog from this area
 BL-05 (offline cache not cleared at sign-out). See [`../ENGINEERING_BACKLOG.md`](../ENGINEERING_BACKLOG.md).
+
+## Added 2026-11-22: decisions the orchestrator made for you
+From the orchestrator's decision logs (`DECISIONS_FOR_OWNER.md`, `DECISIONS_2026-11-11.md`, `DECISIONS_2026-11-12.md`). Code: `origin/agent/pr257-int` `47506e67`. "Yes" keeps the recommendation. Nothing is built from your answer until the whole grill ends.
+
+### GM-27-OD-01: Opening the app with no network keeps you signed in (OD-01, D161/D174)
+**Platforms:** Expo only
+**What happens today:** Before the fix, a cold start with no network signed the user out and deleted the saved sign-in. Now the app keeps the saved session, shows saved data, and checks the account again the next time the app comes to the front. It signs out only when the server refuses the session.
+**Already implemented:** commit 172622e8, `frontend_mobile/context/AuthContext.tsx`
+**Recommendation:** Keep.
+**Other option:** Sign out on any failed check (safer on a lost phone, but locks out workers with weak signal).
+**Status:** OPEN, confirm or change.
+
+### GM-27-OD-02: A saved, unsent change that the phone cannot read is never overwritten silently (OD-02, D99/D131)
+**Platforms:** Expo only
+**What happens today:** If a change saved for resending is unreadable, the app blocks a new attempt and offers "Discard saved change" or "Clear unreadable saved change".
+**Already implemented:** `frontend_mobile/features/parity/marketplace.tsx:518` and the shared saved-request store
+**Recommendation:** Keep, including the wording.
+**Other option:** Discard it automatically without asking.
+**Status:** OPEN, confirm or change.

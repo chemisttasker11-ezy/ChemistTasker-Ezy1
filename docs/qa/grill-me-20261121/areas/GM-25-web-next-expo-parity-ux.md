@@ -71,6 +71,11 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM25-Q16 — Web ↔ app install handoff: where does web send phone users? | Web + Expo |
 | GM25-Q17 — Launch sign-off evidence: what proves each surface ready? | Web + Expo |
 | GM25-Q18 — Twin-drift prevention after launch: who owns parity? | Web + Expo |
+| GM-25-OD-18 — Owner and organisation "public" and "community" shift boards: web pages with no menu links | Web only |
+| GM-25-OD-19 — iPhones older than iOS 16.4 cannot install the app | Expo only |
+| GM-25-OD-20 — App landing: no auto-rotating carousel; picking a persona preselects the role | Expo only |
+| GM-25-OD-21 — Tab rows and stronger grey text | Web + Expo |
+| GM-25-OD-22 — Error wording | Web + Expo |
 
 ## 0. Verification status — read this first
 
@@ -1327,3 +1332,46 @@ deploys queued since October). This trace did not independently verify any
 of those claims; they are recorded here because they bear directly on
 GM25-Q01 (launch cut) and GM25-Q17 (sign-off evidence) and should be
 confirmed or corrected when the owner answers.
+
+## Added 2026-11-22: decisions the orchestrator made for you
+From the orchestrator's decision logs (`DECISIONS_FOR_OWNER.md`, `DECISIONS_2026-11-11.md`, `DECISIONS_2026-11-12.md`). Code: `origin/agent/pr257-int` `47506e67`. "Yes" keeps the recommendation. Nothing is built from your answer until the whole grill ends.
+
+### GM-25-OD-18: Owner and organisation "public" and "community" shift boards: web pages with no menu links (OD-18, decisions-for-owner 26)
+**Platforms:** Web only
+**What happens today:** Web has these owner/organisation pages but no menu leads to them. Expo matches what web users can reach, so it has none.
+**Already implemented:** pr257
+**Recommendation:** Keep as today for launch; decide later whether to add menu links on both or remove the hidden web pages.
+**Other option:** Add menu links and Expo screens now.
+**Status:** OPEN, confirm or change.
+
+### GM-25-OD-19: iPhones older than iOS 16.4 cannot install the app (OD-19, decisions-for-owner 7)
+**Platforms:** Expo only
+**What happens today:** Expo SDK 58 needs iOS 16.4 or later (before: 15.1). iPhones stuck on older iOS (iPhone 6s/7 era) cannot install new versions. The only other way is staying on an old SDK, which has a known memory bug.
+**Already implemented:** pr257 (SDK 58)
+**Recommendation:** Accept.
+**Other option:** Stay on an older SDK.
+**Status:** OPEN, confirm or change.
+
+### GM-25-OD-20: App landing: no auto-rotating carousel; picking a persona preselects the role (OD-20, decisions-for-owner 14, 15)
+**Platforms:** Expo only
+**What happens today:** The app landing borrows the website's hero, persona chips and value strip, but not the auto-rotating persona carousel (it moves while you read on a phone). Tapping a persona preselects that role on Create account; the user can change it.
+**Already implemented:** pr257
+**Recommendation:** Keep.
+**Other option:** Add the rotating carousel.
+**Status:** OPEN, confirm or change.
+
+### GM-25-OD-21: Tab rows and stronger grey text (OD-21, decisions-for-owner 37, 39 (after your 38))
+**Platforms:** Web + Expo
+**What happens today:** Following your rule (no sideways swipe), I chose the look: a dropdown anchored to the pill, a soft violet fill and a check on the current choice. I also made the two grey text colours darker on mobile. Web was to get the same two greys as a small follow-up; not confirmed done.
+**Already implemented:** pr257 (mobile)
+**Recommendation:** Keep, and give web the same greys.
+**Other option:** Keep the old greys.
+**Status:** OPEN, confirm or change.
+
+### GM-25-OD-22: Error wording (OD-22, D25, D158/D163)
+**Platforms:** Web + Expo
+**What happens today:** Expo keeps web's wording "Failed to escalate shift". Raw server text such as "No Pharmacy matches the given query." is replaced by friendly not-found copy in the shared error path, on both web and Expo.
+**Already implemented:** commits 172622e8 and cc5f2787
+**Recommendation:** Keep.
+**Other option:** Show the server's own text.
+**Status:** OPEN, confirm or change.

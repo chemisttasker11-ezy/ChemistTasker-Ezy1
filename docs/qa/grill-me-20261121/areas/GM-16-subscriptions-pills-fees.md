@@ -49,6 +49,7 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM16-Q18 | Web + Expo |
 | GM-16-W01 | Web + Expo |
 | GM-16-W02 | Web + Expo |
+| GM-16-OD-11 — Both Pills entries and Pill rewards stay on Expo | Expo only |
 
 ## 0. What was completed in this re-run
 
@@ -429,3 +430,14 @@ Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + new
 - **DEFER**
 
 **Status:** OPEN
+
+## Added 2026-11-22: decisions the orchestrator made for you
+From the orchestrator's decision logs (`DECISIONS_FOR_OWNER.md`, `DECISIONS_2026-11-11.md`, `DECISIONS_2026-11-12.md`). Code: `origin/agent/pr257-int` `47506e67`. "Yes" keeps the recommendation. Nothing is built from your answer until the whole grill ends.
+
+### GM-16-OD-11: Both Pills entries and Pill rewards stay on Expo (OD-11, decisions-for-owner 4, 6d)
+**Platforms:** Expo only
+**What happens today:** Expo keeps the owner Pills entry and the Pill rewards entry separately, and keeps rewards even though the design review lists gamified rewards as an anti-pattern. Your feature, so I kept it.
+**Already implemented:** pr257
+**Recommendation:** Keep both.
+**Other option:** Merge them into one entry.
+**Status:** OPEN, confirm or change.

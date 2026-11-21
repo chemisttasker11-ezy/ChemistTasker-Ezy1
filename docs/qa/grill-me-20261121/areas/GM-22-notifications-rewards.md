@@ -61,6 +61,7 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM22-26 · NEW — How are duplicate, failed and stale notifications handled — and is there an audit log? | Web + Expo |
 | GM22-27 · NEW — Can a notification leak one tenant's information to another? | Web + Expo |
 | GM22-28 · NEW — Do chat / hub messages notify, and where does GM-22 end and GM-20 begin? | Web + Expo |
+| GM-22-OD-14 — A notice about a shift at your other pharmacy opens that pharmacy | Expo only |
 
 ## 0. Verification header — read first
 
@@ -748,3 +749,14 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 - GitHub calls: 146 in total across the GM-21/GM-22 re-run, all strictly sequential, 9 s apart, one at a time. No real 429. One false-positive stop (settings constant `EMAIL_TASK_RATE_LIMIT` matched by the detector inside a successfully downloaded file) — detector fixed, file usable, no finding rests on it.
 - Adopted verdicts: subscriber discount now applied (GM-16/GM-18); AV-Q09/LA-Q17 CHANGED partial (GM-18). Sibling agents' `/tmp/gm*/` downloads were **not** cited as evidence anywhere (provenance unverified).
 - Do not raise a PR and do not change code during Grill Me — documentation and decisions only (Issue #250 scope freeze).
+
+## Added 2026-11-22: decisions the orchestrator made for you
+From the orchestrator's decision logs (`DECISIONS_FOR_OWNER.md`, `DECISIONS_2026-11-11.md`, `DECISIONS_2026-11-12.md`). Code: `origin/agent/pr257-int` `47506e67`. "Yes" keeps the recommendation. Nothing is built from your answer until the whole grill ends.
+
+### GM-22-OD-14: A notice about a shift at your other pharmacy opens that pharmacy (OD-14, D175 N1)
+**Platforms:** Expo only
+**What happens today:** Tapping a notice for a Brisbane shift while Southport is selected used to show "No active shifts". The Shift Centre now switches to the shift's pharmacy, a fully booked shift opens its booked view, and timesheet notices open the timesheet.
+**Already implemented:** commit cc5f2787
+**Recommendation:** Keep.
+**Other option:** Ask before switching pharmacy.
+**Status:** OPEN, confirm or change.

@@ -41,6 +41,8 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Q8 | Web + Expo |
 | Q9 | Web + Expo |
 | Q10 | Web + Expo |
+| GM-09-OD-07 — A worker's correction request notifies the managers | Web + Expo |
+| GM-09-OD-08 — May a removed worker still raise a correction on a past timesheet? | Web + Expo |
 
 ## Bases (exact SHAs verified 2026-11-21)
 
@@ -350,3 +352,22 @@ Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + new
 - **DEFER**
 
 **Status:** OPEN (re-grill requested by the owner)
+
+## Added 2026-11-22: decisions the orchestrator made for you
+From the orchestrator's decision logs (`DECISIONS_FOR_OWNER.md`, `DECISIONS_2026-11-11.md`, `DECISIONS_2026-11-12.md`). Code: `origin/agent/pr257-int` `47506e67`. "Yes" keeps the recommendation. Nothing is built from your answer until the whole grill ends.
+
+### GM-09-OD-07: A worker's correction request notifies the managers (OD-07, D163/D173)
+**Platforms:** Web + Expo
+**What happens today:** A worker's comment on a timesheet is a correction request. Nobody was told, while the worker saw "Request sent to the timesheet reviewer". Now the managers who can act on that timesheet get a notice, and the author is never notified of their own comment.
+**Already implemented:** commit 7855bbd8, `backend/workforce/timesheet_transitions.py:146`
+**Recommendation:** Keep.
+**Other option:** No notice (managers find requests themselves).
+**Status:** OPEN, confirm or change.
+
+### GM-09-OD-08: May a removed worker still raise a correction on a past timesheet? (OD-08, D181 (five-user run A6))
+**Platforms:** Web + Expo
+**What happens today:** Yes today: Ali, already removed, could still comment on his own past timesheet, and the managers are notified.
+**Code:** today's behaviour, `backend/workforce/timesheet_transitions.py:128`
+**Recommendation:** Keep it allowed, for wage disputes after someone leaves.
+**Other option:** Block it after removal (disputes go to support).
+**Status:** OPEN, confirm or change.
