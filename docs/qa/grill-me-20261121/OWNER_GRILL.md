@@ -52,26 +52,28 @@ This is the one page Tom (the owner) goes through. It sits on top of the 27 area
 | 4 | GM-16 Subscriptions/fees | 17 | W01, W02 (asked in row 0) | GM16-Q01-FIRST |
 | 5 | GM-08 Attendance/kiosk | 12 | W01 re-grill QR/PIN confirmation | GM-08-Q01 |
 | 6 | GM-09 Timesheet/payroll | 12 | W01 re-grill overnight activation | GM-09-Q01 |
-| 7 | GM-14 Terms/Award/GST/super | 9 | W01 re-grill stale terms | ACCEPT-01 |
+| 7 | GM-14 Terms/Award/GST/super | 9 | W01 re-grill stale terms | GM14-Q04 (ACCEPT-01 / GM14-Q03 is asked once, in GM-12, as GM-12-Q25) |
 | 7 | GM-17 Invoices/refunds | 12 | W01 answered by R1 | REFUND-01 |
 | 8 | GM-15 Cancellation/disputes | 32 | W01 (defect, not a question) | GM15-01 |
 | 9 | GM-06 Employment/leave | 9 | | GM-06-Q06 |
 | 9 | GM-07 Roster/cover/swap | 9 | W01 posting window, W02 self-dealing, W03 answered | GM-07-W01 |
 | 10 | GM-18 Talent/recruitment | 14 | | AUDIENCE-01, then OFFER-01 |
 | 10 | GM-19 Availability/matching | 13 | | GM-19-Q03 |
-| 10 | GM-24 Explorer/public | 15 | W01 explorer admin rows; D93 answered | GM-24-Q01 |
+| 10 | GM-24 Explorer/public | 15 | W01 explorer admin rows; D93 answered | GM-24-Q21 (GM-24-Q01 is asked once, in GM-02, as ON-Q05) |
 | 11 | GM-20 Chat/Hubs | 20 | W01 revoked-member edits | GM20-Q01 |
-| 11 | GM-22 Notifications/rewards | 16 | | GM22-04 |
+| 11 | GM-22 Notifications/rewards | 16 | | GM22-17 (GM22-04 is asked once, in GM-15, as GM15-39) |
 | 12 | GM-21 Marketplace | 21 | W01 (asked in row 0) | after LAUNCH-01 |
-| 12 | GM-23 Calendars/operations | 15 | W01 deferred | GM-23-01 |
+| 12 | GM-23 Calendars/operations | 15 | W01 deferred | GM-23-13 (GM-23-01 is asked once, in GM-19, as GM-19-Q12) |
 | 13 | GM-25 Web/Next/Expo parity | 27 | | MOBILE-PARITY-01 (after the joint re-check) |
 | 13 | **GM-27 Mobile-only flows (new)** | 9 | Q01–Q07, including cached export and QR retention | GM27-Q01 |
 | 14 | GM-26 Admin/privacy/security/release | 17 | W01 reCAPTCHA keys (owner action), W02 Dependabot, W03 node-forge, W04 minimatch | GM26 first non-launch question |
 
-**Total open: 388** (each asked once; counts include the waiting-decision and OD questions; GM-15-W01 is a defect, not a question).
+**Total open: 385** (each asked once; LAUNCH-01 in row 0 carries GM21-Q01, GM25-Q01 and GM26-Q36; GM-15-W01 is a defect, not a question).
+
+**Easiest way through:** open [`OWNER_GRILL.html`](OWNER_GRILL.html) (also published privately at https://claude.ai/artifact/VyoJebVTsdcNfJtWiDrqi1). One area at a time, Yes / Change / Defer on each question, answers saved in your browser, then **Export my answers** and paste them to Claude.
 
 
-**Update 22 Nov (orchestrator, done alone at the owner's request):** duplicates merged. Each repeated question is now asked once: 90 questions carry their 168 copies, and every copy says "Merged 22 Nov: asked once, as X in GM-nn" (talent-board questions stay in GM-18 and availability in GM-19; the rest are asked the first time they come up in this order). **388 questions are open** (counted from each area's question headings: 168 merged copies and 37 answered ones excluded). The GM-21 and GM-24 "Platforms per question" tables had shifted question numbers and were rebuilt from the real headings; 12 waiting-decision (W) questions missing from those tables were added. All 173 web/Expo rows were checked by hand and their refs re-pointed at the exact line (re-exports followed). Wrong claims corrected: GM-04 organisation invoices (web has a summary only), GM-17 subscription by invoice (web-only), GM-02 banking (neither onboarding asks for bank details), GM-07 worker swap (missing on Expo, now BL-34), GM-07 acknowledgement, GM-24 Explorer shifts. Still loose: about 45 refs point at a type, import or log line in the right file (second pass pending).
+**Update 22 Nov (orchestrator, done alone at the owner's request):** duplicates merged. Each repeated question is now asked once: 90 questions carry their 168 copies, and every copy says "Merged 22 Nov: asked once, as X in GM-nn" (talent-board questions stay in GM-18 and availability in GM-19; the rest are asked the first time they come up in this order). **385 questions are open** (388 before LAUNCH-01 absorbed its three parts) (counted from each area's question headings: 168 merged copies and 37 answered ones excluded). The GM-21 and GM-24 "Platforms per question" tables had shifted question numbers and were rebuilt from the real headings; 12 waiting-decision (W) questions missing from those tables were added. All 173 web/Expo rows were checked by hand and their refs re-pointed at the exact line (re-exports followed). Wrong claims corrected: GM-04 organisation invoices (web has a summary only), GM-17 subscription by invoice (web-only), GM-02 banking (neither onboarding asks for bank details), GM-07 worker swap (missing on Expo, now BL-34), GM-07 acknowledgement, GM-24 Explorer shifts. Still loose: about 45 refs point at a type, import or log line in the right file (second pass pending).
 
 _Before 22 Nov:_ **463 open question entries across the area and launch rows above.** Ask the launch-blocking questions first (marked in `followup/followup-launch-blocking.md`). The owner can defer the remaining optional questions by area.
 

@@ -418,6 +418,8 @@ is partial, not complete. Branded root crash recovery UI exists on Expo
 
 ### GM25-Q01 — What is the launch cut across Vite web, Next web, and Expo?
 
+> **Merged 22 Nov: asked once, as LAUNCH-01 in row 0.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** today there are three things that could "launch": the Vite
 web app, the Next public/landing site, and the Expo phone app. The Expo work
 is a 314-file draft PR that its own author says is NOT merge-ready, has never

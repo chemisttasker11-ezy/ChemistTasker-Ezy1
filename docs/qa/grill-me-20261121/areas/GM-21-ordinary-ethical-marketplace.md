@@ -260,6 +260,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM21-Q01 — Do we launch the goods marketplace at all, and for whom? [FIRST — see Part D] — VERIFIED, recommendation strengthened
 
+> **Merged 22 Nov: asked once, as LAUNCH-01 in row 0.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** a whole buy/swap/free-goods marketplace is built in code — listings, reviews, buyer circles, deals, delivery, reports — plus a separate private one for medicines. Should any of that be in the first launch, or do we launch shifts and talent only and bring trading later?
 
 **ACTUAL TODAY — Web:** Next has the full goods surface (catalogue, item, create, mine, exchanges) and the ethical workspace; Vite has no marketplace screens at all (bridged to Next). **ACTUAL TODAY — Expo:** full goods parity component (14 screens, creation wizard) and full ethical parity component (16 screens). **Backend:** both apps fully built; at defaults the marketplace is a **read-only public catalogue** (all write flags off). The September "no migrations" release blocker is **resolved** (both `0001_initial` exist at head). What is still missing is verified in §2: **no payment path anywhere in either app**, moderation is Django-admin-only with no SLA, **no notification is ever sent by either marketplace**, reservations never expire, and `public_discovery` is never consulted.
