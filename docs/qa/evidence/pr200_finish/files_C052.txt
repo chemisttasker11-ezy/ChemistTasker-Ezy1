@@ -1,0 +1,15 @@
+frontend_web/src/pages/onboarding/onboarding_pharmacist/BasicInfoV2.tsx
+frontend_web/src/pages/onboarding/onboarding_pharmacist/IdentityV2.tsx
+frontend_web/src/pages/onboarding/onboarding_pharmacist/PaymentV2.tsx
+frontend_web/src/pages/onboarding/onboarding_pharmacist/PharmacistOnboardingV2Layout.tsx
+frontend_web/src/pages/onboarding/onboarding_pharmacist/ProfileV2.tsx
+frontend_web/src/pages/onboarding/onboarding_pharmacist/RatesV2.tsx
+frontend_web/src/pages/onboarding/onboarding_pharmacist/RefereesV2.tsx
+frontend_web/src/pages/onboarding/onboarding_pharmacist/SkillsV2.tsx
+frontend_web/src/pages/onboarding/onboarding_staff/BasicInfoV2.tsx
+frontend_web/src/pages/onboarding/onboarding_staff/IdentityV2.tsx
+frontend_web/src/pages/onboarding/onboarding_staff/OtherStaffOnboardingV2Layout.tsx
+frontend_web/src/pages/onboarding/onboarding_staff/PaymentV2.tsx
+frontend_web/src/pages/onboarding/onboarding_staff/ProfileV2.tsx
+frontend_web/src/pages/onboarding/onboarding_staff/RefereesV2.tsx
+frontend_web/src/pages/onboarding/onboarding_staff/RegulatoryV2.tsx

@@ -1,0 +1,235 @@
+{
+  "chunk": "C080",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "first-pass source retrieval, scripts not executed",
+  "status": "SOURCE_FETCH_COMPLETE_SEMANTIC_PENDING",
+  "files": [
+    {
+      "path": "scripts/ahpra_extension/background.js",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "cf40445e7aead58f663ea9cf7d4b2f0feae5a551",
+      "lines": 242,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "242 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_extension/content.js",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "a3550cf456db258d9b834ba7c4773ba5a785d12c",
+      "lines": 88,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "88 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_extension/options.js",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "294fccbb4684e1606072daac0feb58b34647fd88",
+      "lines": 35,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "35 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_extension/parser.js",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "73eb679e533580ed60b093861b867153320c780a",
+      "lines": 74,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "74 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_extension/tests/parser.test.js",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "20a91c91ad814a788072953111e779236790d81a",
+      "lines": 179,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "179 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_verifier/bridge.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "4c6cd4706e12a3dc252e138c4cc38d98f4a4ca22",
+      "lines": 920,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "920 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_verifier/test_bridge.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "56d6b451e6ba7ba648eba712e963bb3dfaa53e23",
+      "lines": 1217,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "1217 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/ahpra_verifier/test_review_183_repro.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "0694cfad6b758d67e1d70546e112f0eb055ffbc4",
+      "lines": 21,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "21 lines; AHPRA verifier/extension; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/audit-api-v1-cutover.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "cfdee412e4b7111386c017d5ee0e5ff270ce260e",
+      "lines": 81,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "81 lines; architecture/deployment audit script; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/audit-api-v1-cutover.test.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "ee9458642d6d9223ca9319e5c2e0381d74011a21",
+      "lines": 39,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "39 lines; architecture/deployment audit script; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/audit-architecture-boundaries.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "014ec03662c7c7febc4b441ced5559d398b32d14",
+      "lines": 51,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "51 lines; architecture/deployment audit script; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/audit-frontend-static-wiring.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "12f26f045792f042187587a0b29e1af1eae7b68a",
+      "lines": 238,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "238 lines; architecture/deployment audit script; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/audit-generated-skill-icons.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b6d32524aac46dbc1dfb860cbea884d717a763af",
+      "lines": 36,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "36 lines; architecture/deployment audit script; secure permissions, external network requests and CI deployment side effects require S2; no execution."
+    },
+    {
+      "path": "scripts/audit-native-tab-routes.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "a956db0e49e6500a6a37583c764c037ba9906a0b",
+      "lines": 36,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "36 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    },
+    {
+      "path": "scripts/audit-production-deployment.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "4d1817e1e0b4cd3ff5bd607ae14857bb0b27f7bf",
+      "lines": 77,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "77 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    },
+    {
+      "path": "scripts/audit-shared-core-boundary.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "fab02c5ed0f30659514df6d3c0e7d9b4aa8933b2",
+      "lines": 137,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "137 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    },
+    {
+      "path": "scripts/audit-shared-core-boundary.test.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "04de24221189bbfee69e2ed323a140daaccd8dbd",
+      "lines": 40,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "40 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    },
+    {
+      "path": "scripts/audit-shared-core-package.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f86692597b6ce8394ec9383634fcc299e3585655",
+      "lines": 64,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "64 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    },
+    {
+      "path": "scripts/audit-shared-core-transport.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "1ed717b553971399d9d8859132865091c26c7c5e",
+      "lines": 30,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "30 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    },
+    {
+      "path": "scripts/audit-wiring-diff.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "939059130f177c2bd01147e512f868ec335fbc85",
+      "lines": 121,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "121 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    },
+    {
+      "path": "scripts/audit_roster_migrations.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "341a93d4eac3a78acca004fd6455779907262f01",
+      "lines": 137,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "137 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    },
+    {
+      "path": "scripts/collect_backend_runtime_releases.py",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "fb044c7112a7d3e93b6ddf2e097eb97b662cc058",
+      "lines": 119,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "119 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    },
+    {
+      "path": "scripts/install-shared-core-artifact.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "c3cbba353572ee32341ac11d624fa3c71f395cbf",
+      "lines": 24,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "24 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    },
+    {
+      "path": "scripts/inventory-client-api-boundaries.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "b2442db8f818bbc81ab6b6d00a5868b0f1535214",
+      "lines": 199,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "199 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    },
+    {
+      "path": "scripts/inventory-client-api-boundaries.test.mjs",
+      "verdict": "NOTE",
+      "ids": [],
+      "blob_sha": "f9049592becdc431a008f2c98430d4cd53d713c4",
+      "lines": 99,
+      "inspection": "SOURCE_ACQUISITION_ANNOTATED_FIRST_PASS",
+      "note": "99 lines; architecture, generated artifacts, runtime audit script or fixture. CI execution, branch/ref assumptions and behaviour not independently validated."
+    }
+  ],
+  "findings": []
+}

@@ -1,0 +1,437 @@
+{
+  "chunk": "C057",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source inspection, service-boundary and scoped interaction review; independent S2 and runtime S3 not executed",
+  "files": [
+    {
+      "path": "frontend_mobile/app/pharmacist/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/index.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/interests.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/interests.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/invoice.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/invoice.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/invoice/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/invoice/[id].tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/invoice/new.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/invoice/new.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/invoices.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/invoices.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/learning.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/learning.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/memberships.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/memberships.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/messages/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/messages/[id].tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/notifications.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/notifications.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/onboarding.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/onboarding.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/profile-basic-info.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/profile-basic-info.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/profile-bio.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/profile-bio.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/profile-identity.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/profile-identity.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/profile-payment.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/profile-payment.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/profile-rate.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/profile-rate.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/profile-referees.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/profile-referees.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/profile-skills.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/profile-skills.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/profile.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/profile.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/publish-availability.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/publish-availability.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/shifts/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/shifts/[id].tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/shifts/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/shifts/index.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/pharmacist/talent-board.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/pharmacist/talent-board.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/profile/ratings/[id]/report.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/profile/ratings/[id]/report.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/profile/ratings/history.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/profile/ratings/history.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/profile/ratings/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/profile/ratings/index.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/register.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Authenticated identity/OTP/reset input and shared-core call; token invalidation caveat B43."
+    },
+    {
+      "path": "frontend_mobile/app/reset-password.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Authenticated identity/OTP/reset input and shared-core call; token invalidation caveat B43."
+    },
+    {
+      "path": "frontend_mobile/app/rewards/pills.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/rewards/pills.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/setup/owner/onboarding.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/setup/owner/onboarding.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/setup/owner/pharmacies.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/setup/owner/pharmacies.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/shared/chat.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/shared/chat.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/shared/messages/[id].tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/shared/messages/[id].tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/verify-otp.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Authenticated identity/OTP/reset input and shared-core call; token invalidation caveat B43."
+    },
+    {
+      "path": "frontend_mobile/app/welcome.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/welcome.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/workforce-settings.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Workforce period, staff and leave actions via shared-core; B27/B28/B60 apply."
+    },
+    {
+      "path": "frontend_mobile/app/workforce-timesheets.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Workforce period, staff and leave actions via shared-core; B27/B28/B60 apply."
+    },
+    {
+      "path": "frontend_mobile/app/workforce/award-preview.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/workforce/award-preview.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/workforce/employment-engagements/[id]/history.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/workforce/employment-engagements/[id]/history.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/workforce/employment-engagements/[id]/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/workforce/employment-engagements/[id]/index.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/workforce/employment-engagements/[id]/rates.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/workforce/employment-engagements/[id]/rates.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/workforce/employment-engagements/index.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/workforce/employment-engagements/index.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/workforce/employment-engagements/new.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/workforce/employment-engagements/new.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/workforce/leave-requests.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Workforce period, staff and leave actions via shared-core; B27/B28/B60 apply."
+    },
+    {
+      "path": "frontend_mobile/app/workforce/payroll-configuration.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/workforce/payroll-configuration.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/workforce/payroll-export.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/workforce/payroll-export.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/app/workforce/work-settings.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Expo route or component entry \"app/workforce/work-settings.tsx\" delegating to role module, shared-core or parity implementation. Authority enforced server-side."
+    },
+    {
+      "path": "frontend_mobile/assets/skill-symbols/index.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "index.ts user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/components/AhpraStatus.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AhpraStatus.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/components/AuthLayout.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AuthLayout.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/components/ChooseAccountTypeCard.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "ChooseAccountTypeCard.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/components/HomeNavigationGrid.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "HomeNavigationGrid.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/components/OfflineBanner.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "OfflineBanner.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/components/ParityToolsCard.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "ParityToolsCard.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/components/ProgressStepper.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "ProgressStepper.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/components/ShiftFilterModal.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "ShiftFilterModal.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/components/SkillIcon.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "SkillIcon.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/components/pharmacistOnboardingSteps.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "pharmacistOnboardingSteps.tsx loads pharmacy members and performs scoped staff/manager actions; revoke/consent issues B03/B19/F03-N1."
+    },
+    {
+      "path": "frontend_mobile/config/api.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "api.ts user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/constants/Colors.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Colors.ts user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/constants/ahpraConsent.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "ahpraConsent.ts user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/constants/api.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "api.ts user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/constants/roles.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "roles.ts user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/constants/theme.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "theme.ts user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/context/AdminWorkspaceContext.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AdminWorkspaceContext.tsx synchronizes authenticated user, pharmacy and role context with async storage and shared-core; refresh/logout races C071-N1."
+    },
+    {
+      "path": "frontend_mobile/context/AhpraContext.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AhpraContext.tsx synchronizes authenticated user, pharmacy and role context with async storage and shared-core; refresh/logout races C071-N1."
+    },
+    {
+      "path": "frontend_mobile/context/AuthContext.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "C071-N1",
+        "C071-N2",
+        "B52"
+      ],
+      "note": "AuthContext.tsx synchronizes authenticated user, pharmacy and role context with async storage and shared-core; refresh/logout races C071-N1."
+    },
+    {
+      "path": "frontend_mobile/context/WorkspaceContext.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B52"
+      ],
+      "note": "WorkspaceContext.tsx synchronizes authenticated user, pharmacy and role context with async storage and shared-core; refresh/logout races C071-N1."
+    },
+    {
+      "path": "frontend_mobile/features/notifications/NotificationsScreen.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B30"
+      ],
+      "note": "NotificationsScreen.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    },
+    {
+      "path": "frontend_mobile/features/parity/ParityUI.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "ParityUI.tsx user-facing Expo screen, helper or presentation adapter; inspected module imports, interactions and shared service boundary."
+    }
+  ],
+  "findings": []
+}

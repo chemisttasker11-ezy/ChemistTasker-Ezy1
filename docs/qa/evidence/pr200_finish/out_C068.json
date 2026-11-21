@@ -1,0 +1,152 @@
+{
+  "chunk": "C068",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source inspection with shared-core call path trace, S2 independent and S3 runtime outstanding",
+  "files": [
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/types.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "types.ts controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/utils/activeShiftRuntime.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 71-106): The runtime derives 'payment required' UI from shift.paymentStatus and awaiting-payment slot flags, using selected slot ID and pendingPaymentSlotIds. UI is only a projection and can become stale after Stripe callbacks; client must refresh based on server state. Test contract: Negative: stale PENDING after webhook or paid-offer failure; positive: exactly matching pending slot and offer appear. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        71,
+        106
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/utils/candidateHelpers.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "candidateHelpers.ts controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/utils/displayHelpers.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "displayHelpers.ts controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/utils/offerHelpers.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "offerHelpers.ts controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/utils/shiftHelpers.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "shiftHelpers.ts controls shift poster UI status, selected slot, audience, payment options and candidate review; B33/F04-N1 and shift lifecycle risks require runtime tests.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/CommunityShiftsView.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B40"
+      ],
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 126-173): CommunityShiftsView filters by workspace and selectedPharmacyId, merges fetchCommunityShifts with worker interests/rejections and passes server data to ShiftsBoard. Server scope remains authoritative; client tabs/markers can outlive account changes. Test contract: Negative: account switch and inappropriate internal visibility, rejections under different worker; positive: current worker's eligible shifts and offers only. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        126,
+        173
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/ConfirmedShiftsView.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 40-98): ConfirmedShiftsView derives scopedPharmacyId from activeAdminPharmacyId, but activeAdminPharmacyId is hard-coded null; consequently the client-side pharmacy filter is inactive even for admin personas. This may cause a selected-pharmacy UX mismatch, not proof of backend cross-tenant leakage. Test contract: Negative: admin with two pharmacies selects one, verify only intended shifts visible; positive: permitted multi-pharmacy overview if that's the defined UX. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        40,
+        98
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/HistoryShiftsView.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 25-74): HistoryShiftsView similarly sets activeAdminPharmacyId to null and filters returned history only if scopedPharmacyId exists, making local pharmacy scoping ineffective. User-visible scope requires checking product expectations; backend permissions must still isolate tenants. Test contract: Negative: site switch on history; positive: user with multiple assignments sees expected scoped view. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        25,
+        74
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/NativeShiftBoardPreview.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "NativeShiftBoardPreview.tsx pure display helpers, typed models, and shift/slot presentation defaults.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/OwnerAssignedShiftBoard.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 196-344): The assigned board shows locked slot rate, assigned worker and shift details; history mode enables rate-worker action and profile reveal on assigned slot. Profile reveal and rating permission must be enforced server-side. Test contract: Negative: view assignment/profile from other pharmacy or rate nonassigned worker; positive: manager views assigned staff and leaves correct rating. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        196,
+        344
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/PharmacyContextDetails.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmacyContextDetails.tsx pure display helpers, typed models, and shift/slot presentation defaults.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/PostShiftDetailsStep.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PostShiftDetailsStep.tsx shift posting composer handles dates, award/rate, pharmacy ID and escalation options; shared-core payload builder; B14/B39/F04-N2 apply.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/PostShiftPayRateStep.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PostShiftPayRateStep.tsx shift posting composer handles dates, award/rate, pharmacy ID and escalation options; shared-core payload builder; B14/B39/F04-N2 apply.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/PostShiftProgress.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PostShiftProgress.tsx shift posting composer handles dates, award/rate, pharmacy ID and escalation options; shared-core payload builder; B14/B39/F04-N2 apply.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/PostShiftScreen.helpers.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PostShiftScreen.helpers.ts shift posting composer handles dates, award/rate, pharmacy ID and escalation options; shared-core payload builder; B14/B39/F04-N2 apply.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/shifts/PostShiftScreen.styles.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PostShiftScreen.styles.ts shift posting composer handles dates, award/rate, pharmacy ID and escalation options; shared-core payload builder; B14/B39/F04-N2 apply.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    }
+  ],
+  "findings": [],
+  "targeted_recheck_files": 5,
+  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3"
+}

@@ -1,0 +1,8 @@
+backend/chat/views.py
+backend/client_profile/__init__.py
+backend/client_profile/apps.py
+backend/client_profile/characterization_support.py
+backend/client_profile/domains/__init__.py
+backend/client_profile/domains/common/__init__.py
+backend/client_profile/domains/common/access.py
+backend/client_profile/fields.py

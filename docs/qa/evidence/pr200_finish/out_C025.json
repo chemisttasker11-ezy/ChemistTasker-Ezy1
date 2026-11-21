@@ -1,0 +1,319 @@
+{
+ "chunk": "C025",
+ "files": [
+  {
+   "path": "backend/users/test_region_delegation.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B23"
+   ],
+   "note": "Explicitly permits the known Chief Admin organization mutation."
+  },
+  {
+   "path": "backend/users/test_staging_test_data.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no specific problem found."
+  },
+  {
+   "path": "backend/users/tests.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertions identified."
+  },
+  {
+   "path": "backend/users/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no routing problem found."
+  },
+  {
+   "path": "backend/users/utils.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no specific user-facing problem found."
+  },
+  {
+   "path": "backend/users/views.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Compatibility exports preserve the historical API names."
+  },
+  {
+   "path": "backend/worker_finance/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Package documentation only."
+  },
+  {
+   "path": "backend/worker_finance/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "App configuration only."
+  },
+  {
+   "path": "backend/worker_finance/calculations.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no independent calculation defect found."
+  },
+  {
+   "path": "backend/worker_finance/documents.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Rendering rejects external resource access."
+  },
+  {
+   "path": "backend/worker_finance/invoice_bridge.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no specific integration defect found."
+  },
+  {
+   "path": "backend/worker_finance/legacy.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Managed invoice access checks ownership and blocks legacy mutation."
+  },
+  {
+   "path": "backend/worker_finance/migrations/0001_initial.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Schema creation without a data migration."
+  },
+  {
+   "path": "backend/worker_finance/migrations/0002_alter_invoicerecord_parent.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Schema alteration without a data migration."
+  },
+  {
+   "path": "backend/worker_finance/migrations/0003_invoice_revisions_and_review.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Schema changes without a data migration."
+  },
+  {
+   "path": "backend/worker_finance/migrations/0004_portable_revision_constraint.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Constraint rename without a data migration."
+  },
+  {
+   "path": "backend/worker_finance/migrations/0005_consolidate_invoice_record.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Customer reuse by name replaces historical invoice billing snapshots."
+  },
+  {
+   "path": "backend/worker_finance/migrations/0006_remove_invoice_record.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; relation consolidation and revision creation preserve copied records."
+  },
+  {
+   "path": "backend/worker_finance/migrations/0007_repoint_invoicing_relations.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Migration state changes only; database relations remain unchanged."
+  },
+  {
+   "path": "backend/worker_finance/migrations/0008_remove_stale_invoice_record_contenttype.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Cleanup is narrowly scoped and checks unhandled references."
+  },
+  {
+   "path": "backend/worker_finance/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/worker_finance/models.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no independent model defect found."
+  },
+  {
+   "path": "backend/worker_finance/serializers.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no independent input-validation defect found."
+  },
+  {
+   "path": "backend/worker_finance/services.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B58",
+    "B59",
+    "N2",
+    "N3"
+   ],
+   "note": "Known visibility/balance issues; revisions also leave super requests and payment tax allocations stale."
+  },
+  {
+   "path": "backend/worker_finance/tests/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/worker_finance/tests/contracts/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/worker_finance/tests/contracts/client_profile/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/worker_finance/tests/contracts/client_profile/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Isolated test app configuration."
+  },
+  {
+   "path": "backend/worker_finance/tests/contracts/client_profile/models.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect exercised contract found."
+  },
+  {
+   "path": "backend/worker_finance/tests/contracts/invoicing/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/worker_finance/tests/contracts/invoicing/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Isolated test app configuration."
+  },
+  {
+   "path": "backend/worker_finance/tests/contracts/invoicing/models.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect exercised contract found."
+  },
+  {
+   "path": "backend/worker_finance/tests/contracts/notifications/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package initializer."
+  },
+  {
+   "path": "backend/worker_finance/tests/contracts/notifications/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Isolated test app configuration."
+  },
+  {
+   "path": "backend/worker_finance/tests/contracts/notifications/models.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; notification fixture matches its exercised fields."
+  },
+  {
+   "path": "backend/worker_finance/tests/settings.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Isolated test settings."
+  },
+  {
+   "path": "backend/worker_finance/tests/test_api.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertions identified for the exercised scenarios."
+  },
+  {
+   "path": "backend/worker_finance/tests/test_calculations.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; expected calculations match the implemented rules."
+  },
+  {
+   "path": "backend/worker_finance/tests/test_invoice_bridge.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; delegation and delivery assertions match the bridge contract."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Invoicing",
+   "title": "Migration replaces historical invoice billing details with a customer matched only by name.",
+   "scenario": "Sara has historical invoices for Tom's two pharmacies with the same bill-to name but different billing emails and addresses. During the upgrade, both invoices reuse one saved customer, and one invoice receives the other pharmacy's billing details. Resending that invoice can send it to the wrong pharmacy contact, including Nadia.",
+   "evidence": [
+    "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:62",
+    "backend/worker_finance/migrations/0005_consolidate_invoice_record.py:118",
+    "backend/worker_finance/views.py:277"
+   ],
+   "confidence": "high",
+   "test_needed": "Migrate two legacy invoices sharing a bill-to name but having different emails, addresses and ABNs; assert each migrated snapshot retains its original details.",
+   "owner_question": {
+    "question": "When Sara's historical invoices for Tom's pharmacies share a billing name, what should happen to their separate billing details during upgrade?",
+    "options": [
+     "Preserve each invoice's original billing details",
+     "Require Sara to resolve conflicting customer details",
+     "Reuse one customer's details for both invoices (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Invoicing",
+   "title": "Editing an invoice leaves its separate super request at the old amount.",
+   "scenario": "Sara creates an $800 service invoice and its separate $96 super request for Tom. She then corrects the service invoice to $400, making the super amount $48. The linked request remains $96, cannot be edited, and prevents creation of a corrected request, leaving Tom with an excessive contribution request.",
+   "evidence": [
+    "backend/worker_finance/services.py:690",
+    "backend/worker_finance/services.py:606",
+    "backend/worker_finance/services.py:894",
+    "frontend_web/src/pages/finance/FinanceWorkspace.tsx:356"
+   ],
+   "confidence": "high",
+   "test_needed": "Create a separate super request, revise the parent's eligible amount downward, and assert the old contribution cannot remain the active request unchanged.",
+   "owner_question": {
+    "question": "When Sara corrects an invoice after creating Tom's super request, what should happen to that request?",
+    "options": [
+     "Replace it through an audited correction",
+     "Block the invoice correction until the request is resolved",
+     "Keep the original super request unchanged (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Invoicing",
+   "title": "Invoice corrections leave previously recorded payment GST allocations unchanged.",
+   "scenario": "Tom pays Sara $55 toward a $110 invoice containing $10 GST, so the payment records $5 GST. Sara corrects the invoice to GST-free while keeping the $110 total, then records Tom's remaining $55 payment. Her cash GST worksheet still includes the original $5 even though the corrected invoice contains no GST.",
+   "evidence": [
+    "backend/worker_finance/services.py:690",
+    "backend/worker_finance/services.py:965",
+    "backend/worker_finance/services.py:968",
+    "backend/worker_finance/views.py:634"
+   ],
+   "confidence": "high",
+   "test_needed": "Part-pay a GST invoice, revise it to GST-free at the same total, resend and settle it; assert cash GST is reconciled or the correction is rejected.",
+   "owner_question": {
+    "question": "When Sara corrects GST after Tom has partly paid, how should the recorded GST be handled?",
+    "options": [
+     "Reconcile allocations through an audited adjustment",
+     "Require a separate correction before changing GST",
+     "Retain the original payment GST allocation (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-1"
+}

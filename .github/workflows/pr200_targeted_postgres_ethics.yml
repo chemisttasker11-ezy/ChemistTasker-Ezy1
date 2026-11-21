@@ -1,0 +1,69 @@
+name: PR200 Focused PostgreSQL Ethical Reservation Audit
+on:
+  pull_request:
+    paths:
+      - "backend/qa_release/test_pr200_phase5_pg_ethics.py"
+      - ".github/workflows/pr200_targeted_postgres_ethics.yml"
+permissions:
+  contents: read
+jobs:
+  ethical-disjoint-lots-two-connections:
+    if: github.event.pull_request.number == 200
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: chemisttasker_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d chemisttasker_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      LOCAL_DB_NAME: chemisttasker_ci
+      LOCAL_DB_USER: postgres
+      LOCAL_DB_PASSWORD: postgres
+      LOCAL_DB_HOST: 127.0.0.1
+      LOCAL_DB_PORT: 5432
+      SECRET_KEY: ci-only-pr200-b31
+      ADMIN_URL: admin/
+      EMAIL_HOST_USER: ci@example.test
+      EMAIL_HOST_PASSWORD: ci-placeholder
+      DEFAULT_FROM_EMAIL: ci@example.test
+      RECAPTCHA_SECRET_KEY: ci-placeholder
+      AZURE_OCR_ENDPOINT: https://example.test
+      AZURE_OCR_KEY: ci-placeholder
+      SCRAPINGBEE_API_KEY: ci-placeholder
+      MOBILEMESSAGE_USERNAME: ci-placeholder
+      MOBILEMESSAGE_PASSWORD: ci-placeholder
+      MOBILEMESSAGE_SENDER: ChemistTasker
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install -r backend/requirements.txt
+      - name: Run real two-connection PostgreSQL B31 tests only
+        shell: bash
+        run: |
+          set -o pipefail
+          git rev-parse HEAD
+          python backend/manage.py test qa_release.test_pr200_phase5_pg_ethics --settings=core.postgres_test_settings --noinput --verbosity=2 2>&1 | tee pr200-b31-postgres.txt
+      - name: Preserve PostgreSQL synthetic proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr200-b31-postgres
+          path: pr200-b31-postgres.txt
+          retention-days: 30

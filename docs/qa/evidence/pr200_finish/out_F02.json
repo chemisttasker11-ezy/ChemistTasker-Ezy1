@@ -1,0 +1,145 @@
+{
+ "chunk": "F02",
+ "paths_read": [
+  "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md",
+  "docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md",
+  "backend/shifts/urls.py",
+  "backend/shifts/lifecycle.py",
+  "backend/shifts/base.py",
+  "backend/shifts/models.py",
+  "backend/shifts/offers.py",
+  "backend/shifts/finalize.py",
+  "backend/shifts/posting.py",
+  "backend/shifts/emails.py",
+  "backend/shifts/escalation.py",
+  "backend/shifts/cancellation.py",
+  "backend/shifts/history.py",
+  "backend/shifts/worker_requests.py",
+  "backend/shifts/serialization/worker_requests.py",
+  "backend/shifts/serialization/shifts.py",
+  "backend/workforce/roster/worker_actions.py",
+  "backend/workforce/roster/v2_views.py",
+  "backend/workforce/roster/views.py",
+  "backend/workforce/signals.py",
+  "backend/workforce/models.py",
+  "backend/attendance/models.py",
+  "backend/billing/models.py",
+  "backend/billing/views.py",
+  "shared-core/src/domains/shifts/api.ts",
+  "shared-core/src/domains/shifts/postingDraft.ts",
+  "shared-core/src/domains/roster/api.ts",
+  "shared-core/src/domains/shiftRequests/api.ts",
+  "shared-core/src/domains/billing/api.ts",
+  "shared-core/src/utils/pricing.ts",
+  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftActions.ts",
+  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftsDialogs.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx",
+  "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx",
+  "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts",
+  "frontend_mobile/app/my-roster.tsx",
+  "frontend_mobile/features/parity/roster.tsx"
+ ],
+ "confirmed_known": [
+  "B09",
+  "B11",
+  "B15",
+  "B21",
+  "B55",
+  "C079-N1"
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Shifts/Billing",
+   "title": "Deleting a partly filled posting from Active Shifts silently removes the workers already booked on its other dates, with no notice, no cancellation charge and no history check.",
+   "scenario": "Tom posts a Monday-to-Friday locum shift. Sara is confirmed (and paid for) on Monday and Tuesday, but Wednesday to Friday are still open, so the posting stays in Active Shifts. Tom clicks Delete. The warning only says candidates can no longer apply, but Sara's confirmed days are erased too. Nobody tells Sara, so she may still turn up or turn down other work. Tom's paid fee stays as a payment linked to no shift, and the cancellation-penalty endpoint is never called by any screen. Any leave Sara requested against those days is deleted along with them, and attendance already recorded loses its link to the booking. All of this skips the check that the AHPRA cancellation and roster-release paths run first.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftsDialogs.tsx:29",
+    "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftActions.ts:44",
+    "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useShiftActions.ts:44",
+    "shared-core/src/domains/shifts/api.ts:121",
+    "backend/shifts/lifecycle.py:53",
+    "backend/shifts/lifecycle.py:111",
+    "backend/shifts/base.py:111",
+    "backend/shifts/models.py:465",
+    "backend/shifts/models.py:805",
+    "backend/billing/models.py:85",
+    "backend/billing/views.py:699",
+    "shared-core/src/domains/billing/api.ts:58",
+    "backend/shifts/history.py:7",
+    "backend/shifts/cancellation.py:48"
+   ],
+   "confidence": "high",
+   "test_needed": "Create a two-date shift where date 1 has a paid, confirmed assignment for Sara and date 2 is open. DELETE /shifts/active/<id>/ as Tom. Assert the request is refused, or that Sara's assignment survives (or she is notified and the penalty/refund rule runs). Today the delete returns 204 and the assignment is gone.",
+   "owner_question": {
+    "question": "Tom deletes a posting where Sara is already confirmed (and paid for) on two of its five days. What should happen to Sara's days?",
+    "options": [
+     "Block the delete until Tom cancels Sara's days one by one (with notice and the cancellation charge)",
+     "Delete only the open days and keep Sara's confirmed days as their own booking",
+     "Allow the full delete but notify Sara, apply the 24/72-hour penalty rule and keep a cancelled-booking record",
+     "Keep today's behaviour (silent removal)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Workforce/Shifts",
+   "title": "Cover requests from the web and mobile worker screens are never linked to the worker's assignment, so approving one never releases the worker.",
+   "scenario": "Ali can't work his rostered Saturday and taps 'Request cover' on web or mobile. Both screens send only pharmacy, date, times and role, never the assignment itself. On web, Tom approves: the server sees an unlinked request and publishes a brand-new locum shift, while Ali stays rostered. Ali is emailed that his cover was approved, so Tom may end up paying a locum like Sara plus a booking fee while the roster still expects Ali (or marks him absent). On the mobile manager screen, 'Approve' with a replacement always fails with 'assignment no longer exists'. 'Release worker' marks the request approved and reports the worker as released, but changes nothing and publishes no vacancy. Neither Ali nor a replacement like Mia is notified on the mobile path.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:532",
+    "frontend_mobile/app/my-roster.tsx:208",
+    "backend/shifts/worker_requests.py:97",
+    "backend/shifts/worker_requests.py:239",
+    "backend/shifts/worker_requests.py:254",
+    "backend/shifts/worker_requests.py:284",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:602",
+    "frontend_mobile/features/parity/roster.tsx:638",
+    "backend/workforce/roster/worker_actions.py:275",
+    "backend/workforce/roster/worker_actions.py:353",
+    "backend/workforce/roster/v2_views.py:747"
+   ],
+   "confidence": "high",
+   "test_needed": "Ali has an assignment. POST /worker-shift-requests/ with the exact web payload (no 'shift'), then approve it as Tom. Assert Ali's assignment is released and no second shift is created. Today Ali stays assigned and a new LOCUM_CASUAL shift appears.",
+   "owner_question": {
+    "question": "Ali asks for cover on a Saturday he's rostered for, and Tom approves. What should happen?",
+    "options": [
+     "Ali is taken off Saturday and that same slot is advertised to locums; Ali is told he's off",
+     "Ali stays rostered until Tom picks a named replacement (e.g. Mia); both are told",
+     "Approval only publishes a new locum shift and Ali stays rostered (today's web behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Roster",
+   "title": "Removing or escalating an assignment from the owner roster page unbooks the worker silently, including paid marketplace bookings, and skips the attendance/leave history check.",
+   "scenario": "The owner roster page lists every assignment in Tom's pharmacy, including Sara's paid marketplace booking. If Tom removes it or clicks Escalate on it, the server deletes the assignment (escalate clears every assignment on that shift) without notifying Sara and without the check the release path runs, which refuses to remove bookings with attendance or leave history. Leave Sara filed against that day is deleted along with it, and Sara only finds out when the shift disappears from her list.",
+   "evidence": [
+    "backend/workforce/roster/views.py:51",
+    "backend/workforce/roster/views.py:96",
+    "backend/workforce/roster/views.py:418",
+    "backend/workforce/roster/worker_actions.py:364",
+    "backend/shifts/history.py:7",
+    "backend/shifts/models.py:805",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:401",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:509"
+   ],
+   "confidence": "medium",
+   "test_needed": "Give Sara an assignment with a linked LeaveRequest or AttendanceSession. Call POST /roster-shifts/<shift>/escalate/ (or DELETE /roster-owner/<assignment>/) as Tom. Assert it is refused, or that Sara is notified and the history is kept. Today the assignment and its leave are deleted silently.",
+   "owner_question": {
+    "question": "Tom escalates or removes Sara's already-confirmed Saturday from the roster page. What should Sara experience?",
+    "options": [
+     "Block it for marketplace bookings; Tom must cancel through the booking with notice and charges",
+     "Allow it, but notify Sara immediately and keep a cancelled-booking record",
+     "Keep today's behaviour (silent removal)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeA-2"
+}

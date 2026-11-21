@@ -1,0 +1,172 @@
+{
+ "chunk": "C047",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N3"
+   ],
+   "note": "Expired posts disappear from the editor lookup, blocking Explorer republication."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/talentModel.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific user-facing problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/TalentBoard/types.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/WorkerShiftDetailPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no confirmed problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/calendarViews.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no confirmed production blocker found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/ChatListItem.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Continues displaying retained deleted-message text in conversation previews."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "N2"
+   ],
+   "note": "Cached conversations miss messages; deletion retains message text and room previews."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Uses deleted cached messages' bodies for previews and search."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/ConversationHeader.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no independent problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/ConversationMessageList.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no specific user-facing problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/ConversationPanel.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no independent problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/DeleteMessageDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; confirmation awaits deletion and reports errors."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/chat/MessageBubble.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; deleted bubbles hide their content."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Chat",
+   "title": "Reopening a cached conversation hides messages received while it was closed",
+   "scenario": "Tom reads his conversation with Sara, then opens his conversation with Omar. Sara sends Tom another message while he is reading Omar's conversation. When Tom returns to Sara, her new message is missing, but the conversation is marked as read.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:297",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:305",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:347",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:515",
+    "backend/chat/signals.py:63"
+   ],
+   "confidence": "high",
+   "test_needed": "Open Tom's conversation with Sara, switch to Omar, send a message from Sara, then reopen Sara and verify the missed message appears before it is marked read.",
+   "owner_question": {
+    "question": "When Tom returns to Sara's conversation after she sent a message while he was reading Omar's, what should happen?",
+    "options": [
+     "Show Sara's missed messages before marking them read",
+     "Show an unread notice until Tom explicitly loads the messages",
+     "Show cached messages and mark the conversation read (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Chat",
+   "title": "Deleted messages remain readable in conversation previews",
+   "scenario": "Sara sends Tom a message, then deletes it while Tom has the conversation open. The message bubble changes to a deletion notice, but its text remains visible in Tom's conversation preview and searchable in his sidebar. If Tom had pinned the message, its old text also remains in the pinned banner.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:428",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:441",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:578",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatSidebar.tsx:932",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ChatListItem.tsx:122",
+    "frontend_web/src/pages/dashboard/sidebar/chat/ConversationPanel.tsx:327",
+    "backend/chat/views.py:771"
+   ],
+   "confidence": "high",
+   "test_needed": "Delete Sara's latest message while Tom views it with a personal pin; verify its text disappears from the bubble, sidebar preview, search results and pinned banner.",
+   "owner_question": {
+    "question": "When Sara deletes a message Tom has already opened or pinned, what should Tom continue seeing?",
+    "options": [
+     "A deletion notice everywhere, with the original text removed",
+     "No message or preview, with any personal pin removed",
+     "A deleted bubble but readable previews and pinned text (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Talent",
+   "title": "Explorers cannot renew their availability after their published dates expire",
+   "scenario": "Zoe publishes her availability, then all the published dates pass. When she returns to publish new dates, her old post is absent from the board and the editor treats her as having no post. Saving attempts to create another post, which is rejected because her expired post still exists; the editor also offers no way to delete that old post.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:486",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:560",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:703",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:971",
+    "frontend_web/src/pages/dashboard/sidebar/TalentBoard/hooks/useTalentFeed.ts:46",
+    "backend/talent/views/explorer.py:126",
+    "backend/talent/views/explorer.py:182",
+    "backend/talent/models.py:127"
+   ],
+   "confidence": "high",
+   "test_needed": "Give Zoe one expired availability post, open the publish dialog and save future dates; verify the existing post is updated successfully.",
+   "owner_question": {
+    "question": "When Zoe's published availability expires and she adds new dates, what should happen?",
+    "options": [
+     "Load her expired post for editing and republish it",
+     "Offer to replace her expired post with a new one",
+     "Reject publication until the expired post is removed elsewhere (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-4"
+}

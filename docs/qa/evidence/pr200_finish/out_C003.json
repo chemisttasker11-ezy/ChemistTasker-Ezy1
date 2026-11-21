@@ -1,0 +1,151 @@
+{
+ "chunk": "C003",
+ "files": [
+  {
+   "path": "backend/attendance_tests/test_kiosk_qr_pin_security.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Locks in plaintext-token fallback, so a stored hash works as a login token"
+  },
+  {
+   "path": "backend/attendance_tests/test_kiosk_release_blockers.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "PIN email failure and native pairing recovery asserted correctly"
+  },
+  {
+   "path": "backend/attendance_tests/test_kiosk_staff_breaks.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Break start/end checks PIN through the lockout-counted verifier"
+  },
+  {
+   "path": "backend/attendance_tests/test_model_foundation.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Append-only events, one open session, QR expiry boundaries tested"
+  },
+  {
+   "path": "backend/attendance_tests/test_pharmacy_pin_scope.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "PIN scope limited to accepted memberships and owned pharmacies"
+  },
+  {
+   "path": "backend/attendance_tests/test_provisional_approval_safety.py",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "'concurrency' test only repeats approval one after another; no real race covered"
+  },
+  {
+   "path": "backend/attendance_tests/test_roster_api.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Validate, publish and acknowledge API happy paths"
+  },
+  {
+   "path": "backend/attendance_tests/test_roster_copy_templates.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Copy, template and bulk-edit isolation and rollback asserted"
+  },
+  {
+   "path": "backend/attendance_tests/test_roster_safety_regression.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Marketplace protection and read-only GET asserted"
+  },
+  {
+   "path": "backend/attendance_tests/test_roster_services.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Validation rules, publish audit and unpublish visibility"
+  },
+  {
+   "path": "backend/attendance_tests/test_roster_v2_acceptance.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "End-to-end roster V2 contracts including 403s"
+  },
+  {
+   "path": "backend/attendance_tests/test_roster_worker_actions.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Swap, cover and release flows plus permission denials"
+  },
+  {
+   "path": "backend/attendance_tests/test_roster_worker_actions_deterministic.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Stale-request guards protect replacement workers"
+  },
+  {
+   "path": "backend/attendance_tests/test_security_boundaries.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "WebSocket origin, attempt counter, anonymous post, deleted-chat masking"
+  },
+  {
+   "path": "backend/attendance_tests/test_worker_pin_setup.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Asserts kiosk lookup gives 404 vs name/ID/masked email, so staff can be enumerated"
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Kiosk",
+   "title": "The kiosk staff lookup reveals staff names and masked emails by guessable number, and sends setup emails without a dedicated rate limit.",
+   "scenario": "Anyone standing at the paired counter tablet in Tom's pharmacy can type 1, 2, 3 and so on into the Staff ID box. For Omar, Ali, Mia, and also Nadia at Tom's other pharmacy, the kiosk shows the full name, account number and a partly hidden email. Unknown numbers get a different 'not found' answer, so every staff member in the group can be listed. Anyone who has no PIN yet (for example a new starter like Jack) gets a setup-code email on every probe. The PIN clock screen deliberately gives one generic error so this cannot happen, but the lookup screen undoes that.",
+   "evidence": [
+    "backend/attendance/kiosk_api.py:507",
+    "backend/attendance/kiosk_api.py:519",
+    "backend/attendance/kiosk_api.py:531",
+    "backend/attendance/credentials.py:632",
+    "backend/attendance/credentials.py:657",
+    "backend/attendance_tests/test_worker_pin_setup.py:235",
+    "backend/attendance_tests/test_worker_pin_setup.py:260"
+   ],
+   "confidence": "high",
+   "test_needed": "Using one device token, look up a known staff ID and an unknown one and assert both answers look the same with no name or email; then assert repeated lookups are rate-limited like the PIN screen.",
+   "owner_question": {
+    "question": "Someone at Tom's counter tablet types Staff ID numbers one after another. What should the kiosk show them?",
+    "options": [
+     "Nothing that names anyone: the same neutral 'enter your PIN or check your email' answer for every number, rate-limited",
+     "Show names only for staff of this pharmacy, never staff from Tom's other pharmacies, and rate-limit lookups",
+     "Keep today's behaviour: show the name and partly hidden email so staff can confirm it is them"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Kiosk",
+   "title": "The kiosk login check also accepts the stored token text as-is, so the scrambled copy saved in the database works as a kiosk token.",
+   "scenario": "Kiosk tokens are saved only in scrambled (hashed) form so that a leaked database or backup can't be used to sign in a kiosk. But the login check also accepts a token that matches the saved text exactly. So anyone who sees the saved value for Tom's front-counter kiosk (in a backup, an admin screen or a support export) can send it as the token and act as that kiosk: show sign-in QR codes, look up staff and clock people in. Nothing hashes old plain-text tokens, so this extra check is permanent.",
+   "evidence": [
+    "backend/attendance/credentials.py:245",
+    "backend/attendance/credentials.py:256",
+    "backend/attendance/credentials.py:258",
+    "backend/attendance_tests/test_kiosk_qr_pin_security.py:209"
+   ],
+   "confidence": "medium",
+   "test_needed": "Activate a kiosk, read its saved hash from the database, call authenticate_kiosk_device with that hash and assert it returns None.",
+   "owner_question": {
+    "question": "If someone gets a copy of Tom's database backup, should the kiosk token values in it be enough to run Tom's counter kiosk?",
+    "options": [
+     "No: hash the old plain-text tokens once and accept only real tokens from then on",
+     "No: make old unhashed kiosks pair again, then drop the extra check",
+     "Keep today's behaviour so very old kiosks keep working"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeA-3"
+}

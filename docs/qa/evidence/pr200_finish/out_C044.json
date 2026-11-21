@@ -1,0 +1,138 @@
+{
+ "chunk": "C044",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N3"
+   ],
+   "note": "Clearing optional rates silently preserves their saved values."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/PharmacyPageDialogs.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no additional problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/PharmacySoftwareFields.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; host passes the posting context and completion callback."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/PosterShiftDetailPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Interested shifts are filtered from one browse page, with pagination hidden."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Cancelling the posting overlay leaves a pending deletion that a later posting executes."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.model.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; no problem found."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Roster",
+   "title": "A cancelled shift replacement can delete the original shift after an unrelated posting.",
+   "scenario": "Tom starts converting Omar's assigned shift into an open shift, then dismisses the posting overlay. Tom later posts a separate new open shift from the same roster page. Completing that posting deletes Omar's original shift because the cancelled replacement remains pending.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:852",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerDialogs.tsx:866",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:467",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:553",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:577",
+    "frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:585"
+   ],
+   "confidence": "high",
+   "test_needed": "Cancel conversion of Omar's shift, create a separate open shift without leaving the roster page, and assert Omar's original shift and assignment remain.",
+   "owner_question": {
+    "question": "After Tom cancels replacing Omar's shift and later posts a separate shift, what should happen to Omar's original shift?",
+    "options": [
+     "Keep Omar's original shift and create the separate shift",
+     "Require Tom to explicitly resume or discard the cancelled replacement",
+     "Delete Omar's original shift after the later posting (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Interested shifts disappear when they are outside the current browse page.",
+   "scenario": "Sara applies for a shift on the second page of public shifts, then returns to the first browse page. Opening Interested filters only those first-page shifts, so her application is absent. That list hides pagination, preventing Sara from reaching the applied shift there.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:201",
+    "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:217",
+    "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:660",
+    "frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:687",
+    "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:287",
+    "frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:701"
+   ],
+   "confidence": "high",
+   "test_needed": "Place Sara's applied shift on public page two, open Interested from page one, and assert the applied shift is accessible.",
+   "owner_question": {
+    "question": "When Sara opens Interested from the first browse page, which applications should she be able to see?",
+    "options": [
+     "All her eligible applications, with separate pagination if needed",
+     "Current-page applications with controls to reach the other pages",
+     "Only current-page applications without pagination (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Clearing an optional pharmacy rate does not remove the saved rate.",
+   "scenario": "Tom clears his pharmacy's late-night rate and saves the pharmacy. The page reports success, but the old rate remains saved because the empty field is omitted from the update. When Tom starts another shift posting, the old late-night rate is filled in again.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:1161",
+    "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:1948",
+    "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:1949",
+    "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:1993",
+    "shared-core/src/domains/organizations/api.ts:83",
+    "backend/organizations/serializers.py:458",
+    "frontend_web/shared/postShift/useShiftPricing.ts:43"
+   ],
+   "confidence": "high",
+   "test_needed": "Save a pharmacy with a late-night rate, clear that field through the pharmacy form, save again, and assert the persisted rate is null.",
+   "owner_question": {
+    "question": "When Tom clears an optional late-night rate and saves, what should happen?",
+    "options": [
+     "Remove the saved rate so new postings have no late-night default",
+     "Reject the save and explain that a replacement rate is required",
+     "Report success while retaining the old rate (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexB-3"
+}

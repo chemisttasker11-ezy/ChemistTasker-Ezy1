@@ -1,0 +1,10 @@
+frontend_web/src/pages/PublicOrganizationPage.tsx
+frontend_web/src/pages/PublicTalentBoardPage.tsx
+frontend_web/src/pages/ResetPasswordPage.tsx
+frontend_web/src/pages/SharedShiftLandingPage.tsx
+frontend_web/src/pages/TermsOfServicePage.tsx
+frontend_web/src/pages/attendance/KioskActivationView.tsx
+frontend_web/src/pages/attendance/KioskBreakDialog.tsx
+frontend_web/src/pages/attendance/KioskPage.runtime.ts
+frontend_web/src/pages/attendance/KioskPage.tsx
+frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx

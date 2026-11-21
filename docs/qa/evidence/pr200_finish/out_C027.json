@@ -1,0 +1,238 @@
+{
+ "chunk": "C027",
+ "files": [
+  {
+   "path": "backend/workforce/roster/bulk_edit.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B38"
+   ],
+   "note": "Assignment overwrite also occurs through bulk assignment and worker moves."
+  },
+  {
+   "path": "backend/workforce/roster/command_api.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/roster/copying.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/roster/edit_guards.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/roster/periods.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/roster/permissions.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates authorization to the roster capability helper."
+  },
+  {
+   "path": "backend/workforce/roster/publication.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/roster/publication_contract.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/roster/revisions.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Any overlapping assignment counts toward coverage for the entire required interval."
+  },
+  {
+   "path": "backend/workforce/roster/serializers.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B35",
+    "N4"
+   ],
+   "note": "Writable assignment relations support B35; leave notes lack coworker access restrictions."
+  },
+  {
+   "path": "backend/workforce/roster/services.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; compatibility exports introduce no additional problem."
+  },
+  {
+   "path": "backend/workforce/roster/slot_edit.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/roster/slot_edit_inputs.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/roster/slot_locking.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/roster/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; routes match the reviewed handlers."
+  },
+  {
+   "path": "backend/workforce/roster/v2_views.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N3"
+   ],
+   "note": "Worker acknowledgement status accepts acknowledgements from earlier publications."
+  },
+  {
+   "path": "backend/workforce/roster/validation.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/roster/views.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B35",
+    "B36",
+    "B37",
+    "B38",
+    "N4"
+   ],
+   "note": "Known assignment authorization problems remain; coworker roster responses also expose private leave notes."
+  },
+  {
+   "path": "backend/workforce/roster/week_templates.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional problem found."
+  },
+  {
+   "path": "backend/workforce/roster/worker_actions.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Swap and cover approvals change workers without replacing their payment terms."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Roster",
+   "title": "Replacement approval keeps the departing worker's payment terms",
+   "scenario": "Omar requests a swap with Ben, Tom's favourite locum with an accepted pharmacy membership. Tom unpublishes the shift and approves the swap. Ben inherits Omar's employment and payment terms, and his rate is recalculated from Omar's agreement without recording Ben's own accepted terms.",
+   "evidence": [
+    "backend/workforce/roster/worker_actions.py:179",
+    "backend/workforce/roster/worker_actions.py:300",
+    "backend/workforce/roster/assignment_rates.py:11",
+    "backend/workforce/roster/assignment_rates.py:17",
+    "backend/shifts/engagement.py:47"
+   ],
+   "confidence": "high",
+   "test_needed": "Attempt to replace Omar's payroll assignment with Ben's locum membership; verify approval cannot transfer Omar's employment snapshot to Ben.",
+   "owner_question": {
+    "question": "When Tom approves Ben replacing Omar, how should Ben's payment terms be established?",
+    "options": [
+     "Require Ben to accept his own offer and payment terms",
+     "Restrict direct replacements to employed staff and use their own dated agreements",
+     "Give Ben Omar's existing terms (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Roster",
+   "title": "Coverage checks mark partly staffed intervals as fully covered",
+   "scenario": "Tom requires one pharmacist from 09:00 to 17:00 and schedules Omar only from 09:00 to 10:00. The coverage panel reports the whole requirement as covered with no shortfall. Tom can therefore overlook seven hours with no pharmacist scheduled.",
+   "evidence": [
+    "backend/workforce/roster/revisions.py:85",
+    "backend/workforce/roster/revisions.py:99",
+    "frontend_web/src/features/workforce/RosterCoveragePanel.tsx:112"
+   ],
+   "confidence": "high",
+   "test_needed": "Configure one pharmacist required from 09:00 to 17:00 with Omar assigned only 09:00 to 10:00; verify coverage reports a shortfall.",
+   "owner_question": {
+    "question": "Should Tom's 09:00–17:00 pharmacist requirement count as covered when Omar works only 09:00–10:00?",
+    "options": [
+     "Show uncovered hours and a coverage shortfall",
+     "Show partial coverage requiring Tom's review",
+     "Mark the whole interval covered (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P2",
+   "area": "Roster",
+   "title": "Old acknowledgements prevent workers acknowledging a republished roster",
+   "scenario": "Omar acknowledges Tom's published roster. Tom unpublishes the week, changes it and publishes it again. Tom sees Omar as awaiting acknowledgement, but Omar still sees the roster as acknowledged and has no acknowledgement button.",
+   "evidence": [
+    "backend/workforce/roster/v2_views.py:275",
+    "backend/workforce/roster/v2_views.py:295",
+    "backend/workforce/roster/acknowledgements.py:56",
+    "backend/workforce/roster/publication.py:69",
+    "frontend_web/src/components/roster/RosterWorkerAcknowledgements.tsx:73"
+   ],
+   "confidence": "high",
+   "test_needed": "After Omar acknowledges a week, unpublish and republish it; verify his worker response reports acknowledgement pending and the acknowledgement action remains available.",
+   "owner_question": {
+    "question": "After Tom changes and republishes an acknowledged week, what should Omar see?",
+    "options": [
+     "A pending acknowledgement for the new publication",
+     "A pending acknowledgement only if Omar's shifts changed",
+     "His previous acknowledgement remains sufficient (keep today's worker behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P1",
+   "area": "Roster",
+   "title": "Coworker roster responses expose private leave notes",
+   "scenario": "Omar submits a pending sick-leave request linked to a published shift and explains his medical circumstances in the note. Mia opens the pharmacy roster as an ordinary accepted staff member. The response includes Omar's leave type and full private note, although the leave endpoint restricts Mia to her own requests.",
+   "evidence": [
+    "backend/workforce/roster/views.py:552",
+    "backend/workforce/roster/serializers.py:138",
+    "backend/workforce/roster/serializers.py:154",
+    "backend/workforce/views.py:590"
+   ],
+   "confidence": "high",
+   "test_needed": "As Mia, retrieve Omar's roster assignment containing a pending sick-leave note; verify the response excludes his private leave details.",
+   "owner_question": {
+    "question": "What should Mia see about Omar's leave when viewing their shared pharmacy roster?",
+    "options": [
+     "Only a generic availability or cover indicator",
+     "The leave status and type, with the note restricted to Omar and managers",
+     "The full leave note (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-3"
+}

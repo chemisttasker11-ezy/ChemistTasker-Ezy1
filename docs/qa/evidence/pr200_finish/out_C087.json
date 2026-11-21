@@ -1,0 +1,13 @@
+{
+ "chunk": "C087",
+ "files": [
+  {
+   "path": "backend/manage.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read in full; standard Django command entry point with no problem found."
+  }
+ ],
+ "findings": [],
+ "reviewer": "codexA-1"
+}

@@ -1,0 +1,15 @@
+.agents/skills/ui-ux-pro-max/scripts/design_system.py
+.agents/skills/ui-ux-pro-max/scripts/reasoning_contract.py
+.agents/skills/ui-ux-pro-max/scripts/search.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_catalog_refresh.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_catalog_summary_line_endings.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_core.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_core_data_quality.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_data_contracts.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_design_system_mode.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_design_system_stack.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_native_desktop_stack_freshness.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_relevance_evaluator.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_skill_script_paths.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_style_taxonomy.py
+.agents/skills/ui-ux-pro-max/scripts/tests/test_text_layout_resilience.py

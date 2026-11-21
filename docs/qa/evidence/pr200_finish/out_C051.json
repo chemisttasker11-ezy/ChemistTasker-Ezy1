@@ -1,0 +1,167 @@
+{
+ "chunk": "C051",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/finance/InvoiceReviewDialog.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Modal dialog for approving, requesting revisions, or marking invoices as paid."
+  },
+  {
+   "path": "frontend_web/src/pages/finance/InvoiceReviewDrawer.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Drawer component displaying invoice review actions and past revision history."
+  },
+  {
+   "path": "frontend_web/src/pages/finance/InvoiceRows.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Row item rendering for issued and received invoices in the finance workspace."
+  },
+  {
+   "path": "frontend_web/src/pages/finance/financeParts.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Presentational components and helpers for invoice documents, status pills, and due dates."
+  },
+  {
+   "path": "frontend_web/src/pages/finance/helpers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Finance utility functions for date calculations, currency formatting, and CSV downloading."
+  },
+  {
+   "path": "frontend_web/src/pages/finance/invoiceFilters.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tab filters and status categorisation helpers for worker and pharmacy invoice lists."
+  },
+  {
+   "path": "frontend_web/src/pages/finance/useFinanceData.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Data fetching hook for invoices, customers, items, and expenses with race-condition guard."
+  },
+  {
+   "path": "frontend_web/src/pages/login.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Authentication login page handling credentials, remember-me sessions, and role-based redirects."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/ExplorerOnboarding.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Unused legacy V1 multi-tab explorer onboarding component superseded by ExplorerOnboardingV2Layout."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/OnboardingShell.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shared layout shell for worker onboarding wizard with verification progress and badges."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/OwnerOnboarding.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Owner onboarding page managing pharmacy manager details, AHPRA validation, and referrals."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/RefereeConfirmPage.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Dead code; entire file content is commented out."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/RefereeQuestionnairePage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "B45"
+   ],
+   "note": "Submits unvalidated referee feedback matching backend candidate verification issue B45."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/RefereeRejectPage.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Expects legacy pk and refIndex parameters causing 404 on token email links."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/SoftwarePicker.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "UI component for selecting pharmacy dispensing and clinical software experience."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_explorer/BasicInfoV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Basic information step for explorer onboarding including mobile verification and address search."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_explorer/ExplorerOnboardingV2Layout.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Step configuration wrapper binding OnboardingShell to Explorer onboarding tabs."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_explorer/IdentityV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Document upload and verification status UI for explorer identity verification."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_explorer/InterestsV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Checklist component for explorer placement, shadowing, volunteering, and junior roles."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_explorer/ProfileV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Bio and resume upload form for explorer onboarding."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_explorer/RefereesV2.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Step for adding and managing two candidate referees and sending request emails."
+  },
+  {
+   "path": "frontend_web/src/pages/onboarding/onboarding_explorer/UpgradeAccountCard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Card and dialog allowing explorers to upgrade their account to pharmacist or team roles."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Onboarding",
+   "title": "Referee decline link routes to a 404 and invokes an obsolete two-parameter backend path instead of token verification",
+   "scenario": "Zoe registers as an Explorer and provides a referee for verification. The referee receives an email request and clicks the decline link, but lands on a not-found page because the web router expects two parameters instead of the single email token. Even if reached directly, the decline page attempts to submit separate ID parameters to a non-existent API route rather than the server's signed token endpoint. The referee cannot decline, reminder emails continue to be sent to them, and Zoe is never alerted to nominate a replacement referee.",
+   "evidence": [
+    "frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:11",
+    "frontend_web/src/pages/onboarding/RefereeRejectPage.tsx:22",
+    "backend/onboarding/emails.py:79",
+    "backend/onboarding/urls.py:41"
+   ],
+   "confidence": "high",
+   "test_needed": "Navigating to /onboarding/referee-reject/<token> with a valid signed token renders the decline page and sends a POST with the token to /api/v1/onboarding/referee-reject/<token>/, returning 200 rather than 404.",
+   "owner_question": {
+    "question": "When Zoe's nominated referee clicks the decline link in their email request, what should happen?",
+    "options": [
+     "The referee decline page accepts the signed token, records the decline, notifies Zoe to nominate a new referee, and cancels reminder emails",
+     "The decline link asks the referee to confirm their decision on a questionnaire before cancelling reminders",
+     "Keep today's behaviour where the decline link fails with a not found error"
+    ]
+   }
+  }
+ ],
+ "reviewer": "agy-g1"
+}

@@ -1,0 +1,4 @@
+frontend_mobile/app.config.js
+frontend_mobile/eslint.config.js
+frontend_mobile/metro.config.js
+frontend_mobile/react-native-ssl-public-key-pinning.d.ts

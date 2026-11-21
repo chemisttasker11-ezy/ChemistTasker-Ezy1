@@ -1,0 +1,427 @@
+{
+ "chunk": "C055",
+ "files": [
+  {
+   "path": "frontend_mobile/app/manager/roster/acknowledgements.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen acknowledgements."
+  },
+  {
+   "path": "frontend_mobile/app/manager/roster/approvals.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen approvals."
+  },
+  {
+   "path": "frontend_mobile/app/manager/roster/audit.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen audit."
+  },
+  {
+   "path": "frontend_mobile/app/manager/roster/calendar.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen calendar."
+  },
+  {
+   "path": "frontend_mobile/app/manager/roster/copy-week.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen copy-week."
+  },
+  {
+   "path": "frontend_mobile/app/manager/roster/coverage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen coverage."
+  },
+  {
+   "path": "frontend_mobile/app/manager/roster/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen workspace."
+  },
+  {
+   "path": "frontend_mobile/app/manager/roster/publish.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen publish."
+  },
+  {
+   "path": "frontend_mobile/app/manager/roster/shift-editor.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen shift-editor."
+  },
+  {
+   "path": "frontend_mobile/app/manager/roster/staff.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen staff."
+  },
+  {
+   "path": "frontend_mobile/app/manager/roster/templates.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen templates."
+  },
+  {
+   "path": "frontend_mobile/app/manager/roster/validate.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to RosterParityScreen validate."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/access.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen access."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/grants.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen grants."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/inventory/import/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen import."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/inventory/import/review.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen import-review."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/inventory/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen inventory."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/inventory/lots/[id].tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen lot."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/inventory/scan.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen scan."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/listings/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen listings."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/listings/new/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen listing-new."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/listings/new/s8.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen listing-s8."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/pharmacy.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen pharmacy."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/requests.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen requests."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/transfers/[id]/complete.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen complete."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/transfers/[id]/documents.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen documents."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/transfers/[id]/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen transfer."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/ethical/transfers/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to EthicalMarketplaceScreen transfers."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/exchanges/[id].tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen exchange-detail."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/exchanges/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen exchanges."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/filters.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen filters."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen browse."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/items/[id]/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen item."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/items/[id]/report.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen report."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/mine/[id].tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen mine-detail."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/mine/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen mine."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/new/audience.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen audience."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/new/category.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen category."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/new/details.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen details."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/new/photos.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen photos."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/new/review.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen review."
+  },
+  {
+   "path": "frontend_mobile/app/marketplace/new/seller.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Delegates to MarketplaceParityScreen seller."
+  },
+  {
+   "path": "frontend_mobile/app/mobile-verify.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Mobile OTP verification and overseas flow properly handled."
+  },
+  {
+   "path": "frontend_mobile/app/my-hours.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Renders employee timesheet hours and submission actions."
+  },
+  {
+   "path": "frontend_mobile/app/my-leave.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Leave request creation, cancellation, and membership selection."
+  },
+  {
+   "path": "frontend_mobile/app/my-roster.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Worker assignments, shift claim, leave and cover requests."
+  },
+  {
+   "path": "frontend_mobile/app/notifications.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports shared NotificationsScreen."
+  },
+  {
+   "path": "frontend_mobile/app/organization/_layout.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Organization navigation tabs, role guard, and header controls."
+  },
+  {
+   "path": "frontend_mobile/app/organization/calendar.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports shared calendar component."
+  },
+  {
+   "path": "frontend_mobile/app/organization/chat.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports shared chat page."
+  },
+  {
+   "path": "frontend_mobile/app/organization/dashboard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports organization dashboard."
+  },
+  {
+   "path": "frontend_mobile/app/organization/hub.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports shared HubScreen."
+  },
+  {
+   "path": "frontend_mobile/app/organization/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports organization dashboard."
+  },
+  {
+   "path": "frontend_mobile/app/organization/invite.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports organization staff invite view."
+  },
+  {
+   "path": "frontend_mobile/app/organization/invoice.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Renders InvoiceList for organization."
+  },
+  {
+   "path": "frontend_mobile/app/organization/invoice/[id].tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Renders InvoiceDetail for organization."
+  },
+  {
+   "path": "frontend_mobile/app/organization/invoice/new.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Renders InvoiceGenerate for organization."
+  },
+  {
+   "path": "frontend_mobile/app/organization/messages/[id].tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports shared messages view."
+  },
+  {
+   "path": "frontend_mobile/app/organization/notifications.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports shared notifications screen."
+  },
+  {
+   "path": "frontend_mobile/app/organization/pharmacies/[id].tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Loads pharmacy details, memberships, and admins."
+  },
+  {
+   "path": "frontend_mobile/app/organization/pharmacies/[id]/edit.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Renders PharmacyForm in edit mode."
+  },
+  {
+   "path": "frontend_mobile/app/organization/pharmacies/[id]/locums.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Renders StaffManager for pharmacy locums."
+  },
+  {
+   "path": "frontend_mobile/app/organization/pharmacies/[id]/staff.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Renders StaffManager for pharmacy staff."
+  },
+  {
+   "path": "frontend_mobile/app/organization/pharmacies/add.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Renders PharmacyForm in create mode."
+  },
+  {
+   "path": "frontend_mobile/app/organization/pharmacies/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Pharmacies list with counts and actions."
+  },
+  {
+   "path": "frontend_mobile/app/organization/pills.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports shared PillsScreen."
+  },
+  {
+   "path": "frontend_mobile/app/organization/post-shift.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports PostShiftScreen."
+  },
+  {
+   "path": "frontend_mobile/app/organization/profile.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports organization profile."
+  },
+  {
+   "path": "frontend_mobile/app/organization/shifts/[id].tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports owner shift details view."
+  },
+  {
+   "path": "frontend_mobile/app/organization/shifts/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports organization shifts index."
+  }
+ ],
+ "findings": [],
+ "reviewer": "agy-g3"
+}

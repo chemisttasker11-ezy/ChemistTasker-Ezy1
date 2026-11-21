@@ -1,0 +1,9 @@
+frontend_web/src/pages/dashboard/sidebar/MyHistoryShiftsPage.tsx
+frontend_web/src/pages/dashboard/sidebar/OverviewPageOwner.tsx
+frontend_web/src/pages/dashboard/sidebar/OverviewPageStaff.tsx
+frontend_web/src/pages/dashboard/sidebar/OwnerAssignedShiftBoard.tsx
+frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarDialogs.tsx
+frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.model.ts
+frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.tsx
+frontend_web/src/pages/dashboard/sidebar/PharmacyClaimsPanels.tsx
+frontend_web/src/pages/dashboard/sidebar/PharmacyPage.model.ts

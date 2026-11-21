@@ -1,0 +1,227 @@
+{
+  "chunk": "C008",
+  "files": [
+    {
+      "path": "backend/core/contract_test_settings.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Isolated SQLite testing, in-memory channels, eager task mode and disabled HTTP redirect are scoped to tests."
+    },
+    {
+      "path": "backend/core/e2e_acceptance_settings.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "E2E test root guard enforces isolated .e2e/authenticated path; no production DB path."
+    },
+    {
+      "path": "backend/core/file_validation.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B49"
+      ],
+      "note": "When signature sniffing fails, client-declared MIME is trusted; already B49."
+    },
+    {
+      "path": "backend/core/integrations/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Package marker only."
+    },
+    {
+      "path": "backend/core/integrations/abr.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "ABR HTTP helper handles network errors and parses relevant ABN fields; no new release blocker identified."
+    },
+    {
+      "path": "backend/core/migration_operations.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PostgreSQL-only object rename checks old/new names before alters; no unreviewed destructive action identified."
+    },
+    {
+      "path": "backend/core/numbers.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Six-place decimal/float coercion returns distinct, documented types."
+    },
+    {
+      "path": "backend/core/postgres_test_settings.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PostgreSQL test database is configured through local test environment variables."
+    },
+    {
+      "path": "backend/core/routing.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Websocket routes compose chat, notifications and onboarding owners."
+    },
+    {
+      "path": "backend/core/security.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "CSP middleware attaches policy only when not already present."
+    },
+    {
+      "path": "backend/core/serializer_lifecycle.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B44"
+      ],
+      "note": "Old identity file deletion occurs before downstream save; B44-related failure exposure merits a regression test."
+    },
+    {
+      "path": "backend/core/serializer_mixins.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Validation mixin delegates mapping to central file policy."
+    },
+    {
+      "path": "backend/core/serializer_values.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "JSON list coercion rejects invalid nonlists."
+    },
+    {
+      "path": "backend/core/settings.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Checked auth, security cache, cookie/CORS, storage and task defaults; production deployment configurations require separate runtime verification."
+    },
+    {
+      "path": "backend/core/sitemap.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Public URL enumeration uses published articles, published marketplace listings and public shifts."
+    },
+    {
+      "path": "backend/core/task_queue.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Task registration lock and queued notification behavior traced; no new independently evidenced blocker."
+    },
+    {
+      "path": "backend/core/test_admin_registry_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Snapshots admin registrations and OTP site registry, not admin permission behavior."
+    },
+    {
+      "path": "backend/core/test_backend_ownership_boundaries.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AST import, app-edge, kernel and model identity contract examined; not runtime role isolation tests."
+    },
+    {
+      "path": "backend/core/test_client_profile_api_composition.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Checks API v1 URL composition and finance legacy route ordering."
+    },
+    {
+      "path": "backend/core/test_client_profile_common_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Tests numeric, naming and serializer helper identity."
+    },
+    {
+      "path": "backend/core/test_dashboard_read_model_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Verifies dashboard URL targets, not tenant content semantics."
+    },
+    {
+      "path": "backend/core/test_kernel_utility_ownership.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Asserts numeric/normalization helper contracts."
+    },
+    {
+      "path": "backend/core/test_membership_domain_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Checks membership table and router identities, not consent or revocation."
+    },
+    {
+      "path": "backend/core/test_module_size_ratchet.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Enforces 999-code-line module size ratchet with exceptions currently empty."
+    },
+    {
+      "path": "backend/core/test_onboarding_domain_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Checks onboarding model/table, route and Celery task identity."
+    },
+    {
+      "path": "backend/core/test_operational_model_import_ownership.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Asserts operational model imports resolve to their domain owners."
+    },
+    {
+      "path": "backend/core/test_organization_domain_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Checks organization model table and router identity, not admin revocation behavior."
+    },
+    {
+      "path": "backend/core/test_pdf_rendering_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Tests both worker-finance and legacy invoice PDF rendering with text extraction."
+    },
+    {
+      "path": "backend/core/test_promoted_model_import_ownership.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Asserts chat/hub/shift imports use promoted model owners."
+    },
+    {
+      "path": "backend/core/test_public_error_surface.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Static broad-exception secrecy checks and targeted API error-envelope cases; not a full auth test."
+    },
+    {
+      "path": "backend/core/test_runtime_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Checks Django 5.2 and numeric ID JSON behavior against 27 serializer snapshots."
+    },
+    {
+      "path": "backend/core/test_serializer_decomposition.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "SHA-pins serializer field snapshots and import ownership."
+    },
+    {
+      "path": "backend/core/test_serializer_lifecycle_ownership.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Tests successful storage cleanup path; lacks rollback-failure coverage referenced by B44."
+    },
+    {
+      "path": "backend/core/test_settings.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Uses isolated SQLite memory database and fast hashers in test mode."
+    },
+    {
+      "path": "backend/core/test_shift_domain_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Checks shifted models, table naming and shift router identities."
+    },
+    {
+      "path": "backend/core/test_signal_registry_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Compares runtime signal receivers and forbids import-time task execution in signals."
+    }
+  ],
+  "findings": [],
+  "reviewer": "gpt6-senior-20261025"
+}

@@ -1,0 +1,335 @@
+{
+ "chunk": "C004",
+ "files": [
+  {
+   "path": "backend/attendance_tests/urls.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Test-only URLconf mirroring production attendance/roster routes."
+  },
+  {
+   "path": "backend/billing/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file."
+  },
+  {
+   "path": "backend/billing/admin.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Plain admin registrations, read in full."
+  },
+  {
+   "path": "backend/billing/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "App config only."
+  },
+  {
+   "path": "backend/billing/migrations/0001_squashed_baseline.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Schema baseline, no data change."
+  },
+  {
+   "path": "backend/billing/migrations/0002_stripewebhookevent.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Creates webhook dedupe table, no data change."
+  },
+  {
+   "path": "backend/billing/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Package marker."
+  },
+  {
+   "path": "backend/billing/models.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N5"
+   ],
+   "note": "ShiftPayment rows cascade-delete with the owner user account."
+  },
+  {
+   "path": "backend/billing/tests.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Webhook idempotency and payer-scope tests assert sensible outcomes."
+  },
+  {
+   "path": "backend/billing/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Routes only."
+  },
+  {
+   "path": "backend/billing/utils.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B62",
+    "N3"
+   ],
+   "note": "Org free trial follows the acting org admin's join date."
+  },
+  {
+   "path": "backend/billing/views.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B01",
+    "B02",
+    "B04",
+    "B11",
+    "B15",
+    "B53",
+    "B54",
+    "B57",
+    "N2",
+    "N3",
+    "N4"
+   ],
+   "note": "Unselected checkout finalizes all offers for one fee; org falls back to owner subscription."
+  },
+  {
+   "path": "backend/chat/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file."
+  },
+  {
+   "path": "backend/chat/admin.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Registers Message only."
+  },
+  {
+   "path": "backend/chat/apps.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "App config wiring signals."
+  },
+  {
+   "path": "backend/chat/consumers.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B05",
+    "B51"
+   ],
+   "note": "Membership checked only at connect; DM sends allowed for revoked members."
+  },
+  {
+   "path": "backend/chat/identity.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-export facade."
+  },
+  {
+   "path": "backend/chat/migrations/0001_initial.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "State-only model move plus content-type relabel."
+  },
+  {
+   "path": "backend/chat/migrations/0002_clean_table_and_index_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Renames tables/indexes, no data change."
+  },
+  {
+   "path": "backend/chat/migrations/0003_clean_constraint_names.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Renames DB object names only."
+  },
+  {
+   "path": "backend/chat/migrations/__init__.py",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Empty package file."
+  },
+  {
+   "path": "backend/chat/models.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B03"
+   ],
+   "note": "Message.sender cascades on membership delete."
+  },
+  {
+   "path": "backend/chat/realtime.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B30"
+   ],
+   "note": "Badge previews pushed to user group without session recheck."
+  },
+  {
+   "path": "backend/chat/routing.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Single websocket route."
+  },
+  {
+   "path": "backend/chat/serializers.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Group participants accept any active membership platform-wide."
+  },
+  {
+   "path": "backend/chat/signals.py",
+   "verdict": "ISSUE",
+   "ids": [
+    "B05"
+   ],
+   "note": "Participant removal does not close live sockets."
+  },
+  {
+   "path": "backend/chat/test_api.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Characterization tests; no custom-group scope test."
+  },
+  {
+   "path": "backend/chat/test_websocket.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Connect, fan-out and AHPRA freeze tests look correct."
+  },
+  {
+   "path": "backend/chat/text.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Strips tags and script blocks."
+  },
+  {
+   "path": "backend/chat/urls.py",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Router wiring only."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Chat",
+   "title": "Anyone with one active membership can pull any pharmacy's staff into a custom group and harvest their names and emails.",
+   "scenario": "Sara has one active membership somewhere. She creates a custom group chat and lists membership numbers from many pharmacies, including Nadia at Tom's other pharmacy. Each person is added with no check that Sara shares a pharmacy with them. Sara then opens her chat participants list and sees each person's name, email, photo and job type, and can message all of them.",
+   "evidence": [
+    "backend/chat/serializers.py:264",
+    "backend/chat/serializers.py:288",
+    "backend/chat/serializers.py:331",
+    "backend/chat/views.py:472",
+    "backend/chat/views.py:863",
+    "backend/users/presentation.py:60"
+   ],
+   "confidence": "high",
+   "test_needed": "Sara creates a group with Nadia's membership id from an unrelated pharmacy; expect 400/403 and no Participant row for Nadia.",
+   "owner_question": {
+    "question": "When Sara builds a custom group chat, whom should she be allowed to add?",
+    "options": [
+     "Only people she shares an accepted pharmacy membership with",
+     "Only people she already has a DM or shift with",
+     "Anyone on the platform (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Billing",
+   "title": "A shift checkout without selected offers charges one fee but confirms every worker waiting for payment.",
+   "scenario": "Tom's shift has three slots, each with a worker waiting on payment. If checkout is started without naming offers or slots, Stripe charges a single fee. When it is paid, all three workers are confirmed. With slots named, two workers waiting on the same slot are also both confirmed for one fee. ChemistTasker is underpaid for each extra worker.",
+   "evidence": [
+    "backend/billing/views.py:665",
+    "backend/billing/views.py:334",
+    "backend/billing/views.py:346",
+    "backend/billing/views.py:583",
+    "backend/billing/views.py:864"
+   ],
+   "confidence": "medium",
+   "test_needed": "Shift with 3 awaiting offers on 3 slots: POST charge-fulfillment with {} and expect a 400 or quantity 3, not quantity 1 that finalizes 3.",
+   "owner_question": {
+    "question": "Tom pays the fee once while three workers are waiting on his shift. What should happen?",
+    "options": [
+     "Require Tom to pick the workers, and charge one fee per worker",
+     "Charge for all waiting workers automatically",
+     "One fee confirms everyone (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Billing",
+   "title": "An organisation's free trial depends on which org admin clicks pay, so a newly joined admin makes every shift free.",
+   "scenario": "Lina's organisation has been on ChemistTasker for a year. A newly created org admin account, under 30 days old, pays a shift fee for Tom's pharmacy, and the shift is confirmed free as a 'free trial'. This can be repeated with each new admin account. The same shift costs money if a chief admin or Lina pays instead.",
+   "evidence": [
+    "backend/billing/utils.py:121",
+    "backend/billing/utils.py:129",
+    "backend/billing/utils.py:166",
+    "backend/billing/views.py:562",
+    "backend/billing/views.py:594"
+   ],
+   "confidence": "high",
+   "test_needed": "Org created long ago, new ORG_ADMIN joined today pays fulfilment; expect PAYMENT_REQUIRED, not FREE_TRIAL.",
+   "owner_question": {
+    "question": "Lina's year-old organisation adds a new admin, who pays a shift fee. Should it be free?",
+    "options": [
+     "No: the trial follows the organisation's start date",
+     "Trial follows the first org admin only",
+     "Yes: it follows whoever pays (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P2",
+   "area": "Billing",
+   "title": "Organisation billing falls back to the pharmacy owner's personal subscription for viewing, seat purchases and subscriber status.",
+   "scenario": "Tom has his own active subscription, and his pharmacy belongs to Lina's organisation, which has none. Lina's org billing page shows Tom's subscription and its payment-provider ids as the organisation's. When Lina buys extra seats, the checkout runs on Tom's payment customer, and the seats may land on the organisation's record without any base plan.",
+   "evidence": [
+    "backend/billing/views.py:154",
+    "backend/billing/views.py:157",
+    "backend/billing/views.py:471",
+    "backend/billing/views.py:495",
+    "backend/billing/views.py:522",
+    "backend/billing/views.py:214"
+   ],
+   "confidence": "medium",
+   "test_needed": "Org without subscription, owner with active one: ORG_ADMIN GET subscription returns inactive/none, and seat purchase is refused.",
+   "owner_question": {
+    "question": "Tom pays for his own plan and his pharmacy is in Lina's organisation. What should Lina's org billing show?",
+    "options": [
+     "Only the organisation's own subscription (none)",
+     "Tom's plan, read-only, with no seat changes",
+     "Tom's plan, fully manageable (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N5",
+   "severity": "P2",
+   "area": "Billing",
+   "title": "Deleting the owner's user account deletes all their shift payment records.",
+   "scenario": "Tom paid fulfilment fees and penalties, including fees paid for organisation pharmacies, which are recorded under the pharmacy owner. If Tom's account is deleted, every payment record tied to him is deleted too. ChemistTasker loses the financial history it needs for refunds, disputes and tax records.",
+   "evidence": [
+    "backend/billing/models.py:84",
+    "backend/billing/views.py:846"
+   ],
+   "confidence": "medium",
+   "test_needed": "Delete a user with ShiftPayment rows; expect the payments to remain (protected or owner set null).",
+   "owner_question": {
+    "question": "Tom deletes his account after paying shift fees. What should happen to those payment records?",
+    "options": [
+     "Keep them, with Tom's identity anonymised",
+     "Block account deletion while payment records exist",
+     "Delete them with the account (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

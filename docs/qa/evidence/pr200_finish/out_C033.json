@@ -1,0 +1,102 @@
+{
+ "chunk": "C033",
+ "files": [
+  {
+   "path": "shared-core/src/transport/convergence.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Tests URL confinement, refresh sharing and 5xx sanitising as designed."
+  },
+  {
+   "path": "shared-core/src/transport/errors.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Hides every 5xx body, including finance's deliberate 'do not resend' 503 warning."
+  },
+  {
+   "path": "shared-core/src/transport/operational.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Thin adapter over fetchApi; nothing wrong found."
+  },
+  {
+   "path": "shared-core/src/transport/urlResolution.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Slash trimming and finance-boundary checks asserted correctly."
+  },
+  {
+   "path": "shared-core/src/transport/urls.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Same-origin, credential and encoded-separator checks hold."
+  },
+  {
+   "path": "shared-core/src/types.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Type declarations only; no runtime logic."
+  },
+  {
+   "path": "shared-core/src/utils/asyncScope.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Stale-ticket cases assert the right outcomes."
+  },
+  {
+   "path": "shared-core/src/utils/asyncScope.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Generation and lane tokens correctly reject late results."
+  },
+  {
+   "path": "shared-core/src/utils/pricing.ts",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Exported but unused; comment wrongly says the backend imports it."
+  },
+  {
+   "path": "shared-core/src/utils/serialization.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Query and camelCase helpers behave as documented."
+  },
+  {
+   "path": "shared-core/tests/finance.transport.cjs",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Stale, unwired test; its 503 assertion contradicts current transport behaviour."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P2",
+   "area": "Invoicing",
+   "title": "The finance warning not to resend an invoice email is replaced by a generic error, and the test that should catch this never runs.",
+   "scenario": "Sara emails an invoice to Tom's pharmacy and the mail provider times out. The server marks the email as uncertain and replies 'Email acceptance is uncertain. Do not resend until checked with your mail provider.' Sara sees only 'Request failed with status 503', so she doesn't know her email may already have gone out, and she may keep pressing Send or think nothing was sent. The test file that checks this message is kept is not run by any script and depends on a setup function that now does nothing, so the problem goes unnoticed.",
+   "evidence": [
+    "shared-core/src/transport/errors.ts:38",
+    "shared-core/src/transport/client.ts:121",
+    "backend/worker_finance/views.py:313",
+    "shared-core/tests/finance.transport.cjs:42",
+    "shared-core/src/finance.ts:92"
+   ],
+   "confidence": "high",
+   "test_needed": "A finance send call that gets a 503 with the uncertain-delivery detail must reject with that detail text, not the generic status message.",
+   "owner_question": {
+    "question": "When Sara sends Tom an invoice email and the server can't confirm it was delivered, what should Sara see?",
+    "options": [
+     "The server's exact warning: delivery is uncertain, do not resend",
+     "A fixed in-app message, 'Delivery uncertain, check before resending', shown for this 503 only",
+     "Keep the generic 'Request failed with status 503' and rely on the server blocking a second send"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

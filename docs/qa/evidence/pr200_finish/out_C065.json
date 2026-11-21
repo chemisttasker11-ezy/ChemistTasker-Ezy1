@@ -1,0 +1,111 @@
+{
+  "chunk": "C065",
+  "source_sha": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "reviewer": "gpt6-senior-20261025",
+  "review_level": "S1 source inspection, service-boundary and scoped interaction review; S2/S3 pending",
+  "files": [
+    {
+      "path": "frontend_mobile/roles/shared/messages/[id].tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "B51"
+      ],
+      "note": "[id].tsx: Room messaging and WebSocket events use tickets and shared-core message APIs; revocation B05/B30/B51.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/messages/useLiveMessages.ts",
+      "verdict": "ISSUE",
+      "ids": [
+        "B05",
+        "B30"
+      ],
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 20-93): The native websocket helper obtains a ticket with fetchWsTicket, maintains current callback refs and reconnects. It does not itself reauthorize group membership on every event; B05/B30 revocation requires server consumer/notification enforcement. Test contract: Negative: remove member while socket remains connected, assert no further private events; positive: reconnect a valid room without duplicates. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        20,
+        93
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/GooglePlacesInput.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "GooglePlacesInput.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/LocumManager.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 292-438): LocumManager handles multiple invitation rows, role checks, sending invitations, generating links, and deletion of membership by deleteMembershipService. Server invitation permissions and membership deletion effects are critical; this UI should not mask backend F03/B03 hazards. Test contract: Negative: revoked manager invitation and removal of member with historical chat/attendance; positive: owner invites permitted locum and can revoke access without deleting history. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        292,
+        438
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/MembershipApplicationReviewDialog.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 239-306): The manager review dialog saves application draft then calls approveMembershipApplicationService. It relies on backend application review scope; generic ModelViewSet delete gap C012-N2 is not prevented by this normal UI. Test contract: Negative: forged application ID, repeated approval, approval after invitation expiry and generic DELETE; positive: authorized approval with auditable status. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        239,
+        306
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/MembershipApplicationsPanel.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "MembershipApplicationsPanel.tsx: Membership/admin invitation, management, consent and removal flows through shared-core; B03/B19/F03-N1/C011-N2.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmaciesListView.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmaciesListView.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyAdmins.tsx",
+      "verdict": "ISSUE",
+      "ids": [
+        "F03-N1"
+      ],
+      "note": "RISK-TARGETED SOURCE TRACE (baseline b77e9fd2 lines 131-169): The admins page creates a PharmacyAdmin through createPharmacyAdminService and deletes assignments through deletePharmacyAdminService. The admin revocation bypass F03-N1 is a backend reaccept path, not a missing button guard. Test contract: Negative: delete assignment then reuse historical acceptance API; positive: fresh owner invitation restores authority only after explicit grant. This is not a distinct second-reviewer or executed test.",
+      "targeted_source_lines": [
+        131,
+        169
+      ],
+      "reviewer_tier": "TARGETED_SOURCE_CALLPATH_REVIEW_SAME_AGENT_S2_INDEPENDENCE_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyDetailView.tsx",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmacyDetailView.tsx: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyForm.config.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmacyForm.config.ts: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    },
+    {
+      "path": "frontend_mobile/roles/shared/pharmacies/PharmacyForm.styles.ts",
+      "verdict": "OK",
+      "ids": [],
+      "note": "PharmacyForm.styles.ts: Pharmacy detail, files, services, permissions and schema, delegated to shared-core backend; B16/B17.",
+      "reviewer_tier": "INITIAL_S1_FIRST_PASS_SEMANTIC_PENDING"
+    }
+  ],
+  "findings": [],
+  "targeted_recheck_files": 4,
+  "status": "MIXED_TARGETED_CALLPATH_SOURCE_AND_FIRST_PASS; NO S3"
+}

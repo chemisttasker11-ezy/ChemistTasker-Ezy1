@@ -1,0 +1,13 @@
+backend/shifts/announcements.py
+backend/shifts/apps.py
+backend/shifts/assignment.py
+backend/shifts/base.py
+backend/shifts/browse.py
+backend/shifts/cancellation.py
+backend/shifts/candidates.py
+backend/shifts/context.py
+backend/shifts/counter_offers.py
+backend/shifts/description_templates.py
+backend/shifts/emails.py
+backend/shifts/engagement.py
+backend/shifts/escalation.py

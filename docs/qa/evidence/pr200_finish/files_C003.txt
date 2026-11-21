@@ -1,0 +1,15 @@
+backend/attendance_tests/test_kiosk_qr_pin_security.py
+backend/attendance_tests/test_kiosk_release_blockers.py
+backend/attendance_tests/test_kiosk_staff_breaks.py
+backend/attendance_tests/test_model_foundation.py
+backend/attendance_tests/test_pharmacy_pin_scope.py
+backend/attendance_tests/test_provisional_approval_safety.py
+backend/attendance_tests/test_roster_api.py
+backend/attendance_tests/test_roster_copy_templates.py
+backend/attendance_tests/test_roster_safety_regression.py
+backend/attendance_tests/test_roster_services.py
+backend/attendance_tests/test_roster_v2_acceptance.py
+backend/attendance_tests/test_roster_worker_actions.py
+backend/attendance_tests/test_roster_worker_actions_deterministic.py
+backend/attendance_tests/test_security_boundaries.py
+backend/attendance_tests/test_worker_pin_setup.py

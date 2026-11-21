@@ -1,0 +1,17 @@
+frontend_mobile/roles/shared/shifts/ActiveShiftsPage/types.ts
+frontend_mobile/roles/shared/shifts/ActiveShiftsPage/utils/activeShiftRuntime.ts
+frontend_mobile/roles/shared/shifts/ActiveShiftsPage/utils/candidateHelpers.ts
+frontend_mobile/roles/shared/shifts/ActiveShiftsPage/utils/displayHelpers.ts
+frontend_mobile/roles/shared/shifts/ActiveShiftsPage/utils/offerHelpers.ts
+frontend_mobile/roles/shared/shifts/ActiveShiftsPage/utils/shiftHelpers.ts
+frontend_mobile/roles/shared/shifts/CommunityShiftsView.tsx
+frontend_mobile/roles/shared/shifts/ConfirmedShiftsView.tsx
+frontend_mobile/roles/shared/shifts/HistoryShiftsView.tsx
+frontend_mobile/roles/shared/shifts/NativeShiftBoardPreview.tsx
+frontend_mobile/roles/shared/shifts/OwnerAssignedShiftBoard.tsx
+frontend_mobile/roles/shared/shifts/PharmacyContextDetails.tsx
+frontend_mobile/roles/shared/shifts/PostShiftDetailsStep.tsx
+frontend_mobile/roles/shared/shifts/PostShiftPayRateStep.tsx
+frontend_mobile/roles/shared/shifts/PostShiftProgress.tsx
+frontend_mobile/roles/shared/shifts/PostShiftScreen.helpers.ts
+frontend_mobile/roles/shared/shifts/PostShiftScreen.styles.ts

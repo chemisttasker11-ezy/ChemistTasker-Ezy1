@@ -1,0 +1,185 @@
+{
+  "chunk": "C015",
+  "files": [
+    {
+      "path": "backend/onboarding/test_skills_catalog_path.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Tests canonical registry resolution, role catalog override and invalid-data fail-closed behavior"
+    },
+    {
+      "path": "backend/onboarding/test_tab_capabilities_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Identity, payment, reference and photo tab validation and on-change contract tests"
+    },
+    {
+      "path": "backend/onboarding/test_urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Onboarding versioned route resolution tests"
+    },
+    {
+      "path": "backend/onboarding/test_verification_policy.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Verified-state policy under email/mobile/AHPRA, grace and skill certificate conditions"
+    },
+    {
+      "path": "backend/onboarding/test_verification_transitions.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AHPRA number claim concurrency, role upgrade and evidence-state transition regression tests"
+    },
+    {
+      "path": "backend/onboarding/urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Per-role onboarding, reference response and AHPRA endpoint registration"
+    },
+    {
+      "path": "backend/onboarding/verification/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Verification package marker"
+    },
+    {
+      "path": "backend/onboarding/verification/ahpra.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AHPRA lookup parsing, normalized register status and persistence of check results"
+    },
+    {
+      "path": "backend/onboarding/verification/ahpra_numbers.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AHPRA identity normalization, canonical ownership and owner-conflict prevention"
+    },
+    {
+      "path": "backend/onboarding/verification/desktop.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Verifier checks and leased queue, locked results, repair records and after-commit alerts"
+    },
+    {
+      "path": "backend/onboarding/verification/documents.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Temporary OCR downloads, PDF conversion and private artifact cleanup"
+    },
+    {
+      "path": "backend/onboarding/verification/orchestration.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Notification idempotency markers for onboarding"
+    },
+    {
+      "path": "backend/onboarding/verification/policy.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B40"
+      ],
+      "note": "Requirements and Verified state, including retained base state for manual approvals"
+    },
+    {
+      "path": "backend/onboarding/verification/reminders.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Redis marker deduplication, retry and scheduled referee follow-up"
+    },
+    {
+      "path": "backend/onboarding/verification/schema.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Read-only AHPRA and verification badge serialization"
+    },
+    {
+      "path": "backend/onboarding/verification/state.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1"
+      ],
+      "note": "Suspension cancellation and notices; region recipients not narrowed to affected pharmacy"
+    },
+    {
+      "path": "backend/onboarding/verification/support.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Bounded profile fetch/retry utility"
+    },
+    {
+      "path": "backend/onboarding/views.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Owned onboarding data, signed referee responses, state update and notifications"
+    },
+    {
+      "path": "backend/organizations/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Organisations package marker"
+    },
+    {
+      "path": "backend/organizations/access.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B62"
+      ],
+      "note": "Org and pharmacy capability checks; region shift authority uses role without roster capability"
+    },
+    {
+      "path": "backend/organizations/admin.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Django organisational and pharmacy admin metadata, controlled form and ownership edits"
+    },
+    {
+      "path": "backend/organizations/apps.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "AppConfig registration"
+    },
+    {
+      "path": "backend/organizations/chains.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Active ownership-chain lookup"
+    },
+    {
+      "path": "backend/organizations/claims.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B17"
+      ],
+      "note": "Claim requests, owner accept/reject, organisation scoping and recorded claim changes"
+    }
+  ],
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P1",
+      "area": "Onboarding",
+      "title": "AHPRA suspension notices expose an employee's regulatory status to region administrators outside their assigned pharmacies.",
+      "scenario": "Sara works at Tom's pharmacy and her AHPRA registration is suspended. Grace is a region administrator in the same organisation but assigned only to Nadia's different pharmacy. The suspension notifier delivers Sara's name, pharmacy affiliation and registration status to Grace despite her lacking permission to manage Tom's pharmacy.",
+      "evidence": [
+        "backend/onboarding/verification/state.py:335",
+        "backend/onboarding/verification/state.py:340",
+        "backend/onboarding/verification/state.py:343",
+        "backend/onboarding/verification/state.py:346",
+        "backend/onboarding/verification/state.py:352",
+        "backend/users/org_roles.py:1"
+      ],
+      "confidence": "high",
+      "test_needed": "Create two pharmacies in one organisation; Sara is at A, Grace REGION_ADMIN assigned only B. Trigger Sara AHPRA suspension and assert Grace receives no in-app/email status, while authorized A managers do.",
+      "owner_question": {
+        "question": "Should region administrator Grace receive Sara's AHPRA suspension details when Sara works at a pharmacy Grace cannot manage?",
+        "options": [
+          "No; deliver only to managers scoped to Sara's pharmacy",
+          "Send a generic staffing alert without identity or regulatory detail",
+          "Yes; all regional administrators in the organisation receive detailed suspension notices"
+        ]
+      }
+    }
+  ],
+  "reviewer": "gpt6-senior-20261025"
+}

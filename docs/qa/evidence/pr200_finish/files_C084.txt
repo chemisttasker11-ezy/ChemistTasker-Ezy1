@@ -1,0 +1,10 @@
+.agents/skills/design/scripts/icon/generate.py
+.agents/skills/design/scripts/logo/core.py
+.agents/skills/design/scripts/logo/generate.py
+.agents/skills/design/scripts/logo/search.py
+.agents/skills/design/scripts/logo/tests/test_generate.py
+.agents/skills/ui-styling/scripts/shadcn_add.py
+.agents/skills/ui-styling/scripts/tailwind_config_gen.py
+.agents/skills/ui-styling/scripts/tests/test_shadcn_add.py
+.agents/skills/ui-styling/scripts/tests/test_tailwind_config_gen.py
+.agents/skills/ui-ux-pro-max/scripts/core.py

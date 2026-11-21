@@ -1,0 +1,177 @@
+{
+ "chunk": "F01",
+ "paths_read": [
+  "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md",
+  "docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md",
+  "backend/shifts/base.py",
+  "backend/shifts/interest.py",
+  "backend/shifts/browse.py",
+  "backend/shifts/urls.py",
+  "backend/shifts/lifecycle.py",
+  "backend/shifts/assignment.py",
+  "backend/shifts/offers.py",
+  "backend/shifts/finalize.py",
+  "backend/shifts/counter_offers.py",
+  "backend/shifts/posting.py",
+  "backend/shifts/models.py",
+  "backend/shifts/engagement.py",
+  "backend/shifts/rate_visibility.py",
+  "backend/shifts/emails.py",
+  "backend/shifts/serialization/shifts.py",
+  "backend/shifts/serialization/offers.py",
+  "backend/shifts/serialization/interests.py",
+  "backend/shifts/serialization/projections.py",
+  "backend/shifts/test_shift_listing_contract.py",
+  "backend/onboarding/verification/state.py",
+  "backend/billing/utils.py",
+  "backend/billing/views.py",
+  "backend/rewards/views.py",
+  "shared-core/src/utils/pricing.ts",
+  "shared-core/src/domains/billing/api.ts",
+  "shared-core/src/domains/shifts/api.ts",
+  "frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts",
+  "frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx"
+ ],
+ "confirmed_known": [
+  "B04",
+  "B08",
+  "B10",
+  "B11",
+  "B20",
+  "B41",
+  "B54",
+  "B62",
+  "C004-N2",
+  "C004-N3"
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Shifts/Privacy",
+   "title": "Workers browsing shifts can see the names and emails of other workers who are booked on the shift or waiting for payment.",
+   "scenario": "Tom posts a public multi-day shift. Ben is confirmed for Monday and Omar has accepted Tuesday and is waiting for Tom to pay. When Sara opens the public shift list or the shift detail on web or mobile, the data sent to her phone includes Ben's and Omar's full names, emails and user numbers. This happens even when Tom posted anonymously. The anonymous public job board deliberately strips exactly these fields, but signed-in worker views do not, and neither does each worker's own offer list, which embeds the same shift data.",
+   "evidence": [
+    "backend/shifts/base.py:113",
+    "backend/shifts/browse.py:428",
+    "backend/shifts/lifecycle.py:393",
+    "backend/shifts/serialization/shifts.py:91",
+    "backend/shifts/serialization/shifts.py:434",
+    "backend/shifts/serialization/shifts.py:464",
+    "backend/shifts/serialization/offers.py:215",
+    "backend/shifts/serialization/projections.py:87"
+   ],
+   "confidence": "high",
+   "test_needed": "As Sara (unrelated locum), GET /public-shifts/ and /shifts/{id}/ for a shift where Ben is assigned and Omar is awaiting payment; assert no slot_assignments or payment_options entries and no worker email appear.",
+   "owner_question": {
+    "question": "When Sara looks at Tom's shift, should she see who else is already booked or waiting for payment on it?",
+    "options": [
+     "Sara sees nothing about other workers, only which slots are still open",
+     "Sara sees that a slot is taken, with no names or contact details",
+     "Keep today's behaviour: Sara sees other workers' names and emails"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Shifts/Billing",
+   "title": "Editing a shift after a worker has accepted but before payment either locks the worker into new dates they never agreed to, or takes the payment without booking anyone.",
+   "scenario": "Sara accepts Tom's two-day shift and is waiting for Tom to pay. Tom then edits the dates or times, and the shift's days are replaced. Sara gets a 'please review' alert, but she can no longer decline because her acceptance is past the 'pending' stage. On a whole-shift booking, Tom pays and Sara is booked onto the new days with no new confirmation. On a per-day shift, Sara's acceptance loses its day but still shows as payable: Tom pays by card, booking fails on every retry so Sara is never assigned and the charge is never recorded; if Tom pays with Pills, the Pills are spent before booking fails.",
+   "evidence": [
+    "backend/shifts/posting.py:157",
+    "backend/shifts/posting.py:188",
+    "backend/shifts/models.py:678",
+    "backend/shifts/offers.py:615",
+    "backend/shifts/serialization/shifts.py:464",
+    "backend/shifts/finalize.py:30",
+    "backend/billing/views.py:860",
+    "backend/billing/views.py:890",
+    "backend/rewards/views.py:217"
+   ],
+   "confidence": "high",
+   "test_needed": "Create an offer in ACCEPTED_AWAITING_PAYMENT on a multi-slot shift, PATCH the shift with a new slots payload, then run the fulfilment webhook for that offer id; assert the edit is refused (or the offer is reset for re-confirmation) rather than the webhook failing or the worker being assigned.",
+   "owner_question": {
+    "question": "Tom changes the dates of a shift after Sara has accepted but before he has paid. What should happen to Sara's acceptance?",
+    "options": [
+     "Tom cannot change the dates or times until he pays or cancels Sara's acceptance",
+     "Sara's acceptance goes back to 'needs confirming' and she must accept the new times again before Tom can pay",
+     "Keep today's behaviour: Sara stays accepted and Tom can pay for the changed shift"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Shifts/Billing",
+   "title": "A worker or manager can silently delete a shift offer, including one that is accepted and waiting for payment, so payment can be taken with nobody booked.",
+   "scenario": "The shift-offers endpoint still allows a plain delete, and neither web nor mobile uses it. Sara can delete her own accepted offer while Tom is paying at Stripe checkout. Tom's card is charged and the payment is recorded, but there is no offer left to confirm, so nobody is booked and Tom is not told. In the same way, Tom or Grace can delete Sara's accepted offer, and she is never told she lost the booking. Unlike the proper decline action, a delete sends no notice and works on accepted offers too.",
+   "evidence": [
+    "backend/shifts/offers.py:156",
+    "backend/shifts/offers.py:162",
+    "backend/shifts/offers.py:610",
+    "backend/billing/views.py:848",
+    "backend/billing/views.py:864",
+    "shared-core/src/domains/shifts/api.ts:87"
+   ],
+   "confidence": "high",
+   "test_needed": "As Sara, DELETE /shift-offers/{id}/ on her ACCEPTED_AWAITING_PAYMENT offer; assert 405/403 and that the offer still exists.",
+   "owner_question": {
+    "question": "Sara has accepted Tom's shift and Tom is paying. Should anyone be able to make that offer disappear without a trace?",
+    "options": [
+     "No one can delete offers; Sara declines and Tom cancels through the normal steps, which notify the other side",
+     "Only Tom can withdraw an offer, and only before Sara accepts, with a notice to Sara",
+     "Keep today's behaviour: Sara or Tom can delete it silently"
+    ]
+   }
+  },
+  {
+   "id": "N4",
+   "severity": "P2",
+   "area": "Shifts/Notifications",
+   "title": "When a worker accepts or declines, the 'payment needed' or 'declined' notice goes to the pharmacy owner, not the admin who posted the shift.",
+   "scenario": "Grace posts a shift for Tom's pharmacy in Lina's organisation and sends Sara an offer. When Sara accepts, the in-app alert and the 'Action Required: payment' email go to Tom as pharmacy owner; Grace gets nothing. If Sara declines, only Tom is told. Interest and counter-offer emails do go to Grace as the poster. So Grace keeps waiting, the shift sits unpaid, and Sara is never locked in.",
+   "evidence": [
+    "backend/shifts/offers.py:183",
+    "backend/shifts/offers.py:474",
+    "backend/shifts/offers.py:626",
+    "backend/shifts/interest.py:160",
+    "backend/shifts/counter_offers.py:64"
+   ],
+   "confidence": "medium",
+   "test_needed": "Region admin creates the shift, worker accepts an offer under PAYMENT_REQUIRED; assert the region admin who created the shift receives the shift_worker_confirmed notification.",
+   "owner_question": {
+    "question": "Grace posted the shift and Sara accepted it. Who should be told that payment is needed, or that Sara declined?",
+    "options": [
+     "Grace (the poster) and every admin who can pay for that pharmacy",
+     "Grace and Tom (the poster and the pharmacy owner)",
+     "Keep today's behaviour: only Tom, the pharmacy owner"
+    ]
+   }
+  },
+  {
+   "id": "N5",
+   "severity": "P2",
+   "area": "Billing",
+   "title": "A 'Casual employee' shift is charged the $80 part/full-time job fee instead of the $30 per-shift locum fee.",
+   "scenario": "Tom posts a one-day shift with the employment type 'Casual employee' and books Mia. At checkout Tom is charged $80, the published price for a part-time or full-time job, because only shifts marked 'Locum' get the $30 per-shift price. The pricing pages only list locum shifts and part/full-time jobs, so Tom is charged a price he was never shown for this kind of shift.",
+   "evidence": [
+    "backend/billing/views.py:646",
+    "backend/shifts/models.py:24",
+    "frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:268",
+    "shared-core/src/utils/pricing.ts:36"
+   ],
+   "confidence": "medium",
+   "test_needed": "Call charge_shift_fulfillment under PAYMENT_REQUIRED for a CASUAL shift and assert the agreed (per-shift) Stripe price id is used.",
+   "owner_question": {
+    "question": "Tom books Mia for a single casual-employee shift. What fee should Tom pay?",
+    "options": [
+     "The per-shift locum fee ($30, or $15 for subscribers)",
+     "A separate casual fee to be added to the pricing page",
+     "Keep today's behaviour: the $80 part/full-time job fee"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeA-1"
+}

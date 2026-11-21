@@ -1,0 +1,292 @@
+{
+ "chunk": "C032",
+ "files": [
+  {
+   "path": "shared-core/src/domains/shifts/postingDraft.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion found."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/postingDraft.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1",
+    "N2"
+   ],
+   "note": "Edits replace slot identities; escalation timestamps lack timezone information."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/skillPresets.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; preset isolation and validation assertions are sound."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/skillPresets.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/visibility.test.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Automatic escalation assertion accepts timestamps without timezone information."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/visibility.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "N2"
+   ],
+   "note": "Automatic escalation returns local timestamps subsequently submitted without timezone conversion."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/workProfile.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion found."
+  },
+  {
+   "path": "shared-core/src/domains/shifts/workProfile.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "shared-core/src/domains/talent/api.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "B34"
+   ],
+   "note": "Raw list, detail and profile reads expose the known hidden-post access paths."
+  },
+  {
+   "path": "shared-core/src/domains/talent/mappers.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "shared-core/src/domains/talent/presentation.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion found."
+  },
+  {
+   "path": "shared-core/src/domains/talent/presentation.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "shared-core/src/domains/workforce/api.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional wrapper defect found."
+  },
+  {
+   "path": "shared-core/src/finance.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "shared-core/src/financePresentation.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "shared-core/src/index.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; exports and configuration delegation are consistent."
+  },
+  {
+   "path": "shared-core/src/kioskProtocol.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; canonical signing assertions are consistent."
+  },
+  {
+   "path": "shared-core/src/kioskProtocol.ts",
+   "verdict": "ISSUE",
+   "ids": [
+    "B32"
+   ],
+   "note": "Signed shift_id participates in the known assignment identifier mismatch."
+  },
+  {
+   "path": "shared-core/src/legacyApiMapping.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion found."
+  },
+  {
+   "path": "shared-core/src/operationalApi.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion found."
+  },
+  {
+   "path": "shared-core/src/pharmacyProfile.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; compatibility exports are consistent."
+  },
+  {
+   "path": "shared-core/src/platformApi.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion found."
+  },
+  {
+   "path": "shared-core/src/platformApi.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional facade defect found."
+  },
+  {
+   "path": "shared-core/src/policy/accessPolicy.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no demonstrably incorrect assertion found."
+  },
+  {
+   "path": "shared-core/src/policy/accessPolicy.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional user-facing problem established."
+  },
+  {
+   "path": "shared-core/src/policy/marketplacePolicy.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion found."
+  },
+  {
+   "path": "shared-core/src/policy/marketplacePolicy.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "shared-core/src/policy/rosterPolicy.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion found."
+  },
+  {
+   "path": "shared-core/src/policy/rosterPolicy.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional user-facing problem established."
+  },
+  {
+   "path": "shared-core/src/skills.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion found."
+  },
+  {
+   "path": "shared-core/src/skills.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "shared-core/src/storage.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "shared-core/src/talent.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no production-impacting assertion defect established."
+  },
+  {
+   "path": "shared-core/src/talent.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional production problem established in current callers."
+  },
+  {
+   "path": "shared-core/src/transport/application.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no problem found."
+  },
+  {
+   "path": "shared-core/src/transport/client.test.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no incorrect assertion found."
+  },
+  {
+   "path": "shared-core/src/transport/client.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Read fully; no additional transport defect established."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Shifts",
+   "title": "Editing a shift description breaks its pending offers.",
+   "scenario": "Tom offers Sara one date, then edits only the shift description before Sara accepts. Saving replaces the existing dates and detaches Sara's offer from its date. Sara's offer remains pending, but attempting to accept it fails.",
+   "evidence": [
+    "shared-core/src/domains/shifts/postingDraft.ts:46",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:457",
+    "backend/shifts/serialization/shifts.py:355",
+    "backend/shifts/posting.py:189",
+    "backend/shifts/models.py:680",
+    "backend/shifts/offers.py:351"
+   ],
+   "confidence": "high",
+   "test_needed": "Create a pending offer for Sara with single_user_only=false, submit the description-edit payload, and assert its original slot remains linked and accept succeeds.",
+   "owner_question": {
+    "question": "When Tom edits only a shift description after offering a date to Sara, what should happen to Sara's offer?",
+    "options": [
+     "Preserve Sara's offer and its original date",
+     "Block Tom's edit until outstanding offers are withdrawn",
+     "Leave Sara's offer pending but unusable (keep today's behaviour)"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P2",
+   "area": "Shifts",
+   "title": "Automatic escalation can expose shifts earlier than the selected interval.",
+   "scenario": "Tom in Perth selects automatic escalation from his pharmacy's locum audience to the public board after 24 hours in October. The submitted time has no timezone, so the server interprets it as Sydney time. Sara can see the vacancy three hours earlier than Tom selected.",
+   "evidence": [
+    "shared-core/src/domains/shifts/visibility.ts:20",
+    "shared-core/src/domains/shifts/context.ts:98",
+    "shared-core/src/domains/shifts/postingDraft.ts:49",
+    "shared-core/src/domains/shifts/visibility.test.ts:19",
+    "frontend_web/shared/postShift/PostShiftForm.tsx:398",
+    "backend/shifts/models.py:119",
+    "backend/core/settings.py:445"
+   ],
+   "confidence": "high",
+   "test_needed": "With the client in Australia/Perth and Django in Australia/Sydney during October, assert a 24-hour automatic escalation persists exactly 24 hours after the starting instant.",
+   "owner_question": {
+    "question": "When Tom in Perth chooses public visibility after 24 hours, when should Sara gain access?",
+    "options": [
+     "After the full 24 hours Tom selected",
+     "At a pharmacy-local time explicitly shown to Tom",
+     "At the submitted Sydney time regardless of Tom's timezone (keep today's behaviour)"
+    ]
+   }
+  }
+ ],
+ "reviewer": "codexA-2"
+}

@@ -1,0 +1,295 @@
+{
+  "chunk": "C012",
+  "files": [
+    {
+      "path": "backend/memberships/serializers.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Membership role/finance serializer, application creation from invite IDs, and immutable user/pharmacy checks"
+    },
+    {
+      "path": "backend/memberships/tasks.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Membership email task recipient routing and review alerts"
+    },
+    {
+      "path": "backend/memberships/test_ahpra_optional_membership.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Optional AHPRA internal membership test assertions"
+    },
+    {
+      "path": "backend/memberships/test_app_registration.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Installed app contract test"
+    },
+    {
+      "path": "backend/memberships/test_internal_ownership.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Model owner/import contract test"
+    },
+    {
+      "path": "backend/memberships/test_labels.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Membership role label test"
+    },
+    {
+      "path": "backend/memberships/test_membership_workflows_contract.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Invites, accept/reject, scoped membership/applications tests"
+    },
+    {
+      "path": "backend/memberships/test_model_code_ownership.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Model alias migration test"
+    },
+    {
+      "path": "backend/memberships/test_urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "API router ownership assertions"
+    },
+    {
+      "path": "backend/memberships/urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Membership endpoint router with magic-link application path"
+    },
+    {
+      "path": "backend/memberships/views.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "N1",
+        "N2",
+        "B03",
+        "B19"
+      ],
+      "note": "Membership application creation bypass and delete audit trail; membership removal and revoked invitation authority"
+    },
+    {
+      "path": "backend/notifications/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Notifications package marker"
+    },
+    {
+      "path": "backend/notifications/apps.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Notifications app registry"
+    },
+    {
+      "path": "backend/notifications/consumers.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B30"
+      ],
+      "note": "Notification websocket group subscriptions lack session-revocation revalidation; known B30"
+    },
+    {
+      "path": "backend/notifications/migrations/0001_initial.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "State-only notification model transfer migration and content type remap"
+    },
+    {
+      "path": "backend/notifications/migrations/0002_clean_table_and_index_names.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Notification table rename migration"
+    },
+    {
+      "path": "backend/notifications/migrations/0003_clean_constraint_names.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Notification constraint/index rename migration"
+    },
+    {
+      "path": "backend/notifications/migrations/__init__.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Notifications migration marker"
+    },
+    {
+      "path": "backend/notifications/models.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Notification model private record and unread tracking"
+    },
+    {
+      "path": "backend/notifications/routing.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Notification WebSocket route"
+    },
+    {
+      "path": "backend/notifications/serializers.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Push token serializer ownership handling"
+    },
+    {
+      "path": "backend/notifications/services.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Notification broadcasting, push delivery, durable recipient records"
+    },
+    {
+      "path": "backend/notifications/test_api.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B64"
+      ],
+      "note": "Notification authenticated list, read and token API tests"
+    },
+    {
+      "path": "backend/notifications/test_websocket.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "WebSocket anonymous/ticket/origin test suite; no post-revocation test"
+    },
+    {
+      "path": "backend/notifications/urls.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Notification API route registration"
+    },
+    {
+      "path": "backend/notifications/views.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "F09-N3"
+      ],
+      "note": "Notification listing scoped to caller and device-token ownership replacement"
+    },
+    {
+      "path": "backend/onboarding/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Onboarding package marker"
+    },
+    {
+      "path": "backend/onboarding/admin.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "OTP/AHPRA administrative review and scoped registration"
+    },
+    {
+      "path": "backend/onboarding/ahpra_test_lookup.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Dedicated AHPRA test lookup helper gated by credentials/rate limit"
+    },
+    {
+      "path": "backend/onboarding/apps.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Onboarding app configuration"
+    },
+    {
+      "path": "backend/onboarding/consumers.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "WebSocket verifier token checks and leased check dispatch"
+    },
+    {
+      "path": "backend/onboarding/emails.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "Referee notifications and onboarding email events"
+    },
+    {
+      "path": "backend/onboarding/management/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Management package marker"
+    },
+    {
+      "path": "backend/onboarding/management/commands/__init__.py",
+      "verdict": "NA",
+      "ids": [],
+      "note": "Management command package marker"
+    },
+    {
+      "path": "backend/onboarding/management/commands/ahpra_e2e.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AHPRA test exercise management command"
+    },
+    {
+      "path": "backend/onboarding/management/commands/reevaluate_verification.py",
+      "verdict": "ISSUE",
+      "ids": [
+        "B40"
+      ],
+      "note": "Operator re-evaluation management command"
+    },
+    {
+      "path": "backend/onboarding/middleware.py",
+      "verdict": "OK",
+      "ids": [],
+      "note": "AHPRA freeze middleware with limited self-service exemptions"
+    }
+  ],
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "P1",
+      "area": "Memberships",
+      "title": "Authenticated workers can create applications against expired or unauthorised invitation links by calling the generic applications endpoint.",
+      "scenario": "Sara has no valid invitation to Tom's pharmacy. She obtains or guesses a numeric invite-link identifier and sends her details to the membership-applications API directly. The create endpoint only requires authentication and its serializer accepts the link ID without checking active status or expiry, bypassing the secure magic-link application route.",
+      "evidence": [
+        "backend/memberships/views.py:310",
+        "backend/memberships/views.py:316",
+        "backend/memberships/serializers.py:382",
+        "backend/memberships/serializers.py:383",
+        "backend/memberships/serializers.py:423",
+        "backend/memberships/serializers.py:526",
+        "backend/memberships/views.py:249",
+        "backend/memberships/views.py:262"
+      ],
+      "confidence": "high",
+      "test_needed": "As unrelated authenticated Sara, POST /api/v1/membership-applications/ with a valid old or disabled invite_link integer, matching her email/DOB/role. Expect refusal and zero application creation; valid UUID magic-link flow must succeed.",
+      "owner_question": {
+        "question": "May Sara apply to Tom's pharmacy using the internal numeric ID of an expired or revoked invitation?",
+        "options": [
+          "No, all application creation must require a valid active token",
+          "Allow only when Tom explicitly re-enables the invitation",
+          "Yes, the numeric ID is sufficient"
+        ]
+      }
+    },
+    {
+      "id": "N2",
+      "severity": "P1",
+      "area": "Memberships",
+      "title": "A pharmacy administrator can permanently delete pending and decided membership application review records through generic DELETE.",
+      "scenario": "Lina is authorised to review applications for Tom's pharmacy. After deciding an application, she calls DELETE on the application detail endpoint. The default ModelViewSet destroys the application and its submitted snapshot and reviewer decision, removing the employment decision audit trail instead of recording an archival state.",
+      "evidence": [
+        "backend/memberships/views.py:310",
+        "backend/memberships/views.py:318",
+        "backend/memberships/views.py:324",
+        "backend/memberships/models.py:233",
+        "backend/memberships/models.py:283",
+        "backend/memberships/urls.py:22"
+      ],
+      "confidence": "high",
+      "test_needed": "As scoped manager attempt DELETE on approved, rejected and pending applications; require 405/403 or audited soft-archive, preserving submitted/decision history. Verify positive review/approve/reject remains functional.",
+      "owner_question": {
+        "question": "Should Lina be allowed to permanently delete historic membership applications and decisions?",
+        "options": [
+          "No, retain review history and permit only audited archive",
+          "Only permit irreversible deletion by an audited super-admin workflow",
+          "Yes, ordinary managers may delete application history"
+        ]
+      }
+    }
+  ],
+  "reviewer": "gpt6-senior-20261025"
+}

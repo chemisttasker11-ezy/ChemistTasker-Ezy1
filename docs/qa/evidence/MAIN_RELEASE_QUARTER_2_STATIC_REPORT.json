@@ -1,0 +1,35 @@
+{
+  "byte_read_and_sha_verified": 538,
+  "files_with_static_signals": 348,
+  "frozen_main": "b77e9fd296bc2710350ef6f3cd402ce2529ffc06",
+  "generated_utc": "2026-10-24T21:17:08.692667+00:00",
+  "limitations": "Automated byte/source inspection only; pattern hits are not confirmed bugs. No production, app, UI, role, concurrency or semantic certification.",
+  "manual_context_review": 0,
+  "read_or_syntax_errors": [],
+  "scanner_sha": "4ad9e9326352c27ba9ae9615fd5043fb1cd3c0a2",
+  "signal_file_counts": {
+    "BROWSER_STORAGE": 6,
+    "DB_WRITE": 121,
+    "DIRECT_NETWORK": 1,
+    "EXCEPTION_SWALLOW": 20,
+    "FINANCIAL": 87,
+    "FOREIGN_KEY_INPUT": 2,
+    "MUTATION_ROUTE": 35,
+    "PERMISSION": 32,
+    "ROW_LOCK": 37,
+    "SERIALIZER_SAVE": 18,
+    "TENANT_ID": 162,
+    "TRANSACTION": 42,
+    "UI_ROLE_GATE": 11,
+    "UI_ROUTE": 116,
+    "UNSCOPED_DB": 118
+  },
+  "source_buckets": {
+    "backend": 235,
+    "mobile": 95,
+    "shared-core": 63,
+    "web-Next": 50,
+    "web-Vite": 95
+  },
+  "total_selected": 538
+}

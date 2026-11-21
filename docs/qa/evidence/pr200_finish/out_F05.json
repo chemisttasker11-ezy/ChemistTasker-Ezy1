@@ -1,0 +1,118 @@
+{
+ "chunk": "F05",
+ "paths_read": [
+  "docs/qa/evidence/pr200_finish/KNOWN_FINDINGS.md",
+  "docs/qa/evidence/pr200_finish/FILE_PASS_TITLES.md",
+  "backend/users/api_account.py",
+  "backend/onboarding/services/upgrade.py",
+  "backend/onboarding/views.py",
+  "backend/onboarding/services/work_profile.py",
+  "backend/onboarding/verification/policy.py",
+  "backend/onboarding/verification/state.py",
+  "backend/onboarding/middleware.py",
+  "backend/onboarding/models.py",
+  "backend/shifts/interest.py",
+  "backend/shifts/access.py",
+  "backend/shifts/base.py",
+  "backend/shifts/browse.py",
+  "backend/shifts/offers.py",
+  "backend/shifts/assignment.py",
+  "backend/shifts/engagement.py",
+  "backend/shifts/finalize.py",
+  "backend/shifts/announcements.py",
+  "backend/memberships/invites.py",
+  "backend/memberships/role_resolution.py",
+  "backend/rewards/signals.py",
+  "backend/talent/views/explorer.py",
+  "frontend_web/src/navigation.tsx",
+  "shared-core/src/domains/shifts/api.ts"
+ ],
+ "confirmed_known": [
+  "B40",
+  "B44",
+  "B45"
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Onboarding / Public shifts",
+   "title": "A New to pharmacy account can apply for public shifts without ever being verified, though the same profile is blocked from posting on the talent hub.",
+   "scenario": "Zoe signs up as New to pharmacy from overseas and skips the mobile check. Her photo ID has not been checked, and she could be as young as 15. She opens Public Shifts and expresses interest in Tom's public New to pharmacy shift, and it goes through. The verification rules say being Verified is the gate for applying to public shifts, but the apply check only looks at pharmacists and pharmacy team accounts and skips New to pharmacy completely. The talent hub does block Zoe until she is verified, so the two parts of the app disagree, and Tom gets interest from an unverified and possibly under-age person.",
+   "evidence": [
+    "backend/shifts/interest.py:40-72",
+    "backend/shifts/interest.py:82-84",
+    "backend/onboarding/verification/state.py:153-178",
+    "backend/onboarding/verification/policy.py:3-5",
+    "backend/onboarding/verification/policy.py:44-57",
+    "backend/talent/views/explorer.py:147-151",
+    "backend/shifts/access.py:86-87",
+    "frontend_web/src/navigation.tsx:522-530"
+   ],
+   "confidence": "high",
+   "test_needed": "An EXPLORER user with an unverified ExplorerOnboarding (verified=False, mobile_check_skipped=True, gov_id_verified=False) posts express_interest on a PLATFORM shift with role_needed=EXPLORER and gets 403, not 201.",
+   "owner_question": {
+    "question": "Zoe is New to pharmacy, skipped the mobile check from overseas and has no checked photo ID. She tries to apply for Tom's public New to pharmacy shift. What should happen?",
+    "options": [
+     "Block her until her profile is Verified (mobile, or photo ID if overseas), the same rule as the talent hub",
+     "Let her apply, but show Tom a clear 'not verified' label on her interest",
+     "Keep today's behaviour: any New to pharmacy account can apply"
+    ]
+   }
+  },
+  {
+   "id": "N2",
+   "severity": "P1",
+   "area": "Onboarding / Shift confirmation",
+   "title": "A New to pharmacy person who is offered a shift can never confirm it, because the confirm step looks for a pharmacy team profile they cannot have.",
+   "scenario": "Tom sees Zoe's interest in his public New to pharmacy shift, or books her from the Talent Board, and sends her an offer. Zoe gets the offer email and notification and presses Confirm. Every time she is told to 'complete worker onboarding'. The payment and engagement check only reads a pharmacist or pharmacy team profile, and the New to pharmacy profile has no payment settings at all. Her offer sits until it expires after 48 hours, so Tom's slot stays unfilled and he never learns why.",
+   "evidence": [
+    "backend/shifts/engagement.py:25-28",
+    "backend/shifts/engagement.py:245-251",
+    "backend/shifts/engagement.py:580",
+    "backend/shifts/offers.py:354-363",
+    "backend/shifts/assignment.py:95-126",
+    "backend/onboarding/models.py:541-624",
+    "shared-core/src/domains/talent/presentation.test.ts:10"
+   ],
+   "confidence": "high",
+   "test_needed": "Tom accept_users Zoe (EXPLORER, verified ExplorerOnboarding, no OtherStaffOnboarding) on an EXPLORER-role shift; Zoe POSTs the offer accept and must not get the 400 'Complete worker onboarding' error (or Tom must be stopped from sending the offer in the first place).",
+   "owner_question": {
+    "question": "Tom wants to book Zoe, who is New to pharmacy, for a New to pharmacy shift. What should happen when he sends her the offer?",
+    "options": [
+     "Zoe can confirm it; New to pharmacy shifts get their own simple engagement terms with no TFN/ABN step",
+     "Tom is told before sending that Zoe must first upgrade to Pharmacy team and set up payment",
+     "Keep today's behaviour: the offer is sent but Zoe can never confirm it"
+    ]
+   }
+  },
+  {
+   "id": "N3",
+   "severity": "P1",
+   "area": "Shift confirmation / Role gate",
+   "title": "Nothing checks that the person confirming an offer holds the role the shift needs, so a technician or intern can be booked into a pharmacist shift.",
+   "scenario": "Tom sends an offer for his public pharmacist shift to Ali (technician) or Jack (intern), for example by picking the wrong person or calling the app directly. Ali confirms, and the check only asks whether Ali's own technician profile is verified. Ali has no AHPRA number, so the AHPRA check reads as 'pending' and lets him through. Ali is now rostered and paid as the pharmacist on duty. The role match exists for browsing, applying and instant claims, but not for sending an offer, confirming it or finalising it.",
+   "evidence": [
+    "backend/shifts/base.py:232-259",
+    "backend/shifts/assignment.py:25-131",
+    "backend/shifts/offers.py:329-405",
+    "backend/onboarding/verification/state.py:153-167",
+    "backend/onboarding/verification/state.py:58-61",
+    "backend/shifts/finalize.py:23-73",
+    "backend/shifts/engagement.py:528-537",
+    "backend/shifts/browse.py:329-334"
+   ],
+   "confidence": "medium",
+   "test_needed": "Tom accept_users Ali (OTHER_STAFF, role_type TECHNICIAN, verified, no AHPRA) on a PLATFORM shift with role_needed=PHARMACIST; Ali's offer accept must be refused, and no ShiftSlotAssignment may be created.",
+   "owner_question": {
+    "question": "Tom sends an offer for a pharmacist shift to Ali, who is a technician, and Ali presses Confirm. What should happen?",
+    "options": [
+     "Block the offer when Tom sends it: only people whose role covers the shift can be offered it",
+     "Let Tom send it, but refuse Ali's confirmation with a clear role message",
+     "Keep today's behaviour: Ali is booked as the pharmacist"
+    ]
+   }
+  }
+ ],
+ "reviewer": "claudeB-1"
+}

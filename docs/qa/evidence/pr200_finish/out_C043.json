@@ -1,0 +1,85 @@
+{
+ "chunk": "C043",
+ "files": [
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/MyHistoryShiftsPage.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Past shift history board with invoice creation and completed shift pharmacy rating dialog."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/OverviewPageOwner.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Owner dashboard overview displaying shift counts, billed metrics, upcoming shifts, and received invoices."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/OverviewPageStaff.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Staff and explorer dashboard overview with shift commitments, role-based quick actions, and income summaries."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/OwnerAssignedShiftBoard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Owner assigned shift board displaying booked and historical slot cards with messaging and ratings."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarDialogs.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Dialog headers display Create even when editing existing calendar events or work notes."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.model.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Data types, date helpers, and label mappings for pharmacy calendar items and dialog forms."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Month calendar and day agenda with event and note management; contains mojibake character on fallback time."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/PharmacyClaimsPanels.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "N1"
+   ],
+   "note": "Owner claim requests panel is hidden when claimedPharmacyCount is zero, blocking review of pending claims."
+  },
+  {
+   "path": "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.model.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Data structures, normalization functions, and constants for pharmacy profiles and organization claim dialogs."
+  }
+ ],
+ "findings": [
+  {
+   "id": "N1",
+   "severity": "P1",
+   "area": "Organisations",
+   "title": "Pharmacy owner cannot view or respond to organization claim requests because the review section is hidden when no pharmacies are already claimed",
+   "scenario": "Lina submits a claim request for Tom's independent pharmacy so her organisation can manage it. When Tom logs into the web dashboard to review his pharmacies, the claim requests section is hidden because Tom does not yet have any claimed or linked pharmacies. Tom cannot view Lina's request, read her message, or approve the claim, leaving the request permanently pending.",
+   "evidence": [
+    "frontend_web/src/pages/dashboard/sidebar/PharmacyClaimsPanels.tsx:245",
+    "frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:463"
+   ],
+   "confidence": "high",
+   "test_needed": "Render the owner pharmacies page with an unclaimed pharmacy and a pending claim request, asserting the claim requests accordion and approve button are visible.",
+   "owner_question": {
+    "question": "When Lina submits a claim request to manage Tom's independent pharmacy, how should Tom see and act on the request in his dashboard?",
+    "options": [
+     "Outcome A: Show the claim requests section whenever Tom has pending or past claim requests, regardless of whether any pharmacy is already claimed.",
+     "Outcome B: Direct Tom from email and alerts to a dedicated claim requests page rather than embedding it inside the pharmacies list.",
+     "Outcome C (keep today's behaviour): Hide the claim requests section until Tom already has at least one claimed or organization-linked pharmacy."
+    ]
+   }
+  }
+ ],
+ "reviewer": "agy-g1"
+}

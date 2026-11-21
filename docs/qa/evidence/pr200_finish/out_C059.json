@@ -1,0 +1,177 @@
+{
+ "chunk": "C059",
+ "files": [
+  {
+   "path": "frontend_mobile/features/parity/workforce.tsx",
+   "verdict": "ISSUE",
+   "ids": [
+    "B61"
+   ],
+   "note": "B61: timesheet CSV exports blank fields absent from timesheet API payload"
+  },
+  {
+   "path": "frontend_mobile/hooks/useAnimationEnabled.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Accessibility and app-state aware animation toggle hook"
+  },
+  {
+   "path": "frontend_mobile/hooks/useColorScheme.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Native color scheme hook re-export"
+  },
+  {
+   "path": "frontend_mobile/hooks/useColorScheme.web.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Web hydration-safe color scheme hook"
+  },
+  {
+   "path": "frontend_mobile/hooks/useThemeColor.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Light and dark theme color resolver"
+  },
+  {
+   "path": "frontend_mobile/plugins/withAndroidManifestFixes.js",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Expo config plugin configuring AndroidManifest screenOrientation"
+  },
+  {
+   "path": "frontend_mobile/plugins/withIosNonModularHeaders.js",
+   "verdict": "NA",
+   "ids": [],
+   "note": "Expo config plugin configuring iOS Podfile build settings"
+  },
+  {
+   "path": "frontend_mobile/roles/admin/post-shift.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports shared PostShiftScreen"
+  },
+  {
+   "path": "frontend_mobile/roles/admin/shifts/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shift center tab container for admin role"
+  },
+  {
+   "path": "frontend_mobile/roles/explorer/UpgradeAccountCard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Account type upgrade dialog and action card"
+  },
+  {
+   "path": "frontend_mobile/roles/explorer/availability.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports shared SetAvailabilityScreen"
+  },
+  {
+   "path": "frontend_mobile/roles/explorer/dashboard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Explorer overview dashboard and navigation grid"
+  },
+  {
+   "path": "frontend_mobile/roles/explorer/profile-tabs/BasicInfoScreen.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Basic info form with legal name lock and unsaved guard"
+  },
+  {
+   "path": "frontend_mobile/roles/explorer/profile-tabs/BioScreen.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Short bio editor and resume upload screen"
+  },
+  {
+   "path": "frontend_mobile/roles/explorer/profile-tabs/IdentityScreen.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Photo ID upload and document metadata screen"
+  },
+  {
+   "path": "frontend_mobile/roles/explorer/profile-tabs/InterestsScreen.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Role interests checklist screen"
+  },
+  {
+   "path": "frontend_mobile/roles/explorer/profile-tabs/RefereesScreen.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Referee list screen wrapper"
+  },
+  {
+   "path": "frontend_mobile/roles/explorer/profile-tabs/shared.ts",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Shared constants and document picker helpers for explorer"
+  },
+  {
+   "path": "frontend_mobile/roles/explorer/profile.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Explorer profile screen with avatar and verification status"
+  },
+  {
+   "path": "frontend_mobile/roles/explorer/shifts.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Placeholder stub screen for explorer shifts"
+  },
+  {
+   "path": "frontend_mobile/roles/organization/dashboard.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Organization dashboard with pills, metrics, and scoped navigation"
+  },
+  {
+   "path": "frontend_mobile/roles/organization/invite.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Organization member invitation and role delegation screen"
+  },
+  {
+   "path": "frontend_mobile/roles/organization/post-shift.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports shared PostShiftScreen"
+  },
+  {
+   "path": "frontend_mobile/roles/organization/profile.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Organization profile screen with rewards and preferences"
+  },
+  {
+   "path": "frontend_mobile/roles/organization/shifts.tsx",
+   "verdict": "NOTE",
+   "ids": [],
+   "note": "Dead placeholder stub superseded by roles/organization/shifts/index.tsx"
+  },
+  {
+   "path": "frontend_mobile/roles/organization/shifts/index.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Organization shift center tab container"
+  },
+  {
+   "path": "frontend_mobile/roles/organization/talent-board.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Talent board wrapper with post-shift route"
+  },
+  {
+   "path": "frontend_mobile/roles/otherstaff/availability.tsx",
+   "verdict": "OK",
+   "ids": [],
+   "note": "Re-exports shared SetAvailabilityScreen"
+  }
+ ],
+ "findings": [],
+ "reviewer": "agy-g1"
+}

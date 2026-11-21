@@ -1,0 +1,17 @@
+frontend_web/src/pages/dashboard/sidebar/CommunityShiftsPage.tsx
+frontend_web/src/pages/dashboard/sidebar/ConfirmedShiftsPage.tsx
+frontend_web/src/pages/dashboard/sidebar/HistoryShiftsPage.tsx
+frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx
+frontend_web/src/pages/dashboard/sidebar/InvoiceGeneratePage.tsx
+frontend_web/src/pages/dashboard/sidebar/InvoiceManagePage.tsx
+frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceDetailPage.tsx
+frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceGeneratePage.tsx
+frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceManagePage.tsx
+frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceStatsCards.tsx
+frontend_web/src/pages/dashboard/sidebar/Invoices/LegacyInvoiceManagePage.tsx
+frontend_web/src/pages/dashboard/sidebar/Invoices/invoiceParts.tsx
+frontend_web/src/pages/dashboard/sidebar/Invoices/invoiceStats.ts
+frontend_web/src/pages/dashboard/sidebar/LearningMaterialsPage.tsx
+frontend_web/src/pages/dashboard/sidebar/LogoutPage.tsx
+frontend_web/src/pages/dashboard/sidebar/ManageMembershipsPage.tsx
+frontend_web/src/pages/dashboard/sidebar/MyConfirmedShiftsPage.tsx
