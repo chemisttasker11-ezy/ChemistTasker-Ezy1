@@ -2,11 +2,12 @@
 
 This is the one page Tom (the owner) goes through. It sits on top of the 27 area files in `areas/` and replaces the reading order in `README.md` for the owner interview. The older files stay as evidence.
 
-**How we go through it:** one area at a time, one question at a time. For each question you see the scenario, what happens today, and the recommendation first. You answer keep / change (pick an option) / defer. Answers are written into the area file under the question, and into [`OWNER_DECISION_LEDGER.md`](OWNER_DECISION_LEDGER.md).
+**How we go through it (grilling method):** one area at a time. Each area is a design tree. Every round asks the whole current **frontier**: the numbered questions whose prerequisites are already settled, each with the recommendation, worded so that "yes" accepts it. A question that depends on one still open waits for a later round. Facts are looked up in the code, never asked of you. An area is done only when its frontier is empty and you confirm we share the same understanding; then the next area starts. Answers are **recorded only, not built**: building starts after the whole grill. Where an answer is already live in code, the question says "already implemented: <file:line>". Settled terms go into the root [`GLOSSARY.md`](../../../GLOSSARY.md); an ADR is offered only for hard-to-reverse, surprising trade-offs. Answers are written under the question in the area file and in [`OWNER_DECISION_LEDGER.md`](OWNER_DECISION_LEDGER.md).
 
 **Code the answers rest on (checked 21 Nov):**
-- Web and backend as deployed: `origin/main` at `8ccf8f77` (PR #247, 3 Nov). This is also the base the PR traced, so web claims are current.
-- Expo app and newest backend: `origin/agent/pr257-int` at `21add924`. The area files were traced at PR #249 head `97c4543e`, which is 333 commits and 514 files behind it, so every mobile claim and every claim on a changed backend file was re-checked. Results are in section 4.
+- **Web and Expo together: `origin/agent/pr257-int` at `21add924`.** This branch changed the web too (sessions, Explorer rules, posting window and more) and is what merges to main, so it is the "today" for both. Before each area's first round, that area gets a "Web and Expo today, side by side" table (pr257 refs in every cell; differences marked as a parity question or a defect), and each question gets a Platforms line (Web + Expo, Web only, Expo only). Done area by area, just in time: GM-27 is Expo only by definition.
+- Deployed today: `origin/main` at `8ccf8f77` (PR #247, 3 Nov). Where main still differs, the area says "(main today: ...; changes at the PR #257 merge)".
+- The original area traces were made at PR #249 head `97c4543e`, 333 commits behind pr257, so every claim on a changed file was re-checked (section 4).
 
 ## 1. Already decided: never re-asked
 
@@ -19,6 +20,18 @@ This is the one page Tom (the owner) goes through. It sits on top of the 27 area
 | Deferred by the owner | Planner: PR #181 simplified vs PR #192 original; keep both until asked (GM-23-W01) |
 
 **AHPRA-FAV-01** and **VERIFY-GATE-01** are answered by ON-P01 and ON-Q03. Engineering follows BL-01 and BL-02. **GM01-Q04** is the single re-confirmation of ON-Q02. **GM-07-Q04 to Q06** and **GM13-Q01/Q02** implement carried decisions through BL-06.
+
+**Already implemented in code** (live, not pending; refs at `pr257` `21add924` unless marked):
+
+| Decision | Live? | Where |
+|---|---|---|
+| D96 no Explorer admins | Yes on pr257; not yet on main | `backend/access_control/admin_roles.py` |
+| Grill #9 draft roster staff deleted with the shift | Yes | `backend/workforce/roster/views.py:233-234` |
+| D2 terms accepted only as shown | Cover terms: yes on main and pr257 (`main:backend/attendance/cover_terms.py:214`). Outside offers: pr257 only (`backend/shifts/offers.py:386`, BL-21) | |
+| PR #242 items 2, 3, 7 (QR/PIN confirmations, stale cover terms, overnight activation) | Yes, merged 3 Nov | `backend/attendance/kiosk_api.py:449`, `backend/attendance/cover_terms.py`, `backend/shifts/payroll.py` |
+| ON-Q01 sign-up tracks KEEP | Yes (unchanged behaviour) | GM-01 Part B |
+| R1 record invoice payment without approval | Yes | GM-17 F11 |
+| D01, D02, D03, D04, R04A, R04B, R04C, R06, E01A, ON-Q03, ON-P01, ON-Q04 | **No, or only partly**: answered but not built | ENGINEERING_BACKLOG BL-01, BL-02, BL-03, BL-06, BL-15 |
 
 ## 2. Areas, open questions, suggested order
 
