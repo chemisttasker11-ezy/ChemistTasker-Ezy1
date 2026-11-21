@@ -20,12 +20,12 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Fortnightly timesheet period generation | Manager opens new fortnightly period and inspects timesheet summaries (`frontend_web/src/features/workforce/TimesheetsPage.tsx:108`). | Manager creates current fortnight period from workforce timesheets screen (`frontend_mobile/app/workforce-timesheets.tsx:500`). | Yes | — |
-| Recalculate timesheets from attendance | Recalculate rebuilds timesheets from attendance sessions and approved leave (`frontend_web/src/features/workforce/TimesheetsPage.tsx:108`). | Recalculate button updates timesheets and prompts to sync offline kiosks (`frontend_mobile/app/workforce-timesheets.tsx:367`). | Yes | — |
+| Fortnightly timesheet period generation | Manager opens new fortnightly period and inspects timesheet summaries (`frontend_web/src/features/workforce/TimesheetsPage.tsx:292`). | Manager creates current fortnight period from workforce timesheets screen (`frontend_mobile/app/workforce-timesheets.tsx:500`). | Yes | — |
+| Recalculate timesheets from attendance | Recalculate rebuilds timesheets from attendance sessions and approved leave (`frontend_web/src/features/workforce/TimesheetsPage.tsx:44`). | Recalculate button updates timesheets and prompts to sync offline kiosks (`frontend_mobile/app/workforce-timesheets.tsx:367`). | Yes | — |
 | Worker reviews and submits hours | Worker reviews worked hours and breaks in My Hours page (`frontend_web/src/features/workforce/MyHoursPage.tsx:20`). | Worker inspects daily entries and submits timesheet in mobile app (`frontend_mobile/app/my-hours.tsx:129`). | Yes | — |
-| Manager resolves timesheet checks | Detail drawer reviews blocking checks and records resolutions (`frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:35`). | Detail screen inspects blocking checks and allows manager decisions (`frontend_mobile/roles/shared/timesheets/TimesheetDetailScreen.tsx:40`). | Yes | — |
-| Timesheet time adjustments | Manager adjusts timesheet segment times with adjustment dialog (`frontend_web/src/features/workforce/TimesheetAdjustTimesDialog.tsx:25`). | Manager adjusts timesheet hours with mobile adjustment bottom sheet (`frontend_mobile/roles/shared/timesheets/TimesheetAdjustTimesSheet.tsx:30`). | Yes | — |
-| Period lock and payroll handoff | Manager locks approved timesheet period to finalize payroll (`frontend_web/src/features/workforce/TimesheetsPage.tsx:108`). | Manager locks period or reopens locked period for corrections (`frontend_mobile/app/workforce-timesheets.tsx:300`). | Yes | — |
+| Manager resolves timesheet checks | Detail drawer reviews blocking checks and records resolutions (`frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:59`). | Detail screen inspects blocking checks and allows manager decisions (`frontend_mobile/roles/shared/timesheets/TimesheetDetailScreen.tsx:40`). | Yes | — |
+| Timesheet time adjustments | Manager adjusts timesheet segment times with adjustment dialog (`frontend_web/src/features/workforce/TimesheetAdjustTimesDialog.tsx:85`). | Manager adjusts timesheet hours with mobile adjustment bottom sheet (`frontend_mobile/roles/shared/timesheets/TimesheetAdjustTimesSheet.tsx:28`). | Yes | — |
+| Period lock and payroll handoff | Manager locks approved timesheet period to finalize payroll (`frontend_web/src/features/workforce/TimesheetsPage.tsx:44`). | Manager locks period or reopens locked period for corrections (`frontend_mobile/app/workforce-timesheets.tsx:300`). | Yes | — |
 | ChemistTasker payroll toggle | Pharmacy settings toggles ChemistTasker payroll vs external processing (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacySettings.tsx:54`). | Workforce settings toggles ChemistTasker payroll routing (`frontend_mobile/app/workforce-settings.tsx:302`). | Yes | — |
 
 ### Platforms per question
@@ -35,14 +35,15 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Q2 | Web + Expo |
 | Q3 | Web + Expo |
 | Q4 | Web + Expo |
-| Q5 | Web + Expo |
+| Q5 | Web + Expo (asked in GM-10: GM-10-Q04) |
 | Q6 | Web + Expo |
 | Q7 | Web + Expo |
-| Q8 | Web + Expo |
+| Q8 | Web + Expo (also covers GM15-33) |
 | Q9 | Web + Expo |
 | Q10 | Web + Expo |
 | GM-09-OD-07 — A worker's correction request notifies the managers | Web + Expo |
 | GM-09-OD-08 — May a removed worker still raise a correction on a past timesheet? | Web + Expo |
+| GM-09-W01 — Re-grill: overnight deferred payroll activation into a locked period | Web + Expo |
 
 ## Bases (exact SHAs verified 2026-11-21)
 
@@ -177,6 +178,8 @@ GM-09 has almost no direct #184 material. The closest old questions, and their s
 - **Checks:** correction during a dispute, correction after export to payroll (no export exists), concurrent corrections by both sides (revision-must-match guards approve; attendance ordering guards punches), denied role, notification side effects (none), Web vs Expo difference (correction UI traced on web only).
 
 ### Q5 — Which rate applies: base, overtime, weekend and public-holiday premiums?
+
+> **Merged 22 Nov: asked once, as GM-10-Q04 in GM-10.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Plain English:** Is the worker paid one flat hourly rate, or more for nights, Saturdays, Sundays and public holidays — and who sets those rates, the worker, the pharmacy, or the Award?
 - **ACTUAL TODAY:** **No rate is applied in the timesheet system at all** — timesheets show minutes only; there is no dollar figure to apply a premium to. Rates live upstream: GM-10 `pricing.py` segments shifts by day type (weekday/Saturday/Sunday/public holiday) and time window (early-morning/late-night) using Award windows from 1 July 2026 Schedule B; `engagement.py` enforces the Award floor at accept for pharmacists and flags >12h shifts and pre-7am weekday/Saturday shifts for payroll review — **overtime is NOT auto-computed, it only flags review**. What the worker is actually paid per minute is therefore undecided in code, not just in policy.
 - **RECOMMENDED:** Rate agreed at shift posting/acceptance is the contract; premiums, if any, are explicit line items on the timesheet (not silently folded in), so both sides can see the maths — once Q1 creates a payment and the timesheet gains money fields. Severity: HIGH (underpayment risk).
@@ -209,6 +212,8 @@ GM-09 has almost no direct #184 material. The closest old questions, and their s
 - **Decide jointly with GM-09-Q01 (payer model), GM-14 (employment status) and GM-26 (privacy/retention).**
 
 ### Q8 — How does a worker or pharmacy dispute hours or pay, and who decides?
+
+> **Also covers (22 Nov):** GM15-33 (GM-15). Asked once, here.
 - **Plain English:** If the worker says "I worked 8 hours, you paid 7", what button do they press, who looks at it, and how long until there is an answer — and does payment pause while it is argued?
 - **ACTUAL TODAY:** **There is no dispute flow.** No dispute state, no dispute endpoint, no resolver role, no timeline, no payment hold (there is no payment to hold). What exists: comments on a timesheet (`add_comment`, worker_visible), check decisions (resolve/waive/reopen + reason), reopen (reason required), correct-locked-period (reason required), and the attendance evidence (raw sessions kept for audit; rejected provisionals excluded from payable time). The `TimesheetCorrectionRequest` model (worker-raised correction requests with manager response) exists but is **unreachable via API**. Links to GM-15 (cancellation/disputes/ratings).
 - **RECOMMENDED:** In-app dispute on the timesheet itself (not email/chat), with the attendance record attached automatically, a named resolver (pharmacy first, platform admin on escalation), a stated response time, and disputed amounts held while undisputed amounts still pay — once Q1 creates a payment to hold. Severity: HIGH.

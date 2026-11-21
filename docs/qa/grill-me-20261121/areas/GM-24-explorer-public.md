@@ -21,52 +21,55 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Public job board browsing (logged-out) | Visitors browse public shifts on Vite (`frontend_web/src/pages/PublicJobBoardPage.tsx:74`) and Next (`frontend_web/landing_next/app/(public)/shifts/public-board/page.tsx:1`). | Visitors browse public shifts via AnonymousShiftBoardScreen (`frontend_mobile/app/shifts/public-board.tsx:4`). | Yes | |
-| Public talent board browsing (logged-out) | Visitors browse public talent profiles on Vite (`frontend_web/src/pages/PublicTalentBoardPage.tsx:18`) and Next (`frontend_web/landing_next/app/(public)/talent/public-board/page.tsx:1`). | Visitors inspect public candidate pitches (`frontend_mobile/app/explore/talent-board.tsx:22`). | Yes | |
-| View shared shift link via token | Shared shift details viewed anonymously (`frontend_web/src/pages/SharedShiftLandingPage.tsx:20`). | Anonymous shared shift link opened via deep link (`frontend_mobile/roles/shared/shifts/SharedShiftLandingScreen.tsx:20`). | Yes | |
-| Explorer account registration | New user selects EXPLORER role during self-registration (`frontend_web/src/pages/register.tsx:45`). | User registers with EXPLORER role (`frontend_mobile/app/register.tsx:35`). | Yes | |
-| Explorer onboarding completion | Explorer fills background details in onboarding wizard (`frontend_web/src/pages/onboarding/onboarding_explorer/ExplorerOnboardingV2Layout.tsx:20`). | Explorer submits verification details in profile tabs (`frontend_mobile/roles/explorer/profile-tabs/BasicInfoScreen.tsx:20`). | Yes | |
-| Signed-in Explorer shifts browsing | Signed-in explorer sees public shifts on dashboard (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:72`). | Mobile explorer shifts screen renders only a static placeholder (`frontend_mobile/roles/explorer/shifts.tsx:2`). | No | Verified 21 Nov: refuted. Expo Explorer Shifts re-exports the shared Shift Centre (`frontend_mobile/roles/explorer/shifts.tsx`, `export { default } from '@/roles/shared/shifts/ShiftsScreen'`), not a placeholder; same access policy as web. |
-| Express interest in public shift | Explorer submits interest application (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:140`). | Worker applies to public shift card (`frontend_mobile/roles/shared/shifts/AnonymousShiftBoardScreen.tsx:85`). | Yes | |
+| Public job board browsing (logged-out) | Visitors browse public shifts on Vite  and Next (`frontend_web/src/pages/PublicJobBoardPage.tsx:74`). | Visitors browse public shifts via AnonymousShiftBoardScreen (`frontend_mobile/app/shifts/public-board.tsx:4`). | Yes | |
+| Public talent board browsing (logged-out) | Visitors browse public talent profiles on Vite  and Next (`frontend_web/src/pages/PublicTalentBoardPage.tsx:18`, `frontend_web/landing_next/app/(public)/talent/public-board/page.tsx`). | Visitors inspect public candidate pitches (`frontend_mobile/app/explore/talent-board.tsx:22`). | Yes | |
+| View shared shift link via token | Shared shift details viewed anonymously (`frontend_web/src/pages/SharedShiftLandingPage.tsx:33`). | Anonymous shared shift link opened via deep link (`frontend_mobile/roles/shared/shifts/SharedShiftLandingScreen.tsx:45`). | Yes | |
+| Explorer account registration | New user selects EXPLORER role during self-registration (`frontend_web/src/pages/register.tsx:26`). | User registers with EXPLORER role (`frontend_mobile/app/register.tsx:211`). | Yes | |
+| Explorer onboarding completion | Explorer fills background details in onboarding wizard (`frontend_web/src/pages/onboarding/onboarding_explorer/ExplorerOnboardingV2Layout.tsx:20`). | Explorer submits verification details in profile tabs (`frontend_mobile/roles/explorer/profile-tabs/BasicInfoScreen.tsx:41`). | Yes | |
+| Signed-in Explorer shifts browsing | Signed-in explorer sees public shifts on dashboard (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:72`). | Explorer Shifts is the shared Shift Centre (the same screen every worker uses) | Yes | Verified 21 Nov: refuted. Expo Explorer Shifts re-exports the shared Shift Centre (`frontend_mobile/roles/explorer/shifts.tsx`, `export { default } from '@/roles/shared/shifts/ShiftsScreen'`), not a placeholder; same access policy as web. |
+| Express interest in public shift | Explorer submits interest application (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:284`). | Worker applies to public shift card (`frontend_mobile/roles/shared/shifts/AnonymousShiftBoardScreen.tsx:182`). | Yes | |
 
 ### Platforms per question
+_Rebuilt 22 Nov from the real question headings (the earlier table had shifted question numbers)._
+
 | Question id | Platforms |
 |---|---|
-| GM-24-Q01 — What can Explorers ("new to pharmacy") do with shifts? | Web + Expo |
+| GM-24-Q01 — What can Explorers ("new to pharmacy") do with shifts? | Web + Expo (asked in GM-02: ON-Q05) |
 | GM-24-Q02 — Browse access before full verification | Web + Expo |
 | GM-24-Q03 — Verification on outside bookings | Web + Expo |
 | GM-24-Q04 — AHPRA exemption | Web + Expo |
 | GM-24-Q05 — Worker sign-up tracks | Web + Expo |
-| GM-24-Q06 — Who must pass an ID check? | Web + Expo |
-| GM-24-Q07 — What must a pharmacy pass before posting to outside workers? | Web + Expo |
-| GM-24-Q08 — On an anonymous public post, what is hidden? | Web + Expo |
-| GM-24-Q09 — When does an anonymous pharmacy's name reach the worker? | Web + Expo |
-| GM-24-Q10 — When a shift escalates, who is told, and when does escalation stop? | Web + Expo |
-| GM-24-Q11 — Who can see the talent board? | Web + Expo |
-| GM-24-Q12 — When is an anonymous candidate's identity revealed? | Web + Expo |
-| GM-24-Q13 — What stays hidden before identity reveal? | Web + Expo |
-| GM-24-Q14 — Fix before launch? Anonymous talent posts expose full names to any signed-in account. | Web + Expo |
-| GM-24-Q15 — Fix before launch? Hidden, stale and lapsed-credential posts can still be read. | Web + Expo |
-| GM-24-Q16 — Fix before launch? Mobile "add personal profile" drops pharmacist data. | Web + Expo |
-| GM-24-Q17 — Fix before launch? Reachable mobile onboarding screens 404 for non-pharmacists. | Web + Expo |
-| GM-24-Q18 — Fix before launch? Profile progress % doesn't match Verified. | Web + Expo |
-| GM-24-Q19 — Fix before launch? The auto-publish toggle for new shifts has no effect. | Web + Expo |
-| GM-24-Q20 — Fix before launch? The talent board downloads every post and filters in the app. | Web + Expo |
-| GM-24-Q21 — Fix before launch? Web and mobile disagree on Talent Board booking permissions. | Web + Expo |
-| GM-24-Q22 — Fix before launch? Talent post availability is copied once and never syncs with the calendar. | Web + Expo |
-| GM-24-Q23 — Fix before launch? Match emails miss escalated shifts and reach unverified workers. | Web + Expo |
-| GM-24-Q24 — Fix before launch? Availability input has no validation. | Web + Expo |
-| GM-24-Q25 — Is "Request booking" a firm offer or an enquiry? | Web + Expo |
-| GM-24-Q26 — What should the heart on a talent card do? | Web + Expo |
-| GM-24-Q27 — When should a talent post stop showing? | Web + Expo |
-| GM-24-Q28 — How long should verification evidence be kept? | Web + Expo |
-| GM-24-Q29 — What is the rule for hiring a worker directly, off the platform? | Web + Expo |
-| GM-24-Q30 — Who can rate, and when? | Web + Expo |
-| GM-24-Q31 — Accepted terms don't include the cancellation table or terms version. | Web + Expo |
-| GM-24-Q32 — Must every onboarding step work on mobile at launch? | Web + Expo |
+| GM-24-Q06 — Who must pass an ID check? | Web + Expo (asked in GM-02: ON-Q08) |
+| GM-24-Q07 — What must a pharmacy pass before posting to outside workers? | Web + Expo (asked in GM-02: ON-Q11) |
+| GM-24-Q08 — On an anonymous public post, what is hidden? | Web + Expo (asked in GM-11: GM-11-Q07) |
+| GM-24-Q09 — When does an anonymous pharmacy's name reach the worker? | Web + Expo (asked in GM-11: GM-11-Q08) |
+| GM-24-Q10 — When a shift escalates, who is told, and when does escalation stop? | Web + Expo (asked in GM-11: GM-11-Q01) |
+| GM-24-Q11 — Who can see the talent board? | Web + Expo (asked in GM-18: GM-18-Q01) |
+| GM-24-Q12 — When is an anonymous candidate's identity revealed? | Web + Expo (asked in GM-18: GM-18-Q02) |
+| GM-24-Q13 — Fix before launch? Anonymous talent posts expose full names to any signed-in account. | Web + Expo (asked in GM-18: GM-18-Q13) |
+| GM-24-Q14 — Is "Request booking" a firm offer or an enquiry? | Web + Expo (asked in GM-18: GM-18-Q07) |
+| GM-24-Q15 — Who can request a booking — fix the web/mobile drift? | Web + Expo (asked in GM-18: GM-18-Q15) |
+| GM-24-Q16 — How should reviews and reliability show? | Web + Expo (asked in GM-15: GM15-42) |
+| GM-24-Q17 — Who can rate, and when? | Web + Expo (asked in GM-15: GM15-35) |
+| GM-24-Q18 — Should ratings from internal roster shifts appear on the public talent board? | Web + Expo (asked in GM-15: GM15-36) |
+| GM-24-Q19 — Should match emails go to unverified workers, and should escalated shifts notify? | Web + Expo (asked in GM-11: GM-11-Q05) |
+| GM-24-Q20 — Should urgent-shift alerts need a separate opt-in? | Web + Expo (asked in GM-19: GM-19-Q08) |
+| GM-24-Q21 — NEW: Should anonymous visitors see every role on the public job board? | Web + Expo |
+| GM-24-Q22 — NEW: The Explorer Community tab is always empty — hide it or open community to Explorers? | Web + Expo |
+| GM-24-Q23 — NEW: Share-link sitemap URLs are dead, and share tokens never expire? | Web + Expo |
+| GM-24-Q24 — NEW: Which public site is canonical — Vite or Next — and who owns the public pages? | Web only |
+| GM-24-Q25 — NEW: Anonymous pharmacy detail keeps postcode + script volume — hide more? | Web + Expo |
+| GM-24-Q26 — NEW: Non-anonymous talent posts expose identity to anonymous visitors — intended? | Web + Expo |
+| GM-24-Q27 — NEW: Explorer interest that can never become a booking — fail fast? | Web + Expo |
+| GM-24-Q28 — NEW: Public-board role filter has no Explorer option — add it? | Web + Expo |
+| GM-24-Q29 — NEW: Daily public-shift limit is 10 per pharmacy per day — keep? | Web + Expo |
+| GM-24-Q30 — NEW: Talent view counts — every authenticated view counts, no cap — keep? | Web + Expo |
+| GM-24-Q31 — NEW: Talent-post staleness — undated and full-time posts stay visible forever? | Web + Expo (asked in GM-19: GM-19-Q06) |
+| GM-24-Q32 — Launch-gate check: are the mobile dead-ends fixed? | Expo only |
 | GM-24-OD-15 — Learning pages show the "Careers & learning" articles | Web + Expo |
 | GM-24-OD-16 — Public shift links and the signed-out shift board are on Expo too | Expo only |
 | GM-24-OD-17 — Referee forms stay web-only (intended) | Web only |
+| GM-24-W01 — What happens to explorer accounts that already hold admin rows in production? | Server only (production data) |
 
 ## 1. Traced flow — ACTUAL TODAY
 
@@ -218,6 +221,8 @@ Carried decisions that stand (from `questions.json`, not re-asked): D01 (accepta
 Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMMENDED, ALTERNATIVE A (keep current where possible), ALTERNATIVE B/C (concrete scenarios), Other/defer. Normal case, edge case, retry/concurrency, denied role/wrong tenant, payment/notification side effects, and web/Expo difference are noted per question where they bite.
 
 ### GM-24-Q01 — What can Explorers ("new to pharmacy") do with shifts? [FIRST QUESTION — ask this first]
+
+> **Merged 22 Nov: asked once, as ON-Q05 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** ON-Q05. **Status:** CHANGED, still open. **Severity:** launch-gating.
 - **ACTUAL TODAY:** An Explorer can browse the public board (all roles shown anonymously; only EXPLORER-role shifts once signed in), see a Community tab that is always empty, and — if their Explorer onboarding is verified — express interest in EXPLORER-role public shifts. They cannot accept any offer: accept fails late at engagement terms ("Complete worker onboarding before accepting…") because `worker_onboarding()` finds no staff profile and there is no Explorer payment tab on either client. The only way to paid work is the upgrade card (Explorer → Pharmacist/Pharmacy team, once, post removed, verification from scratch). Web and Expo agree on all of this.
 - **RECOMMENDED: C — Paid shifts only after upgrading; keep EXPLORER-role interest for unpaid placement/shadowing.** Rationale: the upgrade path is already built, tested in code, and one-way-safe; it avoids building Explorer payroll, TFN/ABN terms, and payment before launch. But the current interest-without-acceptance must be fixed at the same time: either block offers to Explorers at creation or remove the Apply button for them. Benefit: no dead-end in week one, boards stay a discovery funnel. Risk: fewer Explorer conversions if the upgrade feels like a wall; mitigate with the upgrade card on the shift detail itself. No legal/financial impact beyond the existing unpaid-placement question (see option B).
@@ -244,6 +249,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Actual today:** Pharmacist, Other Staff and Explorer are worker sign-up tracks. Owner is separate. Organisation staff and pharmacy managers join through other routes.
 
 ### GM-24-Q06 — Who must pass an ID check?
+
+> **Merged 22 Nov: asked once, as ON-Q08 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** ON-Q08. **Status:** STILL VALID.
 - **ACTUAL TODAY:** ID is part of Verified only for overseas Explorers (photo ID stands in for an Australian mobile; `mobile_check_skipped`). ID reading (OCR) already works for everyone, and the ID bundle carries over on upgrade. Pharmacists/other staff do not need ID for Verified.
 - **RECOMMENDED: A — Keep current logic, but require ID before a worker's first *paid* booking (not just overseas Explorers).** Rationale: the first paid booking is where identity fraud pays; ID capture already exists. Severity: medium. (If the owner prefers the lightest launch, keep as-is and revisit after launch.)
@@ -253,6 +260,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q07 — What must a pharmacy pass before posting to outside workers?
+
+> **Merged 22 Nov: asked once, as ON-Q11 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** ON-Q11. **Status:** STILL VALID.
 - **ACTUAL TODAY:** Nothing. `Pharmacy.verified` / `abn_verified` exist but `post_shift` checks neither; the only gate is 10 public shifts/day. Workers can accept shifts from unverified or fake sites. `Pharmacy.verified` is only read by the ethical marketplace.
 - **RECOMMENDED: D — ABN verified for chain/org tiers, ABN + admin-verified before PLATFORM.** Rationale: the public board is the trust surface (anonymous visitors, SEO, JobPosting schema); a fake pharmacy there is a launch-ending story. Severity: high.
@@ -263,6 +272,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q08 — On an anonymous public post, what is hidden?
+
+> **Merged 22 Nov: asked once, as GM-11-Q07 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** PO-Q11. **Status:** CHANGED (now specified in code).
 - **ACTUAL TODAY:** `anonymize_pharmacy_detail`: name → "Anonymous Pharmacy", street address removed, file fields removed. **Kept:** suburb, state, postcode, script volumes. Address line drops the street. The accept email shows "Shift in {suburb}". The JSON-LD on the share page omits street when anonymised (backend already stripped it).
 - **RECOMMENDED: Keep the current list, but drop postcode (keep suburb + state only).** A postcode plus script volume can identify a pharmacy in a small suburb — the exact leak the redaction is meant to prevent. Severity: medium (privacy). No code change to the mechanism, just the kept-field list.
@@ -271,6 +282,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q09 — When does an anonymous pharmacy's name reach the worker?
+
+> **Merged 22 Nov: asked once, as GM-11-Q08 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** PO-Q12. **Status:** STILL VALID.
 - **ACTUAL TODAY:** The anonymous listing hides the name. The terms preview exposes the pharmacy name and ABN before acceptance, and several notices use the real name. Which step should reveal it is open. Engineering: see BL-13 (`pr257:backend/shifts/serialization/offers.py:244`).
 - **RECOMMENDED: A — Reveal in the agreement preview (before the worker accepts).** The worker needs to know who they are contracting with before they are bound; the pharmacy keeps anonymity while browsing. Severity: high (contract/clarity).
@@ -281,6 +294,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q10 — When a shift escalates, who is told, and when does escalation stop?
+
+> **Merged 22 Nov: asked once, as GM-11-Q01 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** PO-Q08. **Status:** STILL VALID.
 - **ACTUAL TODAY:** Nobody is told — escalation sends nothing. Availability-match emails go out only when a shift is posted straight to PLATFORM. Auto-escalation stops permanently once any interest has ever existed, even if that worker declined. (Whether a scheduled beat task runs escalation was not inspected in this area.)
 - **RECOMMENDED: A — Notify each new tier (and availability matches) when a shift escalates; keep escalating until reserved.** Rationale: escalation without notice is invisible supply — the whole point is reaching new people. Severity: high (marketplace liquidity).
@@ -290,6 +305,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q11 — Who can see the talent board?
+
+> **Merged 22 Nov: asked once, as GM-18-Q01 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** TB-Q01. **Status:** STILL VALID.
 - **ACTUAL TODAY:** Any signed-in user — including competing workers — plus anonymous visitors on the public (redacted) cards. There is no employer-only gate; `list`/`retrieve`/`feed` require only `IsAuthenticated`.
 - **RECOMMENDED: B — Employers (owner/admin/org) plus your own post, plus public masked cards.** Rationale: the board is a hiring surface; letting competing workers browse every candidate's pitch, rates, and availability is a needless leak and the main driver of the identity problem in Q13. Severity: high (privacy/competitive).
@@ -299,6 +316,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q12 — When is an anonymous candidate's identity revealed?
+
+> **Merged 22 Nov: asked once, as GM-18-Q02 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** TB-Q02. **Status:** STILL VALID.
 - **ACTUAL TODAY:** Not defined. In practice it is revealed immediately to any signed-in user (the API returns name + user ids on the authenticated feed), and never to anonymous visitors (public feed redacts). So the "anonymous" flag currently only works against logged-out visitors.
 - **RECOMMENDED: A — When they accept a booking request.** That is the first moment the pharmacy needs the identity; everything before that can run on the reference code. Severity: high — but only meaningful together with Q13 (fix the leak first, or the reveal rule is theatre).
@@ -309,6 +328,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q13 — Fix before launch? Anonymous talent posts expose full names to any signed-in account.
+
+> **Merged 22 Nov: asked once, as GM-18-Q13 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** LA-Q12. **Status:** STILL VALID.
 - **ACTUAL TODAY:** `feed`, `list`, `retrieve` use `ExplorerPostReadSerializer` (full name + `author_user_id` + `explorer_user_id`); only `public-feed` uses the redacting serializer. Any signed-in account — a competitor, a fake Explorer signup — reads every name. The public feed is tested for redaction; the authenticated feed has no such test.
 - **RECOMMENDED: A — Before launch.** Use the public serializer shape for anonymous posts on every read path (or a viewer-aware serializer). Severity: launch-gating (privacy). This is a code fix, not a judgement call, once the owner confirms Q12's reveal rule.
@@ -318,6 +339,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q14 — Is "Request booking" a firm offer or an enquiry?
+
+> **Merged 22 Nov: asked once, as GM-18-Q07 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** TB-06. **Status:** STILL VALID.
 - **ACTUAL TODAY:** Firm offer. It posts a dedicated shift and immediately creates firm offers with 48h expiry (`offer_dedicated_shift`); the worker cannot ask questions first. The offer email says "Please confirm to lock it in."
 - **RECOMMENDED: B — Enquiry/chat first, then an offer.** Rationale: hiring a person is not buying a shift slot; an enquiry step prevents 48h firm offers landing on people who never wanted that date, and prevents the Explorer dead-end (Q01) from being triggered by a booking request. Severity: medium. (If launch speed wins, keep firm offers but add a visible "this sends a firm 48h offer" warning — see Alt A note.)
@@ -327,6 +350,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q15 — Who can request a booking — fix the web/mobile drift?
+
+> **Merged 22 Nov: asked once, as GM-18-Q15 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** TB-07. **Status:** CHANGED (drift still present).
 - **ACTUAL TODAY:** Web: fixed employer-role list + `isAdminUser`. Mobile: any role except EXPLORER/PHARMACIST/OTHER_STAFF — so PHARMACY_MANAGER can book on mobile but not on web (unless admin). Mobile also opens a general Post Shift when the candidate is anonymous (no `dedicated_user`); web aborts. `add_view` still counts every authenticated call with no cap.
 - **RECOMMENDED: One shared rule in shared-core (`canRequestBooking`), used by both clients: employer roles + admin capability; abort when there is no target user.** Severity: medium (permission drift is a security-class bug, not cosmetics).
@@ -336,6 +361,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q16 — How should reviews and reliability show?
+
+> **Merged 22 Nov: asked once, as GM15-42 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** TB-Q05. **Status:** CHANGED.
 - **ACTUAL TODAY:** One public averaged number (`rating_average` + `rating_count`) from owner→worker ratings; no reliability measure (cancellations, no-shows, response rate) exists anywhere on the card.
 - **RECOMMENDED: A — Separate: reviews and reliability, with counts.** Show the average + count, plus a reliability line (completed shifts, late cancels/no-shows) once the incident data exists. Severity: medium.
@@ -344,6 +371,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q17 — Who can rate, and when?
+
+> **Merged 22 Nov: asked once, as GM15-35 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** CX-Q34. **Status:** CHANGED.
 - **ACTUAL TODAY:** Either side may rate after the worker has ≥1 assignment with a past `slot_date` at that pharmacy — no timesheet approval, no clock-out, no "worked" proof beyond the date passing. Future/unworked assignments can no longer be rated (fixed since #184).
 - **RECOMMENDED: A — After an approved timesheet or clock-out only.** A past date alone can rate a no-show as if they worked. Severity: high (ratings are the public trust signal on talent cards).
@@ -353,6 +382,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q18 — Should ratings from internal roster shifts appear on the public talent board?
+
+> **Merged 22 Nov: asked once, as GM15-36 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** CX-Q35. **Status:** STILL VALID.
 - **ACTUAL TODAY:** Yes — roster assignments satisfy the rating eligibility check and the talent-card average counts all OWNER_TO_WORKER ratings, internal or external.
 - **RECOMMENDED: A — No, keep internal.** An employee's roster performance is an employment record, not a marketplace credential; mixing them inflates/deflates a public hiring signal with data the candidate cannot see or contest. Severity: medium.
@@ -361,6 +392,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q19 — Should match emails go to unverified workers, and should escalated shifts notify?
+
+> **Merged 22 Nov: asked once, as GM-11-Q05 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** LA-Q17 / AV-04. **Status:** STILL VALID.
 - **ACTUAL TODAY:** Match emails go only at posting straight to PLATFORM, to anyone with `notify_new_shifts` and matching availability — Verified is not checked, so unverified workers (and Explorers who cannot accept) are emailed shifts they are blocked from. Escalated shifts never notify anyone.
 - **RECOMMENDED: A — Filter match emails to workers who can actually apply (Verified + role match), and send them on escalation to PLATFORM too.** Severity: medium (spam + false hope + missed liquidity).
@@ -370,6 +403,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q20 — Should urgent-shift alerts need a separate opt-in?
+
+> **Merged 22 Nov: asked once, as GM-19-Q08 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** AV-Q08. **Status:** STILL VALID.
 - **ACTUAL TODAY:** One switch (`notify_new_shifts`) covers everything, including urgent shifts. No separate urgent opt-in exists.
 - **RECOMMENDED: Keep current logic.** One switch is fine for launch; urgent is a property of the shift, not a new channel. Severity: low.
@@ -466,6 +501,8 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **Other / Defer:** ___
 
 ### GM-24-Q31 — NEW: Talent-post staleness — undated and full-time posts stay visible forever?
+
+> **Merged 22 Nov: asked once, as GM-19-Q06 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Status:** NEW (spin-out of AV-02, CHANGED).
 - **ACTUAL TODAY:** Past-date posts are hidden, but undated posts and `FULL_TIME_APPLICATION` posts are visible forever (`is_talent_board_visible` returns True). No nudge to refresh was verified. Availability rows never expire either.
 - **RECOMMENDED: Hide posts not updated in 30 days and nudge the author to refresh; full-time posts get the same rule.** Severity: medium (stale board kills trust).

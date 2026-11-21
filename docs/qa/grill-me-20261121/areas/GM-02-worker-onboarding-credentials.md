@@ -25,12 +25,12 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
 | Sign up role selection | Visitor selects from OWNER, PHARMACIST, OTHER_STAFF, or EXPLORER roles (`frontend_web/src/pages/register.tsx:26`). | Visitor selects from identical four role tracks (`frontend_mobile/app/register.tsx:37`). | Yes | — |
-| Mobile OTP verification gate | Worker verifies Australian mobile or skips if overseas Explorer (`frontend_web/src/pages/MobileOTPVerify.tsx:43`). | Worker enters 6-digit SMS OTP or confirms overseas waiver (`frontend_mobile/app/mobile-verify.tsx:105`). | Yes | — |
-| Enter AHPRA registration number | Staff onboarding collects AHPRA number for interns and pharmacists (`frontend_web/src/pages/onboarding/onboarding_staff/RegulatoryV2.tsx:100`). | Other-staff regulatory tab collects and validates AHPRA registration number (`frontend_mobile/roles/otherstaff/profile-tabs/RegulatoryScreen.tsx:111`). | Yes | — |
-| Pharmacist onboarding profile | Pharmacist enters profile bio, qualifications, and work history (`frontend_web/src/pages/onboarding/onboarding_pharmacist/BasicInfoV2.tsx:84`). | Pharmacist enters personal and professional details in mobile onboarding (`frontend_mobile/roles/pharmacist/onboarding.tsx:64`). | Yes | — |
-| Explorer basic info & Gov ID | Newcomer Explorer fills profile and submits government ID (`frontend_web/src/pages/onboarding/ExplorerOnboarding.tsx:98`). | Explorer completes identity verification on mobile profile screen (`frontend_mobile/app/explorer/profile-identity.tsx:1`). | Yes | — |
-| Payment & banking setup | Worker enters bank account details and tax classification (`frontend_web/src/pages/onboarding/onboarding_pharmacist/PaymentV2.tsx:15`). | Worker enters bank and superannuation details in financial form (`frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:134`). | Yes | — |
-| Shift application verification check | Public shift board blocks unverified workers from applying (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:277`). | Worker home logic evaluates missing verification steps before allowing applications (`frontend_mobile/roles/shared/dashboard/workerHomeLogic.ts:169`). | Yes | — |
+| Mobile OTP verification gate | Worker verifies Australian mobile or skips if overseas Explorer (`frontend_web/src/pages/MobileOTPVerify.tsx:254`). | Worker enters 6-digit SMS OTP or confirms overseas waiver (`frontend_mobile/app/mobile-verify.tsx:105`). | Yes | — |
+| Enter AHPRA registration number | Staff onboarding collects AHPRA number for interns and pharmacists (`frontend_web/src/pages/onboarding/onboarding_staff/RegulatoryV2.tsx:32`). | Other-staff regulatory tab collects and validates AHPRA registration number (`frontend_mobile/roles/otherstaff/profile-tabs/RegulatoryScreen.tsx:111`). | Yes | — |
+| Pharmacist onboarding profile | Pharmacist enters profile bio, qualifications, and work history (`frontend_web/src/pages/onboarding/onboarding_pharmacist/BasicInfoV2.tsx:66`). | Pharmacist enters personal and professional details in mobile onboarding (`frontend_mobile/roles/pharmacist/onboarding.tsx:64`). | Yes | — |
+| Explorer basic info & Gov ID | Newcomer Explorer fills profile and submits government ID (`frontend_web/src/pages/onboarding/ExplorerOnboarding.tsx:98`). | Explorer completes identity verification on mobile profile screen (`frontend_mobile/roles/explorer/profile-tabs/IdentityScreen.tsx:27`). | Yes | — |
+| Payment & banking setup | Worker chooses ABN or TFN payment and enters super details (`frontend_web/src/pages/onboarding/onboarding_pharmacist/PaymentV2.tsx:27`). | Worker chooses ABN or TFN payment and enters super details (`frontend_mobile/roles/pharmacist/profile-tabs/PaymentScreen.tsx:11`). | Yes | Corrected 22 Nov (orchestrator review): neither onboarding asks for bank details; bank details are entered on invoices. |
+| Shift application verification check | Public shift board blocks unverified workers from applying (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:277`). | Worker home logic evaluates missing verification steps before allowing applications (`frontend_mobile/roles/shared/shifts/PublicShiftsView.tsx:284`). | Yes | — |
 
 ### Platforms per question
 | Question id | Platforms |
@@ -40,20 +40,20 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | ON-Q03 | Web + Expo |
 | ON-P01 | Web + Expo |
 | ON-Q04 | Web + Expo |
-| ON-Q05 | Web + Expo |
-| ON-Q06 | Web + Expo |
-| ON-P03 | Web + Expo |
-| ON-Q07 | Web + Expo |
-| ON-P02 | Web + Expo |
-| ON-Q08 | Web + Expo |
-| ON-R01 | Web + Expo |
-| ON-Q09 | Web + Expo |
+| ON-Q05 | Web + Expo (also covers Q-03, GM-12-Q05, GM-24-Q01, GM25-C04) |
+| ON-Q06 | Web + Expo (also covers GM26-Q10) |
+| ON-P03 | Web + Expo (also covers GM-18-Q12, GM26-Q11) |
+| ON-Q07 | Web + Expo (also covers GM26-Q12) |
+| ON-P02 | Web + Expo (also covers GM26-Q13) |
+| ON-Q08 | Web + Expo (also covers Q-15, GM-24-Q06, GM26-Q07) |
+| ON-R01 | Web + Expo (also covers GM26-Q06) |
+| ON-Q09 | Web + Expo (also covers GM26-Q14) |
 | ON-Q10 | Web + Expo |
-| ON-Q11 | Web + Expo |
-| ON-Q12 | Web + Expo |
-| ON-Q13 | Web + Expo |
-| ON-Q14 | Web + Expo |
-| ON-Q15 | Expo only |
+| ON-Q11 | Web + Expo (also covers GM-03-Q01, GM-04-Q03, GM-10-Q08, GM-24-Q07, GM25-C06) |
+| ON-Q12 | Web + Expo (also covers GM-03-Q02) |
+| ON-Q13 | Web + Expo (also covers GM-03-Q03, GM13-Q10, GM16-Q05, GM25-C07) |
+| ON-Q14 | Web + Expo (also covers GM-03-Q04, GM-04-Q01, Q-13) |
+| ON-Q15 | Expo only (asked in GM-01: GM01-Q10) |
 | GM02-Q20 | Web + Expo |
 | GM02-Q21 | Web + Expo |
 | GM02-Q22 | Web + Expo |
@@ -200,6 +200,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
 - **Follow-up for engineering:** Check where the readiness checklist already appears on web and Expo. Add the early notice where missing and reconcile the deferred-payroll exception with the answer.
 
 #### ON-Q05 — What can Explorers (new to pharmacy) do with shifts?
+
+> **Also covers (22 Nov):** Q-03 (GM-05), GM-12-Q05 (GM-12), GM-24-Q01 (GM-24), GM25-C04 (GM-25). Asked once, here.
 - **Validation: STILL VALID.** **Decision status: OPEN.**
 - **Context:** Web shows Explorers the shift boards, but they get no verification check and
   can never accept. No Explorer payment tab exists (ON-09).
@@ -232,6 +234,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
 ### ON-S2 · Credentials and expiry
 
 #### ON-Q06 — How should AHPRA be re-checked after sign-up?
+
+> **Also covers (22 Nov):** GM26-Q10 (GM-26). Asked once, here.
 - **Validation: STILL VALID — WITH A CORRECTION.** **Decision status: OPEN.
   Severity: Critical** (the register is the core legal trust signal).
 - **Context:** Workers can press Re-check, and a public apply or accept queues a check
@@ -271,6 +275,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
   [tasks.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/onboarding/tasks.py#L380-L400).
 
 #### ON-P03 — Which AHPRA lookup should run at launch?
+
+> **Also covers (22 Nov):** GM-18-Q12 (GM-18), GM26-Q11 (GM-26). Asked once, here.
 - **Validation: STILL VALID.** **Decision status: OPEN. Severity: Critical** — it decides
   whether the Q03/Q06/Q07/P02 machinery works at all. **Ask this first (see §3).**
 - **Context:** A desktop verifier exists: a Chrome extension on an office PC reads the
@@ -304,6 +310,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
   [ahpra.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/onboarding/verification/ahpra.py#L18-L75).
 
 #### ON-Q07 — If current registration cannot be confirmed, what happens to future bookings?
+
+> **Also covers (22 Nov):** GM26-Q12 (GM-26). Asked once, here.
 - **Validation: STILL VALID.** **Decision status: OPEN. Severity: High.**
 - **Context:** Not-found or unreadable results block new public applications but keep
   existing bookings, and nobody else is told. Suspension is ON-P02 (ON-02).
@@ -331,6 +339,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
 - **Sources:** [state.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/onboarding/verification/state.py#L239-L280).
 
 #### ON-P02 — When the register shows Suspended or Cancelled, what happens?
+
+> **Also covers (22 Nov):** GM26-Q13 (GM-26). Asked once, here.
 - **Validation: STILL VALID.** **Decision status: OPEN. Severity: Critical.**
 - **Context:** The register status acts automatically. Pharmacist owners become Pharmacy
   Managers; bookings with leave, attendance or invoice history are kept for admins.
@@ -358,6 +368,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
 - **Sources:** [state.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/onboarding/verification/state.py#L239-L330).
 
 #### ON-Q08 — Who must pass an ID check?
+
+> **Also covers (22 Nov):** Q-15 (GM-05), GM-24-Q06 (GM-24), GM26-Q07 (GM-26). Asked once, here.
 - **Validation: STILL VALID.** **Decision status: OPEN. Severity: High.**
 - **Context:** ID is only part of Verified for overseas Explorers. ID reading (OCR) already
   works for everyone.
@@ -385,6 +397,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
   [documents.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/onboarding/verification/documents.py).
 
 #### ON-R01 — How long should verification evidence be kept?
+
+> **Also covers (22 Nov):** GM26-Q06 (GM-26). Asked once, here.
 - **Validation: STILL VALID.** **Decision status: OPEN. Severity: Medium (legal/privacy).**
 - **Context:** Identity and qualification files are collected, but no evidence-specific
   deletion schedule is documented.
@@ -411,6 +425,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
 ### ON-S3 · Insurance and super
 
 #### ON-Q09 — Which workers must prove professional indemnity cover?
+
+> **Also covers (22 Nov):** GM26-Q14 (GM-26). Asked once, here.
 - **Validation: STILL VALID.** **Decision status: OPEN. Severity: High (legal).**
 - **Context:** No insurance field, evidence or expiry gate exists (ON-03).
 - **ACTUAL TODAY:** Confirmed. Zero matches for "insurance"/"indemnity" in the inspected
@@ -457,6 +473,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
 ### ON-S4 · Pharmacy setup
 
 #### ON-Q11 — What must a pharmacy pass before posting to outside workers?
+
+> **Also covers (22 Nov):** GM-03-Q01 (GM-03), GM-04-Q03 (GM-04), GM-10-Q08 (GM-10), GM-24-Q07 (GM-24), GM25-C06 (GM-25). Asked once, here.
 - **Validation: STILL VALID.** **Decision status: OPEN. Severity: Critical.**
 - **Context:** Pharmacy-verified and ABN-verified flags exist, but posting checks neither.
   Workers can accept shifts from unverified sites (ON-06).
@@ -483,6 +501,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
   [organizations/models.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/organizations/models.py#L135-L236).
 
 #### ON-Q12 — Which site brief fields are required before the first post?
+
+> **Also covers (22 Nov):** GM-03-Q02 (GM-03). Asked once, here.
 - **Validation: STILL VALID.** **Decision status: OPEN. Severity: Medium.**
 - **Context:** The pharmacy record holds site details, hours, documents and rates.
   Software, staffing, parking and arrival steps are not structured fields.
@@ -505,6 +525,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
 - **Sources:** [organizations/models.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/organizations/models.py#L191-L197).
 
 #### ON-Q13 — Should pharmacies save a payment method during setup?
+
+> **Also covers (22 Nov):** GM-03-Q03 (GM-03), GM13-Q10 (GM-13), GM16-Q05 (GM-16), GM25-C07 (GM-25). Asked once, here.
 - **Validation: STILL VALID.** **Decision status: OPEN. Severity: High.**
 - **Context:** Every booking opens a new Stripe Checkout; no card is stored. Under D02 a
   shift under 2 hours away leaves 30 minutes to pay (ON-08).
@@ -534,6 +556,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
 ### ON-S5 · Organisations and devices
 
 #### ON-Q14 — How do organisations (multi-site groups) join?
+
+> **Also covers (22 Nov):** GM-03-Q04 (GM-03), GM-04-Q01 (GM-04), Q-13 (GM-05). Asked once, here.
 - **Validation: STILL VALID.** **Decision status: OPEN. Severity: Medium.**
 - **Context:** Only a platform admin can create an organisation. There is no organisation
   sign-up, and the web create page is not routed (ON-07).
@@ -555,6 +579,8 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
   [users/models.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/users/models.py#L50).
 
 #### ON-Q15 — Must every onboarding step work on mobile at launch?
+
+> **Merged 22 Nov: asked once, as GM01-Q10 in GM-01.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Validation: UNVERIFIED — could not re-check at this head.** **Decision status:
   UNVERIFIED (do not ask on stale evidence).**
 - **Context (#184, NOT re-validated):** Profile tabs match, but the mobile "add personal

@@ -25,10 +25,10 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
 | Worker accepts offer and creates reservation | Offer transitions to `ACCEPTED_AWAITING_PAYMENT` holding the slot (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:468`). | Offer transitions to `ACCEPTED_AWAITING_PAYMENT` holding the slot (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:356`). | Yes | - |
-| Owner opens Stripe checkout | Calls `chargeShiftFulfillment` and redirects to Stripe Checkout (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:30`; Next lacks payment UI at `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/index.tsx:1`). | Calls `chargeShiftFulfillment` and opens Stripe Checkout URL via `Linking.openURL` (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:228`). | Yes | - |
-| Stripe checkout completes via webhook | Webhook finalises booking and web UI refreshes on reload (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:64`). | Webhook finalises booking and mobile UI updates on reload (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:236`). | Yes | - |
-| Owner pays booking with Pills | Owner invokes `payShiftWithPills` to finalise shift without Stripe (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:12`). | Owner invokes `payShiftWithPills` to finalise shift without Stripe (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:312`). | Yes | - |
-| Concurrent checkout conflict | Displays conflict dialog offering to resume or expire session (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:51`). | Displays native alert offering to resume, expire, or cancel (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:246`). | Yes | - |
+| Owner opens Stripe checkout | Calls `chargeShiftFulfillment` and redirects to Stripe Checkout (; Next lacks payment UI at ) (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:30`). | Calls `chargeShiftFulfillment` and opens Stripe Checkout URL via `Linking.openURL` (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:228`). | Yes | - |
+| Stripe checkout completes via webhook | Webhook finalises booking and web UI refreshes on reload (`backend/billing/webhooks.py:25`). | Webhook finalises booking and mobile UI updates on reload (`backend/billing/webhooks.py:25`). | Yes | - |
+| Owner pays booking with Pills | Owner invokes `payShiftWithPills` to finalise shift without Stripe (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:12`). | Owner invokes `payShiftWithPills` to finalise shift without Stripe (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:204`). | Yes | - |
+| Concurrent checkout conflict | Displays conflict dialog offering to resume or expire session (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:5`). | Displays native alert offering to resume, expire, or cancel (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:246`). | Yes | - |
 | Lazy offer expiry | Offer list query triggers backend bulk-expiry of stale offers (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:374`). | Offer query triggers backend bulk-expiry of stale offers (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:154`). | Yes | - |
 
 ### Platforms per question
@@ -36,17 +36,19 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 |---|---|
 | GM13-Q01 | Web + Expo |
 | GM13-Q02 | Web + Expo |
-| GM13-Q03 | Web + Expo |
-| GM13-Q04 | Web + Expo |
-| GM13-Q05 | Web + Expo |
-| GM13-Q06 | Web + Expo |
-| GM13-Q07 | Web + Expo |
-| GM13-Q08 | Web + Expo |
+| GM13-Q03 | Web + Expo (asked in GM-12: GM-12-Q24) |
+| GM13-Q04 | Web + Expo (asked in GM-12: GM-12-Q20) |
+| GM13-Q05 | Web + Expo (asked in GM-12: GM-12-Q10) |
+| GM13-Q06 | Web + Expo (asked in GM-11: GM-11-Q10) |
+| GM13-Q07 | Web + Expo (asked in GM-12: GM-12-Q12) |
+| GM13-Q08 | Web + Expo (also covers GM15-41, GM16-Q07) |
 | GM13-Q09 | Web + Expo |
-| GM13-Q10 | Web + Expo |
+| GM13-Q10 | Web + Expo (asked in GM-02: ON-Q13) |
 | GM13-Q11 | Web + Expo |
-| GM13-Q12 | Web + Expo |
-| GM13-Q13 | Web + Expo |
+| GM13-Q12 | Web + Expo (also covers GM15-46, GM16-Q03, GM17-Q17, GM-18-Q20) |
+| GM13-Q13 | Web + Expo (also covers GM15-44) |
+| GM-13-W01 — Should operator recovery of a paid orphan checkout ever book the work? | Web + Expo |
+| GM-13-W02 — Should only a recorded cancellation release paid work? | Web + Expo |
 
 ## Bases (exact SHAs verified 2026-11-21)
 
@@ -168,6 +170,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM13-Q03 — Should reservations show a live payment countdown? (carried BK-Q13)
 
+> **Merged 22 Nov: asked once, as GM-12-Q24 in GM-12.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** the old grill said both sides already see "reserved, not yet confirmed" plus a pay-by time, and asked about adding a live countdown. That description is out of date: there is no pay-by time (D02 not built), and the owner card shows "Payment required to confirm" with a dollar total and Pay buttons, but no time at all. The worker-side wording the old grill quoted was not found in the current worker detail page.
 **ACTUAL TODAY — Web:** owner card "Payment required to confirm", `$n × 30 AUD`, per-offer checkboxes, "Pay with Stripe" / "Pay with Pills" (`ActiveShiftCard.tsx`); no time, no countdown. **ACTUAL TODAY — Expo:** same section, same wording, same `$n × 30` total (`ActiveShiftsPage/ActiveShiftCards.tsx`). **ACTUAL TODAY — Next:** no pay section at all (F02). **Worker side:** UNKNOWN — `WorkerShiftDetailPage.tsx` contains no "Waiting for owner payment" / "Awaiting" / "reserved" / "expires" text.
 **RECOMMENDED:** A — add a live countdown **once Q01 sets a deadline** (counting down to a deadline that does not exist yet is impossible). Until then, show the state + the Stripe session's remaining time if available. Severity: low-medium (usability, not correctness).
@@ -178,6 +182,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM13-Q04 — Can a worker drop a reservation before payment without an incident? (carried BK-Q14)
+
+> **Merged 22 Nov: asked once, as GM-12-Q20 in GM-12.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** today a worker who accepted an offer and then cannot come has no way to release the hold — the reservation only ends when the pharmacy pays, expires the checkout, or the Stripe session lapses. Nothing is confirmed until payment (D01), so holding the worker to it looks wrong.
 **ACTUAL TODAY — Web and Expo (same):** no withdraw action for an `ACCEPTED_AWAITING_PAYMENT` offer exists in the traced code.
@@ -191,6 +197,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM13-Q05 — How long does an offer stay open? (carried BK-Q05 / LA-Q09 / SH-07)
 
+> **Merged 22 Nov: asked once, as GM-12-Q10 in GM-12.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** offers stay open a flat 48 hours, even if the shift starts sooner — an offer can still be "pending" after the shift has started. The old grill recommended scaling with lead time like D02.
 **ACTUAL TODAY — Web and Expo (same backend):** `OFFER_EXPIRY_HOURS = 48` (`assignment.py:22`); `expires_at = now + 48 h`, not capped at shift start; expiry applied lazily when the offer list is opened or on accept.
 **RECOMMENDED:** B — scale with lead time like D02 (24h/6h/2h/30min, capped at start), once Q01 is decided — one timing model for offers and payments. Severity: medium. Benefit: urgent offers stop outliving their shifts. Risk: needs the same deadline machinery as Q01.
@@ -201,6 +209,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM13-Q06 — When an offer is declined or expires, what happens to the shift? (carried BK-Q06)
+
+> **Merged 22 Nov: asked once, as GM-11-Q10 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** a decline tells the owner and the shift stays open. An expiry is silent — nobody is told and nobody is offered the shift next. The old grill recommended reopening to the same audience and telling the manager.
 **ACTUAL TODAY — Web and Expo (same):** decline notifies the owner; expiry changes status silently (lazy expiry in `offers.py:list`; no notification path found).
@@ -214,6 +224,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM13-Q07 — Can a pharmacy offer one shift to several workers at once? (carried BK-Q07)
 
+> **Merged 22 Nov: asked once, as GM-12-Q12 in GM-12.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** yes, today — several workers can hold offers for one slot; the first to accept reserves it, later ones get "already reserved", and the rest expire once the booking confirms.
 **ACTUAL TODAY — Web and Expo (same backend):** verified in the accept flow (slot lock, `ACCEPTED_AWAITING_PAYMENT` check) and in `finalize_shift_offer` → `expire_competing_offers`.
 **RECOMMENDED:** KEEP — several offers, first to accept wins, rest expire. It matches Qwick/Hireup and is already built.
@@ -224,6 +236,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM13-Q08 — What happens after booking payment fails? (carried BK-R01; SH-13 has no definition)
+
+> **Also covers (22 Nov):** GM15-41 (GM-15), GM16-Q07 (GM-16). Asked once, here.
 
 **Plain English:** a failed or cancelled Stripe checkout does not confirm the booking. The owner can resume the same checkout or expire it and start a replacement — but there is no "original deadline" to retry until, because D02 was never built; the practical bound is Stripe's 24-hour session. And the gap this question cites, SH-13, is never defined anywhere in the #184 audit.
 **ACTUAL TODAY — Web:** 409 conflict dialog (resume / expire-and-replace / cancel) + `useShiftPaymentActions.recoverCheckout`. **ACTUAL TODAY — Expo:** same via native alert. **Backend:** failed Stripe call → 400, attempt unchanged; uncertain provider acknowledgement → 503 `checkout_uncertain` ("Retry this unchanged request; do not create another payment"); expired/unpaid session must be provider-confirmed before a replacement.
@@ -243,6 +257,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM13-Q10 — Should pharmacies save a payment method during setup? (carried ON-Q13 / ON-08)
 
+> **Merged 22 Nov: asked once, as ON-Q13 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** every booking opens a fresh Stripe Checkout and no card is stored. The old grill's urgency argument was the 30-minute D02 window — which does not exist — so the case for a saved card is weaker than stated, but the 24-hour Stripe session is still a slow, failure-prone path for urgent shifts.
 **ACTUAL TODAY — Web and Expo (same):** fresh Checkout Session per booking (`shift_payments.py` + `checkout_reservations.py`); a Stripe `customer` is reused only when a subscription exists; no saved-card / auto-charge endpoint exists.
 **RECOMMENDED:** B — save a card at setup, charge on acceptance (confirms in seconds; payment is still verified per D01). Severity: medium-high for urgent shifts. Benefit: the tightest failure point in the flow disappears. Risk: needs card storage (Stripe Customer + PaymentMethod), a charge-on-acceptance path, and failure handling (what if the saved card fails at acceptance — GM13-Q08's retry rule must cover it).
@@ -260,9 +276,13 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM13-Q12 — Legacy cancellation charge (LA-Q06 / SH-02)
 
+> **Also covers (22 Nov):** GM15-46 (GM-15), GM16-Q03 (GM-16), GM17-Q17 (GM-17), GM-18-Q20 (GM-18). Asked once, here.
+
 **Status:** Engineering: see BL-04. Preserve the route and client export behind the existing live-charge flag. Launch scope is owned by GM15-01 and LAUNCH-01.
 
 ### GM13-Q13 — Launch scope for bookings that can strand a checkout (LA-P01)
+
+> **Also covers (22 Nov):** GM15-44 (GM-15). Asked once, here.
 
 **Scenario:** Tom has opened Stripe Checkout for Sara. Her AHPRA status changes before he pays. Tom needs to book Ben instead.
 **What happens today:** The cancellation declines Sara's offer and leaves the unpaid Stripe session and its hold active. Those can block the replacement (`pr257:backend/shifts/cancellation.py:74`).

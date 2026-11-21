@@ -23,43 +23,43 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Authenticated talent board browsing | Renders talent cards with client-side role and category filters (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:41`; Next has migrated copy `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:75`). | Renders talent cards with identical filters (`frontend_mobile/roles/shared/talent-board/index.tsx:94`). | Yes | - |
+| Authenticated talent board browsing | Renders talent cards with client-side role and category filters (; Next has migrated copy ) (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:78`). | Renders talent cards with identical filters (`frontend_mobile/roles/shared/talent-board/index.tsx:89`). | Yes | - |
 | Public talent board browsing | Signed-out visitors browse the public talent feed. | Signed-out visitors browse the same public feed at /explore/talent-board; every `explore` route is public (`frontend_mobile/app/explore/talent-board.tsx`, `frontend_mobile/app/_layout.tsx:315-317`). | Yes | Corrected 22 Nov (orchestrator review): the earlier row said Expo needs sign-in; it does not. |
-| Worker creates / edits talent profile | Worker writes pitch and copies availability via pitch dialog (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:264`). | Worker writes pitch and copies availability via pitch modal (`frontend_mobile/roles/shared/talent-board/index.tsx:210`). | Yes | - |
-| Request booking modal / route | Tapping "Request booking" opens embedded post-shift modal prefilled with worker (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:271`). | Tapping "Request booking" navigates to mobile post-shift screen (`frontend_mobile/roles/shared/talent-board/index.tsx:315`). | Yes | - |
-| Role gating on "Request booking" | Restricted to 9 hiring roles; `PHARMACY_MANAGER` is excluded (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:195`). | Permits any non-worker role; `PHARMACY_MANAGER` is allowed (`frontend_mobile/roles/shared/talent-board/index.tsx:180`). | No | Verified 21 Nov: real drift. Web allows a fixed role list or an admin (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:208-226`); Expo allows any role except Explorer, pharmacist and other staff (`frontend_mobile/roles/shared/talent-board/index.tsx:322-326`). Owner choice: one hiring-role policy (GM-18 Q15, GM-05 Q-17); then align both (BL-24). |
-| Like / react to candidate post | Toggles heart icon to increment/decrement reaction counter (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:420`). | Toggles heart icon on candidate card (`frontend_mobile/roles/shared/talent-board/index.tsx:380`). | Yes | - |
-| Manage availability calendar | Worker configures weekly availability slots on dedicated page (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:129`; Next has no availability page). | Worker configures availability on mobile screen (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:56`). | Yes | - |
+| Worker creates / edits talent profile | Worker writes pitch and copies availability via pitch dialog (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:28`). | Worker writes pitch and copies availability via pitch modal (`frontend_mobile/roles/shared/talent-board/index.tsx:6`). | Yes | - |
+| Request booking modal / route | Tapping "Request booking" opens embedded post-shift modal prefilled with worker (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:264`). | Tapping "Request booking" navigates to mobile post-shift screen (`frontend_mobile/roles/shared/talent-board/index.tsx:100`). | Yes | - |
+| Role gating on "Request booking" | Restricted to 9 hiring roles; `PHARMACY_MANAGER` is excluded (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:208-226`). | Permits any non-worker role; `PHARMACY_MANAGER` is allowed (`frontend_mobile/roles/shared/talent-board/index.tsx:322-326`). | No | Verified 21 Nov: real drift. Web allows a fixed role list or an admin (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:208-226`); Expo allows any role except Explorer, pharmacist and other staff (`frontend_mobile/roles/shared/talent-board/index.tsx:322-326`). Owner choice: one hiring-role policy (GM-18 Q15, GM-05 Q-17); then align both (BL-24). |
+| Like / react to candidate post | Toggles heart icon to increment/decrement reaction counter (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:46`). | Toggles heart icon on candidate card (`frontend_mobile/roles/shared/talent-board/index.tsx:99`). | Yes | - |
+| Manage availability calendar | Worker configures weekly availability slots on dedicated page (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:129`; Next has no availability page). | Worker configures availability on mobile screen (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:1285`). | Yes | - |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
-| GM-18-Q01 | Web + Expo |
-| GM-18-Q02 | Web + Expo |
-| GM-18-Q03 | Web + Expo |
+| GM-18-Q01 | Web + Expo (also covers GM-04-Q12, GM-24-Q11, GM26-Q01) |
+| GM-18-Q02 | Web + Expo (also covers GM-24-Q12, GM26-Q02) |
+| GM-18-Q03 | Web + Expo (also covers GM26-Q03) |
 | GM-18-Q04 | Web + Expo |
-| GM-18-Q05 | Web + Expo |
+| GM-18-Q05 | Web + Expo (asked in GM-15: GM15-42) |
 | GM-18-Q06 | Web + Expo |
-| GM-18-Q07 | Web + Expo |
-| GM-18-Q08 | Web + Expo |
-| GM-18-Q09 | Web + Expo |
-| GM-18-Q10 | Web + Expo |
-| GM-18-Q11 | Web + Expo |
-| GM-18-Q12 | Web + Expo |
-| GM-18-Q13 | Web + Expo |
-| GM-18-Q14 | Web + Expo |
-| GM-18-Q15 | Web + Expo |
-| GM-18-Q16 | Web + Expo |
-| GM-18-Q17 | Web + Expo |
-| GM-18-Q18 | Web + Expo |
-| GM-18-Q19 | Web + Expo |
-| GM-18-Q20 | Web + Expo |
-| GM-18-Q21 | Web + Expo |
-| GM-18-Q22 | Web + Expo |
-| GM-18-Q23 | Web + Expo |
-| GM-18-Q24 | Web + Expo |
-| GM-18-Q25 | Web + Expo |
-| GM-18-Q26 | Web + Expo |
+| GM-18-Q07 | Web + Expo (also covers GM-12-Q18, GM-24-Q14, GM25-C16) |
+| GM-18-Q08 | Web + Expo (also covers Q-14, GM25-C17) |
+| GM-18-Q09 | Web + Expo (asked in GM-15: GM15-43) |
+| GM-18-Q10 | Web + Expo (also covers GM26-Q20) |
+| GM-18-Q11 | Web + Expo (also covers GM26-Q35) |
+| GM-18-Q12 | Web + Expo (asked in GM-02: ON-P03) |
+| GM-18-Q13 | Web + Expo (also covers GM01-Q16, GM-24-Q13, GM25-C12, GM26-Q04) |
+| GM-18-Q14 | Web + Expo (also covers GM01-Q17, GM26-Q05) |
+| GM-18-Q15 | Web + Expo (also covers Q-17, GM-24-Q15, GM25-C14, GM26-Q29) |
+| GM-18-Q16 | Web + Expo (also covers GM25-C13, GM26-Q30) |
+| GM-18-Q17 | Web + Expo (asked in GM-19: GM-19-Q12) |
+| GM-18-Q18 | Web + Expo (asked in GM-11: GM-11-Q05) |
+| GM-18-Q19 | Web + Expo (asked in GM-19: GM-19-Q10) |
+| GM-18-Q20 | Web + Expo (asked in GM-13: GM13-Q12) |
+| GM-18-Q21 | Web + Expo (asked in GM-16: GM16-Q02) |
+| GM-18-Q22 | Web + Expo (asked in GM-12: GM-12-Q10) |
+| GM-18-Q23 | Web + Expo (asked in GM-19: GM-19-Q06) |
+| GM-18-Q24 | Web + Expo (asked in GM-19: GM-19-Q04) |
+| GM-18-Q25 | Web + Expo (asked in GM-19: GM-19-Q09) |
+| GM-18-Q26 | Web + Expo (asked in GM-15: GM15-47) |
 | GM-18-OD-13 — Resending a talent pitch never creates a duplicate | Web + Expo |
 
 ## 0. Reconstruction note — read this first
@@ -335,6 +335,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED 
 Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED. Every question is CURRENT FLOW TRACED; none is owner-decided. Plain English first, then the detail. "KEEP" means keep the code as it is today; "ALTERNATIVE A" is the keep-existing-policy option where it differs from the recommendation.
 
 ### GM-18-Q01 (ex TB-Q01) — Who can see the talent board? ★ FIRST QUESTION — see §4
+
+> **Also covers (22 Nov):** GM-04-Q12 (GM-04), GM-24-Q11 (GM-24), GM26-Q01 (GM-26). Asked once, here.
 - **ACTUAL TODAY (verified):** any signed-in account can read the whole board — including competing workers and newcomers — and sees every author's name and user IDs, because the authenticated feed uses the unmasked serializer (`serializers/explorer.py`, `views/explorer.py::get_permissions` — read = `IsAuthenticated` only). Logged-out visitors see public cards with anonymous authors masked. There is no role check on reading.
 - **RECOMMENDED (carried from #184, rec B):** employers + own post, plus public masked — restrict authenticated discovery to authorised hiring roles and each author; keep public discovery only if masking is enforced server-side. Rationale: worker-to-worker access defeats anonymity, and the leak is API-level, so a UI fix cannot cure it. Severity: **P0 (privacy)**. Benefit: anonymous posting becomes real; workers can advertise availability without competitors and current employers identifying them. Risk: the audience shrinks, so fewer eyes on each post; needs a server-side role gate plus a "my post" exception. Legal: privacy — names + availability + location are personal information; OAIC APP 6 (use/disclosure) supports consent-based disclosure; anonymous posting that is not anonymous is also a misleading-representation risk. Decide jointly with GM-20 (AUDIENCE-01).
 - **ALTERNATIVE A — Keep current logic:** all accounts see identities; public sees masked cards. Scenario: a locum's current employer signs in as an Explorer and reads her name, suburb and "open to full-time" post. Trade-off: zero build, the anonymity promise stays false.
@@ -344,6 +346,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (P0) + code gap (server-side masking must follow the decision).
 
 ### GM-18-Q02 (ex TB-Q02) — When is an anonymous candidate's identity revealed?
+
+> **Also covers (22 Nov):** GM-24-Q12 (GM-24), GM26-Q02 (GM-26). Asked once, here.
 - **ACTUAL TODAY (verified):** immediately, to any signed-in user, on first read. There is no reveal point: no chat reply, booking-request acceptance or offer acceptance gates the name — the API returns it with the card. The public feed is the only masked path.
 - **RECOMMENDED (carried from #184, rec A):** when the worker accepts a booking request. Rationale: identity is disclosed before consent today; tying reveal to the worker accepting a request gives the worker the choice to engage. Severity: **P0 (privacy)**. Benefit: anonymous posting works end-to-end; workers control first contact. Risk: needs a per-relationship reveal state (who has been revealed to whom) and a masked card that still lets an owner judge fit; the booking flow must carry the reveal (and the "Request booking" flow currently needs the author user id client-side — it must be reworked to use the reference code instead). Legal: privacy, as Q01.
 - **ALTERNATIVE A — Keep current logic:** reveal to any signed-in user immediately. Scenario: as Q01 — the leak is the feature. Trade-off: zero build, anonymity is fiction.
@@ -353,6 +357,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (P0), then build (reveal state + reference-code booking flow).
 
 ### GM-18-Q03 (ex TB-Q03) — What stays hidden before identity is revealed?
+
+> **Also covers (22 Nov):** GM26-Q03 (GM-26). Asked once, here.
 - **ACTUAL TODAY (verified):** structured cards omit contact details, street addresses and documents, but authenticated reads return adults' full names (under-18s: first name only) plus skills, software, travel states, AHPRA years and experience. Free-text pitches are **not scrubbed** — the write serializer has no scan, and both PitchDialogs carry only a warning ("Please don't add any contact details…"). A phone number in the pitch is published verbatim.
 - **RECOMMENDED (carried from #184, rec A):** hide surname, contacts, street address and documents until the Q02 reveal point; scan free text so the structured-field rule cannot be bypassed. Rationale: the structured rule is worthless if the pitch can carry the same information in plain text. Severity: **P0 (privacy)**. Benefit: the masking rule holds in practice, not just in the schema. Risk: scanning needs a pattern list (phone/email/URL/social handle) and a false-positive path (a worker whose suburb or employer name looks like an identifier); over-blocking annoys legitimate pitches. Legal: privacy, as Q01.
 - **ALTERNATIVE A — Keep current logic:** expose adult full names to signed-in users; warn about contact details. Scenario: a worker writes "call me on 04xx" and every signed-in reader can call them directly, off-platform. Trade-off: zero build, the leak persists through the pitch.
@@ -369,6 +375,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (which filters, and where the rate lives) + code gap (server-side filtering — Q16).
 
 ### GM-18-Q05 (ex TB-Q05) — How should reviews and reliability show?
+
+> **Merged 22 Nov: asked once, as GM15-42 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified):** one owner-to-worker star average with a count, on every card (`ratingAverage`/`ratingCount`, annotated in `views/explorer.py::get_queryset`). No separate attendance, reliability or responsiveness measure exists. Internal/roster ratings feed the same public average (SH-10 — GM-15).
 - **RECOMMENDED (carried from #184, rec A):** separate: reviews and reliability, with counts — explained in one line each. Rationale: one score hides cancellations and penalises employment relationships; a worker with five stars but three no-shows looks identical to a reliable one. Severity: medium. Benefit: owners can trust the number; reliable newcomers are not tarred by one bad review. Risk: needs the reliability source defined (completed vs cancelled vs no-show — GM-15's incident ladder P10 is decided but not built); two numbers need one line of explanation each or owners will misread them. Legal: ratings are a reputational signal — accuracy and a dispute path matter (GM-15 Q35–Q37).
 - **ALTERNATIVE A — Keep current logic:** one relationship star average and count, no separate reliability. Scenario: an owner picks a 5.0 (2) worker who cancelled twice; the count is small and the cancellations invisible. Trade-off: zero build, misleading signal.
@@ -385,6 +393,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (threshold + "completed" definition), then a small build.
 
 ### GM-18-Q07 (ex TB-Q07) — Is "Request booking" a firm offer or an enquiry? ★ CONFLICT-RESOLVED — see OFFER-01
+
+> **Also covers (22 Nov):** GM-12-Q18 (GM-12), GM-24-Q14 (GM-24), GM25-C16 (GM-25). Asked once, here.
 - **ACTUAL TODAY (verified):** a firm offer. It opens a prefilled dedicated-shift form (web + mobile); submitting creates firm offers with 48-hour expiry (`assignment.py::offer_dedicated_shift`); the worker accepts or declines; outside acceptance reserves pending payment. The worker **cannot ask questions first** — there is no enquiry or chat step in the flow.
 - **RECOMMENDED — C (per consolidated queue OFFER-01, superseding #184's KEEP and GM-24's enquiry-first):** enquiry/chat first for public-board contacts, firm offer for favourites/members. Rationale: the conflict is real — GM-18's firm offer protects the owner, GM-24's enquiry-first protects the worker's identity and consent where no relationship exists. Splitting by relationship keeps the firm-offer mechanism where trust exists and adopts enquiry-first where identity is not yet established. Severity: high (it is the board's core transaction). Benefit: workers are not pressured by blind firm offers from strangers; owners keep the fast path for people they already know. Risk: two flows to build and explain; the boundary (who counts as a favourite/member) must be exact; the enquiry step needs a home (chat — GM-20 — or a lightweight message) or it becomes a dead end. **The GM-18 and GM-24 files' recommendations are superseded by this one; their evidence (48h flat expiry, one offer per slot, identity leak) stands.** Record the answer in both ledgers; do not ask Q07 and GM-24-Q14 separately.
 - **ALTERNATIVE A — Keep firm offer everywhere (GM-18's original KEEP):** continue dedicated offers requiring worker acceptance; payment confirms outside bookings. Scenario: an owner sends a firm offer to a stranger's anonymous card; the worker declines without ever being able to ask about the shift. Trade-off: one flow, fastest; workers get take-it-or-leave-it offers from people they have never spoken to.
@@ -394,6 +404,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap — **decided in principle by OFFER-01 (C)**; the owner confirms C (or picks A/B) and the build follows. The defects around the firm offer (credential gap Q11, expiry Q22, permission drift Q15) are separate questions.
 
 ### GM-18-Q08 (ex TB-Q08) — What should the heart on a talent card do?
+
+> **Also covers (22 Nov):** Q-14 (GM-05), GM25-C17 (GM-25). Asked once, here.
 - **ACTUAL TODAY (verified):** it only likes/unlikes a post and changes its like count, on both apps. It creates no pharmacy-favourites membership, and talent cards have no "Invite to favourites" action. The saved-contacts API exists but has no UI (§1h).
 - **RECOMMENDED (carried from #184, rec B):** keep the like; add "Invite to favourites" — sends a membership invite the worker must accept. Rationale: a like does not create a reusable booking relationship today, and the favourites tier (community audience, re-booking) is the mechanism the platform already has for trusted repeat work. Severity: medium. Benefit: one tap turns discovery into a re-bookable relationship; the worker consents (invite, not silent add). Risk: needs the invite/accept flow (GM-05 membership invites) and a home for the invite in the worker's UI; a rejected invite needs a graceful state. Legal: consent — silent addition to a favourites list is a disclosure/relationship the worker did not choose.
 - **ALTERNATIVE A — Keep current logic:** post likes without a talent-card invitation to favourites. Scenario: an owner likes five locums and still has no way to re-book any of them except by finding the card again. Trade-off: zero build, discovery never converts to relationship.
@@ -402,6 +414,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (which action the card offers), then build. The saved-contacts API already exists — only the UI is missing.
 
 ### GM-18-Q09 (ex TB-Q09) — Can a pharmacy block a worker?
+
+> **Merged 22 Nov: asked once, as GM15-43 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified):** not built. No block list exists in the traced flow — no model, no API, no UI. The only controls are declining per offer and moderator `hidden_at` (which hides the post from everyone, not from one pharmacy).
 - **RECOMMENDED (carried from #184, rec A):** yes — private block. The worker stops seeing that pharmacy's shifts; never shown publicly. Rationale: pharmacies need a scoped control for a worker they will not re-book (reliability, fit) without a public accusation. Severity: medium. Benefit: owners stop wasting offers; workers are not publicly shamed. Risk: a block must be invisible to the worker's public standing (or it becomes a shadow rating); needs an unblock path and an audit trail (who blocked whom, when — admin-visible); a blocked worker who is also staff/favourite needs precedence rules. Legal: private, so low risk — but the reason must not be stored as a defamatory note; keep it to a flag + optional private note.
 - **ALTERNATIVE A — Keep current logic (no blocking):** the pharmacy declines each time. Scenario: an owner declines the same worker's applications for six months. Trade-off: zero build, repeated friction and no memory.
@@ -410,6 +424,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap, then build.
 
 ### GM-18-Q10 (ex TB-Q10) — What is the rule for hiring a worker directly, off the platform?
+
+> **Also covers (22 Nov):** GM26-Q20 (GM-26). Asked once, here.
 - **ACTUAL TODAY (verified):** not built. No direct-hire or off-platform rule exists in the traced flow — no conversion fee, no permanent-hire clause, no disclosure. A pharmacy that finds a worker on the board can hire them directly and the platform has no stated position.
 - **RECOMMENDED (carried from #184, rec A):** permanent hire free; booked shifts stay — shifts found here are booked here. Rationale: a free permanent-hire rule is the simplest honest position (Nursa advertises no hire-away fee); it keeps the platform's revenue on shifts, where the fee is charged, and does not punish a good outcome (a permanent job). Severity: medium (commercial model). Benefit: owners are not afraid to use the board for full-time applications (Q07's full-time post kind exists precisely for this); workers are not trapped. Risk: revenue leakage if owners use the board as a free recruitment agency for permanent roles and never book a shift — needs the full-time-application flow to have its own terms (or a fee) if that becomes the dominant use. Legal: needs the terms to state it plainly; a conversion fee introduced later must not be retroactive (unfair-terms risk — GM-14/GM-26).
 - **ALTERNATIVE A — Keep current logic (no rule):** unclear for both sides. Scenario: an owner hires a locum permanently after two shifts; nobody knows whether a fee is owed. Trade-off: zero build, disputes later.
@@ -418,6 +434,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (commercial model), then terms wording. No code until the rule is chosen.
 
 ### GM-18-Q11 (ex LA-Q01 / ON-02) — Must a fresh AHPRA register check run before a booking?
+
+> **Also covers (22 Nov):** GM26-Q35 (GM-26). Asked once, here.
 - **ACTUAL TODAY (verified):** no. A saved flag drives Verified. `require_public_ahpra` runs only for public (`PUBLIC_LEVEL`) shifts where the worker is not already a member; the re-check it queues is desktop-only, and the default source is ScrapingBee, so under the default config no fresh lookup runs before any booking. Dedicated offers (the whole talent-board booking path) never trigger the gate at all, because they are forced private. A registration cancelled after the last stored check is not caught.
 - **RECOMMENDED (carried from #184, rec A):** before launch — a fresh check before registered-role bookings (turn on the desktop source plus a fresh check). Rationale: AHPRA calls its public register the authoritative source; a stale flag is the difference between a registered pharmacist and a suspended one standing in a pharmacy. Severity: **P0 (safety / legal)**. Benefit: the booking gate means what it says. Risk: the desktop verifier needs a staging trial (GM-02 ON-P03); a fresh lookup adds latency to booking and a failure mode (register unreachable — must fail closed or open? That is a sub-decision). Legal: patient safety; a booking made on a lapsed registration is the platform's worst outcome.
 - **ALTERNATIVE A — Keep current logic:** saved flag + stored check; no fresh lookup. Scenario: a pharmacist suspended on Monday is booked from the board on Tuesday because the last check was in October. Trade-off: zero build, the gate is theatre.
@@ -427,6 +445,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (P0) + code gap (desktop source + fresh-check wiring). Owned jointly with GM-02 (ON-P03 is the same decision — do not ask twice; record once).
 
 ### GM-18-Q12 (ex ON-P03) — Which AHPRA lookup should run at launch?
+
+> **Merged 22 Nov: asked once, as ON-P03 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified):** the default is ScrapingBee (`settings.py:643`), enforcement on (`:644`). The desktop verifier exists (`onboarding/verification/desktop.py`, `enqueue_check`) but is only used when `AHPRA_SOURCE == 'desktop'`; the re-check queue, the expiry-driven recheck and the lock-before-booking all assume the desktop path. The staging trial for the desktop verifier has not been evidenced in this trace.
 - **RECOMMENDED (carried from GM-02, rec A):** desktop verifier, after a staging trial. Rationale: everything else in the gate machinery assumes enforcement that only fully works on desktop; ScrapingBee is a scrape, not the register. Severity: **P0**. Benefit: the Q11 fresh check is real. Risk: the desktop verifier's reliability, cost and latency are unevidenced here; a staging trial is a precondition, not a formality. Legal: as Q11.
 - **ALTERNATIVE A — Keep current logic:** ScrapingBee default, one lookup at sign-up. Scenario: the gate reads stored checks from a scraper; a suspended registration is missed until someone re-checks. Trade-off: zero build, weakest assurance.
@@ -435,6 +455,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (P0), owned by GM-02 — GM-18 records the dependency, does not re-decide it.
 
 ### GM-18-Q13 (ex LA-Q12 / TB-01) — Fix the identity leak before launch?
+
+> **Also covers (22 Nov):** GM01-Q16 (GM-01), GM-24-Q13 (GM-24), GM25-C12 (GM-25), GM26-Q04 (GM-26). Asked once, here.
 - **ACTUAL TODAY (verified):** the leak is live in code: authenticated feed/list/retrieve/`by_profile` return names and user IDs for anonymous posts; only the public feed redacts. Both apps consume the leaking API. This is a **code gap**, not a policy question — anonymous posting is currently bypassed by signing in.
 - **RECOMMENDED (carried from #184, rec A):** before launch — server-side masking and a consent-based reveal (Q01/Q02). Rationale: the fix is the Q01/Q02 decision implemented; shipping the board with a known identity leak ships a false anonymity promise. Severity: **P0**. Benefit: the board can be marketed as anonymous without misleading workers. Risk: the fix touches the serializer the apps depend on — the booking flow needs the author user id today, so it must move to the reference code (Q02) in the same change, or booking breaks. Legal: privacy, as Q01.
 - **ALTERNATIVE A — Keep current logic (no fix):** launch with the leak. Scenario: a worker's anonymous post is identified by a colleague on day one. Trade-off: zero build, reputational and privacy risk from the first post.
@@ -443,6 +465,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** **code gap with a timing decision** — the fix itself needs no owner choice (mask server-side), but *when* it ships is the owner's call. Recommended: before the first real booking.
 
 ### GM-18-Q14 (ex LA-Q13 / TB-03) — Hidden, stale and lapsed-credential posts: are they really unreadable?
+
+> **Also covers (22 Nov):** GM01-Q17 (GM-01), GM26-Q05 (GM-26). Asked once, here.
 - **ACTUAL TODAY (verified, split):** the **bypass half is FIXED** — `get_queryset` now filters through `_visible_posts` on all non-write actions, so moderated (`hidden_at`) and past-date posts are excluded from feed, list and detail. The **lapse half is still missing** — `is_talent_board_visible` checks nothing about Verified/AHPRA status, so a worker whose registration lapses or whose Verified is revoked keeps a visible post. The viewer gate checks the viewer, not the author.
 - **RECOMMENDED (carried from #184, rec A):** before launch — enforce visibility **and** current eligibility consistently (hide on lapse/revocation, re-show on re-verification). Rationale: hidden or newly ineligible candidates remain bookable today; a lapsed pharmacist on the board is the same failure as Q11, one step earlier. Severity: high. Benefit: the board only shows people who can actually be booked. Risk: needs a re-check trigger (on what event does a post hide — a nightly job? an event on revocation? GM-02 has no scheduled re-scan) and a re-show path (a worker who re-verifies must not have to re-post). Legal: safety, as Q11.
 - **ALTERNATIVE A — Keep current logic:** bypass fixed; no lapse re-check. Scenario: a pharmacist's AHPRA lapses in December; her post stays up and owners keep offering. Trade-off: half the fix is already in; the remaining half is the dangerous one.
@@ -451,6 +475,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** **code gap, half fixed** — the remaining half needs a trigger decision (job vs event) from the owner, then build.
 
 ### GM-18-Q15 (ex LA-Q15 / TB-07) — One hiring-role policy: who may request a booking?
+
+> **Also covers (22 Nov):** Q-17 (GM-05), GM-24-Q15 (GM-24), GM25-C14 (GM-25), GM26-Q29 (GM-26). Asked once, here.
 - **ACTUAL TODAY (verified):** three policies, not one. **Web/Next:** fixed 9-role allow-list + admin (`OWNER`, `PHARMACY_ADMIN`, `PHARMACY_OWNER`, `ORG_ADMIN`, `ORG_OWNER`, `ORG_STAFF`, `CHIEF_ADMIN`, `REGION_ADMIN`, `ORGANIZATION`). **Expo:** any role except worker roles (`EXPLORER`, `PHARMACIST`, `OTHER_STAFF`), plus a `canRequestBookingOverride` the owner/org wrappers set to true. **`PHARMACY_MANAGER` can book on mobile and cannot on web.** The backend does not settle it — no hiring-role gate was found in the traced backend slice; whether the shift-creation view enforces one is UNKNOWN. GM-05 Q-17 (talent-board booking-permission parity) is NOT VERIFIED and must wait for this decision, not run in parallel.
 - **RECOMMENDED (carried from #184, rec A):** before launch — set **one backend hiring-role policy** and mirror it in both clients. Rationale: a permission that differs by client is not a permission; a manager who can book on their phone but not their laptop will find the phone path, and the backend cannot stop them. Severity: high. Benefit: one rule, enforced where it cannot be bypassed. Risk: the policy itself needs the PHARMACY_MANAGER call (below) and a home for the rule (shared-core, so all three clients read it — the drift is partly because the rule lives in each client today).
 - **The PHARMACY_MANAGER call (owner must make it):** (i) managers can hire — add `PHARMACY_MANAGER` to the allow-list on web/Next, keep Expo as-is; (ii) managers cannot hire — remove the any-non-worker rule on Expo, add an explicit list. There is no third option that keeps both clients as they are.
@@ -462,6 +488,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (the policy + the PHARMACY_MANAGER call) + code gap (backend enforcement + dedupe the rule into shared-core). **Check against #257:** it touches Expo post-shift screens and `shared-core/src/domains/shifts/audience.ts` — the role rule may move there.
 
 ### GM-18-Q16 (ex LA-Q14 / TB-04) — The board downloads every post: fix before launch?
+
+> **Also covers (22 Nov):** GM25-C13 (GM-25), GM26-Q30 (GM-26). Asked once, here.
 - **ACTUAL TODAY (verified):** yes, it downloads everything. Both apps call `loadAllTalentPages` (`page_size: 200`) and filter in the app; the backend has no filter parameters, and `_visible_posts` loops the whole table in Python before pagination. No server-side distance or rate filter exists. This breaks at a few thousand posts.
 - **RECOMMENDED (carried from #184, rec B):** soon after launch — within the first month of live use — **only** for a deliberately small, monitored board; set a measured migration trigger (e.g. post count or p95 feed latency) now. Rationale: at launch volume the full download works; the fix (server-side filtering + pagination discipline) is real work that should not block the first bookings, but it must have a trigger, or "soon" becomes "never". Severity: medium (scale, not correctness). Benefit: the board survives growth; search becomes server-side (Q04). Risk: the trigger must be monitored — nobody watches it, it will be missed; the Python-loop visibility check must move into the query or the server filter will still scan the table.
 - **ALTERNATIVE A — Keep current logic:** full download, client filtering, no trigger. Scenario: the board grows to 3,000 posts; every open downloads all of them; the feed slows and mobile data usage spikes. Trade-off: zero build, a known cliff.
@@ -470,6 +498,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** **code gap with a timing decision** — the fix needs no owner choice on the principle, but *when* and *at what trigger* are the owner's calls.
 
 ### GM-18-Q17 (ex LA-Q16 / AV-01) — Should the talent-post availability snapshot sync with the calendar?
+
+> **Merged 22 Nov: asked once, as GM-19-Q12 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified):** it never syncs. Both apps copy the live calendar once, at compose time, into the post's `availability_days`; later calendar edits never update the post. The two stores have no link in `models.py`. The matching engine reads the live calendar, so the board and the inbox can disagree about the same worker.
 - **RECOMMENDED (carried from #184, rec A):** before launch — fix it **or** clearly eliminate the copied calendar. Rationale: a post advertising dates the worker removed is misleading — an owner offers, the worker declines, trust in the board drops with every stale post. Severity: high (the board's core promise is "this person is free then"). Benefit: what the owner sees is what the worker means. Risk: the fix has three shapes (below) and each has a cost; auto-sync needs a trigger (on every calendar edit — fan-out to posts) and a test burden.
 - **ALTERNATIVE A — Keep current logic:** one-time copy; later edits do not update the post. Scenario: a worker changes Mondays to Tuesdays; her post still says Mondays for months; owners offer Mondays and are declined. Trade-off: zero build, stale posts.
@@ -479,6 +509,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (which of B/C/stamp) — the owner must choose the model first; the code follows.
 
 ### GM-18-Q18 (ex LA-Q17 / AV-04) — Match emails: escalated shifts and unverified workers?
+
+> **Merged 22 Nov: asked once, as GM-11-Q05 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified, adopted GM-19):** match emails fire at posting time only, for shifts posted straight to PLATFORM, to users with `notify_new_shifts=True` who pass the role/travel/any-overlap checks. **Escalated shifts never re-announce** (no announce call in `escalation.py`, no beat entry for `auto_escalate_due_shifts`), so a shift that widens its audience never alerts the newly eligible workers. **Recipients are not filtered by Verified/AHPRA** — unverified workers are alerted about shifts they are then blocked from applying to.
 - **RECOMMENDED (carried from #184, rec A):** before launch — fix both halves (re-announce on escalation; filter recipients by Verified/AHPRA). Rationale: escalated vacancies miss outreach while unverified workers receive alerts they cannot act on — the alert audience is the opposite of the eligible audience. Severity: high (it decides who hears about every shift). Benefit: every alert is actionable; escalated shifts actually reach people. Risk: re-announce needs a dedupe rule (who was already told at posting time must not be told twice); the Verified filter needs the same "current at send time" semantics as Q14, or it reintroduces the stale-flag problem.
 - **ALTERNATIVE A — Keep current logic:** posting-time only, no Verified filter. Scenario: a shift escalates to PLATFORM on Friday; the available workers who would have taken it are never told. Trade-off: zero build, missed fills and noisy alerts.
@@ -488,6 +520,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** **code gap** (both halves are build, no owner choice on the principle) — except the dedupe rule, which is a small owner decision. Owned jointly with GM-11 (escalation) and GM-19.
 
 ### GM-18-Q19 (ex LA-Q18 / AV-05) — Availability input: add server-side validation?
+
+> **Merged 22 Nov: asked once, as GM-19-Q10 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified, adopted GM-19):** the API accepts anything. The serializer has no `validate()` at all: end-before-start, past dates, weekdays outside 0–6, recurring rows with no days, exact duplicates are all accepted. Both apps do some client-side checks; direct API calls bypass them. No validation tests exist.
 - **RECOMMENDED (carried from #184, rec A):** before launch — add server-side semantic validation (start < end unless all-day; weekdays 0–6; recurring rows must list days; date not in the past for non-recurring rows; reject exact duplicates). Rationale: client checks do not protect the API; malformed availability corrupts matching (a 17:00–09:00 row matches — or fails to match — unpredictably). Severity: medium. Benefit: matching input is trustworthy; the Q03/Q17/Q24 decisions all assume sane data. Risk: low — the rules are uncontroversial except the past-date rule (below). Legal/financial: none direct.
 - **ALTERNATIVE A — Keep current logic:** no validation. Scenario: a worker saves 17:00–09:00 by mistake and is matched (or not matched) unpredictably. Trade-off: zero build, garbage in.
@@ -496,10 +530,14 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** **code gap**, with one owner sub-decision (past dates).
 
 ### GM-18-Q20 (ex LA-Q06 / SH-02) — Legacy cancellation charging
+
+> **Merged 22 Nov: asked once, as GM13-Q12 in GM-13.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** The route uses the old 10%/20% calculation. Its live flag defaults off (`pr257:backend/billing/shift_payments.py:211`, `pr257:backend/core/settings.py:679`).
 - **Status:** Engineering: see BL-04. Preserve the route and client export behind the current flag. Ask launch scope at GM15-01.
 
 ### GM-18-Q21 (ex LA-Q07 / SH-03) — Subscriber discount and hard-coded Stripe price IDs?
+
+> **Merged 22 Nov: asked once, as GM16-Q02 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified, split):** the **discount half is FIXED** — `is_subscriber` now selects the subscriber price IDs (`shift_payments.py:110-132`): locum $15 vs $30, PT-FT $40 vs $80; tests exist (`test_pr201_b01.py`). The **price-ID half is still open** — the four IDs are hard-coded in `shift_payments.py:116-130` and in `checkout_prices.py` (ID → cents map), with no env selection, so test and live cannot differ. The fee is per offer, whatever the hours or days.
 - **RECOMMENDED (carried from #184, rec A):** before launch — move price IDs to environment/config per Stripe mode (test vs live) so environments select independent prices. Rationale: the discount fix proves the code path works; the remaining risk is charging live prices in test (or test prices live) because the IDs are baked in. Severity: medium (money correctness). Benefit: test checkouts cannot touch live prices; price changes do not need a code deploy. Risk: small — config change + a test in each mode; the per-offer fee shape (flat per offer regardless of hours/days) is a separate commercial question, not this fix.
 - **ALTERNATIVE A — Keep current logic:** hard-coded IDs; discount applied. Scenario: a test checkout creates a live $30 charge because the ID is the live one. Trade-off: zero build, environment risk on every test run.
@@ -508,6 +546,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** **code gap, half fixed** — the remaining half is build, no owner choice on the principle.
 
 ### GM-18-Q22 (ex LA-Q09 / SH-07) — Offers can outlive the shift: cap the expiry at shift start?
+
+> **Merged 22 Nov: asked once, as GM-12-Q10 in GM-12.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified):** pending offers get a flat 48h expiry, not capped at shift start (`assignment.py:22`, `:259`), applied lazily on listing (`:69`). An urgent offer made 2 hours before start stays "pending" after the shift has begun; both apps can retain pending offers after start. Re-offering refreshes the terms but **does not** extend the 48h deadline.
 - **RECOMMENDED (carried from #184, rec A):** before launch — cap the response deadline at shift start (as D02 does for payment). Rationale: an offer that can be accepted after its shift begins is not an offer, it is a trap — for the worker (accepting work that has started) and the owner (thinking cover is coming). Severity: high. Benefit: no post-start acceptances; the 48h clock and the shift clock agree. Risk: urgent offers get very short windows (an offer made 2h before start expires in 2h) — that is the point, but owners must see the deadline clearly, and the "refresh does not extend" behaviour must be explained or the deadline will confuse. Legal/financial: none direct; indirectly, fewer disputed acceptances.
 - **ALTERNATIVE A — Keep current logic:** flat 48h, lazy expiry, no start cap. Scenario: a worker accepts a 9am shift at 10am; the roster now has a worker for a shift that started an hour ago. Trade-off: zero build, post-start acceptances.
@@ -517,6 +557,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** **code gap** — the cap needs no owner choice on the principle (D02 already decided the shape for payment).
 
 ### GM-18-Q23 (ex AV-Q06) — When should a talent post stop showing?
+
+> **Merged 22 Nov: asked once, as GM-19-Q06 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified):** dated posts hide after their last listed date; undated and full-time posts stay visible forever unless a moderator hides them. The read-path bypass is fixed (Q14), but there is no inactivity cutoff, no nudge, no "last updated" display. A full-time seeker from 2025 still tops the board in 2027.
 - **RECOMMENDED (carried from #184, rec A):** hide after 30 days without update, nudge the worker first. Rationale: last-date filtering leaves undated/full-time posts stale forever; a nudge + one-tap renew keeps genuinely available workers visible while the board stops filling with ghosts. Severity: medium. Benefit: owners stop messaging people who left the industry; the board stays trustworthy. Risk: a genuinely available full-time seeker is hidden for not tapping a button — the nudge and the renew path must work, and the 30-day number is a proposed local default, not a competitor standard. Legal/financial: none direct.
 - **ALTERNATIVE A — Keep current logic:** hide dated posts after last date; retain undated and full-time posts. Scenario: as today — ghosts accumulate. Trade-off: zero build, stale board.
@@ -526,6 +568,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (inactivity window + nudge) — the code gap (TB-03 bypass) is fixed.
 
 ### GM-18-Q24 (ex AV-Q04) — Who can see a worker's availability?
+
+> **Merged 22 Nov: asked once, as GM-19-Q04 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified):** only the worker can read/edit raw availability through the API (own-rows queryset). Pharmacies see at most what was copied into a talent post (`availability_days` snapshot), not a live calendar. No visibility/opt-in field exists on `UserAvailability`. The authenticated talent list exposes the post author's identity unmasked (Q01).
 - **RECOMMENDED (carried from #184, rec B):** explicit worker opt-in for accepted staff / favourite pharmacies. Rationale: a private calendar (with free-text `notes`) should not be disclosed by relationship alone; OAIC APP 6 supports consent-based disclosure. Severity: medium (privacy). Benefit: owners can invite the right people directly; workers stay in control. Risk: opt-in uptake may be low; needs per-pharmacy scoping UI; a worker who opts in then opts out leaves old copies in talent posts (Q17). Legal: privacy — availability + notes are personal information.
 - **ALTERNATIVE A — Keep current logic:** raw calendar private; posts hold copied dates. Scenario: an owner who wants a regular Monday locum cannot see she is free Mondays unless she posted on the talent board. Trade-off: safest privacy, weakest hiring use.
@@ -534,6 +578,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap (privacy + opt-in scope), then build. Owned jointly with GM-19 (Q04 there).
 
 ### GM-18-Q25 (ex AV-Q09) — Should workers set a max distance and minimum rate for alerts?
+
+> **Merged 22 Nov: asked once, as GM-19-Q09 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified, split):** **distance IS enforced in alerts** — `_user_can_travel_to_shift` (open-to-travel requires the pharmacy state in `travel_states`; otherwise haversine distance ≤ `coverage_radius_km`; missing coords/radius → silently no match). Both screens expose travel/radius (web default 30 km; mobile 5–1000 km + map preview). **Minimum rate is NOT checked** — `announce_availability_matches` has no rate comparison; `UserAvailability` has no rate field. Talent-post radius is a separate snapshot from the matching prefs. Board search has neither filter (Q04).
 - **RECOMMENDED (carried from #184, rec A):** yes — alerts respect both max distance and a minimum rate; search can still widen deliberately. Rationale: a worker 90 minutes away, or below their minimum rate, should not be alerted. Severity: medium. Benefit: fewer irrelevant alerts; owners reach workers who will actually accept. Risk: a minimum-rate field needs a source of truth (onboarding rates vs per-availability rate — the model has neither); too-tight filters thin the audience for hard-to-fill shifts.
 - **ALTERNATIVE A — Keep current logic:** respect existing distance/travel preferences without filtering alerts by minimum rate. Scenario: a $70/hr locum is alerted about a $55/hr shift and declines. Trade-off: zero build, continued mismatched alerts.
@@ -542,6 +588,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Gap type:** decision gap for the **rate half only** (whether rate filters alerts; where the minimum rate lives); the distance half is **built and verified** — no decision needed there. Owned jointly with GM-19 (Q09 there).
 
 ### GM-18-Q26 (ex LA-Q10 / SH-09 + launch gate) — Do accepted terms disclose the cancellation policy, and what must be fixed before the first real booking?
+
+> **Merged 22 Nov: asked once, as GM15-47 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (verified, adopted GM-15):** the accepted-terms snapshot has a terms fingerprint, but **no cancellation band table, no platform terms version, and no pharmacy-side acceptance**. A worker accepting a dedicated offer from the board is not shown the cancellation charges that could later apply — and the legacy 10%/20% route (Q20) is exactly the charge that would be levied. The launch-gate items that are **not** re-validated (LA-Q02–Q05: mobile profile data loss, mobile dead-ends, profile % vs Verified, payment readiness at accept) are still open as written in #184 and must not be asked — or launched on — until re-validated.
 - **RECOMMENDED (carried from #184, rec A):** before launch — record versioned, pre-contract acceptance by **both** sides (cancellation matrix + platform terms version + pharmacy acceptance) and obtain Australian legal review of every charge and remedy (GM-15 LA-R02 / SH-16). Rationale: disclosure alone does not make a one-sided or disproportionate term fair, and since November 2023 proposing, using or relying on unfair standard-form terms can attract major penalties. Severity: **P0 (legal)**. Benefit: charges, if ever levied, rest on a disclosed, reviewed, accepted record. Risk: legal review takes time and may force the fee table (P09, decided but unimplemented) to change; the snapshot change touches the engagement record both apps use. Legal: unfair-contract-terms regime; the agreed P09 table is decided but code charges legacy 10/20 (GM-15 carried-decision conflict — the table and the code disagree today).
 - **ALTERNATIVE A — Keep current logic:** snapshot as it is (fingerprint, no table/version/pharmacy acceptance). Scenario: a worker accepts, cancels, and is charged under a table they never saw. Trade-off: zero build, the dispute writes itself.

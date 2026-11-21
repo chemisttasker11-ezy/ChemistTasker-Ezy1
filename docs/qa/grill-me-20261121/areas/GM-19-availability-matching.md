@@ -21,30 +21,30 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Save dated availability slot | Worker saves dated slot via sidebar form (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:371`). Next web lacks availability surface (`frontend_web/landing_next/package.json:1`). | Worker saves dated slot with start/end time and travel radius (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:505`). | Yes | Parity question: Next web lacks an availability page; Vite web and Expo have matching forms. |
-| Save recurring pattern | Worker configures recurring weekdays with optional end date (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:365`). | Worker configures recurring weekdays with optional end date (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:512`). | Yes | |
-| Edit / delete availability slot | Worker updates or removes slot with immediate preview update (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:288`). | Worker updates or deletes slot via optimistic mutation (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:442`). | Yes | |
+| Save dated availability slot | Worker saves dated slot via sidebar form . Next web lacks availability surface (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:42`). | Worker saves dated slot with start/end time and travel radius (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:251`). | Yes | Parity question: Next web lacks an availability page; Vite web and Expo have matching forms. |
+| Save recurring pattern | Worker configures recurring weekdays with optional end date (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:368`). | Worker configures recurring weekdays with optional end date (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:495`). | Yes | |
+| Edit / delete availability slot | Worker updates or removes slot with immediate preview update (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:387`). | Worker updates or deletes slot via optimistic mutation (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:71`). | Yes | |
 | Matching shift notification toggle | Worker sets a travel radius (default 30 km) with availability (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:271`, `:326`). | Same radius setting, plus a map preview of the circle (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:223`). | Yes | Corrected 22 Nov (orchestrator review): web has the radius too; only the map preview is Expo-only (display, intended). |
-| Shift match alerts on posting | Backend alerts workers with any-overlap availability at shift posting (`backend/shifts/announcements.py:345`). | Push and in-app alerts dispatched from matching engine without client filtering (`backend/shifts/announcements.py:382`). | Yes | |
+| Shift match alerts on posting | Backend alerts workers with any-overlap availability at shift posting (`backend/shifts/announcements.py:29`). | Push and in-app alerts dispatched from matching engine without client filtering (`backend/shifts/announcements.py:29`). | Yes | |
 | Dashboard availability recommendations | Overlap matching endpoint feeds recommended shifts (`backend/shifts/announcements.py:465`). | Mobile dashboard fetches matching shifts from recommendations API (`frontend_mobile/roles/shared/availability/availabilityModel.ts:75`). | Yes | |
-| Roster placement availability warning | Roster displays non-blocking warning when shift is outside full containment (`backend/workforce/roster/validation.py:45`). | Manager roster surfaces non-blocking conflict warning from validation API (`backend/workforce/roster/validation.py:52`). | Yes | |
-| Talent board availability snapshot | Worker publishes talent post with copied availability snapshot that never auto-syncs (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:62`). | Post displays snapshot decoupled from live calendar rows (`frontend_mobile/roles/shared/talent-board/index.tsx:106`). | Yes | |
+| Roster placement availability warning | Roster displays non-blocking warning when shift is outside full containment (`backend/workforce/roster/validation.py:9`). | Manager roster surfaces non-blocking conflict warning from validation API (`backend/workforce/roster/validation.py:9`). | Yes | |
+| Talent board availability snapshot | Worker publishes talent post with copied availability snapshot that never auto-syncs (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:86`). | Post displays snapshot decoupled from live calendar rows (`frontend_mobile/roles/shared/talent-board/index.tsx:63`). | Yes | |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
-| GM-19-Q01 (ex AV-Q01) — How should workers set availability? | Web + Expo |
-| GM-19-Q02 (ex AV-Q02) — How far can a repeating availability run? | Web + Expo |
-| GM-19-Q03 (ex AV-Q03) — When does availability "match" a shift? | Web + Expo |
-| GM-19-Q04 (ex AV-Q04) — Who can see a worker's availability? | Web + Expo |
-| GM-19-Q05 (ex AV-Q05) — Should confirmed bookings block that time automatically? | Web + Expo |
-| GM-19-Q06 (ex AV-Q06) — When should a talent post stop showing? | Web + Expo |
-| GM-19-Q07 (ex AV-Q07) — Should availability show when it was last confirmed? | Web + Expo |
-| GM-19-Q08 (ex AV-Q08) — Should urgent-shift alerts need a separate opt-in? | Web + Expo |
-| GM-19-Q09 (ex AV-Q09) — Should workers set a max distance and minimum rate for alerts? | Web + Expo |
-| GM-19-Q10 (NEW) — Should availability validation be added, and what must it reject? | Web + Expo |
+| GM-19-Q01 (ex AV-Q01) — How should workers set availability? | Web + Expo (also covers GM-23-02) |
+| GM-19-Q02 (ex AV-Q02) — How far can a repeating availability run? | Web + Expo (also covers GM-23-03) |
+| GM-19-Q03 (ex AV-Q03) — When does availability "match" a shift? | Web + Expo (also covers GM-23-04) |
+| GM-19-Q04 (ex AV-Q04) — Who can see a worker's availability? | Web + Expo (also covers GM-18-Q24, GM-23-05, GM26-Q17) |
+| GM-19-Q05 (ex AV-Q05) — Should confirmed bookings block that time automatically? | Web + Expo (also covers GM-23-06) |
+| GM-19-Q06 (ex AV-Q06) — When should a talent post stop showing? | Web + Expo (also covers GM-18-Q23, GM-23-07, GM-24-Q31) |
+| GM-19-Q07 (ex AV-Q07) — Should availability show when it was last confirmed? | Web + Expo (also covers GM-23-08) |
+| GM-19-Q08 (ex AV-Q08) — Should urgent-shift alerts need a separate opt-in? | Web + Expo (also covers GM22-08, GM-23-09, GM-24-Q20, GM26-Q18) |
+| GM-19-Q09 (ex AV-Q09) — Should workers set a max distance and minimum rate for alerts? | Web + Expo (also covers GM-18-Q25, GM22-09, GM-23-10) |
+| GM-19-Q10 (NEW) — Should availability validation be added, and what must it reject? | Web + Expo (also covers GM-18-Q19, GM-23-17) |
 | GM-19-Q11 (NEW) — Should a roster availability warning block placement, or stay a warning? | Web + Expo |
-| GM-19-Q12 (NEW) — Should the talent-post availability snapshot sync with the calendar? | Web + Expo |
+| GM-19-Q12 (NEW) — Should the talent-post availability snapshot sync with the calendar? | Web + Expo (also covers GM-18-Q17, GM-23-01, GM25-C15) |
 | GM-19-Q13 (NEW) — Next web: does an availability surface exist, and must it match Vite/Expo? | Web only |
 
 ## 0. What was completed in this re-run
@@ -125,6 +125,8 @@ Parity note: the backend is client-agnostic (one API, one matching engine). The 
 Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED (none remain in this area after this re-run except where stated).
 
 ### GM-19-Q01 (ex AV-Q01) — How should workers set availability? — ✅ STILL VALID (screens now verified)
+
+> **Also covers (22 Nov):** GM-23-02 (GM-23). Asked once, here.
 - **ACTUAL TODAY (verified):** dated slots and recurring weekdays with time windows / all-day, `recurring_end_date` optional, `notes`, `notify_new_shifts` — on both Vite and Expo, same model. **No unavailable-date / blackout / holiday exception model exists** in the verified model or either screen.
 - **RECOMMENDED (carried from #184, rec A):** keep recurring patterns; add dated blackouts (unavailable dates) that always win over a pattern. Rationale: holidays and outside work cannot currently override a pattern, so workers either delete the pattern or get alerted for shifts they cannot do. Severity: medium. Benefit: fewer false matches, less owner wasted time. Risk: precedence rules must be defined (blackout vs booking vs leave) or three overlapping "unavailable" sources will conflict. Legal/financial: none direct; indirectly, fewer no-shows / late cancels.
 - **ALTERNATIVE A — Keep current logic:** dated + recurring only, no exceptions. Scenario: a pharmacist on annual leave in January deletes her Monday pattern, then must rebuild it in February; in the meantime she gets no alerts. Trade-off: zero build, ongoing stale/false matches and re-entry burden.
@@ -134,6 +136,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED 
 - **Gap type:** decision gap (owner must choose the exception model first); then a build.
 
 ### GM-19-Q02 (ex AV-Q02) — How far can a repeating availability run? — 🔄 CHANGED (Oct claim wrong)
+
+> **Also covers (22 Nov):** GM-23-03 (GM-23). Asked once, here.
 - **ACTUAL TODAY (verified):** open-ended recurrence is allowed by the backend (`recurring_end_date` nullable) **and by both apps** — the end date is optional on Vite and Expo; the payload sends `recurring_end_date: null` when unset, with no "required" validation found. The Oct 2026 claim "apps require an end date" is **WRONG at head**. Nothing expires a pattern and nobody is prompted to refresh it.
 - **RECOMMENDED (carried, rec B):** open-ended, with a quarterly reconfirm prompt. Rationale: nothing reconfirms old patterns; a prompt preserves the low-effort pattern while fighting staleness. Severity: medium. Benefit: fewer ghost availabilities. Risk: prompt fatigue / ignored nudges; needs a `confirmed_at` field and a notification job (neither exists). Legal/financial: none direct.
 - **ALTERNATIVE A — Keep current logic:** optional end date, no prompt. Scenario: a worker who left pharmacy in 2025 still "available Mondays" in 2027 and keeps receiving alerts. Trade-off: zero build, maximum staleness.
@@ -143,6 +147,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED 
 - **Gap type:** decision gap (horizon + prompt cadence), then build (field + job + UI).
 
 ### GM-19-Q03 (ex AV-Q03) — When does availability "match" a shift? ★ FIRST QUESTION — see §4
+
+> **Also covers (22 Nov):** GM-23-04 (GM-23). Asked once, here.
 - **ACTUAL TODAY (verified, split — the divergence is now confirmed):** **alerts/dashboard use ANY OVERLAP** (`_availability_matches_slot`: `start <= slot_end and end >= slot_start`, touching endpoints count). **Roster warnings use FULL CONTAINMENT** (`validation.py`: the shift must sit fully inside a declared window, or the row is all-day). The same worker/shift pair can be "matched" by email and "outside availability" by the roster at the same time.
 - **RECOMMENDED (carried, rec A):** one rule everywhere — the shift must sit fully inside the availability. Rationale: a 9–10 availability matching a 9–17 shift wastes the owner's time and trains workers to ignore alerts. Severity: high (it decides who gets emailed about every shift). Benefit: alerts mean "can actually cover this"; aligns with roster warnings. Risk: fewer alerts per shift, especially for part-day availability; owners of long shifts may see a thinner audience. Legal/financial: none direct; indirectly fewer failed bookings.
 - **ALTERNATIVE A — Keep current logic:** divergent rules (any-overlap alerts + full-containment roster warnings). Scenario: worker available 9–10 is emailed a 9–17 shift, applies, is rejected or cannot cover; owner waits. Trade-off: no build, continued noise and mismatched expectations between alerts and roster.
@@ -152,6 +158,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED 
 - **Gap type:** decision gap — the owner must pick the single matching rule first; the alert engine must then be changed to it. **No longer blocked on re-fetch — both rules are verified.**
 
 ### GM-19-Q04 (ex AV-Q04) — Who can see a worker's availability? — ✅ STILL VALID (now fully verified)
+
+> **Also covers (22 Nov):** GM-18-Q24 (GM-18), GM-23-05 (GM-23), GM26-Q17 (GM-26). Asked once, here.
 - **ACTUAL TODAY (verified):** only the worker can read/edit raw availability through the API (own-rows queryset). Pharmacies see at most what was copied into a talent post (`availability_days` snapshot), not a live calendar. No visibility/opt-in field exists on `UserAvailability`. The authenticated talent list exposes the post author's identity unmasked (`author_user_id`, `explorer_user_id`, `explorer_name`) — LA-Q12 still valid.
 - **RECOMMENDED (carried, rec B):** explicit worker opt-in for accepted staff / favourite pharmacies. Rationale: a private calendar (with free-text `notes`) should not be disclosed by relationship alone; OAIC APP 6 (use/disclosure of personal information) supports consent-based disclosure. Severity: medium (privacy). Benefit: owners can invite the right people directly; workers stay in control. Risk: opt-in uptake may be low; needs per-pharmacy scoping UI. Legal: privacy — availability + notes are personal information; disclosure without consent is the risk.
 - **ALTERNATIVE A — Keep current logic:** raw calendar private; posts hold copied dates. Scenario: an owner who wants a regular Monday locum cannot see she is free Mondays unless she posted on the talent board. Trade-off: safest privacy, weakest hiring use.
@@ -161,6 +169,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED 
 - **Gap type:** decision gap (privacy + opt-in scope), then build.
 
 ### GM-19-Q05 (ex AV-Q05) — Should confirmed bookings block that time automatically? — 🔄 CHANGED (alert side now VERIFIED: they do not)
+
+> **Also covers (22 Nov):** GM-23-06 (GM-23). Asked once, here.
 - **ACTUAL TODAY (verified, split):** **Roster side — blocked:** overlapping assignments are a hard `SHIFT_OVERLAP` error in `worker_issues()`. **Alert side — NOT blocked:** `announce_availability_matches` has **no assignment check** — a worker already booked for those hours is still alerted. It does not delete or amend the `UserAvailability` row. Approved leave is likewise not checked by the alert function (roster blocks it, alerts do not).
 - **RECOMMENDED (carried, rec A):** yes — booked time is unavailable for matching. Rationale: alerting a worker about hours they are already booked for wastes both sides and risks a double-booking attempt. Severity: medium-high. Benefit: alerts stay actionable. Risk: needs the matching engine to consult assignments (and leave, and roster) — a query + test burden; a cancelled booking must restore availability promptly. Financial: fewer failed / double-booked acceptances; no direct fee impact (fees attach at confirmation, GM-13).
 - **ALTERNATIVE A — Keep current logic:** leave declared availability and alerts unchanged when bookings are confirmed; rely on roster conflict checks at placement. Scenario: a locum booked 9–17 Monday keeps receiving Monday 9–17 alerts, applies, and is blocked late. Trade-off: zero build, noisy alerts, late rejections.
@@ -169,6 +179,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED 
 - **Gap type:** decision gap for the alert side; the roster side is already built (code exists).
 
 ### GM-19-Q06 (ex AV-Q06) — When should a talent post stop showing? — ✅ STILL VALID (feeds now verified to call the rule)
+
+> **Also covers (22 Nov):** GM-18-Q23 (GM-18), GM-23-07 (GM-23), GM-24-Q31 (GM-24). Asked once, here.
 - **ACTUAL TODAY (verified):** `is_talent_board_visible()` — hidden → no; full-time application → always yes; dated → until last listed date; undated → forever. **NEW: `get_queryset` now filters through `_visible_posts` for all non-write actions — TB-03 is FIXED at head** (the Oct bypass claim is no longer true). But undated and full-time posts still remain indefinitely unless moderated.
 - **RECOMMENDED (carried, rec A):** hide after 30 days without update, nudge the worker first. Rationale: last-date filtering leaves undated/full-time posts stale forever. Severity: medium. Benefit: the board stops filling with "ghosts". Risk: a genuinely available full-time seeker is hidden for not tapping a button; needs a nudge + one-tap renew path (cf. Q07). The 30-day number is a proposed local default, not a competitor standard.
 - **ALTERNATIVE A — Keep current logic:** hide dated posts after last date; retain undated and full-time posts. Scenario: a full-time seeker from 2025 still tops the board in 2027. Trade-off: zero build, stale board.
@@ -178,6 +190,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED 
 - **Gap type:** decision gap (inactivity window + nudge) — the code gap (TB-03) is fixed.
 
 ### GM-19-Q07 (ex AV-Q07) — Should availability show when it was last confirmed? — ✅ STILL VALID (model verified, no field)
+
+> **Also covers (22 Nov):** GM-23-08 (GM-23). Asked once, here.
 - **ACTUAL TODAY (verified):** not built. There is no freshness signal, no confirmation date, and no one-tap reconfirm; `updated_at` changes on any edit and is not a worker confirmation. No reconfirm action exists in the verified API slice; neither screen shows a freshness display.
 - **RECOMMENDED (carried, rec A):** yes — show "last confirmed" plus a weekly one-tap reconfirm; mark stale after 14 days; add a pause option. Rationale: pharmacies cannot tell a live calendar from a forgotten one. Severity: medium. Benefit: trust in matching; pairs with Q02/Q06. Risk: weekly cadence may annoy; 14-day staleness is a proposed number. Needs a new field + endpoint + UI on both clients.
 - **ALTERNATIVE A — No:** pharmacies guess. Scenario: an owner messages three "available" workers, two never reply. Trade-off: zero build, continued wasted outreach.
@@ -186,6 +200,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED 
 - **Gap type:** decision gap (cadence + stale threshold + pause semantics), then build.
 
 ### GM-19-Q08 (ex AV-Q08) — Should urgent-shift alerts need a separate opt-in? — ✅ VERIFIED (single flag; no separate urgent consent)
+
+> **Also covers (22 Nov):** GM22-08 (GM-22), GM-23-09 (GM-23), GM-24-Q20 (GM-24), GM26-Q18 (GM-26). Asked once, here.
 - **ACTUAL TODAY (verified):** one "notify new shifts" switch per availability row (`notify_new_shifts`, default False) — the only consent in the matching engine and on both screens ("Notify me when new public shifts match my availability"). **No separate urgent-shift consent, no urgency-based alert audience, no quiet-hours** in any verified file. Escalation never re-announces, so there is no second "urgent" wave at all.
 - **RECOMMENDED (carried, rec KEEP):** keep one matching-shift consent; label urgent messages clearly; add frequency controls only if volume proves necessary. Rationale: urgency does not change the notification purpose. Severity: low. Benefit: no extra settings burden. Risk: urgent alerts at night could annoy — mitigation is labelling + quiet-hours, not a second opt-in.
 - **ALTERNATIVE A — Keep current logic:** same consent for urgent and ordinary shifts (identical to the recommendation here — the "keep" option IS the recommendation).
@@ -195,6 +211,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED 
 - **Gap type:** decision gap (small). **No longer blocked — the engine is verified.**
 
 ### GM-19-Q09 (ex AV-Q09) — Should workers set a max distance and minimum rate for alerts? — 🔄 SPLIT (distance verified, rate verified absent)
+
+> **Also covers (22 Nov):** GM-18-Q25 (GM-18), GM22-09 (GM-22), GM-23-10 (GM-23). Asked once, here.
 - **ACTUAL TODAY (verified):** **distance IS enforced in alerts** — `_user_can_travel_to_shift` (open-to-travel requires the pharmacy state in `travel_states`; otherwise haversine distance ≤ `coverage_radius_km`; missing coords/radius → no match). Both screens expose travel/radius (web default 30 km; mobile 5–1000 km + map preview). **Minimum rate is NOT checked** — `announce_availability_matches` has no rate comparison; `UserAvailability` has no rate field. Talent-post radius (`coverage_radius_km` on `ExplorerPost`) is a separate snapshot from the matching prefs.
 - **RECOMMENDED (carried, rec A):** yes — alerts respect both max distance and a minimum rate; search can still widen deliberately. Rationale: a worker 90 minutes away, or below their minimum rate, should not be alerted. Severity: medium. Benefit: fewer irrelevant alerts; owners reach workers who will actually accept. Risk: a minimum-rate field needs a source of truth (onboarding rates vs per-availability rate — the model has neither); too-tight filters thin the audience for hard-to-fill shifts.
 - **ALTERNATIVE A — Keep current logic:** respect existing distance/travel preferences without filtering alerts by minimum rate. Scenario: a $70/hr locum is alerted about a $55/hr shift and declines. Trade-off: zero build, continued mismatched alerts.
@@ -203,6 +221,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED 
 - **Gap type:** decision gap for the rate half (whether rate filters alerts; where the minimum rate lives); the distance half is **built and verified** — no decision needed there. **No longer blocked — `announcements.py` is verified.**
 
 ### GM-19-Q10 (NEW) — Should availability validation be added, and what must it reject? — ✅ VERIFIED (no validation)
+
+> **Also covers (22 Nov):** GM-18-Q19 (GM-18), GM-23-17 (GM-23). Asked once, here.
 - **ACTUAL TODAY (verified):** any row is accepted (end ≤ start, past date, weekday out of range, recurring with no days, exact duplicates). Serializer has zero `validate_*` methods; the characterisation tests contain no validation tests. AV-05 CONFIRMED (GM-18 agreed).
 - **RECOMMENDED:** add validation (start < end unless all-day; weekdays 0–6; recurring rows must list days; date not in the past for non-recurring rows; reject exact duplicates). Severity: medium. This is a **code gap** (no owner choice needed on the principle), but the owner should confirm the past-date rule: can a worker backdate availability for record-keeping?
 - **ALTERNATIVE A — Keep current logic:** no validation. Scenario: a worker saves 17:00–09:00 by mistake and is matched (or not matched) unpredictably. Trade-off: zero build, garbage in.
@@ -216,6 +236,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED 
 - **Gap type:** decision gap.
 
 ### GM-19-Q12 (NEW) — Should the talent-post availability snapshot sync with the calendar? — ✅ VERIFIED (structural; never syncs)
+
+> **Also covers (22 Nov):** GM-18-Q17 (GM-18), GM-23-01 (GM-23), GM25-C15 (GM-25). Asked once, here.
 - **ACTUAL TODAY (verified, model shape + GM-18):** two stores, no link in `models.py`; editing availability does not update any talent post. The copy call-site was not re-traced (GM-18 territory), but the structural fact stands: no sync mechanism exists.
 - **RECOMMENDED:** sync on edit, or show a "last synced" stamp and a one-tap "update my post" action — owner to choose.
 - **ALTERNATIVE A — Keep current logic (one-time copy).** Scenario: worker changes Mondays to Tuesdays; her post still says Mondays for months. Trade-off: zero build, stale posts. **ALTERNATIVE B — Auto-sync.** **ALTERNATIVE C — Post reads the live calendar instead of a snapshot (ties to Q04).** Other / defer.

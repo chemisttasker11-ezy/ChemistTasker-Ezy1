@@ -23,10 +23,10 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 |---|---|---|---|---|
 | Start posting wizard | Multi-step wizard opens in Vite (`frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx:16`; Next has no wizard route, only a navigation helper at `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:307`). | Multi-step posting screen opens in Expo (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:79`, mounted at `frontend_mobile/roles/owner/post-shift.tsx:1`). | Yes | - |
 | Submit shift with required fields | Validates draft and submits payload via `buildShiftPostingPayload` (`frontend_web/shared/postShift/PostShiftForm.tsx:493`). | Validates draft and submits payload via `buildShiftPostingPayload` (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:1372`). | Yes | - |
-| Submit with missing or invalid fields | Shared validation intercepts invalid draft returning inline field errors (`frontend_web/shared/postShift/PostShiftForm.tsx:499`). | Shared validation intercepts invalid draft returning inline field errors (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:532`). | Yes | - |
+| Submit with missing or invalid fields | Shared validation intercepts invalid draft returning inline field errors (`frontend_web/shared/postShift/PostShiftForm.tsx:499`). | Shared validation intercepts invalid draft returning inline field errors (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:1338`). | Yes | - |
 | Hourly rate and loading preview | Renders rate inputs and preview calculations in pay step (`frontend_web/shared/postShift/PostShiftPayStep.tsx:64`). | Renders mobile pay rate step sending identical rate configuration (`frontend_mobile/roles/shared/shifts/PostShiftPayRateStep.tsx:92`). | Yes | - |
-| Edit published shift | Re-enters wizard loading existing shift data under `editingShiftId` (`frontend_web/shared/postShift/PostShiftForm.tsx:210`). | Reuses mobile wizard passing `editingShiftId` to update payload (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:1340`). | Yes | - |
-| Withdraw / delete unfilled shift | Deletes unfilled shift via `deleteShift` action without candidate notifications (`frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:595`). | Deletes unfilled shift via `deleteShift` without candidate notifications (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:265`). | Yes | - |
+| Edit published shift | Re-enters wizard loading existing shift data under `editingShiftId` (`frontend_web/shared/postShift/PostShiftForm.tsx:79`). | Reuses mobile wizard passing `editingShiftId` to update payload (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:1340`). | Yes | - |
+| Withdraw / delete unfilled shift | Deletes unfilled shift via `deleteShift` action without candidate notifications (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftActions.ts:44`). | Deletes unfilled shift via `deleteShift` without candidate notifications (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:294`). | Yes | - |
 | Save draft / leave wizard | In-memory draft state only; closing the page discards unsubmitted data (`frontend_web/shared/postShift/PostShiftForm.tsx:135`). | In-memory draft state only; navigating away discards form progress (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:241`). | Yes | - |
 
 ### Platforms per question
@@ -35,11 +35,11 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM-10-Q01 | Web + Expo |
 | GM-10-Q02 | Web + Expo |
 | GM-10-Q03 | Web + Expo |
-| GM-10-Q04 | Web + Expo |
-| GM-10-Q05 | Web + Expo |
+| GM-10-Q04 | Web + Expo (also covers Q5) |
+| GM-10-Q05 | Web + Expo (also covers GM-23-23) |
 | GM-10-Q06 | Web + Expo |
 | GM-10-Q07 | Web + Expo |
-| GM-10-Q08 | Web + Expo |
+| GM-10-Q08 | Web + Expo (asked in GM-02: ON-Q11) |
 | GM-10-Q09 | Web + Expo |
 | GM-10-Q10 | Web + Expo |
 | GM-10-Q11 | Web + Expo |
@@ -170,6 +170,8 @@ GM-10 has almost no direct #184 material. The closest old questions, and their s
 - **Normal case:** owner posts a Saturday pharmacist shift at a fixed rate. **Edge case:** PHARMACIST_PROVIDED with a worker who has no rate preference stored → `KeyError` in pricing (CG-10-06). **Retry/concurrency:** rate preview (`calculate_shift_rates`) can return "0.00" on error with no hard failure. **Denied role / wrong tenant:** n/a. **Payment/notification:** the posted rate becomes the frozen terms rate at accept (`finalize.py` uses the accepted-terms snapshot). **Web/Expo difference:** same rate types and fields on both (shared-core); Next unknown.
 
 ### GM-10-Q04 — How are overtime, weekend and public-holiday loadings handled?
+
+> **Also covers (22 Nov):** Q5 (GM-09). Asked once, here.
 - **#184 ID:** none established (PO-R01 is the Award-check half). **Status: VALIDATED.**
 - **ACTUAL TODAY:** Loadings are **computed, not entered**: `pricing.py` segments every shift by day type (weekday/Saturday/Sunday/public holiday from the pharmacy's state/region holiday calendar) and time window (early-morning before 08:00 / daytime / late-night from 19:00), using Award windows from 1 July 2026 Schedule B (07:00/08:00/18:00/19:00/21:00 boundaries; part-day holiday boundaries data-driven). Pharmacist FIXED/FLEXIBLE → pharmacy day-rate per segment; non-pharmacist → Award casual rates per segment + `owner_adjusted_rate` bonus. **Overtime is NOT computed anywhere in pricing** — it is only flagged for payroll review at accept (>12h shift, pre-7am weekday/Saturday — `engagement.py`). The owner enters per-day rates + an optional bonus on top of the Award rate; there is no separate "overtime rate" field.
 - **RECOMMENDED:** Keep computed loadings, and decide explicitly that overtime is a payroll-review flag (not an automatic loading) until GM-14 says otherwise. Severity: MEDIUM-HIGH.
@@ -180,6 +182,8 @@ GM-10 has almost no direct #184 material. The closest old questions, and their s
 - **Normal/edge:** overnight shifts split across days (end<=start → +1 day); shifts crossing into a public holiday are segmented per day. **Web/Expo:** same pay step fields (shared-core).
 
 ### GM-10-Q05 — Dates, times and timezones: what guards exist, and what time does the worker see?
+
+> **Also covers (22 Nov):** GM-23-23 (GM-23). Asked once, here.
 - **#184 ID:** none established. **Status: VALIDATED (absence proven).**
 - **ACTUAL TODAY:** **No past-date guard, no end>start guard, no recurring-end cap** — in shared validation, in the slot serializer, and in `ShiftSlot.clean`. Equal start/end times are refused client-side only. Overnight is a convention: end<=start means +1 day (`pricing.py`). Recurring expansion is by weekday with `recurring_end_date` and no horizon cap. Timezone: pricing uses the pharmacy's state/region (holiday calendar); **no single storage/display timezone rule was traced** — whether times are stored as UTC and displayed pharmacy-local, or stored naïve, was not established from the files read. DST handling: UNKNOWN.
 - **RECOMMENDED:** Add a past-date guard (refuse slots in the past) and a recurring horizon cap (e.g. 12 weeks), and state the timezone rule explicitly (pharmacy-local time everywhere, stored as UTC — or whatever the code actually does once confirmed). Severity: 🟠 high — a past-date shift is postable today and then silently invisible in browse (future-or-current filter), which looks like a lost post, not a refused one.
@@ -210,6 +214,8 @@ GM-10 has almost no direct #184 material. The closest old questions, and their s
 - **Normal/edge/retry/denied/payment/Web-Expo:** delete is a shared-core call on both clients; Next unknown.
 
 ### GM-10-Q08 — Must a pharmacy pass any verification check before posting, and does it differ by audience?
+
+> **Merged 22 Nov: asked once, as ON-Q11 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **#184 ID:** ON-Q11 / ON-06 (cf. GM-04-Q03). **Status: VALIDATED — STILL VALID.**
 - **ACTUAL TODAY:** `post_shift` checks **neither** `Pharmacy.verified` **nor** `abn_verified` — re-confirmed at head (same finding as Oct 2026). No audience-dependent gating: the same ungated post can go to own staff, chain, org or public. Do not decide here in isolation — decide jointly with GM-04-Q03 to avoid two conflicting answers.
 - **RECOMMENDED:** C — ABN-verified for chain/org, ABN + admin-verified before public; no gate for own staff. Rationale: chain/org workers already know the site, public workers don't — the risk is asymmetric. Severity: 🟠 high (trust).

@@ -18,27 +18,27 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Organization dashboard overview | Org admin views multi-site overview with key performance metrics (`frontend_web/src/pages/dashboard/organization/OrganizationOverviewPage.tsx:15`). | Org admin accesses mobile organization dashboard (`frontend_mobile/app/organization/dashboard.tsx:1`). | Yes | — |
+| Organization dashboard overview | Org admin views multi-site overview with key performance metrics (`frontend_web/src/pages/dashboard/organization/OrganizationOverviewPage.tsx:15`). | Org admin accesses mobile organization dashboard (`frontend_mobile/roles/organization/dashboard.tsx:69`). | Yes | — |
 | Pharmacy hierarchy & site list | Org dashboard lists pharmacies associated with the organization (`frontend_web/src/pages/dashboard/organization/OrganizationOverviewPage.tsx:53`). | Organization navigation exposes pharmacies tab and detail routes (`frontend_mobile/app/organization/_layout.tsx:222`). | Yes | — |
-| Invite staff to organization | Org admin invites staff members across multiple sites (`frontend_web/src/pages/dashboard/organization/InviteStaffPage.tsx:12`). | Org admin accesses invite staff screen (`frontend_mobile/app/organization/invite.tsx:1`). | Yes | — |
-| Post shift with organization scope | Shift creation allows scoping visibility to chain or organisation tiers (`frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:1120`). | Mobile post-shift wizard supports organisation visibility scoping (`frontend_mobile/app/admin/[pharmacyId]/post-shift.tsx:1`). | Yes | — |
-| Aggregated organization invoicing | Org admin manages organization-level invoices (`frontend_web/src/pages/OrganizationPricingPage.tsx:85`). | Org admin reviews aggregated invoices on mobile (`frontend_mobile/app/organization/invoice.tsx:5`). | Yes | — |
+| Invite staff to organization | Org admin invites staff members across multiple sites (`frontend_web/src/pages/dashboard/organization/InviteStaffPage.tsx:142`). | Org admin accesses invite staff screen (`frontend_mobile/roles/organization/invite.tsx:101`). | Yes | — |
+| Post shift with organization scope | Shift creation allows scoping visibility to chain or organisation tiers (`frontend_web/shared/postShift/PostShiftForm.tsx:236`). | Mobile post-shift wizard supports organisation visibility scoping (`frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx:48`). | Yes | — |
+| Aggregated organization invoicing | Web shows only an invoice summary panel on the organisation overview; its organisation menu has no Invoices list (`frontend_web/src/pages/dashboard/organization/OrganizationOverviewPage.tsx:179`). | Org admin reviews aggregated invoices on mobile (`frontend_mobile/app/organization/invoice.tsx:5`). | No | Corrected 22 Nov (orchestrator review): Expo has an organisation Invoices list, web does not. Parity question: GM-17-OD-12. |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
-| GM-04-Q01 | Web + Expo |
+| GM-04-Q01 | Web + Expo (asked in GM-02: ON-Q14) |
 | GM-04-Q02 | Web + Expo |
-| GM-04-Q03 | Web + Expo |
+| GM-04-Q03 | Web + Expo (asked in GM-02: ON-Q11) |
 | GM-04-Q04 | Web + Expo |
 | GM-04-Q05 | Web + Expo |
 | GM-04-Q06 | Web + Expo |
 | GM-04-Q07 | Web + Expo |
-| GM-04-Q08 | Web + Expo |
-| GM-04-Q09 | Web + Expo |
+| GM-04-Q08 | Web + Expo (also covers GM15-38, GM22-03) |
+| GM-04-Q09 | Web + Expo (also covers GM15-31) |
 | GM-04-Q10 | Web + Expo |
-| GM-04-Q11 | Web + Expo |
-| GM-04-Q12 | Web + Expo |
+| GM-04-Q11 | Web + Expo (also covers GM15-27) |
+| GM-04-Q12 | Web + Expo (asked in GM-18: GM-18-Q01) |
 
 ## Bases (exact SHAs verified 2026-11-21)
 
@@ -197,6 +197,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-04-Q01 — How do organisations (multi-site groups) join? [ex-#184 ON-Q14] — STILL VALID
 
+> **Merged 22 Nov: asked once, as ON-Q14 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** today only a platform superuser can create an organisation. There is no organisation sign-up, and the web create page is not routed. A new model, `PharmacyClaim`, suggests pharmacies may join an org by a claim that someone approves — but nobody has traced whether that claim flow is actually wired up.
 
 **ACTUAL TODAY — Web:** no working org signup; dead `OrganizationCreate.tsx` (unreferenced). **ACTUAL TODAY — Expo:** no org-create screen. **Backend:** `OrganizationViewSet.create` requires `IsAdminUser()`; update/delete by org-wide admins; list/retrieve any authenticated user (`backend/organizations/views.py`). `PharmacyClaim` (PENDING/ACCEPTED/REJECTED, one accepted claim per pharmacy) exists in `models.py`; its API wiring is UNKNOWN.
@@ -224,6 +226,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM-04-Q03 — What must a pharmacy pass before posting to outside workers (including its own chain/org)? [ex-#184 ON-Q11] — STILL VALID
+
+> **Merged 22 Nov: asked once, as ON-Q11 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** today a pharmacy needs to pass nothing before it posts — not an ABN check, not an admin check. The flags exist on the pharmacy, but the posting code never looks at them.
 
@@ -287,6 +291,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-04-Q08 — Who is told when a shift is cancelled, covered or replaced — are org admins told? [ex-#184 AG-Q09] — STILL VALID
 
+> **Also covers (22 Nov):** GM15-38 (GM-15), GM22-03 (GM-22). Asked once, here.
+
 **Plain English:** today each feature picks its own recipients; there is no agreed list of who must be told. One new fact: org-wide admins *are* told about leave requests. They are still not in any agreed list for cancellations, cover, or replacements.
 
 **ACTUAL TODAY — Web and Expo (same backend):** Existing notices are per feature. No recipient list is agreed (D07). Leave notices go to the owner + org-wide admins + pharmacy admins (`backend/workforce/leave_service.py`, read at head). Edits reach every past applicant (per #184 rec. — leaks activity, adds noise).
@@ -300,6 +306,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM-04-Q09 — When is a worker's source (favourite, chain, org, public) frozen, and which wins if several apply? [ex-#184 CX-Q31] — NOT RE-VALIDATED
+
+> **Also covers (22 Nov):** GM15-31 (GM-15). Asked once, here.
 
 **Plain English:** the rulebook says a worker's "source" — favourite, chain, org, or public — is frozen when they accept, and that it decides which cancellation policy and which incident treatment apply. But which source wins when a worker is several things at once was never decided, and the code that does the freezing was not read in this pass.
 
@@ -329,6 +337,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-04-Q11 — Do favourite, chain and organisation incidents count toward the platform ladder? [ex-#184 CX-Q27] — NOT RE-VALIDATED
 
+> **Also covers (22 Nov):** GM15-27 (GM-15). Asked once, here.
+
 **Plain English:** the rulebook says public-source incidents go on the platform ladder and chain/org incidents are handled inside the group — but nobody has checked whether the ladder itself is built, or what it counts.
 
 **ACTUAL TODAY (Oct 2026):** No source-specific platform incident ladder or badge rule is implemented (per #184 rec.). Ladder implementation at head NOT VERIFIED — GM-15 owns cancellation/incidents.
@@ -341,6 +351,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN — NOT RE-VALIDATED.
 
 ### GM-04-Q12 — Who can see the talent board, and does "organisation" count as an employer there? [ex-#184 TB-Q01] — STILL VALID (adopted from GM-01)
+
+> **Merged 22 Nov: asked once, as GM-18-Q01 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** today anyone who is signed in can see the talent board — including competing workers. Only people who are *not* signed in get the masked version. The anonymity promise is broken for every logged-in user (LA-Q12, senior-reviewed, still valid at the head).
 

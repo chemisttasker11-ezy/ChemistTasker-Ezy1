@@ -21,10 +21,10 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Direct email staff invite | Manager opens invite modal to send direct email invitation to staff (`frontend_web/src/pages/dashboard/sidebar/owner/InviteStaffModal.tsx:25`). | Manager sends invitation via staff management screen (`frontend_mobile/app/admin/pharmacies/[id]/staff.tsx:1`). | Yes | — |
+| Direct email staff invite | Manager opens invite modal to send direct email invitation to staff (`frontend_web/src/pages/dashboard/sidebar/owner/InviteStaffModal.tsx:25`). | Manager sends invitation via staff management screen (`frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:41`). | Yes | — |
 | Shareable invite links | Manager generates shareable join link with role presets (`frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:339`). | Mobile app surfaces admin invitations screen to generate join links (`frontend_mobile/app/admin-invitations.tsx:1`). | Yes | — |
 | Promote staff to pharmacy manager | Owner promotes member to pharmacy admin/manager in staff list (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx:165`). | Manager assigns permissions on staff member profile (`frontend_mobile/app/manager/roster/staff.tsx:1`). | Yes | — |
-| Remove member from pharmacy | Owner deletes pharmacy admin or staff membership (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx:42`). | Manager removes staff member from roster directory (`frontend_mobile/app/admin/pharmacies/[id]/staff.tsx:1`). | Yes | — |
+| Remove member from pharmacy | Owner deletes pharmacy admin or staff membership (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx:192`). | Manager removes staff member from roster directory (`frontend_mobile/app/admin/pharmacies/[id]/staff.tsx:1`). | Yes | — |
 | Locum & staff directory | Owner manages active pharmacy staff and locum memberships (`frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:144`). | Manager views pharmacy staff roster directory (`frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:502`). | Yes | — |
 
 ### Platforms per question
@@ -32,7 +32,7 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 |---|---|
 | Q-01 | Web + Expo |
 | Q-02 | Web + Expo |
-| Q-03 | Web + Expo |
+| Q-03 | Web + Expo (asked in GM-02: ON-Q05) |
 | Q-04 | Web + Expo |
 | Q-05 | Web + Expo |
 | Q-06 | Web + Expo |
@@ -42,17 +42,19 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Q-10 | Web + Expo |
 | Q-11 | Web + Expo |
 | Q-12 | Web + Expo |
-| Q-13 | Web + Expo |
-| Q-14 | Web + Expo |
-| Q-15 | Web + Expo |
-| Q-16 | Expo only |
-| Q-17 | Web + Expo |
+| Q-13 | Web + Expo (asked in GM-02: ON-Q14) |
+| Q-14 | Web + Expo (asked in GM-18: GM-18-Q08) |
+| Q-15 | Web + Expo (asked in GM-02: ON-Q08) |
+| Q-16 | Expo only (asked in GM-01: GM01-Q10) |
+| Q-17 | Web + Expo (asked in GM-18: GM-18-Q15) |
 | Q-18 | Web + Expo |
 | Q-19 | Web + Expo |
 | GM-05-OD-03 — Attendance approvals and the roster need both staff and roster rights | Web + Expo |
 | GM-05-OD-04 — Organisation tabs are hidden when Lina lacks the right | Web + Expo |
 | GM-05-OD-05 — A new invitee with no name shows as their email address | Web + Expo |
 | GM-05-OD-06 — When Ali is removed, what happens to his future roster shifts? | Web + Expo |
+| GM-05-W01 — Is a brand-new invitee an active team member before they set a password? | Web + Expo |
+| GM-05-W02 — Explorers can never hold an admin role: answered (D96) | Web + Expo |
 
 ## ⚠️ Verification limits (read this first)
 
@@ -191,6 +193,8 @@ Format per question: **ACTUAL TODAY** (with source links) → **RECOMMENDED** (k
 - **Actual today:** The shared guard skips non-public shifts. Engineering: see BL-01.
 
 ### Q-03 — [ON-Q05] What can Explorers (new to pharmacy) do with shifts?
+
+> **Merged 22 Nov: asked once, as ON-Q05 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Status:** OPEN — REVALIDATED changed, partially (backend confirmed; mobile screen not verified).
 - **Sources:** `backend/shifts/interest.py` `_require_public_shift_onboarding()`; `backend/users/models.py` `User.ROLE_CHOICES`; `frontend_mobile/app/explorer/shifts.tsx` — main-branch search only, NOT #249 head.
 - **ACTUAL TODAY:** An Explorer needs a *verified* Explorer onboarding profile to apply for a public shift (403 otherwise). But per #184, an Explorer can never *accept* an offer (the engagement lookup expects a staff profile) and has no payment tab — so today an Explorer can create interest a pharmacy cannot convert. On mobile the Explorer shifts tab was a blank placeholder in Oct; it may now have a real screen (main-branch search shows a re-export to `@/roles/explorer/shifts`) — **not verified at #249 head**.
@@ -274,6 +278,8 @@ Format per question: **ACTUAL TODAY** (with source links) → **RECOMMENDED** (k
 - **Payment-readiness status:** Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04. Engineering: see BL-03.
 
 ### Q-13 — [ON-Q14] How do organisations (multi-site groups) join? (revalidated)
+
+> **Merged 22 Nov: asked once, as ON-Q14 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Status:** OPEN — REVALIDATED still valid.
 - **Sources:** `backend/organizations/views.py` `OrganizationViewSet` (create = `IsAdminUser()`); `backend/organizations/models.py` `Organization`, `PharmacyClaim`.
 - **ACTUAL TODAY:** Only a platform superuser can create an organisation; there is no organisation sign-up and no ORGANIZATION signup role. Organisations then claim or invite pharmacies by email (`PharmacyClaim`, one accepted claim per pharmacy). The web create page exists but was not routed in Oct (not revalidated).
@@ -284,6 +290,8 @@ Format per question: **ACTUAL TODAY** (with source links) → **RECOMMENDED** (k
 - **Other / defer.** Edge: a pharmacy already claimed by one org being claimed by another — blocked by the unique-accepted-claim constraint; the *pending* claim queue behaviour was not inspected.
 
 ### Q-14 — [TB-Q08] What should the heart on a talent card do?
+
+> **Merged 22 Nov: asked once, as GM-18-Q08 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Status:** OPEN — STILL VALID, not revalidated.
 - **Sources:** #184 `questions.json` TB-Q08; `backend/memberships/models.py` (favourites are `Membership` rows — no separate favourites table ✔ R).
 - **ACTUAL TODAY (per #184):** The heart only likes/unlikes a post and changes its like count on both apps. It creates no favourites membership, and talent cards have no "Invite to favourites" action.
@@ -293,6 +301,8 @@ Format per question: **ACTUAL TODAY** (with source links) → **RECOMMENDED** (k
 - **Other / defer.** Edge: the worker is already a member — the card should not offer a duplicate invite (duplicate rules F11 apply). Notification: a favourite invite should notify the worker (the direct-invite notification exists for memberships — reuse it). Web/Expo: both apps must offer the same action.
 
 ### Q-15 — [ON-Q08] Who must pass an ID check?
+
+> **Merged 22 Nov: asked once, as ON-Q08 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Status:** OPEN — REVALIDATED still valid.
 - **Sources:** `backend/onboarding/verification/policy.py` `requirements()`; `backend/users/models.py` `mobile_check_skipped`.
 - **ACTUAL TODAY:** ID is only *required* for overseas Explorers who skip the mobile check (verified photo ID substitutes for mobile). A setting (`VERIFICATION_EXTRA_REQUIREMENTS`) can add ID to Verified for everyone, but it is off by default (per #184; setting value ✘ NI). ID reading (OCR) already works for everyone; otherwise ID is a badge, never blocking.
@@ -302,6 +312,8 @@ Format per question: **ACTUAL TODAY** (with source links) → **RECOMMENDED** (k
 - **Other / defer.** Edge: a worker whose ID fails OCR — manual review path needed (GM-26). Web/Expo: the ID upload flow must work identically on both.
 
 ### Q-16 — [ON-Q15 / LA-Q02 / LA-Q03] Must onboarding and account upgrades work fully on mobile at launch?
+
+> **Merged 22 Nov: asked once, as GM01-Q10 in GM-01.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Status:** NOT VERIFIED — do not put to the owner until re-checked at #249 head.
 - **Sources:** #184 ON-Q15, LA-Q02, LA-Q03 (Oct 2026 breakage); `backend/users/models.py` PHARMACY_MANAGER switch (new); frontend files — **NOT INSPECTED (429)**.
 - **ACTUAL TODAY (per #184, stale):** Profile tabs matched, but the mobile "add personal profile" flow for managers was broken: the pharmacist screen posted bank/rate fields the backend silently drops, and intern/technician/assistant/student went to a missing route (`/otherstaff/onboarding` had no file). Reachable mobile screens could dead-end; Explorer Shifts and some hubs were placeholders.
@@ -311,6 +323,8 @@ Format per question: **ACTUAL TODAY** (with source links) → **RECOMMENDED** (k
 - **Other / defer.** This question is parked as NOT VERIFIED, not dropped.
 
 ### Q-17 — [LA-Q15] Web and mobile disagree on talent-board booking permissions — fix before launch?
+
+> **Merged 22 Nov: asked once, as GM-18-Q15 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Status:** NOT VERIFIED — do not put to the owner until re-checked at #249 head.
 - **Sources:** #184 LA-Q15; `backend/shifts/offers.py`, `backend/shifts/assignment.py` — **NOT INSPECTED**; frontend Talent Board files — **NOT INSPECTED**.
 - **ACTUAL TODAY (per #184, stale):** Mobile allowed any non-worker role to request bookings; web used a narrower allow-list. The backend must be the authority.

@@ -28,51 +28,51 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Platform admin access | Accessible only via backend `/admin` Django interface (`backend/core/urls.py:25`). Vite has no platform admin console (`frontend_web/src/main.tsx:87`). | Mobile app has no platform admin console; `/admin` is pharmacy manager (`frontend_mobile/app/admin/index.tsx:25`). | Yes | Intended: Platform administration is restricted to secure Django admin. |
-| Talent board anonymous candidate unmasking | Authenticated talent board exposes author names and IDs for anonymous posts (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:210`). | Authenticated mobile talent board displays same author identity pre-consent (`frontend_mobile/roles/shared/talent-board/index.tsx:340`). | Yes | Verified 21 Nov: confirmed, same as BL-08. |
-| Anonymous pharmacy public shift posting | Redacts pharmacy name and street address on public card (`frontend_web/src/pages/PublicJobBoardPage.tsx:110`). | Redacts pharmacy contact info on public shift card (`frontend_mobile/roles/shared/shifts/AnonymousShiftBoardScreen.tsx:85`). | Yes | |
+| Platform admin access | Accessible only via backend `/admin` Django interface . Vite has no platform admin console (`backend/core/urls.py:40`, `frontend_web/src/main.tsx:87`). | Mobile app has no platform admin console; `/admin` is pharmacy manager (`frontend_mobile/app/admin`). | Yes | Intended: Platform administration is restricted to secure Django admin. |
+| Talent board anonymous candidate unmasking | Authenticated talent board exposes author names and IDs for anonymous posts (`backend/talent/serializers/explorer.py:131`, `backend/talent/serializers/explorer.py:250`). | Authenticated mobile talent board displays same author identity pre-consent (`backend/talent/serializers/explorer.py:131`). | Yes | Server-side leak (BL-08): both clients show what these serializers return. |
+| Anonymous pharmacy public shift posting | Redacts pharmacy name and street address on public card (`frontend_web/src/pages/PublicJobBoardPage.tsx:142`). | Redacts pharmacy contact info on public shift card (`frontend_mobile/roles/shared/shifts/AnonymousShiftBoardScreen.tsx:45`). | Yes | |
 | User account deletion & data anonymization | User triggers deletion in account settings with soft-delete anonymization (`frontend_web/src/components/AccountDeletionSection.tsx:49`). | User triggers account deletion in mobile profile settings (`frontend_mobile/roles/pharmacist/profile.tsx:206`). | Yes | |
-| AHPRA suspension booking revocation | Backend revokes bookings; web displays cancellation banner (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:215`). | Backend revokes bookings; mobile displays shift status change (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:230`). | Yes | |
-| Kiosk pairing code security in notifications | Pairing code generated and displayed on kiosk page (`frontend_web/src/pages/attendance/KioskPage.tsx:385`). | Mobile receives pairing code in push notification payload (`frontend_mobile/features/notifications/NotificationsScreen.tsx:90`). | Yes | Verified 21 Nov: confirmed. The code is put in the notification title/body and payload (`backend/attendance/credentials.py:347-356`), and `notify_users` also attempts push, so it can show on a lock screen. Backlog BL-25. |
+| AHPRA suspension booking revocation | Backend revokes bookings; web displays cancellation banner (`backend/shifts/cancellation.py:74`). | Backend revokes bookings; mobile displays shift status change (`backend/shifts/cancellation.py:74`). | Yes | |
+| Kiosk pairing code security in notifications | Pairing code generated and displayed on kiosk page (`frontend_web/src/pages/attendance/KioskPage.tsx:385`). | Mobile receives pairing code in push notification payload (`backend/attendance/credentials.py:347-356`). | Yes | Verified 21 Nov: confirmed. The code is put in the notification title/body and payload (`backend/attendance/credentials.py:347-356`), and `notify_users` also attempts push, so it can show on a lock screen. Backlog BL-25. |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
-| GM26-Q01 — Who can see the talent board, and are anonymous candidates really anonymous? | Web + Expo |
-| GM26-Q02 — When is an anonymous candidate's identity revealed? | Web + Expo |
-| GM26-Q03 — What stays hidden before identity reveal? | Web + Expo |
-| GM26-Q04 — Fix before launch? Anonymous talent posts expose full names to any signed-in account. | Web + Expo |
-| GM26-Q05 — Fix before launch? Hidden, stale and lapsed-credential posts can still be read. | Web + Expo |
-| GM26-Q06 — How long should verification evidence be kept? | Web + Expo |
-| GM26-Q07 — Who must pass an ID check? | Web + Expo |
+| GM26-Q01 — Who can see the talent board, and are anonymous candidates really anonymous? | Web + Expo (asked in GM-18: GM-18-Q01) |
+| GM26-Q02 — When is an anonymous candidate's identity revealed? | Web + Expo (asked in GM-18: GM-18-Q02) |
+| GM26-Q03 — What stays hidden before identity reveal? | Web + Expo (asked in GM-18: GM-18-Q03) |
+| GM26-Q04 — Fix before launch? Anonymous talent posts expose full names to any signed-in account. | Web + Expo (asked in GM-18: GM-18-Q13) |
+| GM26-Q05 — Fix before launch? Hidden, stale and lapsed-credential posts can still be read. | Web + Expo (asked in GM-18: GM-18-Q14) |
+| GM26-Q06 — How long should verification evidence be kept? | Web + Expo (asked in GM-02: ON-R01) |
+| GM26-Q07 — Who must pass an ID check? | Web + Expo (asked in GM-02: ON-Q08) |
 | GM26-Q08 — Browse access before full verification | Web + Expo |
 | GM26-Q09 — Verification on outside bookings | Web + Expo |
-| GM26-Q10 — How should AHPRA be re-checked after sign-up? | Web + Expo |
-| GM26-Q11 — Which AHPRA lookup should run at launch? | Web + Expo |
-| GM26-Q12 — If current registration cannot be confirmed, what happens to future bookings? | Web + Expo |
-| GM26-Q13 — When the register shows Suspended or Cancelled, what happens? | Web + Expo |
-| GM26-Q14 — Professional indemnity insurance: who must hold it, and who checks? | Web + Expo |
-| GM26-Q15 — On an anonymous public post, what is hidden? | Web + Expo |
-| GM26-Q16 — When does an anonymous pharmacy's name reach the worker? | Web + Expo |
-| GM26-Q17 — Who can see a worker's availability? | Web + Expo |
-| GM26-Q18 — Should urgent-shift alerts need a separate opt-in? | Web + Expo |
-| GM26-Q19 — Can a pharmacy block a worker? | Web + Expo |
-| GM26-Q20 — What is the rule for hiring a worker directly, off the platform? | Web + Expo |
-| GM26-Q21 — Who approves refunds and credits? | Web + Expo |
-| GM26-Q22 — Who reviews disputes and appeals? | Web + Expo |
-| GM26-Q23 — How long to appeal, and how fast must support answer? | Web + Expo |
-| GM26-Q24 — Who can see each part of a dispute? | Web + Expo |
-| GM26-Q25 — What process applies before permanent suspension? | Web + Expo |
-| GM26-Q26 — Which events count as an incident? / How far back does the ladder count? | Web + Expo |
-| GM26-Q27 — Who can rate, and when? | Web + Expo |
-| GM26-Q28 — Do cancelled, expired and no-show shifts stay in both sides' history? | Web + Expo |
-| GM26-Q29 — Fix before launch? Web and mobile disagree on Talent Board booking permissions. | Web + Expo |
-| GM26-Q30 — Fix before launch? The talent board downloads every post and filters in the app. | Web + Expo |
-| GM26-Q31 — May cancellation charges launch before Australian legal review? | Web + Expo |
-| GM26-Q32 — Fix before launch? Accepted terms don't include the cancellation table or terms version. | Web + Expo |
-| GM26-Q33 — Fix before launch? Booking fees lack explicit GST and tax-invoice treatment. | Web + Expo |
-| GM26-Q34 — Fix before launch? Subscribers are charged full price, and Stripe price IDs are hard-coded. | Web + Expo |
-| GM26-Q35 — Fix before launch? Booking never refreshes AHPRA registration from the public register. | Web + Expo |
+| GM26-Q10 — How should AHPRA be re-checked after sign-up? | Web + Expo (asked in GM-02: ON-Q06) |
+| GM26-Q11 — Which AHPRA lookup should run at launch? | Web + Expo (asked in GM-02: ON-P03) |
+| GM26-Q12 — If current registration cannot be confirmed, what happens to future bookings? | Web + Expo (asked in GM-02: ON-Q07) |
+| GM26-Q13 — When the register shows Suspended or Cancelled, what happens? | Web + Expo (asked in GM-02: ON-P02) |
+| GM26-Q14 — Professional indemnity insurance: who must hold it, and who checks? | Web + Expo (asked in GM-02: ON-Q09) |
+| GM26-Q15 — On an anonymous public post, what is hidden? | Web + Expo (asked in GM-11: GM-11-Q07) |
+| GM26-Q16 — When does an anonymous pharmacy's name reach the worker? | Web + Expo (asked in GM-11: GM-11-Q08) |
+| GM26-Q17 — Who can see a worker's availability? | Web + Expo (asked in GM-19: GM-19-Q04) |
+| GM26-Q18 — Should urgent-shift alerts need a separate opt-in? | Web + Expo (asked in GM-19: GM-19-Q08) |
+| GM26-Q19 — Can a pharmacy block a worker? | Web + Expo (asked in GM-15: GM15-43) |
+| GM26-Q20 — What is the rule for hiring a worker directly, off the platform? | Web + Expo (asked in GM-18: GM-18-Q10) |
+| GM26-Q21 — Who approves refunds and credits? | Web + Expo (asked in GM-17: GM17-Q03) |
+| GM26-Q22 — Who reviews disputes and appeals? | Web + Expo (asked in GM-15: GM15-23) |
+| GM26-Q23 — How long to appeal, and how fast must support answer? | Web + Expo (asked in GM-15: GM15-24) |
+| GM26-Q24 — Who can see each part of a dispute? | Web + Expo (asked in GM-15: GM15-25) |
+| GM26-Q25 — What process applies before permanent suspension? | Web + Expo (asked in GM-15: GM15-30) |
+| GM26-Q26 — Which events count as an incident? / How far back does the ladder count? | Web + Expo (asked in GM-15: GM15-26) |
+| GM26-Q27 — Who can rate, and when? | Web + Expo (asked in GM-15: GM15-35) |
+| GM26-Q28 — Do cancelled, expired and no-show shifts stay in both sides' history? | Web + Expo (asked in GM-15: GM15-37) |
+| GM26-Q29 — Fix before launch? Web and mobile disagree on Talent Board booking permissions. | Web + Expo (asked in GM-18: GM-18-Q15) |
+| GM26-Q30 — Fix before launch? The talent board downloads every post and filters in the app. | Web + Expo (asked in GM-18: GM-18-Q16) |
+| GM26-Q31 — May cancellation charges launch before Australian legal review? | Web + Expo (asked in GM-16: GM16-Q14) |
+| GM26-Q32 — Fix before launch? Accepted terms don't include the cancellation table or terms version. | Web + Expo (asked in GM-15: GM15-47) |
+| GM26-Q33 — Fix before launch? Booking fees lack explicit GST and tax-invoice treatment. | Web + Expo (asked in GM-16: GM16-Q15) |
+| GM26-Q34 — Fix before launch? Subscribers are charged full price, and Stripe price IDs are hard-coded. | Web + Expo (asked in GM-16: GM16-Q02) |
+| GM26-Q35 — Fix before launch? Booking never refreshes AHPRA registration from the public register. | Web + Expo (asked in GM-18: GM-18-Q11) |
 | GM26-Q36 — What is the launch cut for GM-26 — which release blockers must close before the first real user? | Web + Expo |
 | GM26-Q37 — Who is a platform admin, how do they get the power, and what can they do that nobody else can? | Web + Expo |
 | GM26-Q38 — What is the audit trail for admin actions, and who can read it? | Web + Expo |
@@ -84,8 +84,8 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM26-Q44 — Kiosk codes and worker PIN OTPs in notifications | Web + Expo |
 | GM26-Q45 — Region Admin cross-tenant shift actions; native pairing-code downgrade; pricing-preview leakage | Web + Expo |
 | GM26-Q46 — Staging, migration rehearsal and rollback: what is the deploy path to production? | Web + Expo |
-| GM26-Q47 — Fix before launch? Mobile 'add personal profile' drops pharmacist data / sends other staff to not-found. | Web + Expo |
-| GM26-Q48 — Must every onboarding step work on mobile at launch? | Web + Expo |
+| GM26-Q47 — Fix before launch? Mobile 'add personal profile' drops pharmacist data / sends other staff to not-found. | Web + Expo (asked in GM-25: GM25-C08) |
+| GM26-Q48 — Must every onboarding step work on mobile at launch? | Web + Expo (asked in GM-01: GM01-Q10) |
 | GM-26-W01: Production reCAPTCHA keys: owner action, not a choice | Web only |
 | GM-26-W02: Dependabot pull requests | Web + Expo |
 | GM-26-W03: Keep the node-forge 1.4.1 RSA patch? | Web + Expo |
@@ -315,6 +315,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 ### GM-26 old questions (from #184)
 
 #### GM26-Q01 — [P0 · decision] Who can see the talent board, and are anonymous candidates really anonymous?
+
+> **Merged 22 Nov: asked once, as GM-18-Q01 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: STILL VALID — A18 (adopted GM-18, senior PASS, verified at head `97c4543e…`).**
   `backend/talent/serializers/explorer.py`: `ExplorerPostReadSerializer` exposes `explorer_name` (via
   `get_full_name()`, first name only if `under_18`), `author_user_id`, `explorer_user_id`,
@@ -330,6 +332,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** STILL VALID (adopted GM-18). **Source:** `questions.json` TB-Q01; PR #184 AUDIT gap TB-02; GM-18 senior review §1.
 
 #### GM26-Q02 — [P0 · decision] When is an anonymous candidate's identity revealed?
+
+> **Merged 22 Nov: asked once, as GM-18-Q02 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: STILL VALID — A18 (same leak as Q01; adopted GM-18).**
 - **ACTUAL TODAY:** For anonymous posts, public reads redact identity, but any signed-in user receives names and user IDs immediately. Neither app waits for chat, a booking request or offer acceptance. (TB-Q02, gap TB-02)
 - **RECOMMENDED:** A — When they accept a booking request (worker chooses to engage).
@@ -340,6 +344,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** STILL VALID (adopted GM-18). **Source:** TB-Q02.
 
 #### GM26-Q03 — [P0 · decision] What stays hidden before identity reveal?
+
+> **Merged 22 Nov: asked once, as GM-18-Q03 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: STILL VALID — A18 (adopted GM-18; free-text scrubbing absent).**
 - **ACTUAL TODAY:** Structured cards omit contact details, street addresses and documents, but authenticated APIs return adults' full names; under-18s get first names. Free-text pitches are not scrubbed. (TB-Q03)
 - **RECOMMENDED:** A — Hide identity and contact details: surname, contacts, address, documents — until the reveal point. Scan free text so the rule cannot be bypassed.
@@ -349,6 +355,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** STILL VALID (adopted GM-18). **Source:** TB-Q03.
 
 #### GM26-Q04 — [P0 · code gap, timing decision] Fix before launch? Anonymous talent posts expose full names to any signed-in account.
+
+> **Merged 22 Nov: asked once, as GM-18-Q13 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: STILL VALID — A18 (adopted GM-18).**
 - **ACTUAL TODAY:** Authenticated talent feed, list and detail serializers return anonymous authors' names and user IDs. Only public reads mask them; both apps consume the leaking authenticated API. (LA-Q12, gap TB-01)
 - **RECOMMENDED:** A — Before launch, with server-side masking and a consent-based reveal.
@@ -357,6 +365,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** STILL VALID (adopted GM-18). **Source:** LA-Q12.
 
 #### GM26-Q05 — [P1 · code gap, timing decision] Fix before launch? Hidden, stale and lapsed-credential posts can still be read.
+
+> **Merged 22 Nov: asked once, as GM-18-Q14 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: CHANGED (partial) — A18 (adopted GM-18).** At the #184 head there was NO `get_queryset` override — `_visible_posts` ran only inside `feed` / `public_feed` / `by_profile`, so default `list`/`retrieve` really did bypass the filter (old claim true in Oct 2026). On `main` and PR #249 head, `get_queryset` filters every non-write action through `_visible_posts` → `post.is_talent_board_visible(today)` (`backend/talent/models.py`: `hidden_at` → invisible; past latest-availability date → invisible). **Hidden/stale part is now fixed.** The lapsed-credential part is still open: `is_talent_board_visible` checks nothing about Verified/AHPRA status, so a post whose author lost Verified / lapsed AHPRA stays readable.
 - **ACTUAL TODAY (Oct 2026, superseded in part):** Feed visibility hides moderated or past-dated posts, but list/detail reads bypass it. Revoked Verified or lapsed AHPRA doesn't hide posts. Cards show register status, and paused workers' posts stay listed. (LA-Q13, gap TB-03)
 - **RECOMMENDED:** A — Before launch. Enforce visibility and current eligibility consistently. (Now: the remaining half is the lapsed-credential re-check.)
@@ -365,6 +375,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** CHANGED (partial — adopted GM-18). **Source:** LA-Q13.
 
 #### GM26-Q06 — [P1 · decision] How long should verification evidence be kept? (retention / APP 11)
+
+> **Merged 22 Nov: asked once, as ON-R01 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: STILL VALID — V (re-validated at head).** Privacy policy §6 Data Retention (Vite `PrivacyPolicyPage.tsx`, read at head): retain "for as long as necessary to provide the services … unless a longer retention period is required by law or for legitimate business needs" — **no per-class schedule, no deletion dates**. No dedicated retention/deletion-schedule file exists. Deletion-page text adds only that verification documents are removed within 7 days of account deletion. The Oct 2026 claim stands.
 - **ACTUAL TODAY (Oct 2026):** Verification files are stored, but no evidence-specific retention or deletion schedule is defined. Each AHPRA lookup also keeps a register snapshot with no deletion date. (ON-R01, gap ON-12)
 - **RECOMMENDED:** A — Delete after verification; keep result, source and audit dates only. APP 11 requires destruction or de-identification when information is no longer needed.
@@ -374,6 +386,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** STILL VALID (re-validated). **Source:** ON-R01.
 
 #### GM26-Q07 — [P1 · decision] Who must pass an ID check?
+
+> **Merged 22 Nov: asked once, as ON-Q08 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** ID is only required for overseas Explorers who skip the mobile check. A setting can add ID to Verified for everyone, but it is off by default; OCR works for all. (ON-Q08)
 - **RECOMMENDED:** A — Every worker before first booking (one check, reused for every pharmacy).
 - **ALTERNATIVE A (Keep current logic):** ID only for overseas Explorers. **ALTERNATIVE C:** Pharmacists and ABN workers only.
@@ -389,6 +403,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Actual today:** The shared verification guard skips non-public shifts (`pr257:backend/onboarding/verification/state.py:174`).
 
 #### GM26-Q10 — [P1 · decision] How should AHPRA be re-checked after sign-up?
+
+> **Merged 22 Nov: asked once, as ON-Q06 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: CHANGED (partial) — A18 (adopted GM-18; see Q35).** The new `verification/state.py` state machine exists; default source is still `scrapingbee` (confirmed by me at head, `backend/core/settings.py:642`); no synchronous fresh lookup runs before booking; `queue_public_recheck` returns early unless source is `desktop`.
 - **ACTUAL TODAY (Oct 2026):** One lookup at sign-up stores status, type and expiry. Workers can press Re-check hourly; a public apply/accept after the stored expiry queues a recheck afterwards. No scheduled scan. (ON-Q06, gap ON-02)
 - **RECOMMENDED:** A — Daily scan plus acceptance: rescan workers with upcoming bookings daily; check again at acceptance.
@@ -396,6 +412,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** CHANGED (partial — adopted GM-18). **Source:** ON-Q06. See also Q11/Q35.
 
 #### GM26-Q11 — [P1 · decision] Which AHPRA lookup should run at launch? (ScrapingBee vs desktop verifier)
+
+> **Merged 22 Nov: asked once, as ON-P03 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: CHANGED (partial) — A18 (adopted GM-18; see Q35).** The desktop-verifier state machine now exists, but the default source is still `scrapingbee` (`settings.py:643–644` at head, confirmed by GM-18 and by me at `:642`).
 - **ACTUAL TODAY (Oct 2026):** ScrapingBee looks up the register once at sign-up. Setting the desktop source enables Re-check, suspension and not-found handling; checks wait for the office PC, and admins are emailed after 15 minutes. (ON-P03)
 - **RECOMMENDED:** A — Desktop verifier (only the desktop source feeds PR #183's suspension, not-found and Re-check handling; under ScrapingBee those gates stay inert). Run it on staging first.
@@ -404,6 +422,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** CHANGED (partial — adopted GM-18). **Source:** ON-P03.
 
 #### GM26-Q12 — [P1 · decision] If current registration cannot be confirmed, what happens to future bookings?
+
+> **Merged 22 Nov: asked once, as ON-Q07 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** Not-found, unreadable or rejected AHPRA results revoke Verified and block new public applications; existing bookings stay and the pharmacy is not told. Suspended/non-General results cancel future public bookings. (ON-Q07, gap ON-02)
 - **RECOMMENDED:** C — Block new; review booked: support verifies status and helps both sides.
 - **ALTERNATIVE A (Keep current logic):** Block new public applications; keep bookings; warn nobody. **B:** Cancel automatically (fast, risks cancelling during renewal). **A:** Keep bookings, warn both.
@@ -411,6 +431,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** NOT RE-VALIDATED. (The `verification/state.py` state machine exists per GM-18, but the Q12-specific outcomes — keep bookings, warn nobody — were not re-checked.) **Source:** ON-Q07.
 
 #### GM26-Q13 — [P1 · decision] When the register shows Suspended or Cancelled, what happens?
+
+> **Merged 22 Nov: asked once, as ON-P02 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** Future public bookings are cancelled and pharmacies told; non-member workers are paused account-wide; admins are emailed. Owners become Pharmacy Managers. A non-General result cancels bookings without pausing. No fee or refund rule runs. (ON-P02)
 - **RECOMMENDED:** KEEP — Working while suspended is unlawful; fast cancellation gives pharmacies time to refill. Settle any paid booking fee under CX-Q20.
 - **ALTERNATIVE A (Keep current logic):** as above. **B:** Admin confirms, then cancel (block new bookings at once; cancel only after a person checks).
@@ -418,6 +440,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** NOT RE-VALIDATED. **Source:** ON-P02.
 
 #### GM26-Q14 — [P1 · decision] Which workers must prove professional indemnity cover?
+
+> **Merged 22 Nov: asked once, as ON-Q09 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** No insurance field, evidence, expiry or booking gate exists. (ON-Q09, gap ON-03)
 - **RECOMMENDED:** B — All practising pharmacists (general, limited or provisional; own or third-party cover).
 - **ALTERNATIVE A (Keep current logic):** Collect no insurance evidence. **A:** ABN pharmacists only. **C:** Badge only (show cover, never gate bookings).
@@ -425,6 +449,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** NOT RE-VALIDATED. **Source:** ON-Q09.
 
 #### GM26-Q15 — [P1 · decision] On an anonymous public post, what is hidden? (pharmacy anonymity)
+
+> **Merged 22 Nov: asked once, as GM-11-Q07 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** Anonymous posts show 'Anonymous Pharmacy', suburb, state, postcode, script volume and the rate. Name, street, software and services are hidden from everyone except the pharmacy's managers. (PO-Q11)
 - **RECOMMENDED:** KEEP — hides what matters and keeps the suburb workers need to judge travel.
 - **ALTERNATIVE A (Keep current logic):** as above. **B:** Also hide suburb (region only).
@@ -432,6 +458,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** NOT RE-VALIDATED. **Source:** PO-Q11.
 
 #### GM26-Q16 — [P1 · decision] When does an anonymous pharmacy's name reach the worker?
+
+> **Merged 22 Nov: asked once, as GM-11-Q08 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** The worker never sees the name before accepting: the terms dialog omits it and accept notices say 'Shift in <suburb>'. Cards stay anonymous after booking; the 12-hour reminder email names it. (PO-Q12)
 - **RECOMMENDED:** A — In the agreement preview, before the worker accepts.
 - **ALTERNATIVE A (Keep current logic):** Worker accepts blind; name surfaces only in the reminder email. **B:** After reservation. **C:** After payment confirms.
@@ -439,18 +467,24 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** NOT RE-VALIDATED. **Source:** PO-Q12.
 
 #### GM26-Q17 — [P1 · decision] Who can see a worker's availability?
+
+> **Merged 22 Nov: asked once, as GM-19-Q04 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** Only workers can read or edit their raw availability through the API; it drives alerts, recommendations and roster warnings. Pharmacies see copied talent-post dates rather than a live calendar on either app. (AV-Q04, gap AV-06)
 - **RECOMMENDED:** B — Opt-in trusted pharmacies: worker chooses staff and favourite visibility.
 - **ALTERNATIVE A (Keep current logic):** Raw calendar private; posts hold copied dates. **C:** Opt-in talent card (broader employer visibility).
 - **Status:** NOT RE-VALIDATED. **Source:** AV-Q04. (GM-19 owns availability mechanics.)
 
 #### GM26-Q18 — [P2 · decision] Should urgent-shift alerts need a separate opt-in?
+
+> **Merged 22 Nov: asked once, as GM-19-Q08 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** Both apps show one matching-public-shift notification switch saved on availability rows. No separate urgent-shift consent. (AV-Q08)
 - **RECOMMENDED:** KEEP — one matching-shift consent at launch; label urgent messages clearly.
 - **ALTERNATIVE A (Keep current logic):** same consent for urgent and ordinary. **B:** Yes, separate urgent opt-in (shifts starting within 24h).
 - **Status:** NOT RE-VALIDATED. **Source:** AV-Q08. (GM-22 owns notifications.)
 
 #### GM26-Q19 — [P1 · decision] Can a pharmacy block a worker?
+
+> **Merged 22 Nov: asked once, as GM15-43 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** Not built yet. (TB-Q09)
 - **RECOMMENDED:** A — Yes, private block: worker stops seeing that pharmacy's shifts; never shown publicly.
 - **ALTERNATIVE A:** Yes, private block. **B:** No blocking (pharmacy declines each time).
@@ -458,6 +492,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** NOT RE-VALIDATED. **Source:** TB-Q09.
 
 #### GM26-Q20 — [P1 · decision] What is the rule for hiring a worker directly, off the platform?
+
+> **Merged 22 Nov: asked once, as GM-18-Q10 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** Not built yet. (TB-Q10)
 - **RECOMMENDED:** A — Permanent hire free; booked shifts stay (shifts found here are booked here).
 - **ALTERNATIVE A:** as above. **B:** Conversion fee (like Upwork/Sidekicker). **C:** No rule.
@@ -465,6 +501,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** NOT RE-VALIDATED. **Source:** TB-Q10.
 
 #### GM26-Q21 — [P1 · decision] Who approves refunds and credits? (platform admin finance role)
+
+> **Merged 22 Nov: asked once, as GM17-Q03 in GM-17.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: adopted GM-17 — no refunds in-app, no credit notes, no void action; no approver exists because no workflow exists.**
 - **ACTUAL TODAY (Oct 2026):** Not built yet. Payments can be flagged for reconciliation, but there is no cancellation refund/credit approval workflow. (CX-Q21)
 - **RECOMMENDED:** A — Platform finance/support admin, every case, with reason logged.
@@ -473,18 +511,24 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** Adopted GM-17 (two-money-systems picture). **Source:** CX-Q21. See also PR #200 B58/B59 (invoice mark-paid / negative-balance candidates).
 
 #### GM26-Q22 — [P1 · decision] Who reviews disputes and appeals?
+
+> **Merged 22 Nov: asked once, as GM15-23 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** Not built yet. No dispute or appeal workflow exists. Only the platform may sanction (P04). (CX-Q23)
 - **RECOMMENDED:** A — Support reviews; a second person appeals (appeal never goes to the first reviewer).
 - **ALTERNATIVE A:** as above. **B:** One reviewer does both (simpler, less fair).
 - **Status:** NOT RE-VALIDATED. **Source:** CX-Q23.
 
 #### GM26-Q23 — [P2 · decision] How long to appeal, and how fast must support answer?
+
+> **Merged 22 Nov: asked once, as GM15-24 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** No timings exist. (CX-Q24)
 - **RECOMMENDED:** A — 14 days to appeal; answer in 5 (first review within 2 business days).
 - **ALTERNATIVE A:** as above. **B:** 30 days to appeal; answer in 10.
 - **Status:** NOT RE-VALIDATED. **Source:** CX-Q24.
 
 #### GM26-Q24 — [P1 · decision] Who can see each part of a dispute?
+
+> **Merged 22 Nov: asked once, as GM15-25 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** No dispute case, evidence classes or access policy exists. (CX-Q25)
 - **RECOMMENDED:** A — Summary to both sides; support alone sees sensitive evidence.
 - **ALTERNATIVE A:** as above. **B:** Everything to both sides (exposes medical and identity evidence). **C:** Platform only (parties cannot answer the case).
@@ -492,6 +536,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** NOT RE-VALIDATED. **Source:** CX-Q25.
 
 #### GM26-Q25 — [P1 · decision] What process applies before permanent suspension?
+
+> **Merged 22 Nov: asked once, as GM15-30 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** Not built yet. P10 requires human review, notice, appeal and legal review, but no workflow exists. (CX-Q30)
 - **RECOMMENDED:** A — Code-compliant process: reasons, notice, review, response and appeal (Digital Labour Platform Deactivation Code, where the worker is protected).
 - **ALTERNATIVE A:** as above. **B:** Two reviewers plus legal. **C:** One platform admin (fast, one-sided, high risk).
@@ -499,6 +545,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** NOT RE-VALIDATED. **Source:** CX-Q30.
 
 #### GM26-Q26 — [P2 · decision] Which events count as an incident? / How far back does the ladder count? / When does the reliability badge disappear?
+
+> **Merged 22 Nov: asked once, as GM15-26 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** Not built yet — no reviewed incident ledger, no qualifying-cancellation cutoff, no lookback/reset, no badge-clear rule. (CX-Q26, CX-Q28, CX-Q29)
 - **RECOMMENDED:** Incidents = no-shows and cancels inside 72h (CX-Q26 A); rolling 12-month lookback (CX-Q28 A); badge clears when fewer than three active incidents remain (CX-Q29 B).
 - **ALTERNATIVES:** 24h cutoff (more forgiving) / any cancel after confirmation (strictest); 6-month or lifetime lookback; badge clears after three clear months, or permanent.
@@ -506,6 +554,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** NOT RE-VALIDATED. **Source:** CX-Q26/Q28/Q29.
 
 #### GM26-Q27 — [P1 · decision] Who can rate, and when? / Should internal roster ratings appear on the public talent board?
+
+> **Merged 22 Nov: asked once, as GM15-35 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: CHANGED (partial) — A18 (adopted GM-18).** Eligibility now requires a past-dated assignment; internal-roster ratings still feed the public talent-board average.
 - **ACTUAL TODAY (Oct 2026, superseded in part):** Owners, organisation admins and pharmacy admins can rate assigned workers; workers can rate pharmacies. The write API accepts any assignment, including future, internal or unworked ones. Talent cards average all owner-to-worker ratings, including internal roster assignments; web and mobile show the same aggregate. (CX-Q34, CX-Q35, gap SH-10)
 - **RECOMMENDED:** A — After approved timesheet only (no rating when no work happened); keep internal ratings private, separate from marketplace reviews.
@@ -514,6 +564,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** CHANGED (partial — adopted GM-18). **Source:** CX-Q34/Q35.
 
 #### GM26-Q28 — [P2 · decision] Do cancelled, expired and no-show shifts stay in both sides' history?
+
+> **Merged 22 Nov: asked once, as GM15-37 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: adopted GM-17 — history is assignment-based; cancelled/no-show states do not exist as such; expired unpaid offers without assignments do not appear.**
 - **ACTUAL TODAY (Oct 2026):** Both sides have assignment-based history filtered by scheduled time. Cancelled and no-show states do not exist; expired unpaid offers without assignments do not appear. (CX-Q36)
 - **RECOMMENDED:** A — Yes, both see them with status; reason visible only to the two parties.
@@ -522,6 +574,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** Adopted GM-17. **Source:** CX-Q36.
 
 #### GM26-Q29 — [P1 · code gap, timing decision] Fix before launch? Web and mobile disagree on Talent Board booking permissions.
+
+> **Merged 22 Nov: asked once, as GM-18-Q15 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: CHANGED (persists in a new shape) — A18 (adopted GM-18, senior-verified at head).** Mobile permits every non-worker role to request bookings; web limits roles and admin status. The shared backend must enforce the final policy regardless of client gates. Web `TalentBoard/index.tsx:313` = fixed 9-role allow-list + `isAdminUser`; mobile `talent-board/index.tsx:313` = any role except EXPLORER / PHARMACIST / OTHER_STAFF, with `canRequestBookingOverride` fallback.
 - **ACTUAL TODAY (Oct 2026):** Mobile permits every non-worker role to request bookings; web limits roles and admin status. The shared backend must enforce the final policy regardless of client gates. (LA-Q15, gap TB-07)
 - **RECOMMENDED:** A — Before launch. Set one backend hiring-role policy and mirror it in both clients.
@@ -530,6 +584,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** CHANGED (new shape — adopted GM-18). **Source:** LA-Q15.
 
 #### GM26-Q30 — [P1 · code gap, timing decision] Fix before launch? The talent board downloads every post and filters in the app.
+
+> **Merged 22 Nov: asked once, as GM-18-Q16 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: STILL VALID — A18 (adopted GM-18).**
 - **ACTUAL TODAY (Oct 2026):** Both apps fetch every feed page through shared-core, then filter locally; the backend checks post visibility in a Python loop before pagination. No server-side pharmacy-distance or rate filters. (LA-Q14, gap TB-04)
 - **RECOMMENDED:** B — Soon after launch is reasonable only for a deliberately small, monitored board; set a measured migration trigger.
@@ -538,6 +594,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** STILL VALID (adopted GM-18). **Source:** LA-Q14.
 
 #### GM26-Q31 — [P0 · decision] May cancellation charges launch before Australian legal review?
+
+> **Merged 22 Nov: asked once, as GM16-Q14 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: STILL VALID — A18 (adopted GM-18).** Legacy penalty route still live (`backend/billing/urls.py:15` routes `charge-penalty/<int:shift_id>/`, GM-18 senior-verified at head). `docs/qa/RELEASE_DECISIONS_20261102.md` #8 (read at head): cancellation charging (`billing/shift_payments.py` `charge_penalty`) is "inherited behaviour: ambient timezone, every assignment on the shift, the submitted slot selection ignored, and no persisted obligation or idempotency key" — before enabling: real cancellation payments. Live fulfilment + penalty collection are closed by default through server-side capability guards.
 - **ACTUAL TODAY (Oct 2026):** The approved charge table is not implemented. A separate legacy 10% or 20% checkout remains callable, without evidence of Australian legal review. (LA-R02, gap SH-16)
 - **RECOMMENDED:** A — Legal review before launch: review every charge and remedy before enforcement.
@@ -546,6 +604,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** STILL VALID (adopted GM-18 + release decisions). **Source:** LA-R02.
 
 #### GM26-Q32 — [P1 · code gap, timing decision] Fix before launch? Accepted terms don't include the cancellation table or terms version.
+
+> **Merged 22 Nov: asked once, as GM15-47 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: STILL VALID — V (D2 open per mobile ledger at head).** `backend/shifts/engagement.py:739` checks consent booleans but does not validate a reviewed snapshot identifier; `backend/shifts/offers.py:386` rebuilds terms on acceptance, while shared-core sends consent booleans only. D2 remains OPEN; W3 remains OPEN.
 - **ACTUAL TODAY (Oct 2026):** Accepted engagement snapshots include a schema version and worker acceptance, but omit the cancellation matrix, platform terms version and pharmacy-side policy acceptance. Both apps use this shared backend record. (LA-Q10, gap SH-09)
 - **RECOMMENDED:** A — Before launch. Record versioned, pre-contract acceptance by both sides and obtain Australian legal review.
@@ -553,12 +613,16 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** STILL VALID (re-validated via ledger). **Source:** LA-Q10.
 
 #### GM26-Q33 — [P1 · code gap, timing decision] Fix before launch? Booking fees lack explicit GST and tax-invoice treatment.
+
+> **Merged 22 Nov: asked once, as GM16-Q15 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **ACTUAL TODAY (Oct 2026, NOT re-validated):** Checkout selects fixed Stripe prices and stores the amount, but no reviewed field or flow states GST treatment or creates a platform tax invoice. (LA-R01, gap SH-15)
 - **RECOMMENDED:** A — Before launch: confirm tax treatment, display it and issue compliant records.
 - **ALTERNATIVES:** A before launch / B soon after (take payments while tax treatment is unclear) / C not needed.
 - **Status:** NOT RE-VALIDATED. **Source:** LA-R01.
 
 #### GM26-Q34 — [P1 · code gap, timing decision] Fix before launch? Subscribers are charged full price, and Stripe price IDs are hard-coded.
+
+> **Merged 22 Nov: asked once, as GM16-Q02 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: CHANGED (partial) — A18 (adopted GM-18/GM-16).** The subscriber discount is **now applied** ($30/$15, $80/$40); Stripe price IDs are **still hard-coded**. The Oct 2026 "computed but never applied" claim must NOT be carried as current.
 - **ACTUAL TODAY (Oct 2026, superseded in part):** Checkout computes subscriber status but always selects the standard locum or permanent Stripe price ID. Those IDs are hard-coded; web and mobile use the same billing endpoint. (LA-Q07, gap SH-03)
 - **RECOMMENDED:** A — Before launch (paying subscribers must not be charged the standard tier; environments cannot select independent prices). (Now: the remaining half is environment-independent price IDs.)
@@ -566,6 +630,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** CHANGED (partial — adopted GM-18). **Source:** LA-Q07.
 
 #### GM26-Q35 — [P1 · code gap, timing decision] Fix before launch? Booking never refreshes AHPRA registration from the public register.
+
+> **Merged 22 Nov: asked once, as GM-18-Q11 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: CHANGED (partial) — A18 (adopted GM-18) + V.** The new `verification/state.py` state machine exists; default source is still `scrapingbee` (`backend/core/settings.py:642`, confirmed by me at head); no synchronous fresh lookup before booking.
 - **ACTUAL TODAY (Oct 2026, superseded in part):** A saved AHPRA flag drives Verified. Public gates read the latest stored register check and queue a recheck after expiry; nothing looks up the register before booking. Default source still ScrapingBee. (LA-Q01, gap ON-02)
 - **RECOMMENDED:** A — Before launch (desktop source + fresh check before registered-role bookings).
@@ -649,6 +715,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** TRACED (V — docs); live staging check still needed by an agent with browser/deploy access (this subagent cannot do it).
 
 #### GM26-Q47 — [P2 · code gap, timing decision] Fix before launch? Mobile 'add personal profile' drops pharmacist data / sends other staff to not-found; profile progress % doesn't match Verified; payment readiness only visible at acceptance.
+
+> **Merged 22 Nov: asked once, as GM25-C08 in GM-25.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict (V, via GM-25 re-trace at head):** Pharmacist data-loss **STILL VALID** — `roles/pharmacist/onboarding.tsx` still posts `preferred_hourly_rate`, `minimum_rate`, `overtime_multiplier`, `weekend_premium` (repo-wide: 1 hit each — this file only — plus `overtime_multiplier` in an award table, not a worker profile); bank fields uncertain (see GM25-C08). Other-staff dead-end **CHANGED** — the card now routes to the existing `/otherstaff/profile-basic-info`; the 404 is gone. Progress % **NOT RE-VALIDATED** (`progress.py` not re-read; the % UI still renders on the mobile screen). Payment-readiness visibility **NOT RE-VALIDATED**.
 - **ACTUAL TODAY (Oct 2026, superseded in part):** Mobile manager upgrades send pharmacists to a legacy form posting unsupported bank/rate fields; other staff go to a missing onboarding route. Profile progress % doesn't match what Verified needs. Workers only see payment readiness at the moment of accepting. (LA-Q02, LA-Q04, LA-Q05; gaps ON-04/ON-10/ON-11)
 - **RECOMMENDED:** A — Before launch for the data-loss/dead-end (LA-Q02); A for progress-vs-Verified mismatch; A for payment-readiness visibility.
@@ -656,6 +724,8 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Status:** Mixed — see verdict. **Source:** LA-Q02/Q04/Q05. PR #249 W1/W-AUTH redesign did not remove the legacy pharmacist form.
 
 #### GM26-Q48 — [P2 · decision] Must every onboarding step work on mobile at launch? (parity gate for GM-26-adjacent onboarding)
+
+> **Merged 22 Nov: asked once, as GM01-Q10 in GM-01.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Verdict: CHANGED (partial) — V, via GM-25 re-trace.** Pharmacist add-profile still broken (see Q47); other-staff route now works via `profile-basic-info`; auth steps exist on Expo per GM-01.
 - **ACTUAL TODAY (Oct 2026):** Profile tabs match, but mobile 'add personal profile' for managers is broken (see Q47). (ON-Q15, gap ON-04)
 - **RECOMMENDED:** A — Full parity on web and mobile.

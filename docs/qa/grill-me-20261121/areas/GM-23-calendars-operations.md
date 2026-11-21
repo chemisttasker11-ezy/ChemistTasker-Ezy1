@@ -18,40 +18,40 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Worker personal roster view | Worker reviews assigned shifts in personal roster view (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:125`). | Worker views upcoming shifts on My Roster screen (`frontend_mobile/app/my-roster.tsx:194`). | Yes | |
-| Manager team roster / coverage view | Manager plans and reviews pharmacy shifts in owner roster view (`frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:60`). | Manager inspects coverage and assignments in manager roster (`frontend_mobile/app/manager/roster/calendar.tsx:3`). | Yes | |
-| Pharmacy calendar view (month / week / day) | Pharmacy staff view calendar events and shifts (`frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.tsx:40`). | Shared calendar component displays monthly/weekly schedule (`frontend_mobile/roles/shared/calendar/index.tsx:35`). | Yes | |
+| Worker personal roster view | Worker reviews assigned shifts in personal roster view (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:77`). | Worker views upcoming shifts on My Roster screen (`frontend_mobile/app/my-roster.tsx:82`). | Yes | |
+| Manager team roster / coverage view | Manager plans and reviews pharmacy shifts in owner roster view (`frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:97`). | Manager inspects coverage and assignments in manager roster (`frontend_mobile/app/manager/roster/calendar.tsx:3`). | Yes | |
+| Pharmacy calendar view (month / week / day) | Pharmacy staff view calendar events and shifts (`frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.tsx:73`). | Shared calendar component displays monthly/weekly schedule (`frontend_mobile/roles/shared/calendar/index.tsx:35`). | Yes | |
 | Leave request submission and approval | Worker submits leave and manager reviews approvals (`frontend_web/src/features/workforce/MyLeavePage.tsx:10`). | Worker submits leave and manager approves requests (`frontend_mobile/app/workforce/leave-requests.tsx:185`). | Yes | |
 | Shift cover / replacement request | Worker requests cover from the roster (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:111`). | Worker requests cover from My Roster (`frontend_mobile/app/my-roster.tsx:280`, `:367`). | Yes | Citation corrected 22 Nov (orchestrator review). |
-| Automated birthday & anniversary events | System generates recurring events displayed on pharmacy calendar (`backend/team_calendar/tasks.py:20`). | Birthday events display alongside shift entries on mobile calendar (`frontend_mobile/roles/shared/calendar/index.tsx:80`). | Yes | |
-| Add shift to personal external calendar | Web lacks one-click external calendar intent generator (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:120`). | Worker taps 'Add to calendar' to open Google/device calendar editor (`frontend_mobile/app/next-shifts.tsx:133`). | Expo only | Intended: Mobile leverages native device calendar integrations (`nextShiftModel.ts`). |
+| Automated birthday & anniversary events | System generates recurring events displayed on pharmacy calendar (`backend/team_calendar/tasks.py:105`, `backend/core/settings.py:284`). | Birthday events display alongside shift entries on mobile calendar (`frontend_mobile/roles/shared/calendar/index.tsx:233`). | Yes | |
+| Add shift to personal external calendar | Web lacks one-click external calendar intent generator (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx`). | Worker taps 'Add to calendar' to open Google/device calendar editor (`frontend_mobile/app/next-shifts.tsx:133`). | Expo only | Intended: Mobile leverages native device calendar integrations (`nextShiftModel.ts`). |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
-| GM-23-01 — Talent-post availability is copied once and never syncs with the calendar | Web + Expo |
-| GM-23-02 — How should workers set availability? | Web + Expo |
-| GM-23-03 — How far can a repeating availability run? | Web + Expo |
-| GM-23-04 — When does availability "match" a shift? | Web + Expo |
-| GM-23-05 — Who can see a worker's availability? | Web + Expo |
-| GM-23-06 — Should confirmed bookings block that time automatically? | Web + Expo |
-| GM-23-07 — When should a talent post stop showing? | Web + Expo |
-| GM-23-08 — Should availability show when it was last confirmed? | Web + Expo |
-| GM-23-09 — Should urgent-shift alerts need a separate opt-in? | Web + Expo |
-| GM-23-10 — Should workers set a max distance and minimum rate for alerts? | Web + Expo |
-| GM-23-11 — Which shifts get pre-shift reminders, and when? | Web + Expo |
-| GM-23-12 — If a shift changes inside 12 hours of start, what happens to reminders? | Web + Expo |
+| GM-23-01 — Talent-post availability is copied once and never syncs with the calendar | Web + Expo (asked in GM-19: GM-19-Q12) |
+| GM-23-02 — How should workers set availability? | Web + Expo (asked in GM-19: GM-19-Q01) |
+| GM-23-03 — How far can a repeating availability run? | Web + Expo (asked in GM-19: GM-19-Q02) |
+| GM-23-04 — When does availability "match" a shift? | Web + Expo (asked in GM-19: GM-19-Q03) |
+| GM-23-05 — Who can see a worker's availability? | Web + Expo (asked in GM-19: GM-19-Q04) |
+| GM-23-06 — Should confirmed bookings block that time automatically? | Web + Expo (asked in GM-19: GM-19-Q05) |
+| GM-23-07 — When should a talent post stop showing? | Web + Expo (asked in GM-19: GM-19-Q06) |
+| GM-23-08 — Should availability show when it was last confirmed? | Web + Expo (asked in GM-19: GM-19-Q07) |
+| GM-23-09 — Should urgent-shift alerts need a separate opt-in? | Web + Expo (asked in GM-19: GM-19-Q08) |
+| GM-23-10 — Should workers set a max distance and minimum rate for alerts? | Web + Expo (asked in GM-19: GM-19-Q09) |
+| GM-23-11 — Which shifts get pre-shift reminders, and when? | Web + Expo (asked in GM-22: GM22-05) |
+| GM-23-12 — If a shift changes inside 12 hours of start, what happens to reminders? | Web + Expo (asked in GM-22: GM22-06) |
 | GM-23-13 — For multi-date posts, how is "same worker for every date" set? | Web + Expo |
 | GM-23-14 — How far ahead can recurring shifts run? | Web + Expo |
 | GM-23-15 — How should owners repeat a past shift? | Web + Expo |
-| GM-23-16 — Match emails miss escalated shifts and reach unverified workers | Web + Expo |
-| GM-23-17 — Availability input has no validation | Web + Expo |
+| GM-23-16 — Match emails miss escalated shifts and reach unverified workers | Web + Expo (asked in GM-11: GM-11-Q05) |
+| GM-23-17 — Availability input has no validation | Web + Expo (asked in GM-19: GM-19-Q10) |
 | GM-23-18 — Team calendar views: day / week / month — what does each role see? | Web + Expo |
 | GM-23-19 — Operations tasks / rules engine: what rules run, when, and who acts on them? | Web + Expo |
 | GM-23-20 — Leave on the calendar: how do leave / roster / cover requests appear? | Web + Expo |
 | GM-23-21 — Shift display on the calendar: what state does each entry show? | Web + Expo |
 | GM-23-22 — Operations dashboard: what does it show, to whom, and how fresh is it? | Web + Expo |
-| GM-23-23 — Clock / timezone: whose time is a shift time? | Web + Expo |
+| GM-23-23 — Clock / timezone: whose time is a shift time? | Web + Expo (asked in GM-10: GM-10-Q05) |
 | GM-23-24 — Calendar permissions: who can create / edit / delete calendar entries? | Web + Expo |
 | GM-23-25 — Which external calendar exports or sync should workers get? | Web + Expo |
 | GM-23-26 — Calendar notifications: which calendar events notify, on which channel? | Web + Expo |
@@ -221,6 +221,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-23-01 — LA-Q16 / AV-01. Talent-post availability is copied once and never syncs with the calendar. Fix before launch? — FIRST QUESTION (Part D)
 
+> **Merged 22 Nov: asked once, as GM-19-Q12 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** a worker writes a talent post and the dates they typed are frozen in that post. If they later change their calendar, the post still shows the old dates.
 
 **ACTUAL TODAY — Web and Expo (same backend, ADOPTED GM-18/GM-19):** both apps copy availability into the pitch form when composing a talent post and save separate post dates (`availability_days` snapshot). Later calendar edits do not update the saved snapshot — there is no link or sync mechanism in `talent/models.py`.
@@ -235,6 +237,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-23-02 — AV-Q01. How should workers set availability? (ADOPTED GM-19)
 
+> **Merged 22 Nov: asked once, as GM-19-Q01 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** can a worker say "I'm usually free Mondays" and also block out a holiday, or must they type every single date?
 **ACTUAL TODAY — Web:** dated + recurring entry, calendar preview, notify toggle, travel/radius (default 30 km). **Expo:** same, radius 5–1000 km + map preview. **Backend:** `UserAvailability` has date, time window or all-day, recurring weekdays, optional end date, `notify_new_shifts`, notes — **no unavailable-date / blackout / holiday exception model**.
 **RECOMMENDED:** A — Weekly pattern plus unavailable dates; exceptions always win. (Relief Buddy / Locate a Locum pattern.)
@@ -245,6 +249,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM-23-03 — AV-Q02 / AV-02. How far can a repeating availability run? (ADOPTED GM-19 + this trace)
+
+> **Merged 22 Nov: asked once, as GM-19-Q02 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** can "every Monday forever" run forever, or must it end and be renewed?
 **ACTUAL TODAY — Web and Expo:** open-ended recurrence is allowed by the backend (`recurring_end_date` nullable) **and by both apps** — the end date is optional; the payload sends `recurring_end_date: null` when unset. The Oct 2026 claim "apps require an end date" is wrong at head. **Team calendar, this trace:** `recurrence.py` likewise allows open-ended recurrence (`until_date` optional; unknown `freq` silently yields no occurrences). Nothing expires a pattern and nobody is prompted to refresh it.
@@ -257,6 +263,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-23-04 — AV-Q03 / AV-03. When does availability "match" a shift? (ADOPTED GM-19)
 
+> **Merged 22 Nov: asked once, as GM-19-Q03 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** if you're free 9–10 and a shift is 9–17, is that a match?
 **ACTUAL TODAY — Web and Expo (same backend):** match emails + dashboard suggestions accept **any time overlap**, including touching endpoints (`announcements.py:229`); roster warnings require **full containment** (shift fully inside availability, `workforce/roster/validation.py:76`).
 **RECOMMENDED:** A — Shift fully inside availability, same rule everywhere.
@@ -267,6 +275,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM-23-05 — AV-Q04 / AV-06. Who can see a worker's availability? (ADOPTED GM-19)
+
+> **Merged 22 Nov: asked once, as GM-19-Q04 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** is your calendar private, or can pharmacies see when you're free?
 **ACTUAL TODAY — Web and Expo (same API):** only workers can read/edit their raw availability; it drives alerts, recommendations and roster warnings. Pharmacies see copied talent-post dates rather than a live calendar on either app. No visibility/opt-in field exists on `UserAvailability`.
@@ -279,6 +289,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-23-06 — AV-Q05. Should confirmed bookings block that time automatically? (ADOPTED GM-19)
 
+> **Merged 22 Nov: asked once, as GM-19-Q05 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** once you're booked 9–17, should the system stop telling you about other shifts at that time?
 **ACTUAL TODAY — Web and Expo (same backend, split):** roster side — overlapping assignments are a hard `SHIFT_OVERLAP` error. Alert side — `announce_availability_matches` has **no assignment check**: a worker already booked for those hours is still alerted. Approved leave is likewise not checked by alerts (roster blocks it, alerts do not).
 **RECOMMENDED:** A — Yes, booked time is unavailable; no alerts for those hours.
@@ -288,6 +300,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM-23-07 — AV-Q06 / AV-02. When should a talent post stop showing? (ADOPTED GM-19)
+
+> **Merged 22 Nov: asked once, as GM-19-Q06 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** how long can an old talent post sit on the board before it disappears?
 **ACTUAL TODAY — Web and Expo (same backend):** feeds hide dated availability posts after their last date; undated and full-time posts remain indefinitely unless moderated. **Fixed since Oct 2026:** ordinary list/detail endpoints now filter through `_visible_posts` too (TB-03 fixed) — the old bypass is closed.
@@ -300,6 +314,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-23-08 — AV-Q07. Should availability show when it was last confirmed? (ADOPTED GM-19)
 
+> **Merged 22 Nov: asked once, as GM-19-Q07 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** should pharmacies see "this calendar was confirmed 3 days ago" vs "6 months ago"?
 **ACTUAL TODAY — Web and Expo:** not built yet. No availability confirmation date, reconfirm action, or freshness status; generic DB update timestamps are not a worker confirmation.
 **RECOMMENDED:** A — Yes, plus weekly one-tap reconfirm; marked stale after 14 days; pause option. (Weekly/14-day timing proposed, not a competitor standard.)
@@ -309,6 +325,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM-23-09 — AV-Q08. Should urgent-shift alerts need a separate opt-in? (ADOPTED GM-19 + new context)
+
+> **Merged 22 Nov: asked once, as GM-19-Q08 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** one switch for all shift alerts, or a separate switch for urgent (starting within 24h) shifts?
 **ACTUAL TODAY — Web and Expo (same backend):** one matching-public-shift notification switch per availability row (`notify_new_shifts`). No separate urgent-shift consent or urgency-based alert audience. **New in this trace:** push preferences now exist (`NotificationPushPreference`: per-type opt-outs, quiet hours 22:00–07:00, per-user timezone; alerts bypass quiet hours but honour an explicit alert opt-out) and `Shift.is_urgent` exists as a poster flag — but neither creates an urgent-alert audience, and match alerts never consult `is_urgent`.
@@ -320,6 +338,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-23-10 — AV-Q09. Should workers set a max distance and minimum rate for alerts? (ADOPTED GM-19)
 
+> **Merged 22 Nov: asked once, as GM-19-Q09 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** should alerts respect "don't tell me about shifts more than 30 km away or under $X/hour"?
 **ACTUAL TODAY — Web and Expo:** both apps let workers set coverage radius / travel states, and match alerts **already enforce** these preferences (haversine ≤ `coverage_radius_km`, or travel-states check; missing coords/radius → silently no match). Alerts do **not** check a minimum hourly rate; talent-post radius is a separate snapshot.
 **RECOMMENDED:** A — Yes, alerts respect both (keep distance/travel matching; add a worker minimum-rate preference for alerts; search can still widen).
@@ -329,6 +349,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM-23-11 — AG-Q11. Which shifts get pre-shift reminders, and when? (re-verified this trace)
+
+> **Merged 22 Nov: asked once, as GM22-05 in GM-22.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** who gets reminded before a shift, how many times, and how close to the start?
 **ACTUAL TODAY — Web and Expo (same backend, verified `backend/shifts/tasks.py`):** an hourly job emails every worker with a `ShiftSlotAssignment` once, when the slot starts 12–13 hours ahead in **pharmacy-local time** (`get_pharmacy_timezone`). Reservations: whether a payment-pending reservation holds an assignment row is GM-13 territory — the function has no payment/reservation filter, so this trace cannot confirm the Oct claim "reservations get none". No push, no in-app copy, no second reminder, no dedupe record.
@@ -342,6 +364,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM-23-12 — AG-Q12. If a shift changes inside 12 hours of start, what happens to reminders? (re-verified this trace)
+
+> **Merged 22 Nov: asked once, as GM22-06 in GM-22.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** the start time moves after the reminder went out — does the worker get told?
 **ACTUAL TODAY — Web and Expo (same backend):** no special handling for a plain re-time: the 12h reminder reads the slot's current time when it fires, and there is no cancellation of an already-sent reminder and no instant alert. **But** the roster edit path now has a real mechanism: `unpublish_roster_shift` takes one shift back to draft (hidden from workers, audit only, **no notification**), and `republish_roster_shift` notifies with the manager's choice of worker / team / none (default worker, "Roster updated"). Whether every re-time goes through unpublish/republish (slot-mutability guard not read) is UNKNOWN.
@@ -385,6 +409,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-23-16 — LA-Q17 / AV-04. Match emails miss escalated shifts and reach unverified workers. Fix before launch? (re-verified this trace)
 
+> **Merged 22 Nov: asked once, as GM-11-Q05 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** when a shift widens to the public, do available workers hear about it — and do workers who can't apply get emailed anyway?
 **ACTUAL TODAY — Web and Expo (same backend):** availability-match messages run when posting directly to public, not when shifts later escalate there (`escalation.py` has no announce call; `auto_escalate_due_shifts` has no beat entry and is only called lazily from `get_queryset`). Recipients are filtered by active account, role and travel/availability, but **not Verified** (adopted GM-19); the same backend serves both apps.
 **RECOMMENDED:** A — Before launch. Fix both: notify on escalation to PLATFORM, and filter recipients by Verified (eligible recipients only).
@@ -395,6 +421,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM-23-17 — LA-Q18 / AV-05. Availability input has no validation. Fix before launch? (ADOPTED GM-18/GM-19)
+
+> **Merged 22 Nov: asked once, as GM-19-Q10 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** can a broken calendar entry (end before start, impossible weekday) be saved?
 **ACTUAL TODAY — Web and Expo:** both apps check time order and repeat fields, but the API serializer has **no semantic validation** for time order, weekdays, recurrence, past dates or duplicates. Direct API calls bypass the client checks.
@@ -456,6 +484,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM-23-23 — NEW. Clock / timezone: whose time is a shift time? (verified this trace — ALTERNATE FIRST QUESTION)
+
+> **Merged 22 Nov: asked once, as GM-10-Q05 in GM-10.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** a shift at "9am" — 9am in Brisbane, in the pharmacy's timezone, or on the worker's phone?
 **ACTUAL TODAY — verified, three clocks at once:** (1) **Server default** `TIME_ZONE = 'Australia/Sydney'`, `USE_TZ = True` (`backend/core/settings.py`). (2) **Pharmacy-local time** for scheduled work: `organizations/timezone.py::get_pharmacy_timezone` resolves an explicit `pharmacy.timezone` field, then postcode `2880` → Broken Hill, then a state map (NSW/ACT→Sydney, VIC→Melbourne, QLD→Brisbane, WA→Perth, SA→Adelaide, TAS→Hobart, NT→Darwin), then the server default. Both the work-note notifications and the 12h reminder compute their windows in pharmacy-local time. (3) **Per-user push-preference timezone**, default `Australia/Brisbane` (`NotificationPushPreference.time_zone`), used only for quiet-hours checks. **Storage:** shift and calendar dates are **naive local dates + naive times** (`ShiftSlot.date` + `start_time`/`end_time`; `CalendarEvent.date` + times) — there is no UTC instant stored for a shift; the pharmacy timezone is applied at *read/compute* time, not stored with the slot. **Display:** both calendar pages parse dates device-local (`toDate`: `new Date("YYYY-MM-DDT00:00:00")`; roster pages use `moment("YYYY-MM-DD HH:mm")`) — a worker in Perth viewing a Sydney pharmacy's 9am shift sees it rendered in device-local terms with **no timezone label anywhere traced**. **DST:** no DST test or transition handling was found in the traced files; the reminder window adds 12h to an aware local datetime, so a repeated/skipped hour at a DST boundary is an unhandled edge. **Weekday split:** availability recurrence counts Sunday=0; shift and team-calendar recurrence count Monday=0.

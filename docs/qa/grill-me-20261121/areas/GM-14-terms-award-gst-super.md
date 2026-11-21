@@ -20,26 +20,27 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
 | TFN casual terms presentation | Dialog renders Award code MA000012, classification, and superannuation notice (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:35`). | Dialog renders Award details, classification, and superannuation notice (`frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:28`). | Yes | - |
-| ABN contractor terms presentation | Dialog presents contractor terms requiring separate contractor checkbox confirmation (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:75`). | Dialog presents contractor terms requiring contractor confirmation (`frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:65`). | Yes | - |
+| ABN contractor terms presentation | Dialog presents contractor terms requiring separate contractor checkbox confirmation (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:45`). | Dialog presents contractor terms requiring contractor confirmation (`frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:40`). | Yes | - |
 | Terms version snapshot & freeze | Sends `termsVersion` with acceptance to prevent stale review drift (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:468`). | Sends `termsVersion` with acceptance to prevent stale review drift (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:356`). | Yes | - |
-| Award floor enforcement | Displays locked rate ensuring rate cannot fall below statutory minima (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:110`). | Displays locked rate ensuring rate cannot fall below statutory minima (`frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:95`). | Yes | - |
-| Payment profile readiness | Incomplete payment details trigger navigation to profile settings (`frontend_web/src/pages/attendance/WorkerAttendancePage.tsx:631`). | Incomplete payment details trigger `openPaymentProfile` callback (`frontend_mobile/features/parity/attendance.tsx:337`). | Yes | - |
+| Award floor enforcement | Displays locked rate ensuring rate cannot fall below statutory minima (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:94`). | Displays locked rate ensuring rate cannot fall below statutory minima (`frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:123`). | Yes | - |
+| Payment profile readiness | Incomplete payment details trigger navigation to profile settings (`frontend_web/src/pages/attendance/WorkerAttendancePage.tsx:66`). | Incomplete payment details trigger `openPaymentProfile` callback (`frontend_mobile/features/parity/attendance.tsx:296`). | Yes | - |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
 | GM14-Q01 | Web + Expo |
-| GM14-Q02 | Web + Expo |
-| GM14-Q03 | Web + Expo |
+| GM14-Q02 | Web + Expo (asked in GM-12: GM-12-Q25) |
+| GM14-Q03 | Web + Expo (asked in GM-12: GM-12-Q25) |
 | GM14-Q04 | Web + Expo |
 | GM14-Q05 | Web + Expo |
-| GM14-Q06 | Web + Expo |
+| GM14-Q06 | Web + Expo (also covers GM22-15) |
 | GM14-Q07 | Web + Expo |
 | GM14-Q08 | Web + Expo |
 | GM14-Q09 | Web + Expo |
 | GM14-Q10 | Web + Expo |
-| GM14-Q11 | Web + Expo |
+| GM14-Q11 | Web + Expo (asked in GM-16: GM16-Q15) |
 | GM14-Q12 | Web + Expo |
+| GM-14-W01 — Re-grill: the cover-terms dialog went stale (409 TERMS_CHANGED) | Web + Expo |
 
 ## Bases (exact SHAs verified 2026-11-21)
 
@@ -147,6 +148,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM14-Q02 — What must the worker see before accepting? (carried AG-Q01 / SH-09)
 
+> **Merged 22 Nov: asked once, as GM-12-Q25 in GM-12.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** the worker sees pay type, Award basis, dates, times, the final rate and legal notices — but not breaks, duties, site details, the cancellation table, or which version of the platform terms they are agreeing to. The cancellation table matters most: without it, the P09 fees cannot fairly be charged.
 **ACTUAL TODAY — Web:** accept dialog shows the frozen terms fields (exact rendering not line-read — UNKNOWN which component). **ACTUAL TODAY — Expo:** same backend terms; the pre-apply `ShiftTermsSummary` shows only super/payment/travel/accommodation pills. **Backend (both):** terms dict has no breaks, duties, site, cancellation, or platform terms version.
 **RECOMMENDED:** A — pay, times, breaks, duties, site, cancellation (table + version). Severity: high — disclosure is what makes the cancellation fees enforceable (GM-15/GM-16). Benefit: the worker agrees to the real deal. Risk: needs the cancellation table decided first (GM-15) and the terms version defined.
@@ -156,6 +159,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM14-Q03 — Does the pharmacy accept the same agreement? (carried AG-Q02 / SH-09 — FIRST QUESTION, see Part D)
+
+> **Merged 22 Nov: asked once, as GM-12-Q25 in GM-12.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** only the worker accepts the terms. The pharmacy never records acceptance of anything — not the shift terms, not the owner fee table, not the subscription terms. If a fee is ever disputed, there is no record the pharmacy agreed to it.
 **ACTUAL TODAY — Web and Expo (same backend):** `freeze_accepted_terms` stamps worker id + time only; no pharmacy acceptance field, endpoint, or timestamp exists in the traced code.
@@ -182,6 +187,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Actual today:** Missing or unverified ABN blocks external acceptance. Missing TFN/super allows assignment and defers payroll. Early checklist coverage across clients still needs a trace (`pr257:backend/shifts/engagement.py:265`, `:716`).
 
 ### GM14-Q06 — Should both sides get a PDF copy of the agreement? (carried AG-Q03)
+
+> **Also covers (22 Nov):** GM22-15 (GM-22). Asked once, here.
 
 **Plain English:** today nobody gets a copy of what was agreed — the acceptance emails go out, but the terms themselves are only in the database. Both sides should be able to prove what they agreed to.
 **ACTUAL TODAY — Web and Expo (same):** no PDF, no downloadable copy, no terms attachment on the acceptance emails.
@@ -226,6 +233,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN — **NOT RE-VALIDATED**.
 
 ### GM14-Q11 — Booking fees: GST and tax invoice? (carried LA-R01 / SH-15; jointly GM-16-Q15 / GM-17-Q06)
+
+> **Merged 22 Nov: asked once, as GM16-Q15 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** the platform charges $30/$80 (or $15/$40) per booking and $30/month for a subscription, and nothing anywhere says whether GST is included, who the supplier is for tax purposes, or what tax invoice the pharmacy gets. The only GST fact in the code is a yes/no flag on ABN worker terms.
 **ACTUAL TODAY — Web and Expo (same):** no GST treatment in any traced billing file; no tax invoice created; the pay card shows `$n × 30 AUD` with no tax line; the subscription page shows `$30 + $5/seat` with no tax line.

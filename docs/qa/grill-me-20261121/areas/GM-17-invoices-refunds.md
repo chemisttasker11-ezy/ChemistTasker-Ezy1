@@ -20,32 +20,32 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
 | Fulfillment fee checkout redirect | Dispatches `chargeShiftFulfillment` and redirects to Stripe Checkout (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:30`). | Dispatches `chargeShiftFulfillment` opening Stripe session on mobile (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:228`). | Yes | - |
-| Free mode finalisation | PRE_LIVE / FREE_TRIAL finalises booking with zero charge (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:40`). | Free billing mode finalises booking with zero charge (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:235`). | Yes | - |
-| Worker invoices list | Renders list of worker invoices with status and date filters (`frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceManagePage.tsx:8`). | Renders invoice list grouped by status (`frontend_mobile/roles/shared/invoices/InvoiceList.tsx:51`). | Yes | - |
-| Worker invoice details & generation | Inspects invoice line items and triggers PDF generation (`frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx (re-exported by sidebar/Invoices/InvoiceDetailPage.tsx:1)`). | Displays invoice details and allows line item edits (`frontend_mobile/roles/shared/invoices/InvoiceDetail.tsx:19`). | Yes | - |
-| Subscription payment by invoice | Allows selecting invoice billing for subscriptions (`frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:85`). | Allows selecting invoice billing for subscriptions (`frontend_mobile/roles/owner/subscription-seats.tsx:82`). | Yes | - |
-| Checkout reconciliation & conflict queue | Displays conflict dialog when previous checkout state is unresolved (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:55`). | Displays alert when checkout attempt is in conflict (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:246`). | Yes | - |
+| Free mode finalisation | PRE_LIVE / FREE_TRIAL finalises booking with zero charge (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:33`). | Free billing mode finalises booking with zero charge (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:232`). | Yes | - |
+| Worker invoices list | Renders list of worker invoices with status and date filters (`frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceManagePage.tsx:8`). | Renders invoice list grouped by status (`frontend_mobile/roles/shared/invoices/InvoiceList.tsx:68`). | Yes | - |
+| Worker invoice details & generation | Inspects invoice line items and triggers PDF generation (`frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx (re-exported by sidebar/Invoices/InvoiceDetailPage.tsx:1)`). | Displays invoice details and allows line item edits (`frontend_mobile/roles/shared/invoices/InvoiceDetail.tsx:91`). | Yes | - |
+| Subscription payment by invoice | Allows selecting invoice billing for subscriptions (`frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:85`). | Expo manages extra seats only; it has no option to pay the subscription by invoice (`frontend_mobile/roles/owner/subscription-seats.tsx:29`). | No | Corrected 22 Nov (orchestrator review): invoice billing is web-only. Covered by GM-16-W02 (subscription and seats web-only for launch). |
+| Checkout reconciliation & conflict queue | Displays conflict dialog when previous checkout state is unresolved (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:5`). | Displays alert when checkout attempt is in conflict (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:246`). | Yes | - |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
 | GM17-Q01 | Web + Expo |
-| GM17-Q02 | Web + Expo |
-| GM17-Q03 | Web + Expo |
-| GM17-Q04 | Web + Expo |
-| GM17-Q05 | Web + Expo |
-| GM17-Q06 | Web + Expo |
-| GM17-Q07 | Web + Expo |
-| GM17-Q08 | Web + Expo |
+| GM17-Q02 | Web + Expo (also covers GM15-20) |
+| GM17-Q03 | Web + Expo (also covers GM15-21, GM26-Q21) |
+| GM17-Q04 | Web + Expo (asked in GM-16: GM16-Q11) |
+| GM17-Q05 | Web + Expo (also covers GM15-22) |
+| GM17-Q06 | Web + Expo (asked in GM-16: GM16-Q15) |
+| GM17-Q07 | Web + Expo (asked in GM-16: GM16-Q04) |
+| GM17-Q08 | Web + Expo (asked in GM-16: GM16-Q01) |
 | GM17-Q09 | Web + Expo |
-| GM17-Q10 | Web + Expo |
-| GM17-Q11 | Web + Expo |
+| GM17-Q10 | Web + Expo (asked in GM-16: GM16-Q06) |
+| GM17-Q11 | Web + Expo (also covers GM15-45, GM22-16) |
 | GM17-Q12 | Web + Expo |
 | GM17-Q13 | Web + Expo |
 | GM17-Q14 | Web + Expo |
 | GM17-Q15 | Web + Expo |
-| GM17-Q16 | Web + Expo |
-| GM17-Q17 | Web + Expo |
+| GM17-Q16 | Web + Expo (asked in GM-08: GM-08-Q11) |
+| GM17-Q17 | Web + Expo (asked in GM-13: GM13-Q12) |
 | GM17-Q18 | Web + Expo |
 | GM-17-W01 | Web + Expo |
 | GM-17-OD-12 — Organisation Invoices are on Expo but not in web's organisation menu | Web + Expo |
@@ -177,42 +177,56 @@ Carried decisions that bound these questions: D02 payment windows (24h / 6h / 2h
 - Normal case: pharmacy cancels 4 days out → refund. Edge: cancels 1h out after worker travelled → credit + penalty may both apply — owner must say whether both can apply. Retry/concurrency: refund requested twice → must be idempotent (no engine exists today). Denied role: only platform finance/support or the paying pharmacy can request; worker cannot trigger a fee refund. Payment side effect: Stripe refund → webhook sets `refunded`/`partially_refunded`. Web/Expo: no UI on either today; same backend either way.
 
 ### GM17-Q02 — Worker cancels or no-shows: what happens to the booking fee?
+
+> **Also covers (22 Nov):** GM15-20 (GM-15). Asked once, here.
 - **Actual today:** Not built. No rule, no remedy, no replacement flow tied to the fee (`CX-Q20`, still valid).
 - **Recommended:** **C — Keep the fee only if a replacement actually fulfils the booking; otherwise the pharmacy chooses refund or credit.** Rationale: the pharmacy paid for a filled shift; if the platform refills it, the fee bought something.
 - **A — Pharmacy picks remedy after each failure (refund or credit).** **B — Credit only.** **Other / defer.**
 - Scenarios: locum no-shows at 7am for an 8am shift, replacement found by 9am (fee kept, worker sanctioned separately per P04); no replacement found (pharmacy chooses); worker cancels 5 days out and replacement fills it (fee kept).
 
 ### GM17-Q03 — Who approves refunds and credits, and how fast?
+
+> **Also covers (22 Nov):** GM15-21 (GM-15), GM26-Q21 (GM-26). Asked once, here.
 - **Actual today:** Nobody in-app. Refunds happen in Stripe by whoever has Stripe access; the app only reconciles afterwards. `reconciliation_required` flags need human follow-up with no owner, queue or SLA.
 - **Recommended:** **A — Platform finance/support admin, every case, reason logged, 2-business-day SLA.** Start manual; automate by rule later.
 - **A — Platform admin, every case (recommended).** **B — Automatic by rule, admin for exceptions.** **C — Pharmacy self-serves refund inside a window (e.g. >72h), admin beyond it.** **Other / defer.**
 - Edge: refund requested twice; refund after partial refund; refund for a deleted shift (F15) — who is told, and does the pharmacy get the money or just a flag?
 
 ### GM17-Q04 — Who receives the owner cancellation fee (the 10%/20% penalty)?
+
+> **Merged 22 Nov: asked once, as GM16-Q11 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** Not built as a distribution. The penalty, when charged, is a platform Stripe charge; no worker compensation is recorded or paid.
 - **Recommended:** **A — The worker, as cancellation pay** (per #184 CX-Q02 rec; Locumate/Hireup compensate the worker for lost work). The platform keeps the booking fee separate.
 - **A — Worker (recommended).** **B — Platform.** **C — Split worker/platform.** **Other / defer.**
 - Scenarios: owner cancels 12h out, worker turned down other work → worker gets 20% of wages; owner cancels 4 days out → no penalty at all (0% band), worker gets nothing — is that acceptable?
 
 ### GM17-Q05 — How is the worker's cancellation pay paid out?
+
+> **Also covers (22 Nov):** GM15-22 (GM-15). Asked once, here.
 - **Actual today:** No record or payout path. Timesheets route ordinary pay to payroll or invoicing, but cancellation pay has no line.
 - **Recommended:** **A — Same invoice or payroll channel as wages, labelled "cancellation pay"** (per #184 CX-Q22 rec). The worker invoices it, or it rides the payroll export — never a platform wage wallet.
 - **A — Same channel, labelled (recommended).** **B — Platform pays the worker directly.** **C — Pharmacy pays off-platform, worker records it as an external invoice.** **Other / defer.**
 - Edge: worker is TFN payroll vs ABN invoice — channel follows the frozen `settlement_channel`; a cancelled shift has no approved timesheet, so what evidence supports the invoice?
 
 ### GM17-Q06 — Booking fee GST and platform tax invoice (launch-gating)
+
+> **Merged 22 Nov: asked once, as GM16-Q15 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** No GST treatment, no platform tax invoice; Stripe receipts only (LA-R01, unchanged).
 - **Recommended:** **A — Before launch: confirm tax treatment with Australian tax advice, show GST on the total before payment, and issue a compliant tax invoice/receipt from the correct supplier.** Do not take live payments while this is unclear.
 - **A — Before launch (recommended).** **B — Soon after launch.** **C — Not needed (Stripe receipts suffice).** **Other / defer.**
 - Legal/financial impact: GST on a $30/$80 fee is $2.73/$7.27 per booking; wrong treatment means wrong BAS and potentially issuing invalid tax invoices. Also decides whether the $30/$80 is GST-inclusive or exclusive — which changes the real price.
 
 ### GM17-Q07 — Booking-fee trial and going live (PO-Q15, changed)
+
+> **Merged 22 Nov: asked once, as GM16-Q04 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** Trial machinery exists but is set to zero: live date 2025-06-01 (past), `FREE_TRIAL_DAYS = 0`. Separately, live collection is gated off by deployment flags (default False) — the flags, not the date, are the real switch now.
 - **Recommended:** **C — N-day trial per new pharmacy (e.g. 30 days), then charge; enable live collection only after Q01–Q03 and Q06 are decided and test-mode acceptance passes.**
 - **A — Keep current logic (charge from day one, no trial).** **B — Free until a set date.** **C — N-day trial per new pharmacy (recommended).** **Other / defer.**
 - Note: a saved card is not stored today (every booking opens a new Stripe Checkout), so a trial cannot auto-convert without a saved payment method — see GM-16 subscription/Pills scope.
 
 ### GM17-Q08 — Should the booking fee depend on shift length? (PO-Q16, changed in part)
+
+> **Merged 22 Nov: asked once, as GM16-Q01 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** Flat per offer — $30/$80 (or $15/$40 subscriber). A one-offer 10-day block costs one fee; each slot in a multi-slot shift costs per offer.
 - **Recommended:** **B — Per shift day.** Simple, fair for blocks, matches the per-day shape of the work.
 - **A — Keep current logic (flat per offer).** **B — Per shift day (recommended).** **C — Percentage of wages, with min/max.** **Other / defer.**
@@ -224,12 +238,16 @@ Carried decisions that bound these questions: D02 payment windows (24h / 6h / 2h
 - **A — Rate + super + GST + total (recommended).** **B — Keep current logic.** **C — One all-in rate.** **Other / defer.**
 
 ### GM17-Q10 — Should the pharmacy see the full cost before posting? (PO-Q04)
+
+> **Merged 22 Nov: asked once, as GM16-Q06 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** The wizard shows rate and wages per date; super, GST and the booking fee are not shown — the fee first appears at Stripe checkout.
 - **Recommended:** **A — Yes: wages, super, platform fee and GST treatment, one payable total, before posting and again before payment.**
 - **A — Yes, full breakdown (recommended).** **B — Keep current logic (wages only; fee at checkout).** **Other / defer.**
 - Risk of B: pharmacies feel ambushed by a fee at checkout; disputes and abandoned bookings.
 
 ### GM17-Q11 — AHPRA auto-cancellation: fee, refund, notices (ON-P02 + LA-P02)
+
+> **Also covers (22 Nov):** GM15-45 (GM-15), GM22-16 (GM-22). Asked once, here.
 - **Actual today:** Future public bookings are auto-cancelled, pharmacies told, no fee or refund rule runs; the AHPRA path bypasses the cancellation policy entirely (two paths, different outcomes for the same booking).
 - **Recommended:** **Keep auto-cancel, and settle any paid booking fee under Q01/Q02** (refund/credit as if the pharmacy had cancelled in good time — the worker did nothing wrong, the pharmacy did nothing wrong).
 - **A — Keep auto-cancel + settle fee under Q01/Q02 (recommended).** **B — Admin confirms, then cancel (slower; unlawful work risk).** **Other / defer.**
@@ -258,12 +276,16 @@ Carried decisions that bound these questions: D02 payment windows (24h / 6h / 2h
 - **A — Support-owned queue + SLA (recommended).** **B — Auto-refund everything flagged (fast, but wrong for locked-payroll cases that should be replayed).** **C — Leave to the pharmacy (keep current logic).** **Other / defer.**
 
 ### GM17-Q16 — What marks a shift complete, so wages become payable? (CX-Q32)
+
+> **Merged 22 Nov: asked once, as GM-08-Q11 in GM-08.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** Assigned shifts enter history after their scheduled end, regardless of approved timesheets or clock-out. No completed state; timesheet approval is separate; no auto-approval rule found.
 - **Recommended:** **A — Timesheet approved, or auto-approved 48h after submission if the pharmacy has not acted.** (Locumate documents 48h auto-approval.)
 - **A — Approved, or auto after 48h (recommended).** **B — Keep current logic (time-based history).** **C — Clock-out alone.** **D — Manager approval only.** **Other / defer.**
 - This decides when a worker may invoice: today invoice prefill needs an *accepted* invoice-routed assignment, not a completed shift — so in theory a worker could invoice before the shift is worked. Owner must close that.
 
 ### GM17-Q17 — Cancellation penalty: fix the charge before it can ever be used? (NEW, code gap with decision attached)
+
+> **Merged 22 Nov: asked once, as GM13-Q12 in GM-13.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** 10%/20% of *all* assignments' wages, ambient timezone, submitted slot selection ignored, no persisted obligation, no idempotency key, route still live, live collection gated off (D8).
 - **Recommended:** **A — Before any live penalty: persist the obligation (amount, basis, dates, timezone) with an idempotency key, charge only the cancelled slots, use the shift's timezone, and disclose the bands in the accepted terms (SH-09 gap: terms snapshot has no cancellation band table).**
 - **A — Fix before live use (recommended).** **B — Use as-is in test mode only.** **C — Drop the penalty entirely; cancellations are free.** **Other / defer.**

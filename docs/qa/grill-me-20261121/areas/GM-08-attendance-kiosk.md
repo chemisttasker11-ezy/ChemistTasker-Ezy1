@@ -18,27 +18,28 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Clock in via mobile QR scanner | Web browser app does not implement camera scanner for physical kiosk QR (`frontend_web/src/App.tsx:50`). | Mobile app opens camera scanner to read kiosk QR token (`frontend_mobile/app/attendance/clock.tsx:3`). | Expo only | Intended: camera QR scanning of the physical on-site kiosk is mobile-native. |
-| Rotating kiosk QR display | Dedicated tablet kiosk web app renders rotating dynamic QR code (`frontend_web/src/pages/attendance/KioskPage.tsx:112`). | Mobile app provides pairing status and link screen for kiosk hardware (`frontend_mobile/app/attendance/kiosk-status.tsx:3`). | No | Parity question: the kiosk display terminal is web-only (`KioskPage.tsx`), while mobile manages pairing and diagnostics. |
-| PIN clock in/out | Kiosk terminal provides numeric keypad for PIN attendance (`frontend_web/src/pages/attendance/KioskPage.tsx:185`). | Worker configures attendance PIN in dedicated mobile settings screen (`frontend_mobile/app/attendance-pin.tsx:5`). | No | Intended: terminal handles physical PIN entry while mobile allows worker PIN configuration. |
-| Breaks recording | Kiosk terminal logs break start and break return events (`frontend_web/src/pages/attendance/KioskBreakDialog.tsx:15`). | Mobile parity screen tracks break events during shift attendance (`frontend_mobile/features/parity/attendance.tsx:36`). | Yes | — |
-| Manager provisional attendance review | Manager audits unrostered and suspicious clock-ins (`frontend_web/src/pages/attendance/KioskEvidenceReview.tsx:25`). | Manager reviews attendance exceptions on mobile (`frontend_mobile/app/attendance/exceptions/[id].tsx:3`). | Yes | — |
-| Attendance corrections | Attendance tracking logs manual time adjustments (`frontend_web/src/pages/attendance/KioskActivationView.tsx:20`). | Manager submits manual attendance correction request (`frontend_mobile/app/attendance/corrections/new.tsx:3`). | Yes | — |
+| Clock in via mobile QR scanner | Web browser app does not implement camera scanner for physical kiosk QR (`frontend_web/src/App.tsx`). | Mobile app opens camera scanner to read kiosk QR token (`frontend_mobile/app/attendance/clock.tsx:3`). | Expo only | Intended: camera QR scanning of the physical on-site kiosk is mobile-native. |
+| Rotating kiosk QR display | Dedicated tablet kiosk web app renders rotating dynamic QR code (`frontend_web/src/pages/attendance/KioskPage.tsx:95`). | Mobile app provides pairing status and link screen for kiosk hardware (`frontend_mobile/app/attendance/kiosk-status.tsx:3`). | No | Parity question: the kiosk display terminal is web-only (`KioskPage.tsx`), while mobile manages pairing and diagnostics. |
+| PIN clock in/out | Kiosk terminal provides numeric keypad for PIN attendance (`frontend_web/src/pages/attendance/KioskPage.tsx:75`). | Worker configures attendance PIN in dedicated mobile settings screen (`frontend_mobile/app/attendance-pin.tsx:11`). | No | Intended: terminal handles physical PIN entry while mobile allows worker PIN configuration. |
+| Breaks recording | Kiosk terminal logs break start and break return events (`frontend_web/src/pages/attendance/KioskBreakDialog.tsx:65`). | Mobile parity screen tracks break events during shift attendance (`frontend_mobile/features/parity/attendance.tsx:27`). | Yes | — |
+| Manager provisional attendance review | Manager audits unrostered and suspicious clock-ins (`frontend_web/src/pages/attendance/KioskEvidenceReview.tsx:41`). | Manager reviews attendance exceptions on mobile (`frontend_mobile/app/attendance/exceptions/[id].tsx:3`). | Yes | — |
+| Attendance corrections | Attendance tracking logs manual time adjustments (`frontend_web/src/pages/attendance/ManagerAttendanceReviewPage.tsx:77`). | Manager submits manual attendance correction request (`frontend_mobile/app/attendance/corrections/new.tsx:3`). | Yes | — |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
 | GM-08-Q01 | Web + Expo |
 | GM-08-Q02 | Web + Expo |
-| GM-08-Q03 | Web + Expo |
-| GM-08-Q04 | Web + Expo |
+| GM-08-Q03 | Web + Expo (also covers GM15-11) |
+| GM-08-Q04 | Web + Expo (also covers GM15-12) |
 | GM-08-Q05 | Web + Expo |
 | GM-08-Q06 | Web + Expo |
 | GM-08-Q07 | Web + Expo |
 | GM-08-Q08 | Web + Expo |
 | GM-08-Q09 | Web + Expo |
 | GM-08-Q10 | Web + Expo |
-| GM-08-Q11 | Web + Expo |
+| GM-08-Q11 | Web + Expo (also covers GM15-32, GM17-Q16) |
+| GM-08-W01 — Re-grill: kiosk PIN setup and worker QR confirmations tied to the session the worker saw | Web + Expo |
 
 ## Bases (exact SHAs verified 2026-11-21)
 
@@ -238,6 +239,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-08-Q03 — When does a missing worker become a no-show? (carried CX-Q11) — STILL VALID
 
+> **Also covers (22 Nov):** GM15-11 (GM-15). Asked once, here.
+
 **Plain English:** today there is no such thing as a no-show in the product. A worker who never turns up simply has no attendance record, and their shift still shows them assigned. Nobody is told, nothing is flagged, and the incident ladder (which is supposed to count no-shows) has nothing to count.
 
 **ACTUAL TODAY — Web and Expo (same backend):** No no-show state, field, transition, or job exists in `backend/attendance/` (models, transitions, approvals read in full). No scheduled task marks missing workers (no beat task for attendance was found in the files read; `backend/core/celery.py` was not read — GM-11/GM-23 territory). The rostered worker stays assigned (GM-07 R04) until a manager releases them. The incident ladder (P06/P10) is GM-15's; it has no no-show input from attendance today.
@@ -251,6 +254,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN (carried CX-Q11, STILL VALID).
 
 ### GM-08-Q04 — Late arrival, early departure, early finish: is there a grace period, and what counts? (carried CX-Q12) — STILL VALID
+
+> **Also covers (22 Nov):** GM15-12 (GM-15). Asked once, here.
 
 **Plain English:** today "late" doesn't exist. The clock-in window is two hours either side of the shift, and a clock-in at 8:00 for a 9:00 shift looks exactly the same as a clock-in at 10:30. There is no grace period, no late flag, and no rule for leaving early.
 
@@ -349,6 +354,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN — NEW (with an UNKNOWN: search the whole backend for MANAGER writers before implementing).
 
 ### GM-08-Q11 — What does attendance hand to the timesheet — and what marks a shift complete? (carried CX-Q32 / CX-R01, GM-09 boundary)
+
+> **Also covers (22 Nov):** GM15-32 (GM-15), GM17-Q16 (GM-17). Asked once, here.
 
 **Plain English:** attendance records what actually happened; the timesheet turns it into pay. The handover between the two was not traced in this pass, and there is still no "shift complete" state anywhere. The owner needs to say what counts as a finished, payable shift — and what happens to the awkward cases (forgot to clock out, clocked in but never rostered, provisional never approved).
 

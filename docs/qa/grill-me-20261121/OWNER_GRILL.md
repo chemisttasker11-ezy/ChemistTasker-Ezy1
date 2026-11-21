@@ -68,7 +68,10 @@ This is the one page Tom (the owner) goes through. It sits on top of the 27 area
 | 13 | **GM-27 Mobile-only flows (new)** | 7 | Q01–Q07, including cached export and QR retention | GM27-Q01 |
 | 14 | GM-26 Admin/privacy/security/release | 27 | W01 reCAPTCHA keys (owner action), W02 Dependabot, W03 node-forge, W04 minimatch | GM26 first non-launch question |
 
-**463 open question entries across the area and launch rows above.** Ask the launch-blocking questions first (marked in `followup/followup-launch-blocking.md`). The owner can defer the remaining optional questions by area.
+
+**Update 22 Nov (orchestrator, done alone at the owner's request):** duplicates merged. Each repeated question is now asked once: 90 questions carry their 168 copies, and every copy says "Merged 22 Nov: asked once, as X in GM-nn" (talent-board questions stay in GM-18 and availability in GM-19; the rest are asked the first time they come up in this order). **388 questions are open** (counted from each area's question headings: 168 merged copies and 37 answered ones excluded). The GM-21 and GM-24 "Platforms per question" tables had shifted question numbers and were rebuilt from the real headings; 12 waiting-decision (W) questions missing from those tables were added. All 173 web/Expo rows were checked by hand and their refs re-pointed at the exact line (re-exports followed). Wrong claims corrected: GM-04 organisation invoices (web has a summary only), GM-17 subscription by invoice (web-only), GM-02 banking (neither onboarding asks for bank details), GM-07 worker swap (missing on Expo, now BL-34), GM-07 acknowledgement, GM-24 Explorer shifts. Still loose: about 45 refs point at a type, import or log line in the right file (second pass pending).
+
+_Before 22 Nov:_ **463 open question entries across the area and launch rows above.** Ask the launch-blocking questions first (marked in `followup/followup-launch-blocking.md`). The owner can defer the remaining optional questions by area.
 
 ## 3. Where the 17 waiting decisions went
 
@@ -154,4 +157,4 @@ Corrections that touched this review's own additions (GM-05, GM-07, GM-13, GM-24
 
 ## 6. Engineering backlog (not owner questions)
 
-Defects and carried rules the code does not yet follow are in [`ENGINEERING_BACKLOG.md`](ENGINEERING_BACKLOG.md), BL-01 to BL-33. The area files keep their own code-gap notes. BL-07 links the existing O4 fix in `local/o4-fixes`.
+Defects and carried rules the code does not yet follow are in [`ENGINEERING_BACKLOG.md`](ENGINEERING_BACKLOG.md), BL-01 to BL-34. The area files keep their own code-gap notes. BL-07 links the existing O4 fix in `local/o4-fixes`.

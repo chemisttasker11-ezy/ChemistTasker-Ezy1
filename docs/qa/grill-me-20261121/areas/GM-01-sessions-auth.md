@@ -20,13 +20,13 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Sign up (create account) | Visitor submits registration form with role selection and reCAPTCHA (`frontend_web/src/pages/register.tsx:96`). | Visitor submits registration with role picker and captcha verification (`frontend_mobile/app/register.tsx:91`). | Yes | — |
-| Verify email OTP | User inputs 6-digit email code sent upon registration (`frontend_web/src/pages/OTPVerify.tsx:35`). | User enters 6-digit OTP with auto-advancing text inputs (`frontend_mobile/app/verify-otp.tsx:36`). | Yes | — |
-| Log in (email & password) | User enters credentials with "Keep me signed in" checkbox (`frontend_web/src/pages/login.tsx:30`). | User enters credentials without "Keep me signed in" checkbox (`frontend_mobile/app/login.tsx:22`). | No | Parity question: web exposes "Keep me signed in" checkbox altering refresh token lifetime (`frontend_web/src/pages/login.tsx:189`), while mobile omits it. |
-| Biometric fast login | Web client does not implement biometric or WebAuthn passkey authentication (`frontend_web/src/pages/login.tsx:30`). | Mobile client prompts for biometric enrolment and allows Face ID/fingerprint sign-in (`frontend_mobile/app/login.tsx:162`). | Expo only | Intended: mobile-only native device hardware capability. |
-| Mobile OTP verification | Unverified worker is gated to mobile OTP verification screen (`frontend_web/src/pages/MobileOTPVerify.tsx:67`). | Mobile app gates unverified workers to mobile-verify screen before accessing tabs (`frontend_mobile/app/mobile-verify.tsx:19`). | Yes | — |
-| Password reset request | Visitor submits email to request password reset link (`frontend_web/src/pages/PasswordResetRequestPage.tsx:8`). | Visitor inputs email on forgot-password screen to trigger reset code (`frontend_mobile/app/forgot-password.tsx:7`). | Yes | — |
-| Session token refresh | Browser refreshes access token via HttpOnly cookies and session storage sync (`frontend_web/src/contexts/AuthContext.tsx:456`). | Native app exchanges stored refresh token via bearer payload (`frontend_mobile/context/AuthContext.tsx:475`). | Same (different storage) | Intended (orchestrator review 22 Nov): each platform keeps the sign-in where it is safest (web HttpOnly cookie, phone secure storage). Not an owner question. |
+| Sign up (create account) | Visitor submits registration form with role selection and reCAPTCHA (`frontend_web/src/pages/register.tsx:96`). | Visitor submits registration with role picker and captcha verification (`frontend_mobile/app/register.tsx:241`). | Yes | — |
+| Verify email OTP | User inputs 6-digit email code sent upon registration (`frontend_web/src/pages/OTPVerify.tsx:35`). | User enters 6-digit OTP with auto-advancing text inputs (`frontend_mobile/app/verify-otp.tsx:57`). | Yes | — |
+| Log in (email & password) | User enters credentials with "Keep me signed in" checkbox (`frontend_web/src/pages/login.tsx:61`). | User enters credentials without "Keep me signed in" checkbox (`frontend_mobile/app/login.tsx:143`). | No | Parity question: web exposes "Keep me signed in" checkbox altering refresh token lifetime (`frontend_web/src/pages/login.tsx:189`), while mobile omits it. |
+| Biometric fast login | Web client does not implement biometric or WebAuthn passkey authentication (`frontend_web/src/pages/login.tsx`). | Mobile client prompts for biometric enrolment and allows Face ID/fingerprint sign-in (`frontend_mobile/app/login.tsx:162`). | Expo only | Intended: mobile-only native device hardware capability. |
+| Mobile OTP verification | Unverified worker is gated to mobile OTP verification screen (`frontend_web/src/pages/MobileOTPVerify.tsx:67`). | Mobile app gates unverified workers to mobile-verify screen before accessing tabs (`frontend_mobile/app/_layout.tsx:314`). | Yes | — |
+| Password reset request | Visitor submits email to request password reset link (`frontend_web/src/pages/PasswordResetRequestPage.tsx:26`). | Visitor inputs email on forgot-password screen to trigger reset code (`frontend_mobile/app/forgot-password.tsx:25`). | Yes | — |
+| Session token refresh | Browser refreshes access token via HttpOnly cookies and session storage sync (`frontend_web/src/contexts/AuthContext.tsx:191`). | Native app exchanges stored refresh token via bearer payload (`frontend_mobile/context/AuthContext.tsx:127`). | Same (different storage) | Intended (orchestrator review 22 Nov): each platform keeps the sign-in where it is safest (web HttpOnly cookie, phone secure storage). Not an owner question. |
 | Log out | User logs out, clearing browser storage and session cookies (`frontend_web/src/contexts/AuthContext.tsx:453`). | User logs out, clearing SecureStore and resetting root navigation (`frontend_mobile/context/AuthContext.tsx:518`). | Yes | — |
 
 ### Platforms per question
@@ -35,20 +35,20 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM01-Q01 | Web + Expo |
 | GM01-Q02 | Web + Expo |
 | GM01-Q03 | Web + Expo |
-| GM01-Q04 | Web + Expo |
+| GM01-Q04 | Web + Expo (also covers GM25-C02) |
 | GM01-Q05 | Web + Expo |
 | GM01-Q06 | Web + Expo |
 | GM01-Q07 | Web only |
 | GM01-Q08 | Web + Expo |
 | GM01-Q09 | Web only |
-| GM01-Q10 | Expo only |
+| GM01-Q10 | Expo only (also covers ON-Q15, GM-03-Q05, Q-16, GM25-C01, GM26-Q48) |
 | GM01-Q11 | Expo only |
 | GM01-Q12 | Expo only |
 | GM01-Q13 | Web + Expo |
 | GM01-Q14 | Web + Expo |
 | GM01-Q15 | Web + Expo |
-| GM01-Q16 | Web + Expo |
-| GM01-Q17 | Web + Expo |
+| GM01-Q16 | Web + Expo (asked in GM-18: GM-18-Q13) |
+| GM01-Q17 | Web + Expo (asked in GM-18: GM-18-Q14) |
 | GM01-Q18 | Web + Expo |
 | GM01-Q19 | Web + Expo |
 
@@ -218,6 +218,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM01-Q04 — Must a worker verify their mobile before they can browse anything? (carried ON-Q02, re-asked — FIRST QUESTION, see Part D)
 
+> **Also covers (22 Nov):** GM25-C02 (GM-25). Asked once, here.
+
 **Previous answer:** KEEP (launch grill, 23 Oct 2026). Re-confirm here once using the corrected dashboard baseline.
 
 **Plain English:** today, after email + password, a pharmacist, assistant, technician or Explorer must also verify an Australian mobile number (or, for overseas Explorers, a photo ID) before they can see *any* dashboard page — the app bounces them to the mobile-check screen. The old grill said workers could "browse everything after email login". That is not what the code does. The owner needs to confirm the strict rule or relax it.
@@ -299,6 +301,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM01-Q10 — Should every onboarding/auth step work on mobile, including the password and OTP screens?
 
+> **Also covers (22 Nov):** ON-Q15 (GM-02), GM-03-Q05 (GM-03), Q-16 (GM-05), GM25-C01 (GM-25), GM26-Q48 (GM-26). Asked once, here.
+
 **Plain English:** the auth screens themselves (sign in, sign up, email code, mobile check, forgot password, reset password) all exist on the phone app — but the Next web app's shared API setup is missing its token-refresh callback, so it is not proven that a signed-in Next session refreshes cleanly. And the old grill's complaint about the mobile "add personal profile" flow belongs to onboarding, not to sessions.
 
 **ACTUAL TODAY — Expo:** public routes in `frontend_mobile/app/_layout.tsx` include `login, register, welcome, verify-otp, forgot-password, reset-password, mobile-verify` — all auth screens exist. **ACTUAL TODAY — Vite:** all equivalent pages exist (`login.tsx`, `register.tsx`, `OTPVerify.tsx`, `MobileOTPVerify.tsx`, `password-reset.tsx`, `ResetPasswordPage.tsx`). **ACTUAL TODAY — Next:** login/register migrated copies exist and mirror Vite, BUT `frontend_web/landing_next/migrated/config/api.ts` passes `getToken` and **no `refreshToken` callback** to `configureApi` — so shared-core API calls from Next cannot refresh on 401; only calls through `browserRequest` (`browser-session.ts`) refresh. Whether the live Next app hits the broken path was not verified.
@@ -377,6 +381,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM01-Q16 — Should a signed-in worker be able to see an anonymous talent poster's real name? (carried LA-Q12)
 
+> **Merged 22 Nov: asked once, as GM-18-Q13 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** today anyone who is signed in can read the real name and user ID behind an "anonymous" talent post — only people who are *not* signed in get the masked version. The anonymity promise is broken for every logged-in user.
 
 **ACTUAL TODAY — Web and Expo (same backend):** authenticated `list` / `retrieve` / `feed` / `by_profile` return `author_user_id`, `explorer_user_id`, `explorer_name` via unmasked `ExplorerPostReadSerializer`; only `public_feed` (AllowAny) uses `PublicExplorerPostReadSerializer`, which nulls those fields and shows "Anonymous candidate" when `is_anonymous` (`backend/talent/serializers/explorer.py`, `backend/talent/views/explorer.py`). Both apps consume the leaking authenticated API (old `current`, still true — re-verified).
@@ -390,6 +396,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN (carried from LA-Q12, re-verified at `main` and PR #249 head).
 
 ### GM01-Q17 — Should a talent post disappear when its author loses Verified status or their AHPRA lapses? (carried LA-Q13, lapsed-credential half)
+
+> **Merged 22 Nov: asked once, as GM-18-Q14 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** hidden posts and past-dated posts are now hidden everywhere (fixed since the old grill). But if a worker's verification is revoked or their AHPRA registration lapses, their talent post stays up and readable. Should it hide automatically?
 

@@ -21,25 +21,25 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
 | Select audience tier in posting wizard | Offers 5 audience tiers and custom escalation timing (`frontend_web/shared/postShift/PostShiftVisibilityStep.tsx:61`). | Offers identical 5 audience tiers and escalation intervals (`frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx:63`). | Yes | - |
-| Unfilled shift escalation check | Any shift list load triggers backend auto-escalation evaluation (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:75`). | Shift list load triggers identical backend auto-escalation check (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:125`). | Yes | - |
-| Disclosing widened shift to new tier | Widened shift becomes visible to new audience on feed query (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:370`). | Widened shift becomes discoverable on mobile shift query (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:145`). | Yes | - |
-| Posting-time notification toggles | Wizard exposes notification switches for email and in-app alerts (`frontend_web/shared/postShift/PostShiftVisibilityStep.tsx:142`). | Wizard exposes notification switches for email and in-app alerts (`frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx:185`). | Yes | - |
+| Unfilled shift escalation check | Any shift list load triggers backend auto-escalation evaluation (`backend/shifts/base.py:252`, `backend/shifts/escalation.py:91`). | Shift list load triggers identical backend auto-escalation check (`backend/shifts/base.py:252`). | Yes | - |
+| Disclosing widened shift to new tier | Widened shift becomes visible to new audience on feed query (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:159`). | Widened shift becomes discoverable on mobile shift query (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:13`). | Yes | - |
+| Posting-time notification toggles | Wizard exposes notification switches for email and in-app alerts (`frontend_web/shared/postShift/PostShiftVisibilityStep.tsx:21`). | Wizard exposes notification switches for email and in-app alerts (`frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx:28`). | Yes | - |
 | Worker interest halts escalation | Submitting interest halts further automatic audience widening (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:284`). | Submitting interest halts further automatic audience widening (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:234`). | Yes | - |
-| Anonymous public posting toggle | Toggle anonymises pharmacy details for public platform tier (`frontend_web/shared/postShift/PostShiftVisibilityStep.tsx:180`). | Toggle hides pharmacy name on public platform tier (`frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx:210`). | Yes | - |
+| Anonymous public posting toggle | Toggle anonymises pharmacy details for public platform tier (`frontend_web/shared/postShift/PostShiftVisibilityStep.tsx:18`). | Toggle hides pharmacy name on public platform tier (`frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx:210`). | Yes | - |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
-| GM-11-Q01 | Web + Expo |
-| GM-11-Q02 | Web + Expo |
-| GM-11-Q03 | Web + Expo |
-| GM-11-Q04 | Web + Expo |
-| GM-11-Q05 | Web + Expo |
+| GM-11-Q01 | Web + Expo (also covers GM-12-Q19, GM22-01, GM-24-Q10) |
+| GM-11-Q02 | Web + Expo (also covers GM22-13) |
+| GM-11-Q03 | Web + Expo (also covers GM22-11, GM25-C20) |
+| GM-11-Q04 | Web + Expo (also covers GM22-12) |
+| GM-11-Q05 | Web + Expo (also covers GM-18-Q18, GM22-10, GM-23-16, GM-24-Q19) |
 | GM-11-Q06 | Web + Expo |
-| GM-11-Q07 | Web + Expo |
-| GM-11-Q08 | Web + Expo |
+| GM-11-Q07 | Web + Expo (also covers GM-24-Q08, GM26-Q15) |
+| GM-11-Q08 | Web + Expo (also covers GM22-14, GM-24-Q09, GM26-Q16) |
 | GM-11-Q09 | Web + Expo |
-| GM-11-Q10 | Web + Expo |
+| GM-11-Q10 | Web + Expo (also covers GM-12-Q11, GM13-Q06) |
 | GM-11-Q11 | Web + Expo |
 | GM-11-Q12 | Web + Expo |
 | GM-11-Q13 | Web + Expo |
@@ -171,6 +171,8 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 | D03 | Unpaid reservation expires → release to the same audience, notify worker + manager. No auto-escalation, no penalty. | Decision stands; expiry implementation NOT found (GM-13). |
 
 ### GM-11-Q01 — When a shift escalates, who is told, and when does escalation stop? 🔴 [FIRST — see §4]
+
+> **Also covers (22 Nov):** GM-12-Q19 (GM-12), GM22-01 (GM-22), GM-24-Q10 (GM-24). Asked once, here.
 - **Old ID:** PO-Q08 (gap SH-06). **Status: STILL VALID.**
 - **ACTUAL TODAY:** Escalation sends no notices at any tier; availability-match emails go out only when a shift is posted straight to public. Auto-escalation stops for good once anyone has shown interest, even if they later declined, withdrew, or their offer expired (`escalation.py` filter `interests__isnull=True`; no resume path).
 - **RECOMMENDED:** A — Notify each new tier; stop when reserved. Respects the owner's notice flags. Rationale: newly eligible workers are never told today, and one declined applicant strands the shift. Severity: launch-gating — shifts can strand silently on launch weekend.
@@ -181,6 +183,8 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 - **Edge cases:** declined vs withdrawn vs expired-offer interest (all stop it today); interest from an unverified worker; interest on one date of a multi-date block; two workers interested at once (race — first interest stops widening for both); escalation reaching PLATFORM after shift start (no late bound); PLATFORM step skipped while at daily public-shift limit (silent — no notice the step was skipped). **Payment/notification side effects:** notifying a tier costs email/push volume only; no fee is charged on escalation. **Web/Expo difference:** none in the rule (shared backend); the *discovery* difference is that Expo workers rely on push/list loads, web workers on email/list loads — both silent today.
 
 ### GM-11-Q02 — Should escalation pause while an offer waits for an answer? 🟠
+
+> **Also covers (22 Nov):** GM22-13 (GM-22). Asked once, here.
 - **Old ID:** PO-Q09. **Status: STILL VALID.**
 - **ACTUAL TODAY:** No pause rule. Auto-escalation stops for good once anyone shows interest, so most shifts with a pending offer never escalate again, even after decline or expiry. (Offer expiry is flat 48h, lazily applied — GM-12-Q10.)
 - **RECOMMENDED:** A — Pause; resume on decline or expiry. No two workers race for one slot. Rationale: the current stop rule is a pause that never resumes; turning it into a real pause keeps the no-race benefit without stranding the shift.
@@ -190,6 +194,8 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 - **Edge cases:** offer expires (lazily — may outlive shift start); worker withdraws; owner withdraws offer (no withdraw action exists — GM-12-Q16); multi-date block with one date offered. **Blocked by:** Q01 (the stop rule must be replaced before a pause rule makes sense).
 
 ### GM-11-Q03 — How late may a scheduled escalation fire? 🔴 (code gap once decided)
+
+> **Also covers (22 Nov):** GM22-11 (GM-22), GM25-C20 (GM-25). Asked once, here.
 - **Old ID:** PO-Q10 (gap SH-05), type `code` in #184; also LA-Q08. **Status: STILL VALID.**
 - **ACTUAL TODAY:** Auto-escalation only runs when someone loads a shift list or detail (`base.py:get_queryset` → `_auto_escalate_shifts` on every request); no scheduled job exists, so due escalations fire late or never, and each request scans every due shift.
 - **RECOMMENDED:** A — Within 5 minutes. A scheduled job every few minutes. Rationale: the existing beat schedule already runs jobs every 60 s (editorial revisions) and */15 (AHPRA alerts), so a job is cheap; 5 minutes is plenty for owner-set intervals.
@@ -200,6 +206,8 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 
 ### GM-11-Q04 — Should automatic widening be in the first launch? (LA-Q08)
 
+> **Also covers (22 Nov):** GM22-12 (GM-22). Asked once, here.
+
 **Scenario:** Tom's shift is due to widen at 2 am. Sara checks at 7 am.
 **What happens today:** The shift widens when a shift-list or detail request runs the due check. Until someone loads it, the shift can stay at its earlier tier (`pr257:backend/shifts/escalation.py:91`).
 **Recommendation first: A.** Launch automatic widening with the scheduled check and the timing chosen in GM-11-Q03.
@@ -209,6 +217,8 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 **Status:** OPEN (launch scope). Engineering: see BL-24.
 
 ### GM-11-Q05 — Fix before launch? Match emails miss escalated shifts and reach unverified workers. 🟠 (code gap)
+
+> **Also covers (22 Nov):** GM-18-Q18 (GM-18), GM22-10 (GM-22), GM-23-16 (GM-23), GM-24-Q19 (GM-24). Asked once, here.
 - **Old ID:** LA-Q17 (gap AV-04). **Status: STILL VALID.**
 - **ACTUAL TODAY:** Match emails go out only at posting time, for shifts posted straight to PLATFORM (`announcements.py:announce_availability_matches`); shifts that later escalate to PLATFORM never notify available workers. Recipients are not filtered by Verified, so unverified workers are emailed shifts they are then blocked from applying to. Match uses any-overlap (`availability.start <= slot_end AND availability.end >= slot_start`).
 - **RECOMMENDED:** A — Fix before launch. Send on escalation to PLATFORM as well as on direct posting; filter recipients to Verified (and role-appropriate) workers.
@@ -229,6 +239,8 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 - **Edge cases:** starting at PLATFORM anonymously (see Q07/Q08); starting late on a multi-date block; changing the starting tier after posting (edit — GM-10 territory).
 
 ### GM-11-Q07 — On an anonymous public post, what is hidden? 🟡
+
+> **Also covers (22 Nov):** GM-24-Q08 (GM-24), GM26-Q15 (GM-26). Asked once, here.
 - **Old ID:** PO-Q11. **Status: PARTLY (mechanism confirmed, field list not re-verified).**
 - **ACTUAL TODAY:** Redaction runs through `anonymize_pharmacy_detail` (`serialization/shifts.py:to_representation`); anonymous shifts are included in the public queryset with search excluding name/street. The Oct 2026 field list — name, street, software and services hidden; suburb, state, postcode, script volume and rate shown — was **not** re-verified at head. Do not present that list as current until the serializer is read line by line.
 - **RECOMMENDED (Oct 2026, stands as proposal):** KEEP the Oct 2026 list if confirmed. It hides what was proposed and keeps the suburb workers need to judge travel, as Mable does. It also hides software and services, which could identify a small-suburb pharmacy.
@@ -238,6 +250,8 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 - **Edge cases:** anonymous post escalates *to* PLATFORM from a named earlier tier — do earlier-tier workers keep seeing the name while public workers see "Anonymous"? NOT inspected — unknown. Anonymous + urgent flag; anonymous multi-date block. **Web/Expo difference:** redaction must hold in both clients and in emails/push — NOT inspected on Expo. Re-verify the serializer field list before deciding.
 
 ### GM-11-Q08 — When does an anonymous pharmacy's name reach the worker? 🟠
+
+> **Also covers (22 Nov):** GM22-14 (GM-22), GM-24-Q09 (GM-24), GM26-Q16 (GM-26). Asked once, here.
 - **Old ID:** PO-Q12. **Status: PARTLY (reminder job confirmed, naming not verified).**
 - **ACTUAL TODAY:** The reminder job exists (`tasks.py:send_shift_reminders`, 12h window, hourly beat). Whether the 12-hour reminder email names the pharmacy on anonymous shifts, and whether the terms dialog omits the name, were NOT re-verified at head. Oct 2026 said: worker never sees the name before accepting; terms dialog omits it; accept notices say "Shift in &lt;suburb&gt;"; cards stay anonymous after booking; the 12-hour reminder email names it. Treat that as Oct 2026 only.
 - **RECOMMENDED (Oct 2026):** A — In the agreement preview, before the worker accepts. Today (Oct 2026) a worker agrees to work for an unknown business and learns the name by accident in an email.
@@ -258,6 +272,8 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 - **Edge cases:** owner turns urgent off after posting; shift becomes urgent by passage of time (crosses the 24h boundary) — does it re-escalate? NOT inspected.
 
 ### GM-11-Q10 — When an offer is declined or expires, what happens to the shift's audience? 🟠
+
+> **Also covers (22 Nov):** GM-12-Q11 (GM-12), GM13-Q06 (GM-13). Asked once, here.
 - **Old ID:** BK-Q06 (booking area, escalation-adjacent). **Status: STILL VALID.**
 - **ACTUAL TODAY:** Decline/expiry does not resume escalation (SH-06 stop rule — any past interest blocks it). The shift stays at whatever tier it reached, with the same audience; a reservation expiry releases to the same audience only (D03 — decision; implementation not found, see §6).
 - **RECOMMENDED:** A — On decline/expiry/withdrawal, resume escalation from the tier it had reached (do not restart from tier 1, do not jump to PLATFORM), and notify the next tier. Rationale: the slot is empty again; the audience should widen, not freeze. This is the same recommendation as Q01-A/Q02-A, applied to the decline/expiry event.

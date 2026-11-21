@@ -20,11 +20,11 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Build draft roster week | Manager plans shifts on calendar grid (`frontend_web/src/components/roster/HorizontalCalendarGrid.tsx:30`). | Manager views and edits roster calendar (`frontend_mobile/app/manager/roster/calendar.tsx:1`). | Yes | — |
-| Validate and publish roster | Manager validates roster requirements and publishes week (`frontend_web/src/components/roster/RosterManagerOverview.tsx:45`). | Manager accesses published roster view (`frontend_mobile/app/attendance/published-roster.tsx:1`). | Yes | — |
-| Worker roster view & acknowledgement | Worker reviews schedule on roster grid (`frontend_web/src/components/roster/RosterGridViews.tsx:50`). | Manager tracks worker roster acknowledgements (`frontend_mobile/app/manager/roster/acknowledgements.tsx:1`). | Yes | — |
-| Shift swap request | Shift engagement terms modal displays roster shift metadata (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:15`). | Manager reviews roster approvals including shift swaps (`frontend_mobile/app/manager/roster/approvals.tsx:1`). | Yes | — |
-| Roster audit trail | Manager overview records roster status and revision summaries (`frontend_web/src/components/roster/RosterManagerOverview.tsx:70`). | Mobile manager roster audit screen inspects historical changes (`frontend_mobile/app/manager/roster/audit.tsx:1`). | Yes | — |
+| Build draft roster week | Manager plans shifts on calendar grid (`frontend_web/src/components/roster/HorizontalCalendarGrid.tsx:28`). | Manager views and edits roster calendar (`frontend_mobile/app/manager/roster/calendar.tsx:1`). | Yes | — |
+| Validate and publish roster | Manager validates roster requirements and publishes week (`frontend_web/src/components/roster/RosterManagerOverview.tsx:79`). | Manager accesses published roster view (`frontend_mobile/app/attendance/published-roster.tsx:1`). | Yes | — |
+| Worker roster view & acknowledgement | Worker reviews schedule on roster grid (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:770`). | Worker sees the published roster in My Roster, with a notice linking to the acknowledgement screen (`frontend_mobile/app/my-roster.tsx:494`). | Yes | — |
+| Shift swap request | Worker requests a swap with a named colleague from the roster action dialog (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:113`). | Missing: My Roster offers leave, cover and claim only; a worker cannot request a swap (managers can approve swaps on Expo) (`frontend_mobile/app/my-roster.tsx:69-71`, `frontend_mobile/features/parity/roster.tsx:640`). | No | Corrected 22 Nov (orchestrator review): missing on Expo. Defect BL-34 (the app must carry every web feature), not an owner question. |
+| Roster audit trail | Manager overview records roster status and revision summaries (`frontend_web/src/components/roster/RosterPlanningToolbar.tsx:132`). | Mobile manager roster audit screen inspects historical changes (`frontend_mobile/app/manager/roster/audit.tsx:1`). | Yes | — |
 
 ### Platforms per question
 | Question id | Platforms |
@@ -39,6 +39,9 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM-07-Q08 | Web + Expo |
 | GM-07-Q09 | Web + Expo |
 | GM-07-Q10 | Web + Expo |
+| GM-07-W01 — Does the 4-month posting window also apply to roster planning? | Web + Expo |
+| GM-07-W02 — May a roster manager edit or cancel a shift they are booked on themselves? | Web + Expo |
+| GM-07-W03 — Plain draft roster staff are deleted with their shift | Web + Expo |
 
 ## Bases (exact SHAs verified 2026-11-21)
 

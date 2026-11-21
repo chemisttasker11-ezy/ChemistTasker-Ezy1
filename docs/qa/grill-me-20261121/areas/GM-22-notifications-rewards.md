@@ -22,33 +22,33 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Shift announcement on posting | Backend announces public shifts to matched audience via email/in-app notification (`backend/shifts/announcements.py:345`). | Push notification and in-app alerts dispatched simultaneously (`backend/shifts/announcements.py:382`). | Yes | |
-| In-app notification center / feed | Top bar bell icon opens notification dropdown list (`frontend_web/src/layouts/TopBarActions.tsx:109`). | Dedicated notifications screen renders grouped alert history (`frontend_mobile/features/notifications/NotificationsScreen.tsx:40`). | Yes | Parity question: Web provides a header dropdown menu, whereas Expo features a full-page notification screen. |
-| Push notification delivery & permissions | Web has no push token registration; relies on email and in-app banners (`frontend_web/src/layouts/TopBarActions.tsx:254`). | Registers Expo push token with native permission prompt (`frontend_mobile/app/_layout.tsx:10`). | Expo only | Intended: Native mobile platforms support APNs/FCM push notifications while web relies on email and in-app dropdowns. |
-| Notification preferences & quiet hours | Web lacks push quiet-hours settings (`frontend_web/src/pages/login.tsx:50`). | User configures quiet-hours window and push delivery toggles (`frontend_mobile/app/settings/mobile.tsx:276`). | Expo only | Verified 21 Nov: intended. Quiet hours govern push, and push exists only on Expo. |
-| Shift reminders (24h / 12h pre-shift) | Celery beat triggers pre-shift reminders sent by email (`backend/shifts/tasks.py:45`). | Mobile receives synchronized push notification reminder (`backend/shifts/tasks.py:65`). | Yes | |
-| Rewards / Pills balance & ledger history | User views Pills balance and ledger in sidebar rewards page (`frontend_web/src/pages/dashboard/sidebar/rewards/PillsPage.tsx:45`). | User reviews Pills balance, history, and redemption in native screen (`frontend_mobile/roles/shared/pills/PillsScreen.tsx:61`). | Yes | |
-| Pay shift fees with Pills | Owner selects Pills payment option in active shifts table (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:204`). | Owner selects 'Pay with Pills' on payable shift cards (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/ActiveShiftCards.tsx:648`). | Yes | |
+| Shift announcement on posting | Backend announces public shifts to matched audience via email/in-app notification (`backend/shifts/announcements.py:29`). | Push notification and in-app alerts dispatched simultaneously (`backend/shifts/announcements.py:29`). | Yes | |
+| In-app notification center / feed | Top bar bell icon opens notification dropdown list (`frontend_web/src/layouts/TopBarActions.tsx:109`). | Dedicated notifications screen renders grouped alert history (`frontend_mobile/features/notifications/NotificationsScreen.tsx:33`). | Yes | Parity question: Web provides a header dropdown menu, whereas Expo features a full-page notification screen. |
+| Push notification delivery & permissions | Web has no push token registration; relies on email and in-app banners (`frontend_web/src/layouts/TopBarActions.tsx:254`). | Registers Expo push token with native permission prompt (`frontend_mobile/utils/pushNotifications.ts:62`). | Expo only | Intended: Native mobile platforms support APNs/FCM push notifications while web relies on email and in-app dropdowns. |
+| Notification preferences & quiet hours | Web lacks push quiet-hours settings (`frontend_web/src/pages/dashboard/sidebar`). | User configures quiet-hours window and push delivery toggles (`frontend_mobile/app/settings/mobile.tsx:276`). | Expo only | Verified 21 Nov: intended. Quiet hours govern push, and push exists only on Expo. |
+| Shift reminders (24h / 12h pre-shift) | Celery beat triggers pre-shift reminders sent by email (`backend/shifts/tasks.py:22`). | Mobile receives synchronized push notification reminder (`backend/shifts/tasks.py:22`). | Yes | |
+| Rewards / Pills balance & ledger history | User views Pills balance and ledger in sidebar rewards page (`frontend_web/src/pages/dashboard/sidebar/rewards/PillsPage.tsx:56`). | User reviews Pills balance, history, and redemption in native screen (`frontend_mobile/roles/shared/pills/PillsScreen.tsx:61`). | Yes | |
+| Pay shift fees with Pills | Owner selects Pills payment option in active shifts table (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:12`). | Owner selects 'Pay with Pills' on payable shift cards (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/ActiveShiftCards.tsx:648`). | Yes | |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
-| GM22-01 · PO-Q08 — When a shift escalates, who is told, and when does escalation stop? | Web + Expo |
+| GM22-01 · PO-Q08 — When a shift escalates, who is told, and when does escalation stop? | Web + Expo (asked in GM-11: GM-11-Q01) |
 | GM22-02 · BK-Q06 — When an offer is declined or expires, what happens to the shift? | Web + Expo |
-| GM22-03 · AG-Q09 — Who is told when a shift is cancelled, covered or replaced? | Web + Expo |
-| GM22-04 · AG-Q10 — Which channels carry those notices? | Web + Expo |
-| GM22-05 · AG-Q11 — Which shifts get pre-shift reminders, and when? | Web + Expo |
-| GM22-06 · AG-Q12 — If a shift changes inside 12 hours of start, what happens to reminders? | Web + Expo |
-| GM22-07 · CX-Q06 — Inside the window, who is alerted and how fast? | Web + Expo |
-| GM22-08 · AV-Q08 — Should urgent-shift alerts need a separate opt-in? | Web + Expo |
-| GM22-09 · AV-Q09 — Should workers set a max distance and minimum rate for alerts? | Web + Expo |
-| GM22-10 · LA-Q17 — Fix before launch? Match emails miss escalated shifts and reach unverified workers. | Web + Expo |
-| GM22-11 · PO-Q10 — How late may a scheduled escalation fire? | Web + Expo |
-| GM22-12 · LA-Q08 — Fix before launch? Scheduled escalation only runs when someone loads a shift list. | Web + Expo |
-| GM22-13 · PO-Q09 — Should escalation pause while an offer waits for an answer? | Web + Expo |
-| GM22-14 · PO-Q12 — When does an anonymous pharmacy's name reach the worker? | Web + Expo |
-| GM22-15 · AG-Q03 — Should both sides get a PDF copy of the agreement? | Web + Expo |
-| GM22-16 · LA-P02 — Fix before launch? AHPRA cancellations bypass the cancellation policy and notices. | Web + Expo |
+| GM22-03 · AG-Q09 — Who is told when a shift is cancelled, covered or replaced? | Web + Expo (asked in GM-04: GM-04-Q08) |
+| GM22-04 · AG-Q10 — Which channels carry those notices? | Web + Expo (asked in GM-15: GM15-39) |
+| GM22-05 · AG-Q11 — Which shifts get pre-shift reminders, and when? | Web + Expo (also covers GM-23-11, GM25-C19) |
+| GM22-06 · AG-Q12 — If a shift changes inside 12 hours of start, what happens to reminders? | Web + Expo (also covers GM-23-12) |
+| GM22-07 · CX-Q06 — Inside the window, who is alerted and how fast? | Web + Expo (asked in GM-15: GM15-06) |
+| GM22-08 · AV-Q08 — Should urgent-shift alerts need a separate opt-in? | Web + Expo (asked in GM-19: GM-19-Q08) |
+| GM22-09 · AV-Q09 — Should workers set a max distance and minimum rate for alerts? | Web + Expo (asked in GM-19: GM-19-Q09) |
+| GM22-10 · LA-Q17 — Fix before launch? Match emails miss escalated shifts and reach unverified workers. | Web + Expo (asked in GM-11: GM-11-Q05) |
+| GM22-11 · PO-Q10 — How late may a scheduled escalation fire? | Web + Expo (asked in GM-11: GM-11-Q03) |
+| GM22-12 · LA-Q08 — Fix before launch? Scheduled escalation only runs when someone loads a shift list. | Web + Expo (asked in GM-11: GM-11-Q04) |
+| GM22-13 · PO-Q09 — Should escalation pause while an offer waits for an answer? | Web + Expo (asked in GM-11: GM-11-Q02) |
+| GM22-14 · PO-Q12 — When does an anonymous pharmacy's name reach the worker? | Web + Expo (asked in GM-11: GM-11-Q08) |
+| GM22-15 · AG-Q03 — Should both sides get a PDF copy of the agreement? | Web + Expo (asked in GM-14: GM14-Q06) |
+| GM22-16 · LA-P02 — Fix before launch? AHPRA cancellations bypass the cancellation policy and notices. | Web + Expo (asked in GM-17: GM17-Q11) |
 | GM22-17 · NEW — Is there an in-app notification centre, and what does it do? | Web + Expo |
 | GM22-18 · NEW — How do Expo push notifications work, and what happens when permission is denied? | Expo only |
 | GM22-19 · NEW — Who sends the emails, and what happens when one fails? | Web + Expo |
@@ -224,6 +224,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM22-01 · PO-Q08 — When a shift escalates, who is told, and when does escalation stop? 🔴 decision · gap SH-06 — CHANGED
 
+> **Merged 22 Nov: asked once, as GM-11-Q01 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** today a shift widens to a new audience in total silence — nobody is told — and once anyone has ever shown interest, it never widens again, even if that person declined. One declined applicant can strand a shift forever.
 
 **ACTUAL TODAY — Web and Expo (same, backend-shared):** `escalation.py` sends **nothing** on escalation; `auto_escalate_due_shifts` advances the tier only. The stop rule is confirmed: any interest **ever** stops auto-escalation. Manual `escalate_shift` has no interest check. **New since Oct 2026:** `reject_shift` sends an escalation-prompt email + in-app notice to the creator only ("Shift declined… escalate to the platform with a single click") — so the creator is now prompted, but the new audience is still not told. Escalated shifts still never trigger match emails (F1). Escalation is request-driven (no scheduled job) — mechanics → GM-11/GM-23.
@@ -252,6 +254,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM22-03 · AG-Q09 — Who is told when a shift is cancelled, covered or replaced? 🔴 decision · gap D07 — CHANGED (partial)
 
+> **Merged 22 Nov: asked once, as GM-04-Q08 in GM-04.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** each feature still picks its own recipients. The edit half is now verified: every past applicant, counter-offerer and offer holder gets told about every edit — including text-only edits — and the notice names the pharmacy. The cancel half could not be re-validated: the cancel path itself was not re-read.
 
 **ACTUAL TODAY — Web and Expo (same):** shift edits → `send_shift_updated_notifications`: **all interested + counter-offerers + PENDING/ACCEPTED_AWAITING_PAYMENT/ACCEPTED offer holders minus creator**, in-app ALERT "Shift updated: {pharmacy.name}" + email, on **every** edit including text-only. Booked outside shifts: **cancel path NOT RE-VALIDATED** (SH-01 not re-read — the Oct 2026 claim "no cancel endpoint for confirmed external bookings" must not be presented as current).
@@ -265,6 +269,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN · Oct 2026 rec A. **Blocked in practice by SH-01:** the cancel path was not re-traced, so the cancel half of this question cannot be answered from evidence yet.
 
 ### GM22-04 · AG-Q10 — Which channels carry those notices? 🔴 decision · gap D07 — ★ FIRST QUESTION (see Part D) — CHANGED
+
+> **Merged 22 Nov: asked once, as GM15-39 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** in-app, push and email all exist now, with concrete rules — but each feature still picks its own channels, so some money events get no email and some reminders get no push. The owner needs to set one rule for which channel carries which event.
 
@@ -280,6 +286,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM22-05 · AG-Q11 — Which shifts get pre-shift reminders, and when? 🟠 decision · gap D12 — CHANGED
 
+> **Also covers (22 Nov):** GM-23-11 (GM-23), GM25-C19 (GM-25). Asked once, here.
+
 **Plain English:** one email about 12 hours before each assigned slot, plus an in-app notice that the email automatically creates (with an empty body). Reservations get none, there is no second reminder, no dedup, and the reminder can be held back by quiet hours because it is not an alert.
 
 **ACTUAL TODAY — Web and Expo (same, backend-driven):** hourly beat at :15 (`send_shift_reminders`); emails ~12 h before slot (12–13 h window in pharmacy tz); `ShiftSlotAssignment` rows only — **reservations get none**; **no dedup / sent-state** (a double run would duplicate); the auto in-app notice has **empty body** and type TASK, so push follows `push_tasks` opt-out and is **held during quiet hours**. Subject names the pharmacy (PO-Q12 leak, GM22-14). Mechanics → GM-11/GM-23.
@@ -294,6 +302,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM22-06 · AG-Q12 — If a shift changes inside 12 hours of start, what happens to reminders? 🟠 decision · gap D12 — CHANGED
 
+> **Also covers (22 Nov):** GM-23-12 (GM-23). Asked once, here.
+
 **Plain English:** there is still no dedicated late-change alert and old reminders are never voided — but the Oct claim "no instant alert" is now wrong, because every edit (including text-only edits) already notifies all past applicants. The problem is now the opposite: too broad, not silent.
 
 **ACTUAL TODAY — Web and Expo (same):** no special late-change handling; no voiding of old reminders; BUT `send_shift_updated_notifications` fires on **every** edit (in-app ALERT "Shift updated: {pharmacy.name}" + email to all interested/counter-offerers/offer holders). A time change at 8pm the night before **does** produce a notice — with no "late" marking, and the old 12 h reminder (which named the old time) is **not** voided. Booked slots can only be re-timed in the roster editor (Oct claim, not re-traced).
@@ -305,6 +315,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN · Oct 2026 rec A.
 
 ### GM22-07 · CX-Q06 — Inside the window, who is alerted and how fast? 🔴 decision · gap R04D — NOT RE-VALIDATED
+
+> **Merged 22 Nov: asked once, as GM15-06 in GM-15.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** a worker asks to cancel close to start. The principle was settled (manager approval always, emergency escalation near start) but recipients and timing were open — and they are still open: no repeating-push emergency mechanism was found in any traced file.
 
@@ -319,6 +331,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM22-08 · AV-Q08 — Should urgent-shift alerts need a separate opt-in? 🟡 decision — CHANGED
 
+> **Merged 22 Nov: asked once, as GM-19-Q08 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** there is one switch for matching-shift alerts, on availability rows, on both apps. There is no second switch for urgent shifts. The owner needs to decide whether one switch stays enough.
 
 **ACTUAL TODAY — Web and Expo (same):** one matching-shift switch (`notify_new_shifts` on availability rows), enforced in `announce_availability_matches`. No separate urgent-shift consent or urgency-based availability-alert audience exists in any traced preference model (`NotificationPushPreference` has per-type switches only). What counts as "urgent" is itself undecided (PO-Q13: owner flag only today; auto-urgent within 24 h proposed — not re-traced).
@@ -331,6 +345,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM22-09 · AV-Q09 — Should workers set a max distance and minimum rate for alerts? 🟡 decision — CHANGED (partial)
 
+> **Merged 22 Nov: asked once, as GM-19-Q09 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** distance and travel preferences are now enforced for match alerts — that half is fixed. But alerts still do not check a minimum hourly rate, and they still go to unverified workers.
 
 **ACTUAL TODAY — Web and Expo (same, backend-enforced):** both apps let workers set coverage radius or travel states, and match alerts **enforce** these preferences (`announce_availability_matches`). Alerts **do not check a minimum hourly rate**; talent-post radius is a separate snapshot. Recipients are **not Verified-filtered**.
@@ -342,6 +358,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN · Oct 2026 rec A.
 
 ### GM22-10 · LA-Q17 — Fix before launch? Match emails miss escalated shifts and reach unverified workers. 🔴 code · gap AV-04 — CHANGED (partial)
+
+> **Merged 22 Nov: asked once, as GM-11-Q05 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** the match-email bug is still there, in both halves: shifts that escalate to public never trigger a match email, and the emails that do go out are not filtered by Verified — so unverified workers get alerts for shifts the apply gate then blocks.
 
@@ -356,6 +374,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM22-11 · PO-Q10 — How late may a scheduled escalation fire? 🟠 code · gap SH-05 — CHANGED
 
+> **Merged 22 Nov: asked once, as GM-11-Q03 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** there is still no scheduled job, so the question is still hypothetical — but it is now verified that escalation only runs when someone loads a shift list, and the celery beat has no shift-escalation entry at all.
 
 **ACTUAL TODAY — Web and Expo (same):** auto-escalation only runs when someone loads a shift list or detail (`BaseShiftViewSet.get_queryset`); no scheduled job exists, so due escalations fire late or never, and each request scans every due shift. `core/celery.py` schedules only the two marketplace escalation tasks every minute.
@@ -369,6 +389,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM22-12 · LA-Q08 — Fix before launch? Scheduled escalation only runs when someone loads a shift list. 🔴 code · gap SH-05 — CHANGED
 
+> **Merged 22 Nov: asked once, as GM-11-Q04 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** same bug, now verified at head: shift escalation runs during shared shift-query handling, including list/detail requests, rather than a scheduled shift job. The only periodic escalation tasks in celery are the goods marketplaces'.
 
 **ACTUAL TODAY — Web and Expo (same):** shift escalation runs during shared shift-query handling, including list/detail requests, rather than a scheduled shift job. Existing periodic escalation tasks cover goods marketplaces (and ethical); web and mobile both depend on browsing to trigger shift escalation.
@@ -380,6 +402,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN · Oct 2026 rec A.
 
 ### GM22-13 · PO-Q09 — Should escalation pause while an offer waits for an answer? 🟡 decision — CHANGED
+
+> **Merged 22 Nov: asked once, as GM-11-Q02 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** there is still no pause rule. In practice escalation usually stops anyway, because any interest ever stops it — and an offer implies interest. But after a decline or expiry it never resumes, so the shift can sit unfilled.
 
@@ -393,6 +417,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN · Oct 2026 rec A.
 
 ### GM22-14 · PO-Q12 — When does an anonymous pharmacy's name reach the worker? 🟠 decision — CHANGED (leak wider than Oct)
+
+> **Merged 22 Nov: asked once, as GM-11-Q08 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** the worker never sees the name before accepting — the terms dialog omits it and accept notices say "Shift in &lt;suburb&gt;". But the name leaks in **three** places now, not one: the 12-hour reminder email, the shift-updated notice to all past applicants, and the not-selected notice after payment. The email code sets the pharmacy name unconditionally.
 
@@ -408,6 +434,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM22-15 · AG-Q03 — Should both sides get a PDF copy of the agreement? 🟡 decision — NOT RE-VALIDATED
 
+> **Merged 22 Nov: asked once, as GM14-Q06 in GM-14.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Plain English:** Oct 2026 said no PDF or emailed copy exists. That was not re-checked in this pass — no PDF code was encountered in the traced files, but it was not specifically searched.
 
 **ACTUAL TODAY (Oct 2026, NOT re-validated):** Not built yet. (No PDF or emailed copy exists.)
@@ -419,6 +447,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN · Oct 2026 rec A.
 
 ### GM22-16 · LA-P02 — Fix before launch? AHPRA cancellations bypass the cancellation policy and notices. 🔴 code — CHANGED (partial)
+
+> **Merged 22 Nov: asked once, as GM17-Q11 in GM-17.** Answer it there; this copy stays for its own evidence and is not asked again.
 
 **Plain English:** the notice half is fixed — an AHPRA suspension now tells the worker (in-app + email), the admins (email), and the affected pharmacies (member-suspension notice). Whether the cancellation itself now follows the ordinary policy, fees and refunds was not checked.
 

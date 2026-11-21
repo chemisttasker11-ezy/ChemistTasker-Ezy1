@@ -32,20 +32,20 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
 | Owner registration | New user selects OWNER role during registration (`frontend_web/src/pages/register.tsx:26`). | New user selects OWNER role in mobile registration (`frontend_mobile/app/register.tsx:37`). | Yes | — |
-| Setup gate enforcement | Incomplete owner is redirected to owner setup during login (`frontend_web/src/pages/login.tsx:83`). | Layout redirect guards force incomplete owners into setup wizard (`frontend_mobile/app/_layout.tsx:453`). | Yes | — |
+| Setup gate enforcement | Incomplete owner is redirected to owner setup during login (`frontend_web/src/pages/login.tsx:89`). | Layout redirect guards force incomplete owners into setup wizard (`frontend_mobile/app/_layout.tsx:379`). | Yes | — |
 | Step 1: Owner personal profile | Owner submits single-page personal profile form (`frontend_web/src/pages/onboarding/OwnerOnboarding.tsx:837`). | Owner completes step-by-step onboarding wizard with unsaved changes guard (`frontend_mobile/roles/owner/setup-onboarding.tsx:95`). | No | Verified 21 Nov: intended layout difference (single page on web, wizard on Expo); not a defect. |
-| Step 2: Create primary pharmacy | Owner fills pharmacy details and creates pharmacy record (`frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:2010`). | Owner enters pharmacy location and operating details in setup wizard (`frontend_mobile/roles/owner/setup-pharmacy.tsx:35`). | Yes | — |
-| Dashboard unlock | Completing profile and pharmacy unlocks the owner overview container (`frontend_web/src/pages/dashboard/sidebar/owner/OwnerOverviewContainer.tsx:29`). | Completing setup redirects owner to mobile dashboard (`frontend_mobile/roles/owner/dashboard.tsx:50`). | Yes | — |
+| Step 2: Create primary pharmacy | Owner fills pharmacy details and creates pharmacy record (`frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:2010`). | Owner enters pharmacy location and operating details in setup wizard (`frontend_mobile/roles/owner/setup-pharmacy.tsx:110`). | Yes | — |
+| Dashboard unlock | Completing profile and pharmacy unlocks the owner overview container (`frontend_web/src/pages/dashboard/sidebar/owner/OwnerOverviewContainer.tsx:29`). | Completing setup redirects owner to mobile dashboard (`frontend_mobile/roles/owner/dashboard.tsx:196`). | Yes | — |
 | Pharmacy management & settings | Owner manages pharmacy operating hours and details in settings (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacySettings.tsx:20`). | Owner edits pharmacy details using the shared mobile form (`frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx:251`). | Yes | — |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
-| GM-03-Q01 | Web + Expo |
-| GM-03-Q02 | Web + Expo |
-| GM-03-Q03 | Web + Expo |
-| GM-03-Q04 | Web + Expo |
-| GM-03-Q05 | Web + Expo |
+| GM-03-Q01 | Web + Expo (asked in GM-02: ON-Q11) |
+| GM-03-Q02 | Web + Expo (asked in GM-02: ON-Q12) |
+| GM-03-Q03 | Web + Expo (asked in GM-02: ON-Q13) |
+| GM-03-Q04 | Web + Expo (asked in GM-02: ON-Q14) |
+| GM-03-Q05 | Web + Expo (asked in GM-01: GM01-Q10) |
 | GM-03-Q06 | Web + Expo |
 | GM-03-Q07 | Web + Expo |
 | GM-03-Q08 | Web + Expo |
@@ -148,6 +148,8 @@ Base for source links: `https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy
 Decision status for **every** question: **OPEN — NOT DECIDED** (see header). Severity: **Launch-blocking** = must be decided before first real booking; **High** = decide before launch, could be decided after first bookings only with a named workaround; **Medium** = decide before scale, safe to defer past launch with the "today" behaviour documented.
 
 ### GM-03-Q01 — What must a pharmacy pass before posting to outside workers?
+
+> **Merged 22 Nov: asked once, as ON-Q11 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** ON-Q11 (gap ON-06). **Status: STILL VALID, unchanged. Decision: OPEN.**
 - **Question (plain English):** Before a pharmacy can offer shifts to locums it doesn't already know, what proof should it have passed — nothing, a checked ABN, or a checked ABN plus a human admin review?
 - **ACTUAL TODAY:** Nothing. `post_shift()` (`backend/shifts/posting.py:62`) checks neither `Pharmacy.verified` nor `abn_verified`. Any pharmacy row — fresh, ABN unchecked, `verified=False` — can post to every tier including public, and workers can accept. The `verified` flag is only read by the two marketplaces (`backend/marketplace/policy.py:99-100`; `backend/ethical_marketplace/policy.py:89,94,127`). Nobody in-app can set `verified` (read-only in `backend/organizations/serializers.py:211`); who sets it, on what evidence, is unknown.
@@ -160,6 +162,8 @@ Decision status for **every** question: **OPEN — NOT DECIDED** (see header). S
 - **Sources:** `backend/shifts/posting.py:62` (`post_shift`); `backend/organizations/models.py:135` (`verified`), `:236` (`abn_verified`); `backend/marketplace/policy.py:99-100`; `backend/ethical_marketplace/policy.py:89,94,127`; `backend/organizations/serializers.py:211` (read-only). Commit context: PR #249 head `97c4543`.
 
 ### GM-03-Q02 — Which site-brief fields are required before the first post?
+
+> **Merged 22 Nov: asked once, as ON-Q12 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** ON-Q12. **Status: STILL VALID, context updated. Decision: OPEN.**
 - **Question:** When a pharmacy is set up, which facts about the shop must be filled in before its first shift — and which can stay optional?
 - **ACTUAL TODAY:** Backend requires only name + 11-digit ABN (`backend/organizations/serializers.py:111`). Web form additionally blocks saving a draft without name + street + suburb + postcode + ABN, and blocks FIXED rate type without all four day rates; Expo blocks without name + street + suburb + state + postcode + ABN. Hours, software, services, script volumes, roles, documents, rates (except the web FIXED rule) are all optional. There is **no field at all** for parking, a contact person/number for the day, or arrival instructions (search: `parking` 0 product hits; `arrival_instructions` 0).
@@ -171,6 +175,8 @@ Decision status for **every** question: **OPEN — NOT DECIDED** (see header). S
 - **Sources:** `backend/organizations/models.py:71-259` (all fields); `backend/organizations/serializers.py:82-211`; `frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:1895` (`canCreatePharmacyDraft`), `:1974-1980` (FIXED rule); `frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx:451-452` (`canCreateDraft`); `backend/shifts/posting.py` (rate fallback).
 
 ### GM-03-Q03 — Should pharmacies save a payment method during setup?
+
+> **Merged 22 Nov: asked once, as ON-Q13 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** ON-Q13 (gap ON-08). **Status: STILL VALID, unchanged in substance. Decision: OPEN.**
 - **Question:** Should the owner put a card on file while setting up the pharmacy, so a booking can be paid for automatically the moment a worker accepts — or keep opening a fresh payment page for every booking?
 - **ACTUAL TODAY:** No saved card exists. Every booking fee opens a new Stripe Checkout (`backend/billing/shift_payments.py:26`, `mode='payment'`, card only; `backend/billing/views.py: charge_shift_fulfillment`). Under carried decision D02, a shift starting in under 2 hours leaves the owner 30 minutes to complete that checkout before the reservation expires. Subscriber discount now works ($15 locum / $40 job vs $30/$80). Billing live date is `2025-06-01` with a comment saying "June 1, 2026" and 0 free-trial days (`backend/core/settings.py:679-682`); the pre-live/free-trial free-confirm path still exists in code.
@@ -182,6 +188,8 @@ Decision status for **every** question: **OPEN — NOT DECIDED** (see header). S
 - **Sources:** `backend/billing/shift_payments.py:26-180`; `backend/billing/views.py` (`charge_shift_fulfillment`); `backend/billing/utils.py` (`user_can_manage_billing_for_pharmacy`, `resolve_billing_account`); `backend/core/settings.py:679-682`; search `SetupIntent` = 0 hits (this trace).
 
 ### GM-03-Q04 — How do organisations (multi-site groups) join?
+
+> **Merged 22 Nov: asked once, as ON-Q14 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** ON-Q14 (gap ON-07). **Status: STILL VALID, unchanged. Decision: OPEN.**
 - **Question:** When a group with several pharmacies (e.g. Chempro) wants to join, do they sign up themselves, or does ChemistTasker set them up for them?
 - **ACTUAL TODAY:** Sales-led only. Only a platform admin can create an organisation (`OrganizationViewSet.create`, `IsAdminUser`, `backend/organizations/views.py:49-77`). There is no organisation sign-up role. The web create page exists but is not linked anywhere (`frontend_web/src/pages/OrganizationCreate.tsx`; no route in `main.tsx`), and a non-admin submitting it would get a 403. Once created, the org claims pharmacies (pending → accepted/rejected, one accepted claim per pharmacy) and invites people by email (`backend/organizations/claims.py`).
@@ -193,6 +201,8 @@ Decision status for **every** question: **OPEN — NOT DECIDED** (see header). S
 - **Sources:** `backend/organizations/views.py:49-77`; `backend/organizations/models.py:39-69` (`Organization`), `:261-354` (`PharmacyClaim`); `backend/organizations/claims.py` (incl. PR #249 explicit-`organization_id` change); `frontend_web/src/pages/OrganizationCreate.tsx`.
 
 ### GM-03-Q05 — Must every owner-setup step work on mobile (Expo) at launch — and what about Next?
+
+> **Merged 22 Nov: asked once, as GM01-Q10 in GM-01.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** ON-Q15, reframed (gap ON-04). **Status: CHANGED — premise partly fixed; reframed. Decision: OPEN.**
 - **Question:** An owner does everything on their phone. Must the whole setup — personal profile, pharmacy form, ABN check, skipping — work in the Expo app at launch, or can some of it send them to the website? And does the Next website have setup at all?
 - **ACTUAL TODAY:** Expo owner setup exists and mirrors Vite closely: 4-step profile wizard (`roles/owner/setup-onboarding.tsx`, via `app/setup/owner/onboarding.tsx`) and pharmacy form (`roles/owner/setup-pharmacy.tsx` + shared `PharmacyForm`, via `app/setup/owner/pharmacies.tsx`); the gate helper is near-identical to Vite's. Differences found: (1) skip is persistent on Expo (AsyncStorage) vs per-tab on web (sessionStorage); (2) Expo Back button = skip; (3) web enforces the FIXED-rate four-rate rule, Expo enforcement unknown; (4) Expo owner-profile wizard field parity (chain/number/AHPRA/gov ID) not verified; (5) **Next: no setup page found at all** — only a migrated copy of the gate helper. The old worker add-profile breakage that motivated ON-Q15 is largely fixed (see §3, LA-Q02).

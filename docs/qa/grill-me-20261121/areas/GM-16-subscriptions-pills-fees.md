@@ -20,30 +20,30 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
 | Shift fulfilment fee checkout (Stripe) | Shows fee card and launches Stripe checkout session (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:30`). | Shows fee card and launches mobile checkout session (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:228`). | Yes | - |
-| Pay fulfilment fee with Pills | Taps Pay with Pills button to pay via reward balance (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:12`). | Taps Pay with Pills button to pay via reward balance (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:312`). | Yes | - |
-| Subscriber discount on checkout | Server applies $15/$40 rate but UI displays flat `$n × 30` calculation bug (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:35`). | Server applies $15/$40 rate but UI displays same `$n × 30` calculation bug (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:230`). | Yes | - |
-| Owner subscription & extra seats management | Manages subscription plan, card/invoice payment, and extra seats in `OwnerBillingPage` (`frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:85`). | Manages extra seats and subscription in dedicated `subscription-seats` screen (`frontend_mobile/roles/owner/subscription-seats.tsx:82`). | Yes | - |
+| Pay fulfilment fee with Pills | Taps Pay with Pills button to pay via reward balance (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:12`). | Taps Pay with Pills button to pay via reward balance (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:204`). | Yes | - |
+| Subscriber discount on checkout | Server applies $15/$40 rate but UI displays flat `$n × 30` calculation bug (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/ActiveShiftCard.tsx:583`). | Server applies $15/$40 rate but UI displays same `$n × 30` calculation bug (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/ActiveShiftCards.tsx:574`). | Yes | - |
+| Owner subscription & extra seats management | Manages subscription plan, card/invoice payment, and extra seats in `OwnerBillingPage` (`frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:85`). | Manages extra seats and subscription in dedicated `subscription-seats` screen (`frontend_mobile/roles/owner/subscription-seats.tsx:29`). | Yes | - |
 | Pills reward wallet & referrals | Displays pill balance, referral code, and history on Pills page (`frontend_web/src/pages/dashboard/sidebar/rewards/PillsPage.tsx:56`). | Displays pill balance and referral history via `trustRewards` (`frontend_mobile/app/rewards/pills.tsx:3`). | Yes | - |
-| Legacy cancellation penalty endpoint | Backend endpoint `/billing/charge-penalty/` has no caller in web UI (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:250`). | Backend endpoint has no caller in mobile UI (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:270`). | Yes | - |
+| Legacy cancellation penalty endpoint | Backend endpoint `/billing/charge-penalty/` has no caller in web UI (`shared-core/src/domains/billing/api.ts:67`). | Backend endpoint has no caller in mobile UI (`shared-core/src/domains/billing/api.ts:67`). | Yes | Checked 22 Nov: the shared client function exists but no web or Expo screen calls it. |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
-| GM16-Q01 | Web + Expo |
-| GM16-Q02 | Web + Expo |
-| GM16-Q03 | Web + Expo |
-| GM16-Q04 | Web + Expo |
-| GM16-Q05 | Web + Expo |
-| GM16-Q06 | Web + Expo |
-| GM16-Q07 | Web + Expo |
+| GM16-Q01 | Web + Expo (also covers GM17-Q08) |
+| GM16-Q02 | Web + Expo (also covers GM-18-Q21, GM26-Q34) |
+| GM16-Q03 | Web + Expo (asked in GM-13: GM13-Q12) |
+| GM16-Q04 | Web + Expo (also covers GM17-Q07) |
+| GM16-Q05 | Web + Expo (asked in GM-02: ON-Q13) |
+| GM16-Q06 | Web + Expo (also covers GM17-Q10) |
+| GM16-Q07 | Web + Expo (asked in GM-13: GM13-Q08) |
 | GM16-Q08 | Web + Expo |
 | GM16-Q09 | Web + Expo |
 | GM16-Q10 | Web + Expo |
-| GM16-Q11 | Web + Expo |
-| GM16-Q12 | Web + Expo |
-| GM16-Q13 | Web + Expo |
-| GM16-Q14 | Web + Expo |
-| GM16-Q15 | Web + Expo |
+| GM16-Q11 | Web + Expo (also covers GM15-02, GM17-Q04) |
+| GM16-Q12 | Web + Expo (asked in GM15-19, GM17-Q02, GM17-Q03, GM17-Q05) |
+| GM16-Q13 | Web + Expo (also covers GM15-03) |
+| GM16-Q14 | Web + Expo (also covers GM15-49, GM26-Q31) |
+| GM16-Q15 | Web + Expo (also covers GM14-Q11, GM17-Q06, GM26-Q33) |
 | GM16-Q16 | Web + Expo |
 | GM16-Q17 | Web + Expo |
 | GM16-Q18 | Web + Expo |
@@ -184,6 +184,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 PART-FIXED / FIXED · ❓ NOT 
 ### A. Re-validated old questions (evidence at PR #249 head)
 
 **GM16-Q01 — [PO-Q16 / SH-03] Should the booking fee depend on shift length? — 🔄 CHANGED (partly)**
+
+> **Also covers (22 Nov):** GM17-Q08 (GM-17). Asked once, here.
 - ACTUAL TODAY (verified, `shift_payments.py` + `checkout_prices.py`): fee is flat per accepted offer — $30 locum / $80 PT-FT, `quantity = len(offer_ids)` — whatever the hours or days. A 10-day block under one offer = one fee.
 - What changed since Oct 2026: the subscriber half-price is NOW applied ($15/$40). The flat per-offer shape is unchanged; no per-day / %-of-wages option exists in this file.
 - RECOMMENDED: keep flat per-offer for launch (simple, matches the code), revisit per-day only if multi-day blocks are common. Severity: low-medium (fairness, not correctness).
@@ -194,6 +196,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 PART-FIXED / FIXED · ❓ NOT 
 - Source: `backend/billing/shift_payments.py::charge_shift_fulfillment` + `checkout_prices.py::FULFILLMENT_PRICES` @ 97c4543e.
 
 **GM16-Q02 — [LA-Q07 / SH-03] Fix before launch? Subscribers charged full price; Stripe price IDs hard-coded. — 🟢 PART-FIXED**
+
+> **Also covers (22 Nov):** GM-18-Q21 (GM-18), GM26-Q34 (GM-26). Asked once, here.
 - ACTUAL TODAY (verified): subscriber discount IS now applied — `is_subscriber` (local status `active`) selects the $15/$40 Price IDs. The Oct 2026 bug (computed but unused) is gone. Price IDs are STILL hard-coded (`checkout_prices.py`, `stripe_support.py`: `BASE_SUB_PRICE`, `EXTRA_SEAT_PRICE` + 4 fulfilment IDs); test and live cannot differ.
 - RECOMMENDED: keep the discount logic; fix the hard-coded IDs (env/config per environment) before any live checkout. Severity: high for the config half (a test-mode checkout in production, or vice versa, charges real money or fails); the discount half is done.
 - ALTERNATIVE A — Keep current logic: hard-coded IDs, one set for all environments. Scenario: staging checkout uses the live $30 price. Trade-off: works until someone tests with real money. (Note the guard helps here: staging + live key is rejected by `release_guards.py`, and live collection needs the flag — but a wrong *test* price in production would still charge the wrong amount.)
@@ -202,10 +206,14 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 PART-FIXED / FIXED · ❓ NOT 
 - Source: `backend/billing/shift_payments.py` + `checkout_prices.py` + `stripe_support.py` @ 97c4543e. Code gap (config), not a decision gap, for the hard-coded half; the discount half needs no decision.
 
 **GM16-Q03 — Legacy cancellation charging (LA-Q06 / SH-02)**
+
+> **Merged 22 Nov: asked once, as GM13-Q12 in GM-13.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** The billing route and shared-core export remain available behind the existing live collection guard. The calculation uses the old bands and all assignments.
 - **Status:** Engineering: see BL-04. Launch scope remains in GM15-01 and LAUNCH-01.
 
 **GM16-Q04 — [PO-Q15 / SH-04] When should booking fees start? — 🔄 CHANGED (mechanism fully verified now)**
+
+> **Also covers (22 Nov):** GM17-Q07 (GM-17). Asked once, here.
 - ACTUAL TODAY (verified, `settings.py:674-682` + `utils.py` + `release_guards.py`): **two mechanisms coexist.** (1) `BILLING_LIVE_DATE = _date(2025, 6, 1)` with comment "June 1, 2026 — flip this to go live" — the date/comment contradiction is real at head — and `FREE_TRIAL_DAYS = 0`; `get_billing_state_for_account` returns PRE_LIVE before the date, FREE_TRIAL within the trial window, else PAYMENT_REQUIRED. (2) Live *collection* is separately gated by `BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED` (default False) + Stripe key mode (test only in non-production envs; staging + live key rejected). The Oct 2026 claim ("live 2025-06-01, comment says 2026, FREE_TRIAL_DAYS = 0") describes mechanism (1) correctly; mechanism (2) is new since Oct.
 - RECOMMENDED: do not decide the launch date/trial until the owner confirms which gate is authoritative — the date, the flag, or both — and the contradiction (2025 date vs 2026 comment) is resolved in code. Severity: high (decides whether the first booking costs money).
 - ALTERNATIVE A — Keep current logic (date + flag as coded). Cannot be stated honestly as a single rule until the owner confirms the interaction — do not pick this blind.
@@ -214,6 +222,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 PART-FIXED / FIXED · ❓ NOT 
 - Source: `backend/core/settings.py:674-682`, `backend/billing/utils.py`, `backend/billing/release_guards.py` @ 97c4543e.
 
 **GM16-Q05 — [ON-Q13 / ON-08] Should pharmacies save a payment method during setup? — ✅ STILL VALID (now verified)**
+
+> **Merged 22 Nov: asked once, as ON-Q13 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - ACTUAL TODAY (verified): every booking opens a new Stripe Checkout; no card is stored anywhere in the traced code — no saved-card endpoint exists; `charge_shift_fulfillment` creates a fresh Session per booking; a Stripe `customer` is reused only when a subscription exists. Under GM-13's findings there is no D02 30-minute window, so the Oct urgency argument (a shift <2h away leaves 30 minutes to pay) does not describe current code — but the no-saved-card fact stands, and the 24-hour Stripe session is still a slow path for urgent shifts.
 - RECOMMENDED (carried, rec B): save a card, charge on acceptance. Severity: medium-high for urgent shifts.
 - ALTERNATIVE A — Keep current logic: one checkout per booking; no stored card. ALTERNATIVE B — Save card, charge on acceptance (recommended). ALTERNATIVE C — Saved card for subscribers only.
@@ -221,6 +231,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 PART-FIXED / FIXED · ❓ NOT 
 - Source: `backend/billing/shift_payments.py`, `views.py:charge_shift_fulfillment`, `checkout_reservations.py` @ 97c4543e.
 
 **GM16-Q06 — [PO-Q04] Should the pharmacy see the full cost before posting? — 🔄 CHANGED (pay-time half verified; pre-posting half not re-validated)**
+
+> **Also covers (22 Nov):** GM17-Q10 (GM-17). Asked once, here.
 - ACTUAL TODAY (verified at pay time): the owner card shows a total — but it is **`$n × 30 AUD` regardless of type or subscriber status** (Vite `ActiveShiftCard.tsx`, Expo `ActiveShiftsPage/ActiveShiftCards.tsx`). A PT/FT booking ($80 / $40) is displayed as $30/offer; a subscriber's $15/$40 is displayed as $30/offer. The server charges the right price (GM16-Q01) — the display is wrong. Whether the posting wizard shows wages/super/fee/GST/total before posting was **not** re-traced (posting wizard screens not read in this trace).
 - RECOMMENDED: A — show wages, super, fee, GST, total before posting **and** before payment — with the fee computed from the same price table the server uses (locum vs PT/FT, subscriber vs standard), not a hard-coded $30. Severity: high (the current display misstates the price for PT/FT and subscribers). Needs the GST decision first (GM16-Q15).
 - ALTERNATIVE A — Keep current logic: `$n × 30` at pay time; wizard as-is. Trade-off: no work; PT/FT and subscriber owners are shown the wrong total until Stripe.
@@ -228,6 +240,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 PART-FIXED / FIXED · ❓ NOT 
 - Source: pay card (both clients) @ 97c4543e; posting wizard ❓ (not re-traced).
 
 **GM16-Q07 — [BK-R01 / SH-13] What happens after booking payment fails? — 🔄 CHANGED (mechanism verified; SH-13 undefined)**
+
+> **Merged 22 Nov: asked once, as GM13-Q08 in GM-13.** Answer it there; this copy stays for its own evidence and is not asked again.
 - ACTUAL TODAY (verified, GM-13): a failed/cancelled Stripe attempt leaves the `FulfillmentCheckout` PREPARED/OPEN/UNKNOWN; the owner can resume the same attempt or expire it and start a replacement (409 conflict dialog on web, native alert on Expo; `resumeFulfillmentCheckout` / `expireFulfillmentCheckout` in shared-core). A Stripe provider error returns 400 (or 503 `checkout_uncertain` — "Retry this unchanged request; do not create another payment") and changes nothing. There is no "original deadline" to retry until, because D02 does not exist (GM-13-Q01) — the effective bound is the Stripe session's 24 h. `SH-13` has no definition in `AUDIT.md` (only the `gap` field on BK-R01).
 - RECOMMENDED: KEEP the retry rule once GM13-Q01 creates a deadline; until then the rule is "resume or expire-and-replace within the Stripe session". Severity: medium.
 - ALTERNATIVE A — Keep current logic (as above). ALTERNATIVE B — Release immediately. ALTERNATIVE C — Extend once.
@@ -258,12 +272,16 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 PART-FIXED / FIXED · ❓ NOT 
 - Source: `backend/billing/subscription_events.py` @ 97c4543e; gating ❓.
 
 **GM16-Q11 — [CX-Q02 + P09 + NOPEN] Who receives the owner cancellation fee, and does the legacy penalty conflict? — ❓ + verified conflict**
+
+> **Also covers (22 Nov):** GM15-02 (GM-15), GM17-Q04 (GM-17). Asked once, here.
 - Oct 2026: P09 set a % of agreed wages but no recipient; F01 keeps booking fee and worker pay separate; #184 rec: A (worker, as cancellation pay). NOT re-validated as a decision. NEW verified facts: the only charging code at the head (`charge_penalty`) pays nobody — it is a platform Stripe checkout with no payee — and its bands (10/20%) differ from P09 (0–30%). It also charges on *all* assignments, not cancelled dates only. The route + view + shared-core export are all live (§1b).
 - RECOMMENDED: decide recipient + bands + legal review together (with GM16-Q03/Q14); do not launch any cancellation charge until then. Severity: high (legal/financial).
 - ALTERNATIVE A — Worker, as cancellation pay (via payroll/invoice, CX-Q22). ALTERNATIVE B — Platform keeps it. ALTERNATIVE C — Split. Other / defer.
 - Source: `shift_payments.py::charge_penalty` @ 97c4543e; P09/GM-15 adopted.
 
 **GM16-Q12 — [CX-Q19 / CX-Q20 / CX-Q21 / CX-Q22] Booking-fee refunds/credits and cancellation pay — ✅ STILL VALID as "not built" (now verified)**
+
+> **Merged 22 Nov: this bundles four questions, each asked once:** GM15-19 in GM-15, GM17-Q02 in GM-17, GM17-Q03 in GM-17, GM17-Q05 in GM-17. Not asked again here.
 - CX-Q19: pharmacy cancels a paid booking → refund >72h / credit inside / refund+credit? #184 rec: C.
 - CX-Q20: worker cancels/no-shows → pharmacy picks remedy / credit only / keep only if replaced? #184 rec: C.
 - CX-Q21: who approves refunds/credits — platform finance/support admin vs automatic by rule? #184 rec: A.
@@ -272,6 +290,8 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 PART-FIXED / FIXED · ❓ NOT 
 - Source: `backend/billing/urls.py` (GM-17), `views.py`, `payment_events.py` @ 97c4543e.
 
 **GM16-Q13 — [CX-Q03] If the pharmacy cancels an unpaid reservation, is any fee due? — ✅ STILL VALID (now verified)**
+
+> **Also covers (22 Nov):** GM15-03 (GM-15). Asked once, here.
 - Oct 2026: not built; #184 rec: A (no fee; worker notified), because D01 makes payment the confirmation point. **Now verified:** there is no pharmacy-cancel transition for unpaid reservations at all — the only ways an unpaid reservation ends are payment, explicit checkout expiry, AHPRA decline, or Stripe session lapse (GM-13). No fee is charged on any of those paths (expiry is free; AHPRA decline is free).
 - RECOMMENDED: A — no fee; worker notified (the notification half needs GM13-Q02's expiry notices to exist). Severity: low.
 - ALTERNATIVE A — No fee (recommended). ALTERNATIVE B — Fee bands apply: treat it like a confirmed booking (contradicts D01).
@@ -279,10 +299,14 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 PART-FIXED / FIXED · ❓ NOT 
 - Source: `checkout_reservations.py`, `cancellation.py` @ 97c4543e; GM-15 adopted.
 
 **GM16-Q14 — [LA-R02 / SH-16] May cancellation charges launch before Australian legal review? — ✅ still open (decision)**
+
+> **Also covers (22 Nov):** GM15-49 (GM-15), GM26-Q31 (GM-26). Asked once, here.
 - Oct 2026: P08/P09 define % charges; no review of classification, proportionality, or unfair-contract-term compliance (penalties for unfair standard-form terms apply since Nov 2023). #184 rec: A (legal review before launch). Nothing in the verified files shows a review happened. The legacy penalty still being routed + exported makes this launch-gating. ALTERNATIVE A — Legal review before launch. B — Disclosure is enough. C — Never charge. Other / defer.
 - Source: #184 Oct 2026; no review evidence in any verified file @ 97c4543e.
 
 **GM16-Q15 — [LA-R01 / SH-15] Booking fees: GST and tax invoice? — ✅ STILL VALID (now verified)**
+
+> **Also covers (22 Nov):** GM14-Q11 (GM-14), GM17-Q06 (GM-17), GM26-Q33 (GM-26). Asked once, here.
 - Oct 2026: fixed Stripe prices, no stated GST treatment, no platform tax invoice. **Now verified:** no GST mention in any traced billing file (`checkout_prices.py` is bare cents; `stripe_support.py` has no tax settings; `OwnerBillingPage.tsx` and the pay card show no GST line); the only GST fact in the code is the `gst_registered` flag on ABN worker terms (GM-14). Applies to the $30/$80 fees AND the $30/month subscription AND extra seats (Stripe Price dollar value UNKNOWN from code). Re-trace: none needed for the gap — it is verified absent.
 - RECOMMENDED: A (before launch — tax advice, correct GST treatment, total shown before payment, invoice/receipt from correct supplier). Needs qualified tax advice, not just an opinion.
 - ALTERNATIVE A — Tax advice + correct treatment before launch (recommended). B — Disclosure is enough. C — No GST treatment (not a real option without advice).

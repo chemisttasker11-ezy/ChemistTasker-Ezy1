@@ -21,12 +21,12 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
 | Express interest in shift slots | Worker submits interest via `expressInterestInPublicShiftService` (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:284`). | Worker submits interest via `expressInterestInShiftService` (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:234`). | Yes | - |
-| View applicants & reveal candidates | Manager reviews applicants in candidates drawer (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:280`). | Manager reviews applicants on candidates screen (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:589`). | Yes | - |
-| Send shift offer with 48h expiry | Manager dispatches offer to candidate (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:65`). | Manager dispatches offer to candidate (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useCounterOffers.ts:65`). | Yes | - |
+| View applicants & reveal candidates | Manager reviews applicants in candidates drawer (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:157`). | Manager reviews applicants on candidates screen (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:285`). | Yes | - |
+| Send shift offer with 48h expiry | Manager dispatches offer to candidate (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:418`). | Manager dispatches offer to candidate (`frontend_mobile/roles/shared/shifts/ShiftsBoard/hooks/useCounterOffers.ts:434`). | Yes | - |
 | Accept pending offer | Worker reviews terms dialog and accepts offer (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:468`). | Worker reviews terms dialog and accepts offer (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:356`). | Yes | - |
 | Decline pending offer | Worker declines offer via `declineShiftOfferService` (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:529`). | Worker declines offer via `declineWorkerShiftOfferService` (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:393`). | Yes | - |
-| Remind worker with buzz | Manager triggers buzz reminder subject to 1h cooldown (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:24`). | Manager triggers buzz reminder subject to 1h cooldown (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:24`). | Yes | - |
-| Counter-offer workflow | Worker submits proposed terms and manager can accept or reject (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/constants.ts:8`). | Worker submits proposed terms and manager can accept or reject (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Candidates/StatusCard.tsx:126`). | Yes | - |
+| Remind worker with buzz | Manager triggers buzz reminder subject to 1h cooldown (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:168`). | Manager triggers buzz reminder subject to 1h cooldown (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:775`). | Yes | - |
+| Counter-offer workflow | Worker submits proposed terms and manager can accept or reject (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/hooks/useCounterOffers.ts:51`). | Worker submits proposed terms and manager can accept or reject (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Candidates/StatusCard.tsx:126`). | Yes | - |
 
 ### Platforms per question
 | Question id | Platforms |
@@ -35,27 +35,27 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM-12-Q02 | Web + Expo |
 | GM-12-Q03 | Web + Expo |
 | GM-12-Q04 | Web + Expo |
-| GM-12-Q05 | Web + Expo |
+| GM-12-Q05 | Web + Expo (asked in GM-02: ON-Q05) |
 | GM-12-Q06 | Web + Expo |
 | GM-12-Q07 | Web + Expo |
 | GM-12-Q08 | Web + Expo |
 | GM-12-Q09 | Web + Expo |
-| GM-12-Q10 | Web + Expo |
-| GM-12-Q11 | Web + Expo |
-| GM-12-Q12 | Web + Expo |
+| GM-12-Q10 | Web + Expo (also covers GM13-Q05, GM-18-Q22) |
+| GM-12-Q11 | Web + Expo (asked in GM-11: GM-11-Q10) |
+| GM-12-Q12 | Web + Expo (also covers GM13-Q07) |
 | GM-12-Q13 | Web + Expo |
 | GM-12-Q14 | Web + Expo |
 | GM-12-Q15 | Web + Expo |
 | GM-12-Q16 | Web + Expo |
 | GM-12-Q17 | Web + Expo |
-| GM-12-Q18 | Web + Expo |
-| GM-12-Q19 | Web + Expo |
-| GM-12-Q20 | Web + Expo |
+| GM-12-Q18 | Web + Expo (asked in GM-18: GM-18-Q07) |
+| GM-12-Q19 | Web + Expo (asked in GM-11: GM-11-Q01) |
+| GM-12-Q20 | Web + Expo (also covers GM13-Q04, GM15-40) |
 | GM-12-Q21 | Web + Expo |
 | GM-12-Q22 | Web + Expo |
 | GM-12-Q23 | Web + Expo |
-| GM-12-Q24 | Web + Expo |
-| GM-12-Q25 | Web + Expo |
+| GM-12-Q24 | Web + Expo (also covers GM13-Q03, GM25-C18) |
+| GM-12-Q25 | Web + Expo (also covers GM14-Q02, GM14-Q03) |
 | GM-12-Q26 | Web + Expo |
 
 ## Bases (exact SHAs verified 2026-11-21)
@@ -269,6 +269,8 @@ Status key: **VALIDATED** = re-checked in current code at 97c4543e · **PARTLY**
 - **Actual today:** Missing or unverified ABN blocks acceptance. Missing TFN/super permits assignment and defers payroll (`pr257:backend/shifts/engagement.py:265`, `:716`).
 
 ## GM-12-Q05 — What can Explorers (new to pharmacy) do with shifts?
+
+> **Merged 22 Nov: asked once, as ON-Q05 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** ON-Q05. **Status: PARTLY VALIDATED.** Explorer branch exists in `_require_public_shift_onboarding` (`interest.py:40-46`: Verified ExplorerOnboarding required for public shifts) but that helper is apparently not called by `express_interest`; `require_public_ahpra`'s Explorer handling is not separately traced. Accept path for Explorers UNKNOWN. Explorer shifts tab state not inspected.
 - **RECOMMENDED:** Decide explicitly (see options in #184): A) no shifts — hide boards/apply; B) unpaid shadowing/volunteer posts only; C) paid shifts only after upgrading to a staff role. Provisional recommendation: C, with the upgrade path shown where apply is blocked. Severity: MEDIUM. **ALTERNATIVE A/B/C** as in #184 + Other / defer. Re-validate `state.py` Explorer handling before deciding.
 
@@ -293,16 +295,22 @@ Status key: **VALIDATED** = re-checked in current code at 97c4543e · **PARTLY**
 - **RECOMMENDED:** Show role, Verified/AHPRA badge, rating, distance/rate if the worker opts in; reveal full identity on offer, not on interest — for public shifts. The current reveal-on-manager-action shape already matches this; the decision is whether the quota and the no-contact-details rule stay. Severity: MEDIUM. **ALTERNATIVE A — Keep current logic** (reveal with quota, no contact details/CV). **ALTERNATIVE B — Reveal on interest.** **ALTERNATIVE C — Reveal only on accept.** Other / defer.
 
 ## GM-12-Q10 — How long does an offer stay open?
+
+> **Also covers (22 Nov):** GM13-Q05 (GM-13), GM-18-Q22 (GM-18). Asked once, here.
 - **Old ID:** BK-Q05 (gap SH-07). **Status: VALIDATED — CHANGED (value now confirmed).**
 - **ACTUAL TODAY (validated):** `OFFER_EXPIRY_HOURS = 48` (`assignment.py`) — flat 48h, confirmed at head. Expiry is lazy (list + accept paths mark EXPIRED, `offers.py:182-186, :355-359`); **NO start-cap** is visible in any inspected file. Re-offering an existing PENDING offer refreshes rate/times but does **not** refresh `expires_at` — a re-offer does not extend the deadline. No offer-expiry beat job exists.
 - **RECOMMENDED:** Cap expiry at shift start (never past start), shorten for urgent shifts, and expire eagerly (scheduled job) rather than lazily. Severity: HIGH (an offer accepted after start, or a shift that looks staffed while its offer silently lapsed, breaks week-one operations). **ALTERNATIVE A — Keep current logic** (flat 48h, lazy). **ALTERNATIVE B — Cap at start, keep lazy expiry.** **ALTERNATIVE C — Per-shift expiry chosen by the pharmacy at offer time, capped at start.** Other / defer. Normal: 48h-style offer well before start. Edge: offer made 2h before start. Retry: accept-after-expiry → EXPIRED + 400 (validated). Payment: an expired offer never reaches payment. Web/Expo: UNKNOWN (countdown display not inspected).
 
 ## GM-12-Q11 — When an offer is declined or expires, what happens to the shift?
+
+> **Merged 22 Nov: asked once, as GM-11-Q10 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** BK-Q06 (fallback D06). **Status: VALIDATED — STILL VALID.**
 - **ACTUAL TODAY:** Decline (`offers.py:676`) only notifies the owner; expiry only flips status. No fallback, re-offer, or escalation-resume exists in the inspected files. Auto-escalation is ALSO permanently stopped by any past interest (`escalation.py:92`) — so a shift whose only interested worker declines is stuck: not escalated, not re-offered, unless a manager acts manually.
 - **RECOMMENDED:** On decline/expiry, offer the next interested worker (in the Q08 order) OR resume escalation if no live interest/offers remain — manager chooses per shift, defaulting to "offer next". Severity: HIGH. **ALTERNATIVE A — Keep current logic** (manager must notice and act). **ALTERNATIVE B — Auto-offer next interested worker.** **ALTERNATIVE C — Resume escalation only (no auto-offer).** Other / defer.
 
 ## GM-12-Q12 — Can a pharmacy offer one shift to several workers at once?
+
+> **Also covers (22 Nov):** GM13-Q07 (GM-13). Asked once, here.
 - **Old ID:** BK-Q07. **Status: VALIDATED — CHANGED (payment-branch ambiguity resolved).**
 - **ACTUAL TODAY:** Multiple offers per slot can coexist. First acceptance wins via the slot lock — **in both branches now proven:** `slot_locked_for_shift_offer` (`assignment.py`) locks a slot if any assignment exists for slot/date OR any ACCEPTED_AWAITING_PAYMENT offer exists for the same slot/date (a whole-shift offer holds every slot). So a second accept IS blocked in the payment branch even though rivals are not expired there (Q15 refined). Rivals are expired at accept ONLY in the no-payment branch, same slot+date (`offers.py:437-448`); in the payment branch rivals stay PENDING (stale) until lazy expiry — and can still accept if the reservation expires unpaid.
 - **RECOMMENDED:** Allow parallel offers, but hold the slot from the FIRST acceptance (awaiting payment included — the lock already does this) and tell later workers "this shift is on hold pending payment" instead of leaving them with a live-looking PENDING offer. Severity: HIGH (stale PENDING offers + a rival accept after an unpaid reservation expires is confusing, even if the lock prevents a true double-booking). **ALTERNATIVE A — Keep current logic** (lock holds the slot; rivals left stale-PENDING). **ALTERNATIVE B — One offer at a time (serial).** **ALTERNATIVE C — Parallel offers, first PAID wins, others auto-expired at payment.** Other / defer.
@@ -333,16 +341,22 @@ Status key: **VALIDATED** = re-checked in current code at 97c4543e · **PARTLY**
 - **RECOMMENDED:** Notify the shift creator/managers on withdraw (in-app only, no email), and treat "no live interest/offers" as resuming escalation eligibility. Severity: MEDIUM. **ALTERNATIVE A — Keep current logic (silent).** **ALTERNATIVE B — Notify + resume escalation (recommended).** **ALTERNATIVE C — Notify only.** Other / defer.
 
 ## GM-12-Q18 — Is "Request booking" (Talent Board) a firm offer or an enquiry?
+
+> **Merged 22 Nov: asked once, as GM-18-Q07 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** TB-Q07 (gap TB-06). **Status: VALIDATED — CHANGED (firm offer confirmed).**
 - **ACTUAL TODAY:** `offer_dedicated_shift` (`assignment.py`) posts a dedicated shift and immediately creates firm offers with 48h expiry; one email. Worker cannot ask questions first through this path. Dedicated posting forces visibility LOCUM_CASUAL, `post_anonymously=False`, clears escalation timestamps. Talent Board UI not inspected at head.
 - **RECOMMENDED (provisional, #184):** B — enquiry/chat first, then an offer — OR owner chooses each time (C). Severity: HIGH (a firm offer creates payment/terms consequences). **ALTERNATIVE A — Firm offer (today, confirmed).** **ALTERNATIVE B — Enquiry/chat first.** **ALTERNATIVE C — Owner chooses each time.** Other / defer.
 
 ## GM-12-Q19 — When a shift escalates, who is told, and does a pending offer pause it?
+
+> **Merged 22 Nov: asked once, as GM-11-Q01 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Old ID:** PO-Q08 + PO-Q09 (gap SH-06). **Status: VALIDATED — CHANGED (caller side now verified).**
 - **ACTUAL TODAY:** `escalation.py` sends NO notification on escalation, and auto-escalation stops permanently on ANY interest ever (`:92`). Caller side now verified: escalation runs lazily from `base.py:get_queryset` on every list/detail request (SH-05); no beat job. No pause-on-pending-offer rule exists anywhere traced; escalation is already stopped by the first interest, so a pending offer never gets the chance to pause it.
 - **RECOMMENDED:** Notify each newly eligible tier (and availability matches) on escalation; keep escalating until reserved; pause (don't cancel) escalation while a live offer/counter is pending. Severity: MEDIUM-HIGH. **ALTERNATIVE A — Keep current logic** (silent, stops on first interest). **ALTERNATIVE B — Notify only on reaching PLATFORM; stop on first interest.** **ALTERNATIVE C — Owner chooses per shift.** Other / defer. **Decide jointly with GM-11-Q01/Q02.**
 
 ## GM-12-Q20 — Can a worker drop a reservation before payment without an incident?
+
+> **Also covers (22 Nov):** GM13-Q04 (GM-13), GM15-40 (GM-15). Asked once, here.
 - **Old ID:** BK-Q14. **Status: NOT RE-VALIDATED — BLOCKED (no reservations module).**
 - **ACTUAL TODAY:** No `reservations.py` exists in `backend/shifts/` at head; no reservation-expiry beat job was found in `settings.py`/`celery.py`. The Oct 2026 claim (unpaid reservations expire under D03) has no implementation traced in this area. The accept path proves the reservation *state* (`ACCEPTED_AWAITING_PAYMENT`, `shift.payment_status = 'PENDING'`), but withdrawal-before-payment has no rule and no endpoint in the files traced. This is GM-13 (billing) territory.
 - **RECOMMENDED (provisional):** Worker may withdraw an unpaid reservation freely (no incident, no fee) — it is not yet a confirmed booking; notify the pharmacy at once so the shift re-opens. **ALTERNATIVE A — Withdraw freely (recommended).** **ALTERNATIVE B — Withdraw counts as a decline (affects re-offer only).** **ALTERNATIVE C — No withdraw; wait for expiry.** Other / defer. Re-validate against GM-13 before deciding.
@@ -363,11 +377,15 @@ Status key: **VALIDATED** = re-checked in current code at 97c4543e · **PARTLY**
 - **RECOMMENDED (provisional):** Must-haves block interest with a clear reason; nice-to-haves never block. **ALTERNATIVE A — Never block (show only).** **ALTERNATIVE B — Block on must-haves (recommended).** Other / defer.
 
 ## GM-12-Q24 — Should reservations show a live payment countdown? / What happens after booking payment fails?
+
+> **Also covers (22 Nov):** GM13-Q03 (GM-13), GM25-C18 (GM-25). Asked once, here.
 - **Old ID:** BK-Q13 + BK-R01 (gap SH-13). **Status: NOT RE-VALIDATED** (frontend + billing not inspected; reservation-expiry implementation not found — see Q20).
 - **ACTUAL TODAY (Oct 2026 only):** both sides see reserved-not-confirmed wording + pay-by time, no live countdown; on payment failure the reservation lives until its deadline with no retry/extension rule. The shared-core API exposes `acceptShiftOffer` / `activateShiftOfferPayroll` but no countdown logic was seen in `api.ts`. Do not present Oct 2026 as current.
 - **RECOMMENDED (provisional):** Live countdown on web + Expo; on payment failure, one automatic retry window + immediate release if the pharmacy chooses, else release at deadline (D03). **ALTERNATIVE A — Keep current logic.** **ALTERNATIVE B — Countdown + auto-release on first failure.** **ALTERNATIVE C — Countdown + extend once by 30 min.** Other / defer. Re-validate against GM-13 + the offer screens before deciding.
 
 ## GM-12-Q25 — What must the worker see before accepting? Does the pharmacy accept the same agreement?
+
+> **Also covers (22 Nov):** GM14-Q02 (GM-14), GM14-Q03 (GM-14). Asked once, here.
 - **Old ID:** AG-Q01 + AG-Q02 (gap SH-09). **Status: VALIDATED — CHANGED (terms contents now proven).**
 - **ACTUAL TODAY:** Accept enforces a terms version match (409 TERMS_CHANGED) and freezes the accepted terms snapshot (`offers.py:392-408`; `engagement.py:freeze_accepted_terms`). The snapshot is `version: 1` and contains **NO cancellation table, NO platform terms version, and NO pharmacy-side acceptance** (`engagement.py:build_shift_engagement_terms`). Only the WORKER accepts in the traced code; staff path has `acceptance_required=False`. Award terms are computed (`_build_tfn_award_terms`: pharmacist above Award floor else ValidationError; >12h shift → payroll review; pre-7am weekday/Saturday → overtime review; overtime NOT auto-computed).
 - **RECOMMENDED:** Show pay, times, breaks, duties, site, cancellation table + platform terms version before accept; record pharmacy acceptance of the same terms. Severity: HIGH (P09 fees cannot be charged without pre-acceptance disclosure). **ALTERNATIVE A — Keep current logic** (pay/times/legal notices only — Oct 2026). **ALTERNATIVE B — Full disclosure + dual acceptance (recommended).** Other / defer. **Decide jointly with GM-13 (agreement/terms) and GM-14 (Award).**

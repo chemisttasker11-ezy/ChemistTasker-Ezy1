@@ -20,10 +20,10 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Owner cancels confirmed booking | No endpoint or button exists in UI to cancel confirmed bookings (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:220`). | No endpoint or button exists in mobile UI to cancel confirmed bookings (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:265`). | Yes | - |
-| Worker cancels confirmed booking | No cancellation button exists; cover requests blocked on booked shifts (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:142`). | No cancellation button exists; cover requests blocked on booked shifts (`frontend_mobile/app/my-roster.tsx:50`). | Yes | - |
+| Owner cancels confirmed booking | No endpoint or button exists in UI to cancel confirmed bookings (`backend/workforce/roster/worker_actions.py:55`). | No endpoint or button exists in mobile UI to cancel confirmed bookings (`backend/workforce/roster/worker_actions.py:55`). | Yes | - |
+| Worker cancels confirmed booking | No cancellation button exists; cover requests blocked on booked shifts (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:357`). | No cancellation button exists; cover requests blocked on booked shifts (`frontend_mobile/app/my-roster.tsx:280`). | Yes | - |
 | Worker declines pending offer | Worker declines offer via `declineShiftOfferService` (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:529`). | Worker declines offer via `declineWorkerShiftOfferService` (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:393`). | Yes | - |
-| Internal roster shift cover request | Worker requests cover for rostered internal shift (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:142`). | Worker requests cover for rostered internal shift (`frontend_mobile/app/my-roster.tsx:50`). | Yes | - |
+| Internal roster shift cover request | Worker requests cover for rostered internal shift (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:357`). | Worker requests cover for rostered internal shift (`frontend_mobile/app/my-roster.tsx:280`). | Yes | - |
 | Completed shift rating submission | Allows 1-5 star rating and feedback on completed shifts (`frontend_web/src/pages/dashboard/sidebar/HistoryShiftsPage.tsx:180`). | Opens dialog for 1-5 star rating on completed shifts (`frontend_mobile/roles/shared/shifts/HistoryShiftsView.tsx:193`). | Yes | - |
 | Historical ratings profile review | Displays rating summary and individual comments (`frontend_web/src/pages/dashboard/shiftCenter/WorkerBookedShifts.tsx:158`). | Displays rating summary and paginated reviews (`frontend_mobile/roles/shared/shifts/WorkerBookedShifts.tsx:182`). | Yes | - |
 
@@ -31,17 +31,17 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Question id | Platforms |
 |---|---|
 | GM15-01 | Web + Expo |
-| GM15-02 | Web + Expo |
-| GM15-03 | Web + Expo |
+| GM15-02 | Web + Expo (asked in GM-16: GM16-Q11) |
+| GM15-03 | Web + Expo (asked in GM-16: GM16-Q13) |
 | GM15-04 | Web + Expo |
 | GM15-05 | Web + Expo |
-| GM15-06 | Web + Expo |
+| GM15-06 | Web + Expo (also covers GM22-07) |
 | GM15-07 | Web + Expo |
 | GM15-08 | Web + Expo |
 | GM15-09 | Web + Expo |
 | GM15-10 | Web + Expo |
-| GM15-11 | Web + Expo |
-| GM15-12 | Web + Expo |
+| GM15-11 | Web + Expo (asked in GM-08: GM-08-Q03) |
+| GM15-12 | Web + Expo (asked in GM-08: GM-08-Q04) |
 | GM15-13 | Web + Expo |
 | GM15-14 | Web + Expo |
 | GM15-15 | Web + Expo |
@@ -49,36 +49,37 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | GM15-17 | Web + Expo |
 | GM15-18 | Web + Expo |
 | GM15-19 | Web + Expo |
-| GM15-20 | Web + Expo |
-| GM15-21 | Web + Expo |
-| GM15-22 | Web + Expo |
-| GM15-23 | Web + Expo |
-| GM15-24 | Web + Expo |
-| GM15-25 | Web + Expo |
-| GM15-26 | Web + Expo |
-| GM15-27 | Web + Expo |
+| GM15-20 | Web + Expo (asked in GM-17: GM17-Q02) |
+| GM15-21 | Web + Expo (asked in GM-17: GM17-Q03) |
+| GM15-22 | Web + Expo (asked in GM-17: GM17-Q05) |
+| GM15-23 | Web + Expo (also covers GM26-Q22) |
+| GM15-24 | Web + Expo (also covers GM26-Q23) |
+| GM15-25 | Web + Expo (also covers GM26-Q24) |
+| GM15-26 | Web + Expo (also covers GM26-Q26) |
+| GM15-27 | Web + Expo (asked in GM-04: GM-04-Q11) |
 | GM15-28 | Web + Expo |
 | GM15-29 | Web + Expo |
-| GM15-30 | Web + Expo |
-| GM15-31 | Web + Expo |
-| GM15-32 | Web + Expo |
-| GM15-33 | Web + Expo |
+| GM15-30 | Web + Expo (also covers GM26-Q25) |
+| GM15-31 | Web + Expo (asked in GM-04: GM-04-Q09) |
+| GM15-32 | Web + Expo (asked in GM-08: GM-08-Q11) |
+| GM15-33 | Web + Expo (asked in GM-09: Q8) |
 | GM15-34 | Web + Expo |
-| GM15-35 | Web + Expo |
-| GM15-36 | Web + Expo |
-| GM15-37 | Web + Expo |
-| GM15-38 | Web + Expo |
-| GM15-39 | Web + Expo |
-| GM15-40 | Web + Expo |
-| GM15-41 | Web + Expo |
-| GM15-42 | Web + Expo |
-| GM15-43 | Web + Expo |
-| GM15-44 | Web + Expo |
-| GM15-45 | Web + Expo |
-| GM15-46 | Web + Expo |
-| GM15-47 | Web + Expo |
+| GM15-35 | Web + Expo (also covers GM-24-Q17, GM26-Q27) |
+| GM15-36 | Web + Expo (also covers GM-24-Q18) |
+| GM15-37 | Web + Expo (also covers GM26-Q28) |
+| GM15-38 | Web + Expo (asked in GM-04: GM-04-Q08) |
+| GM15-39 | Web + Expo (also covers GM22-04) |
+| GM15-40 | Web + Expo (asked in GM-12: GM-12-Q20) |
+| GM15-41 | Web + Expo (asked in GM-13: GM13-Q08) |
+| GM15-42 | Web + Expo (also covers GM-18-Q05, GM-24-Q16) |
+| GM15-43 | Web + Expo (also covers GM-18-Q09, GM26-Q19) |
+| GM15-44 | Web + Expo (asked in GM-13: GM13-Q13) |
+| GM15-45 | Web + Expo (asked in GM-17: GM17-Q11) |
+| GM15-46 | Web + Expo (asked in GM-13: GM13-Q12) |
+| GM15-47 | Web + Expo (also covers GM-18-Q26, GM26-Q32) |
 | GM15-48 | Web + Expo |
-| GM15-49 | Web + Expo |
+| GM15-49 | Web + Expo (asked in GM-16: GM16-Q14) |
+| GM-15-W01 — Cancellation charging code vs the carried fee rules | Web + Expo (defect, see backlog) |
 
 ## 0. Headline finding (plain English)
 
@@ -258,12 +259,16 @@ Severity: **Launch-blocker** = cannot launch real bookings without it; **High** 
 - **Edge cases:** cancel before/after acceptance, before/after payment, <2h to start, recurring multi-date (D05: one date / selected / whole posting), concurrent cancel + payment, wrong tenant/role denied (403), payment in flight.
 
 ### GM15-02 — CX-Q02 · Who receives the owner cancellation fee? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM16-Q11 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** No fee recipient exists. The only money route (`charge_penalty`) pays the platform via Stripe; the worker gets nothing; nothing is recorded as owed to anyone.
 - **Recommended (High): A** — The worker, as cancellation pay for lost work (matches Locumate/Hireup pattern in #184 research). Keeps booking fee separate (F01).
 - **A — Worker, as cancellation pay:** compensates lost shift; needs a payout path (Q22). **B — Platform:** worker gets nothing; hard to defend to workers. **C — Split worker/platform:** harder to explain, two payouts.
 - **Other / defer.**
 
 ### GM15-03 — CX-Q03 · If the pharmacy cancels an unpaid reservation, is any fee due? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM16-Q13 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** No cancel transition for unpaid reservations exists at all. D01: payment is the confirmation point.
 - **Recommended: A** — No fee; worker notified. Nothing confirmed, so no booking to cancel.
 - **A — No fee (recommended). B — Fee bands apply:** treats a reservation like a confirmed booking; contradicts D01.
@@ -281,6 +286,8 @@ Severity: **Launch-blocker** = cannot launch real bookings without it; **High** 
 - **Other / defer.**
 
 ### GM15-06 — CX-Q06 · Inside the window, who is alerted and how fast? [STILL VALID]
+
+> **Also covers (22 Nov):** GM22-07 (GM-22). Asked once, here.
 - **Actual today:** No emergency escalation exists. Roster emails go once to owner/admins; nothing repeats, nothing escalates to support.
 - **Recommended: B** — Manager + owner push every 15 min, plus platform support after 30 min (support chases, does not approve).
 - **A — Manager + owner push every 15 min. C — Manager only.**
@@ -311,12 +318,16 @@ Severity: **Launch-blocker** = cannot launch real bookings without it; **High** 
 - **Other / defer.**
 
 ### GM15-11 — CX-Q11 · When does a missing worker become a no-show? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM-08-Q03 in GM-08.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** No no-show state, timer or classification. A missing worker stays assigned; nothing reposts the slot.
 - **Recommended: A — 30 min after start, no contact** (pharmacy can repost sooner).
 - **B — 60 min (Instawork's automatic line). C — Manager reports any time after start.**
 - **Other / defer.**
 
 ### GM15-12 — CX-Q12 · How is late arrival treated? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM-08-Q04 in GM-08.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** No lateness rule. Attendance timestamps exist (GM-08) but no booking lateness classification, no "running late" message, no ETA.
 - **Recommended: A — 15+ min late is logged, not an incident**; shown on reliability; "running late" message with ETA.
 - **B — Late counts as an incident.**
@@ -365,48 +376,64 @@ Severity: **Launch-blocker** = cannot launch real bookings without it; **High** 
 - **Other / defer.**
 
 ### GM15-20 — CX-Q20 · When the worker cancels or no-shows, what happens to the booking fee? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM17-Q02 in GM-17.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** No rule, no engine. The pharmacy has paid a fulfillment fee for work that did not happen, with no remedy path.
 - **Recommended: C — Keep only if replaced**; otherwise pharmacy chooses refund or credit.
 - **A — Pharmacy picks remedy each time. B — Credit only.**
 - **Other / defer.**
 
 ### GM15-21 — CX-Q21 · Who approves refunds and credits? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM17-Q03 in GM-17.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** Payments can be flagged for reconciliation, but no approval workflow exists; a flag cannot issue money.
 - **Recommended: A — Platform finance/support admin, every case, with reason logged** (matches F04).
 - **B — Automatic by rule, admin for exceptions.**
 - **Other / defer.**
 
 ### GM15-22 — CX-Q22 · How is the worker's cancellation pay paid out? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM17-Q05 in GM-17.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** Timesheets route ordinary pay to payroll/invoicing, but cancellation pay has no record or payout path.
 - **Recommended: A — Same invoice or payroll as wages, labelled "cancellation pay".**
 - **B — Platform pays the worker** (platform would need to hold the money).
 - **Other / defer.**
 
 ### GM15-23 — CX-Q23 · Who reviews disputes and appeals? [STILL VALID]
+
+> **Also covers (22 Nov):** GM26-Q22 (GM-26). Asked once, here.
 - **Actual today:** No dispute or appeal workflow. Only the platform may sanction (P04, decided) — but there is no reviewer, no queue, no case. (Partial related build: `RatingReport` lets a ratee report a *rating*; that is not a cancellation/hours dispute and has no review queue.)
 - **Recommended: A — Support reviews; a second person hears the appeal** (appeal never goes to the first reviewer).
 - **B — One reviewer does both.**
 - **Other / defer.**
 
 ### GM15-24 — CX-Q24 · How long to appeal, and how fast must support answer? [STILL VALID]
+
+> **Also covers (22 Nov):** GM26-Q23 (GM-26). Asked once, here.
 - **Actual today:** No clocks exist.
 - **Recommended: A — 14 days to appeal; answer in 5 (first review in 2 business days).**
 - **B — 30 days to appeal; answer in 10.**
 - **Other / defer.**
 
 ### GM15-25 — CX-Q25 · Who can see each part of a dispute? [STILL VALID]
+
+> **Also covers (22 Nov):** GM26-Q24 (GM-26). Asked once, here.
 - **Actual today:** No dispute case, evidence classes or access policy exist.
 - **Recommended: A — Summary to both sides; support alone sees sensitive evidence** (medical, identity, third-party).
 - **B — Everything to both sides. C — Platform only.**
 - **Other / defer.**
 
 ### GM15-26 — CX-Q26 · Which events count as an incident? [STILL VALID]
+
+> **Also covers (22 Nov):** GM26-Q26 (GM-26). Asked once, here.
 - **Actual today:** No reviewed incident ledger, no qualifying cutoff. P10 says every non-exempt qualifying cancel/no-show counts after platform review — "qualifying" is undefined.
 - **Recommended: A — No-shows and cancels inside 72h** (matches the owner fee line).
 - **B — Inside 24h. C — Any cancel after confirmation, even weeks ahead.**
 - **Other / defer.**
 
 ### GM15-27 — CX-Q27 · Do favourite, chain and organisation incidents count toward the platform ladder? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM-04-Q11 in GM-04.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** No source-specific ladder or badge rule. P04 (favourites: warnings) / P05 (chain/org: handled internally, badges possible) are decisions only. Source is *not* frozen per worker/date (CX-Q31, still open) — only shift visibility is frozen in engagement terms.
 - **Recommended: A — Public-sourced only; others badge only** (non-public incidents can add a badge, never suspension).
 - **B — All outside sources count on one ladder.**
@@ -425,24 +452,32 @@ Severity: **Launch-blocker** = cannot launch real bookings without it; **High** 
 - **Other / defer.**
 
 ### GM15-30 — CX-Q30 · What process applies before permanent suspension? [STILL VALID]
+
+> **Also covers (22 Nov):** GM26-Q25 (GM-26). Asked once, here.
 - **Actual today:** No suspension tooling, no process. P10 requires human review, notice, appeal and legal review — none exists.
 - **Recommended (High — legal): A — Code-compliant process** (reasons, notice, review, response, appeal) under the Digital Labour Platform Deactivation Code.
 - **B — Two reviewers plus legal. C — One platform admin.**
 - **Other / defer.** Note: do not build suspension tooling before this is decided; a one-sided permanent ban is the highest-risk item in this area.
 
 ### GM15-31 — CX-Q31 · When is a worker's source (favourite, chain, org, public) frozen, and which wins if several apply? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM-04-Q09 in GM-04.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** Accepted engagement terms freeze the *shift visibility* at acceptance (`engagement.py: build_shift_engagement_terms`, `source_visibility: shift.visibility`); assignments link to the source offer. They do **not** freeze each worker's favourite/chain/org/public relationship or resolve precedence.
 - **Recommended: A — Freeze at accept; closest relationship wins** (a favourite seen via public counts as favourite).
 - **Keep — Keep freezing shift visibility without worker-specific precedence. B — Freeze at accept; channel seen wins. C — Freeze at payment.**
 - **Other / defer.**
 
 ### GM15-32 — CX-Q32 · What marks a shift complete? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM-08-Q11 in GM-08.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** Nothing marks it complete. Assignments enter history after scheduled end regardless of approved timesheets or clock-out (`lifecycle.py: HistoryShiftViewSet`); no completed state; **no 48h auto-approval** — `timesheet_transitions.py` has submit/approve/reopen/comment/lock and no "48" anywhere.
 - **Recommended: A — Timesheet approved, or auto after 48h** (worker submits; pharmacy approves or it auto-approves).
 - **Keep — Continue time-based history without an explicit completion state. B — Clock-out alone. C — Manager approval only.**
 - **Other / defer.**
 
 ### GM15-33 — CX-Q33 · How are disputed hours settled? [STILL VALID — PARTIAL]
+
+> **Merged 22 Nov: asked once, as Q8 in GM-09.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** Managers can correct attendance with a reason; workers can comment on timesheets and request missing punches (Oct description; manager-correction/worker-comment half **not re-opened line-by-line at this head**). Verified at this head: **no escalation of an hours disagreement to platform support exists** (no dispute/appeal code anywhere; `appeal` = 0 product hits). Both apps share this backend.
 - **Recommended: A — Pharmacy edits with reason; worker can escalate; support decides if they disagree.**
 - **Keep — Manager corrections + worker comments, no platform escalation. B — Support handles every dispute.**
@@ -455,76 +490,102 @@ Severity: **Launch-blocker** = cannot launch real bookings without it; **High** 
 - **Other / defer.**
 
 ### GM15-35 — CX-Q34 · Who can rate, and when? [CHANGED]
+
+> **Also covers (22 Nov):** GM-24-Q17 (GM-24), GM26-Q27 (GM-26). Asked once, here.
 - **Actual today (changed):** Owners/org-admins/pharmacy-admins can rate assigned workers; workers can rate pharmacies — but now only with a **past-date assignment** at a controlled pharmacy (`ratings/views.py: _has_completed_relationship_*`, `slot_date < today`; 403 otherwise). One editable rating per relationship. `pending` lists unrated eligible relationships. **Still not proof of work:** no timesheet approval, no clock-out, no attendance check — a no-showed worker can still be rated, and can rate the pharmacy. Still relationship-level, not per-shift. Still no internal/marketplace separation (see Q36).
 - **Recommended (High — trust): A — After approved timesheet only.** No rating when no work happened.
 - **Keep (stale — needs rewriting) — "Allow relationship ratings after any assignment":** no longer describes the code; the code now requires a past-date assignment. Do not carry the old KEEP text forward. **B — After the shift's end time** (current code, roughly: past date; unworked shifts could still be rated).
 - **Other / defer.**
 
 ### GM15-36 — CX-Q35 · Should ratings from internal roster shifts appear on the public talent board? [STILL VALID]
+
+> **Also covers (22 Nov):** GM-24-Q18 (GM-24). Asked once, here.
 - **Actual today:** Yes, they do. Talent cards average **all** OWNER_TO_WORKER ratings including internal-roster ones (`talent/views/explorer.py:78-82`, `Avg`/`Count` with no source filter); web and mobile show the same aggregate; no internal-vs-marketplace separation.
 - **Recommended: A — No, keep internal private** (employer reviews stay private; marketplace reviews are separate).
 - **Keep — Continue including internal ratings in the talent-card average.**
 - **Other / defer.**
 
 ### GM15-37 — CX-Q36 · Do cancelled, expired and no-show shifts stay in both sides' history? [STILL VALID]
+
+> **Also covers (22 Nov):** GM26-Q28 (GM-26). Asked once, here.
 - **Actual today:** Both sides have assignment-and-time history. Cancelled/no-show states do not exist; expired unpaid offers without assignments do not appear. **Worse than Oct:** AHPRA-cancelled assignments are *deleted* (`cancellation.py`), so they vanish from history instead of appearing as "cancelled".
 - **Recommended: A — Yes, both see them with status**; reason visible only to the two parties.
 - **Keep — Assignment-and-time history without cancellation/expiry records. B — Hidden once cancelled.**
 - **Other / defer.**
 
 ### GM15-38 — AG-Q09 · Who is told when a shift is cancelled, covered or replaced? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM-04-Q08 in GM-04.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** Each feature picks its own recipients. Shift edits notify past applicants; offer decline notifies the owner; cover approve/reject notifies the worker; AHPRA cancel notifies managers only. No cancel notice exists for user-initiated cancels (there is no cancel).
 - **Recommended: A — Affected workers, owner, shift's managers only** (people who must act).
 - **Keep — Each feature keeps choosing its own recipients. B — Plus organisation admins. C — Plus anyone watching.**
 - **Other / defer.**
 
 ### GM15-39 — AG-Q10 · Which channels carry those notices? [STILL VALID]
+
+> **Also covers (22 Nov):** GM22-04 (GM-22). Asked once, here.
 - **Actual today:** In-app, push and email exist; each feature picks its own. Offer/confirmation: in-app + email. Pre-shift reminders: email only (hourly beat, 12–13h window, `shifts/tasks.py`).
 - **Recommended: A — In-app and push; email for money/cancel.**
 - **Keep — Each feature keeps choosing its own channels. B — Email everything. C — In-app only.**
 - **Other / defer.**
 
 ### GM15-40 — BK-Q14 · Can a worker drop a reservation before payment without an incident? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM-12-Q20 in GM-12.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** No worker withdraw action exists for a reservation; it ends only when the pharmacy pays or the reservation expires (D03). (Worker *can* decline a PENDING offer and delete interest/saved shifts — that is before acceptance, not a reservation.)
 - **Recommended: A — Yes, no incident** (nothing is confirmed until the pharmacy pays, D01; releasing the slot helps the pharmacy).
 - **Keep — Worker cannot drop a reservation. B — Free for 15 minutes, then counts. C — Counts as a cancellation.**
 - **Other / defer.**
 
 ### GM15-41 — BK-R01 · What happens after booking payment fails? [STILL VALID — strengthened]
+
+> **Merged 22 Nov: asked once, as GM13-Q08 in GM-13.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** A failed/cancelled checkout does not confirm the assignment. The reservation remains for another attempt until its original payment deadline. New since Oct: explicit `expireFulfillmentCheckout` / `resumeFulfillmentCheckout` actions exist (`billing/views.py`, shared-core), and `checkout_reservations.py` reconciles orphaned/expired provider sessions.
 - **Recommended: Keep — Retry until deadline** (same reservation, original deadline; D02/D03 stay deterministic).
 - **A — Release immediately. B — Extend once.**
 - **Other / defer.**
 
 ### GM15-42 — TB-Q05 · How should reviews and reliability show? [STILL VALID]
+
+> **Also covers (22 Nov):** GM-18-Q05 (GM-18), GM-24-Q16 (GM-24). Asked once, here.
 - **Actual today:** Web and mobile show one average OWNER_TO_WORKER star score + count (`talent/views/explorer.py:78-82`; `ratings/views.py: summary`). No separate attendance reliability or responsiveness measure; internal ratings feed the same average.
 - **Recommended: A — Separate: reviews and reliability, with counts** (one line each).
 - **Keep — One relationship star average and count, no separate reliability.**
 - **Other / defer.**
 
 ### GM15-43 — TB-Q09 · Can a pharmacy block a worker? [STILL VALID]
+
+> **Also covers (22 Nov):** GM-18-Q09 (GM-18), GM26-Q19 (GM-26). Asked once, here.
 - **Actual today:** No block list exists anywhere (repo search: 0 hits in backend/talent).
 - **Recommended: A — Yes, private block** (worker stops seeing that pharmacy's shifts; never shown publicly).
 - **B — No blocking; pharmacy declines each time.**
 - **Other / defer.**
 
 ### GM15-44 — LA-P01 · AHPRA cancellation leaves a shift stuck as waiting for payment [CHANGED — PARTIAL]
+
+> **Merged 22 Nov: asked once, as GM13-Q13 in GM-13.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** `cancel_upcoming_assignments` now declines future ACCEPTED_AWAITING_PAYMENT offers and deletes future assignments (with history protection), so the *offer* no longer sits waiting. **Not verified in that function:** any reset of `Shift.payment_status` or outstanding fulfillment checkouts — the function touches neither. Payment-state reset needs a GM-13/GM-17 cross-check before this is closed.
 - **Recommended: A — Before launch: fix as part of merging** (verify + fix the payment reset; do not ship a path that frees the worker but leaves the shift "awaiting payment").
 - **B — Soon after launch. C — Not needed.**
 - **Other / defer.**
 
 ### GM15-45 — LA-P02 · AHPRA cancellations bypass the cancellation policy and notices [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM17-Q11 in GM-17.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** The AHPRA path is still its own cancellation path: no fee, no refund/credit, managers-only notice, worker not notified by that function. It skips every P09/F01 rule.
 - **Recommended: A — Before launch: fix** (one cancellation path, one policy; or an explicit, owner-approved exception for regulatory cancellations).
 - **B — Soon after launch. C — Not needed.**
 - **Other / defer.**
 
 ### GM15-46 — Legacy cancellation charging (LA-Q06 / SH-02)
+
+> **Merged 22 Nov: asked once, as GM13-Q12 in GM-13.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** The route and client export exist. The live penalty flag defaults off. Checkout still uses the old bands and all assignments in an allowed environment.
 - **Status:** Engineering: see BL-04. Keep the route and export behind the existing live flag and fix the charge. Ask about launch scope at GM15-01.
 
 ### GM15-47 — LA-Q10 / SH-09 · Accepted terms don't include the cancellation table or terms version [CHANGED — PARTIAL]
+
+> **Also covers (22 Nov):** GM-18-Q26 (GM-18), GM26-Q32 (GM-26). Asked once, here.
 - **Actual today:** Better than Oct, still incomplete. A stable terms fingerprint now exists (`engagement.py: shift_engagement_terms_version`, SHA-256) and acceptance echoes it (PR #249 D2 work). But the snapshot (`build_shift_engagement_terms`, `version: 1`) still contains **no cancellation band table, no platform terms version, no pharmacy-side acceptance** — only worker `accepted_at` / `accepted_by_user_id`. The register's legal note stands: P09 fees need clear disclosure *before* acceptance before they can ever be charged.
 - **Recommended: A — Before launch:** record versioned pre-contract acceptance by both sides, include the cancellation matrix, and obtain Australian legal review.
 - **B — Soon after launch. C — Not needed.**
@@ -536,6 +597,8 @@ Severity: **Launch-blocker** = cannot launch real bookings without it; **High** 
 - **Other / defer.**
 
 ### GM15-49 — LA-R02 · May cancellation charges launch before Australian legal review? [STILL VALID]
+
+> **Merged 22 Nov: asked once, as GM16-Q14 in GM-16.** Answer it there; this copy stays for its own evidence and is not asked again.
 - **Actual today:** The approved P09 charge table is not implemented. The separate legacy 10%/20% checkout remains callable (test mode ungated; live flag-gated), with no evidence of Australian legal review. Since Nov 2023, proposing/using/relying on unfair standard-form terms can attract major penalties; clear wording alone does not cure unfairness.
 - **Recommended (Launch-blocker): A — Legal review before launch** (review every charge and remedy before enforcement).
 - **B — Disclosure is enough. C — Never charge: use non-money reliability controls only.**

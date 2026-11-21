@@ -21,38 +21,38 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Sign up / login / email OTP | Vite handles registration (`frontend_web/src/pages/register.tsx:28`) and Next handles landing login (`frontend_web/landing_next/app/(public)/login/page.tsx:1`). | Mobile provides native email/password and OTP login screens (`frontend_mobile/app/login.tsx:20`). | Yes | |
+| Sign up / login / email OTP | Vite handles registration (`frontend_web/src/pages/register.tsx:28`) and Next handles landing login (`frontend_web/landing_next/app/(public)/login/page.tsx:1`). | Mobile provides native email/password and OTP login screens (`frontend_mobile/app/login.tsx:143`). | Yes | |
 | Worker onboarding & credential verification | Pharmacist submits AHPRA and ID in multi-step wizard (`frontend_web/src/pages/onboarding/onboarding_pharmacist/PharmacistOnboardingV2Layout.tsx:20`). | Pharmacist completes credentials via profile basic info redirect (`frontend_mobile/app/pharmacist/onboarding.tsx:5`). | Yes | |
-| Owner / pharmacy onboarding & setup gate | Owner registers pharmacy details with setup checklist (`frontend_web/src/pages/onboarding/OwnerOnboarding.tsx:30`). | Owner completes pharmacy setup in native step wizard (`frontend_mobile/app/owner/onboarding/step1.tsx:1`). | Yes | |
-| Shift posting flow (single / multi-slot) | Owner creates shift via multi-step wizard (`frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx:10`). | Owner creates shift with duplicate draft recovery and escalation settings (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:40`). | Yes | |
+| Owner / pharmacy onboarding & setup gate | Owner registers pharmacy details with setup checklist (`frontend_web/src/pages/onboarding/OwnerOnboarding.tsx:837`). | Owner completes pharmacy setup in native step wizard (`frontend_mobile/app/owner/onboarding/step1.tsx:1`). | Yes | |
+| Shift posting flow (single / multi-slot) | Owner creates shift via multi-step wizard (`frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx:10`). | Owner creates shift with duplicate draft recovery and escalation settings (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:79`). | Yes | |
 | Public shift discovery (logged out) | Next renders landing board (`frontend_web/landing_next/app/(public)/shifts/public-board/page.tsx:1`) and Vite renders discovery page (`frontend_web/src/pages/PublicJobBoardPage.tsx:74`). | Native anonymous shift board renders public shift cards (`frontend_mobile/app/shifts/public-board.tsx:4`). | Yes | |
-| Shift offer negotiation and acceptance | Worker reviews offer terms and confirms booking reservation (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:120`). | Worker reviews offer and accepts with reservation prompt (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:150`). | Yes | |
-| Talent board discovery & booking request | Authenticated users search talent cards and request bookings (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:62`). | Mobile users browse candidate cards and submit booking proposals (`frontend_mobile/roles/shared/talent-board/index.tsx:106`). | Yes | |
-| Goods & Ethical marketplace | Managed on Next web (`frontend_web/landing_next/app/(public)/marketplace/page.tsx:1`); missing from Vite (`frontend_web/src/main.tsx:1`). | Supported natively in mobile marketplace screens (`frontend_mobile/features/parity/marketplace.tsx:31`). | Yes | Parity question: Marketplace operates on Next web and Expo, completely omitted from Vite web. |
+| Shift offer negotiation and acceptance | Worker reviews offer terms and confirms booking reservation (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:468`). | Worker reviews offer and accepts with reservation prompt (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:11`). | Yes | |
+| Talent board discovery & booking request | Authenticated users search talent cards and request bookings (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/components/TalentCardV2.tsx:278`). | Mobile users browse candidate cards and submit booking proposals (`frontend_mobile/roles/shared/talent-board/components/AvailabilitySidebar.tsx:26`). | Yes | |
+| Goods & Ethical marketplace | Managed on Next web ; missing from Vite (`frontend_web/landing_next/app/(public)/marketplace/page.tsx:15`, `frontend_web/src/main.tsx`). | Supported natively in mobile marketplace screens (`frontend_mobile/features/parity/marketplace.tsx:31`). | Yes | Parity question: Marketplace operates on Next web and Expo, completely omitted from Vite web. |
 
 ### Platforms per question
 | Question id | Platforms |
 |---|---|
-| GM25-C01 — Must every onboarding step work on mobile at launch? | Web + Expo |
-| GM25-C02 — Browse access before full verification | Web + Expo |
+| GM25-C01 — Must every onboarding step work on mobile at launch? | Web + Expo (asked in GM-01: GM01-Q10) |
+| GM25-C02 — Browse access before full verification | Web + Expo (asked in GM-01: GM01-Q04) |
 | GM25-C03 — Verification on outside bookings | Web + Expo |
-| GM25-C04 — What can Explorers (new to pharmacy) do with shifts? | Web + Expo |
+| GM25-C04 — What can Explorers (new to pharmacy) do with shifts? | Web + Expo (asked in GM-02: ON-Q05) |
 | GM25-C05 — Payment readiness across clients | Web + Expo |
-| GM25-C06 — What must a pharmacy pass before posting to outside workers? | Web + Expo |
-| GM25-C07 — Should pharmacies save a payment method during onboarding? | Web + Expo |
-| GM25-C08 — Fix before launch? Mobile "add personal profile" drops pharmacist data. | Web + Expo |
+| GM25-C06 — What must a pharmacy pass before posting to outside workers? | Web + Expo (asked in GM-02: ON-Q11) |
+| GM25-C07 — Should pharmacies save a payment method during onboarding? | Web + Expo (asked in GM-02: ON-Q13) |
+| GM25-C08 — Fix before launch? Mobile "add personal profile" drops pharmacist data. | Web + Expo (also covers GM26-Q47) |
 | GM25-C09 — Fix before launch? Reachable mobile onboarding screens 404 for non-pharmacists. | Web + Expo |
 | GM25-C10 — Fix before launch? Profile progress % doesn't match Verified. | Web + Expo |
 | GM25-C11 — Fix before launch? The auto-publish toggle for new shifts has no effect. | Web + Expo |
-| GM25-C12 — Fix before launch? Anonymous talent posts expose full names. | Web + Expo |
-| GM25-C13 — Fix before launch? The talent board downloads every post and filters in the app. | Web + Expo |
-| GM25-C14 — Fix before launch? Web and mobile disagree on Talent Board booking permissions. | Web + Expo |
-| GM25-C15 — Fix before launch? Talent post availability is copied once and never syncs. | Web + Expo |
-| GM25-C16 — Is "Request booking" a firm offer or an enquiry? | Web + Expo |
-| GM25-C17 — What should the heart on a talent card do? | Web + Expo |
-| GM25-C18 — Should reservations show a live payment countdown? | Web + Expo |
-| GM25-C19 — Which shifts get pre-shift reminders, and when? | Web + Expo |
-| GM25-C20 — Escalation: who is told, and how late may a scheduled escalation fire? | Web + Expo |
+| GM25-C12 — Fix before launch? Anonymous talent posts expose full names. | Web + Expo (asked in GM-18: GM-18-Q13) |
+| GM25-C13 — Fix before launch? The talent board downloads every post and filters in the app. | Web + Expo (asked in GM-18: GM-18-Q16) |
+| GM25-C14 — Fix before launch? Web and mobile disagree on Talent Board booking permissions. | Web + Expo (asked in GM-18: GM-18-Q15) |
+| GM25-C15 — Fix before launch? Talent post availability is copied once and never syncs. | Web + Expo (asked in GM-19: GM-19-Q12) |
+| GM25-C16 — Is "Request booking" a firm offer or an enquiry? | Web + Expo (asked in GM-18: GM-18-Q07) |
+| GM25-C17 — What should the heart on a talent card do? | Web + Expo (asked in GM-18: GM-18-Q08) |
+| GM25-C18 — Should reservations show a live payment countdown? | Web + Expo (asked in GM-12: GM-12-Q24) |
+| GM25-C19 — Which shifts get pre-shift reminders, and when? | Web + Expo (asked in GM-22: GM22-05) |
+| GM25-C20 — Escalation: who is told, and how late may a scheduled escalation fire? | Web + Expo (asked in GM-11: GM-11-Q03) |
 | GM25-Q01 — What is the launch cut across Vite web, Next web, and Expo? | Web + Expo |
 | GM25-Q02 — Vite vs Next: which routes live where, and is the migration finished? | Web only |
 | GM25-Q03 — Duplicated public boards: one implementation or tolerated twin? | Web + Expo |
@@ -668,6 +668,8 @@ option is marked n/a.
 ### 4A. Carried #184 questions relevant to GM-25 (parity angle added)
 
 **GM25-C01 — ON-Q15. Must every onboarding step work on mobile at launch?**
+
+> **Merged 22 Nov: asked once, as GM01-Q10 in GM-01.** Answer it there; this copy stays for its own evidence and is not asked again.
 **Verdict: CHANGED (partial) — V.** The pharmacist half is still broken
 (see C08): the legacy add-profile screen still posts rate fields with no
 backend home. The other-staff half is FIXED by reroute: the card now sends
@@ -683,6 +685,8 @@ OPEN.**
 
 **GM25-C02 — ON-Q02. Browse access before full verification**
 
+> **Merged 22 Nov: asked once, as GM01-Q04 in GM-01.** Answer it there; this copy stays for its own evidence and is not asked again.
+
 **Status:** Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation. The dashboard requires email and mobile verification. Anonymous browsing stays open on public boards.
 
 **GM25-C03 — ON-Q03. Verification on outside bookings**
@@ -690,6 +694,8 @@ OPEN.**
 **Status:** Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01. Engineering: see BL-01 for the backend guard shared by the three clients.
 
 **GM25-C04 — ON-Q05. What can Explorers (new to pharmacy) do with shifts?**
+
+> **Merged 22 Nov: asked once, as ON-Q05 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 **Verdict: STILL VALID — M (mobile half) + O (web half).** Mobile:
 `roles/explorer/shifts.tsx` is still a placeholder rendering only
 "Shifts" (PARITY_MATRIX L17, in repo at head). Web half (web shows
@@ -707,6 +713,8 @@ upgrading role (upgrade card exists). Other / defer. Recommended (Oct
 **Status:** Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04. Engineering: see BL-03 for the acceptance gate and early notice on web and Expo. LA-Q05's remaining launch timing choice is covered by LAUNCH-01.
 
 **GM25-C06 — ON-Q11. What must a pharmacy pass before posting to outside
+
+> **Merged 22 Nov: asked once, as ON-Q11 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 workers?** Context (Oct 2026, NOT RE-VALIDATED): posting checks neither
 `Pharmacy.verified` nor `abn_verified`; any pharmacy can post to every
 tier, including public. Parity angle: none in the gate itself (backend) —
@@ -717,6 +725,8 @@ public. Other / defer. Recommended (Oct 2026): D. **Status:
 NOT RE-VALIDATED.**
 
 **GM25-C07 — ON-Q13. Should pharmacies save a payment method during
+
+> **Merged 22 Nov: asked once, as ON-Q13 in GM-02.** Answer it there; this copy stays for its own evidence and is not asked again.
 setup?** Context (Oct 2026, NOT RE-VALIDATED): every booking opens a new
 Stripe Checkout; no card stored; under D02 a shift under 2h away leaves
 30 minutes to pay. Parity angle: acute on Expo — a phone user doing a
@@ -728,6 +738,8 @@ subscribers only. Other / defer. Recommended (Oct 2026): B.
 **Status: NOT RE-VALIDATED.**
 
 **GM25-C08 — LA-Q02 (code, ON-04). Fix before launch? Mobile "add
+
+> **Also covers (22 Nov):** GM26-Q47 (GM-26). Asked once, here.
 personal profile" drops pharmacist data and sends other staff to
 not-found.** **Verdict: STILL VALID (pharmacist half) / CHANGED
 (other-staff half) — V.** Pharmacist: `roles/pharmacist/onboarding.tsx`
@@ -778,6 +790,8 @@ Options: A/B/C as above. Recommended (Oct 2026): A (correct copy, enforce
 per-pharmacy cover permission). **Status: STILL VALID, OPEN.**
 
 **GM25-C12 — LA-Q12 (code, TB-01). Fix before launch? Anonymous talent
+
+> **Merged 22 Nov: asked once, as GM-18-Q13 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 posts expose full names to any signed-in account.** **Verdict: STILL VALID
 — A18 (adopted GM-18, senior PASS).** Authenticated feed/list/detail
 return names and user IDs; only public reads mask them; both apps consume
@@ -786,6 +800,8 @@ Severity: **launch-gate, privacy.** **Status: STILL VALID (adopted),
 OPEN.**
 
 **GM25-C13 — LA-Q14 (code, TB-04). Fix before launch? The talent board
+
+> **Merged 22 Nov: asked once, as GM-18-Q16 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 downloads every post and filters in the app.** **Verdict: STILL VALID —
 A18 (adopted GM-18).** Both apps fetch every feed page through
 shared-core, then filter locally; backend checks visibility in a Python
@@ -795,6 +811,8 @@ Expo public board paginates.) Options: A/B/C as above. Recommended (Oct
 **Status: STILL VALID (adopted), OPEN.**
 
 **GM25-C14 — LA-Q15 (code, TB-07). Fix before launch? Web and mobile
+
+> **Merged 22 Nov: asked once, as GM-18-Q15 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 disagree on Talent Board booking permissions.** **Verdict: CHANGED
 (persists in a new shape) — A18 (adopted GM-18, senior-verified at head).**
 Web `TalentBoard/index.tsx:313` `canRequestBooking` = fixed 9-role
@@ -807,11 +825,15 @@ Recommended (Oct 2026): A — one backend hiring-role policy, mirrored in
 both clients. **Status: CHANGED (new shape), OPEN.**
 
 **GM25-C15 — LA-Q16 (code, AV-01). Fix before launch? Talent post
+
+> **Merged 22 Nov: asked once, as GM-19-Q12 in GM-19.** Answer it there; this copy stays for its own evidence and is not asked again.
 availability is copied once and never syncs with the calendar.**
 **Verdict: STILL VALID — A18 (adopted GM-18).** Options: A/B/C as above.
 Recommended (Oct 2026): A. **Status: STILL VALID (adopted), OPEN.**
 
 **GM25-C16 — TB-Q07. Is "Request booking" a firm offer or an enquiry?**
+
+> **Merged 22 Nov: asked once, as GM-18-Q07 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 **Verdict: KEEP (firm offer) — A18 (adopted GM-18).** GM-18's senior
 review confirms the recommendation is KEEP (firm offer) and correctly
 separates the firmness itself (fine) from the defects around it
@@ -824,6 +846,8 @@ an offer; C — Owner chooses each time. Other / defer. **Status: KEEP
 (adopted), OPEN.**
 
 **GM25-C17 — TB-Q08. What should the heart on a talent card do?**
+
+> **Merged 22 Nov: asked once, as GM-18-Q08 in GM-18.** Answer it there; this copy stays for its own evidence and is not asked again.
 Context (Oct 2026, NOT RE-VALIDATED): heart likes/unlikes a post on both
 apps; creates no favourites membership; no "Invite to favourites" action.
 Options: KEEP — likes only; A — Adds to favourites, with worker consent;
@@ -831,6 +855,8 @@ B — Keep like; add "Invite to favourites" (membership invite). Other /
 defer. Recommended (Oct 2026): B. **Status: NOT RE-VALIDATED.**
 
 **GM25-C18 — BK-Q13. Should reservations show a live payment countdown?**
+
+> **Merged 22 Nov: asked once, as GM-12-Q24 in GM-12.** Answer it there; this copy stays for its own evidence and is not asked again.
 Context (Oct 2026, NOT RE-VALIDATED): both sides see reserved-not-
 confirmed wording and the pay-by time; neither sees a live countdown.
 Parity angle: same on both apps in Oct 2026; whether Expo shows the same
@@ -840,6 +866,8 @@ deadline; A — Add live countdown; B — Show as booked (misleading). Other
 / defer. Recommended (Oct 2026): A. **Status: NOT RE-VALIDATED.**
 
 **GM25-C19 — AG-Q11. Which shifts get pre-shift reminders, and when?**
+
+> **Merged 22 Nov: asked once, as GM22-05 in GM-22.** Answer it there; this copy stays for its own evidence and is not asked again.
 Context (Oct 2026, NOT RE-VALIDATED): hourly job emails every booked or
 rostered worker once, ~12h before each slot; reservations get none; no
 push, no second reminder. Parity angle (GM-25 owns only this): Expo now
@@ -851,6 +879,8 @@ defer. Recommended (Oct 2026): A. **Status: NOT RE-VALIDATED
 (mechanics owned elsewhere); parity angle OPEN.**
 
 **GM25-C20 — PO-Q08 / PO-Q10. Escalation: who is told, and how late may
+
+> **Merged 22 Nov: asked once, as GM-11-Q03 in GM-11.** Answer it there; this copy stays for its own evidence and is not asked again.
 it fire?** Context (Oct 2026, NOT RE-VALIDATED): escalation sends
 nothing; match emails only at posting straight to public; any past
 interest stops escalation for good; escalation runs only when someone
