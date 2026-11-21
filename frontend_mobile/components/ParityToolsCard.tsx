@@ -4,6 +4,7 @@ import { Card, Icon, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import { colors, font, radius, space, touch } from '@/constants/tokens';
 
 export type PlatformTool = { title: string; subtitle: string; icon: string; route: string };
 
@@ -34,12 +35,12 @@ const explorerTools: PlatformTool[] = [
 
 const managerRoles = new Set(['OWNER','ORGANIZATION','ORG_ADMIN','ORG_OWNER','ORG_STAFF','CHIEF_ADMIN','REGION_ADMIN']);
 
-export default function ParityToolsCard() {
-  const router = useRouter();
+/** The work and platform tools this user may open (capability-gated); the dashboard card and the More tab list them. */
+export function usePlatformTools(): PlatformTool[] {
   const { user, hasCapability } = useAuth();
   const { selectedPharmacyId } = useWorkspace();
   const role = String(user?.role || '').toUpperCase();
-  const tools = useMemo(() => {
+  return useMemo(() => {
     if (role === 'EXPLORER') return explorerTools;
 
     const canManageRoster = hasCapability('MANAGE_ROSTER', selectedPharmacyId);
@@ -58,6 +59,11 @@ export default function ParityToolsCard() {
     delegated.push(...(isOrganizationRole ? managerTools.slice(3) : workerTools));
     return delegated.filter((tool, index, rows) => rows.findIndex((candidate) => candidate.route === tool.route) === index);
   }, [hasCapability, role, selectedPharmacyId]);
+}
+
+export default function ParityToolsCard() {
+  const router = useRouter();
+  const tools = usePlatformTools();
 
   return (
     <View style={styles.section}>
@@ -72,12 +78,12 @@ export default function ParityToolsCard() {
             onPress={() => router.push(tool.route as any)}
           >
             <Card.Content style={styles.content}>
-              <View style={styles.icon} importantForAccessibility="no-hide-descendants"><Icon source={tool.icon} size={22} color="#6366F1" /></View>
+              <View style={styles.icon} importantForAccessibility="no-hide-descendants"><Icon source={tool.icon} size={22} color={colors.primary} /></View>
               <View style={styles.copy}>
                 <Text variant="titleSmall" style={styles.title}>{tool.title}</Text>
                 <Text variant="bodySmall" style={styles.subtitle}>{tool.subtitle}</Text>
               </View>
-              <View importantForAccessibility="no-hide-descendants"><Icon source="chevron-right" size={18} color="#9CA3AF" /></View>
+              <View importantForAccessibility="no-hide-descendants"><Icon source="chevron-right" size={18} color={colors.textMuted} /></View>
             </Card.Content>
           </Card>
         ))}
@@ -87,13 +93,13 @@ export default function ParityToolsCard() {
 }
 
 const styles = StyleSheet.create({
-  section: { marginHorizontal: 20, marginBottom: 24, gap: 12 },
-  heading: { color: '#111827', fontWeight: '700' },
-  grid: { gap: 10 },
-  card: { borderRadius: 14, backgroundColor: '#FFFFFF', borderColor: '#E5E7EB' },
-  content: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 66 },
-  icon: { width: 46, height: 46, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  section: { marginHorizontal: space.xl, marginBottom: space['2xl'], gap: space.md },
+  heading: { color: colors.textPrimary, fontFamily: font.outfit.semiBold },
+  grid: { gap: space.sm },
+  card: { borderRadius: radius.card, backgroundColor: colors.surfaceBg, borderColor: colors.border },
+  content: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: touch.min + space.md },
+  icon: { width: touch.min, height: touch.min, borderRadius: radius.control, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1 },
-  title: { color: '#111827', fontWeight: '700' },
-  subtitle: { color: '#6B7280', marginTop: 2 },
+  title: { color: colors.textPrimary, fontFamily: font.inter.semiBold },
+  subtitle: { color: colors.textSecondary, marginTop: space.xxs },
 });

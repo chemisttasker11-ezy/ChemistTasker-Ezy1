@@ -97,6 +97,7 @@ async function review({ rows = [evidence], load, decide, page = false } = {}) {
     'lucide-react': names, '@mui/icons-material': names,
     '@chemisttasker/shared-core': {
       attendance,
+      correctionTimestamp: (local, original) => original,
       fetchPharmaciesService: async () => [{ id: 9, name: 'Old pharmacy' }, { id: 10, name: 'New pharmacy' }],
     },
     '../../components/ui/PageHeader': { __esModule: true, default: 'PageHeader' },

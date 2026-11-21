@@ -4,20 +4,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { ShareQr } from '@/features/parity/ShareQr';
 import {
-    Card,
-    Text,
-    Button,
-    Chip,
-    Portal,
-    Modal,
-    TextInput,
-    ActivityIndicator,
-    Snackbar,
-    IconButton,
-    Menu,
-    Divider,
+  Card,
+  Text,
+  Button,
+  Chip,
+  Portal,
+  Modal,
+  TextInput,
+  Snackbar,
+  IconButton,
+  Menu,
+  Divider,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import {
     Role,
     WorkType,
@@ -175,6 +176,7 @@ export default function LocumManager({
     const [inviteSubmitting, setInviteSubmitting] = useState(false);
 
     const [linkOpen, setLinkOpen] = useState(false);
+    const [showInviteQr, setShowInviteQr] = useState(false);
     const [linkExpiry, setLinkExpiry] = useState('14');
     const [linkValue, setLinkValue] = useState('');
     const [linkSubmitting, setLinkSubmitting] = useState(false);
@@ -183,6 +185,7 @@ export default function LocumManager({
     const [deleteLoadingId, setDeleteLoadingId] = useState<string | number | null>(null);
 
     const [toast, setToast] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
+    const [inviteQr, setInviteQr] = useState<{ token: string; origin: string } | null>(null);
     const handleApplicationsNotification = useCallback(
         (message: string, severity: 'success' | 'error') => {
             setToast({ message, severity });
@@ -205,6 +208,7 @@ export default function LocumManager({
     const openLinkDialog = () => {
         setLinkExpiry('14');
         setLinkValue('');
+        setShowInviteQr(false);
         setLinkOpen(true);
     };
 
@@ -409,6 +413,7 @@ export default function LocumManager({
             const token = response.token;
             const url = `${baseInviteUrl}/membership/apply/${token}`;
             setLinkValue(url);
+            setShowInviteQr(false); setInviteQr(null); // a QR of the previous link must not stay on screen
             setToast({ message: 'Invite link generated', severity: 'success' });
         } catch (error: any) {
             setToast({
@@ -595,13 +600,11 @@ export default function LocumManager({
 
             {showSkeleton ? (
                 <View style={styles.skeletonContainer}>
-                    {[1, 2, 3].map((i) => (
-                        <Card key={i} style={styles.card}>
-                            <Card.Content>
-                                <ActivityIndicator />
-                            </Card.Content>
-                        </Card>
-                    ))}
+                    <Card style={styles.card}>
+                        <Card.Content style={{ alignItems: 'center', paddingVertical: 32 }}>
+                            <ActivityIndicator size="large" accessibilityLabel="Loading locums…" />
+                        </Card.Content>
+                    </Card>
                 </View>
             ) : (
                 <FlatList
@@ -722,6 +725,7 @@ export default function LocumManager({
                     onDismiss={() => setLinkOpen(false)}
                     contentContainerStyle={styles.modal}
                 >
+                    <ScrollView>
                     <Text style={styles.modalTitle}>Generate Locum Invite Link</Text>
                     <TextInput
                         label="Expiry (days)"
@@ -740,6 +744,7 @@ export default function LocumManager({
                             style={styles.input}
                         />
                     )}
+                    {showInviteQr && inviteQr ? <ShareQr kind="pharmacy-invite" value={inviteQr.token} origin={inviteQr.origin} /> : null}
                     <View style={styles.modalActions}>
                         <Button mode="outlined" onPress={() => setLinkOpen(false)} style={styles.modalActionButton}>
                             Close
@@ -753,10 +758,23 @@ export default function LocumManager({
                         >
                             {linkSubmitting ? 'Generating...' : 'Generate'}
                         </Button>
+                        <Button mode="outlined" disabled={!linkValue} onPress={() => {
+                            const token = linkValue.match(/\/membership\/apply\/([A-Za-z0-9_-]{8,200})(?:$|[?#])/i)?.[1];
+                            if (!token) { setToast({ message: 'Invitation link is not valid for QR sharing.', severity: 'error' }); return; }
+                            try {
+                                const origin = new URL(linkValue).origin;
+                                if (origin === 'null') throw new Error('Invalid origin');
+                                setInviteQr({ token, origin });
+                                setShowInviteQr(true);
+                            } catch { setToast({ message: 'Invitation link is not valid for QR sharing.', severity: 'error' }); }
+                        }} style={styles.modalActionButton}>
+                            Show invite QR
+                        </Button>
                         <Button mode="contained" onPress={handleCopyLink} disabled={!linkValue} style={styles.modalActionButton}>
                             Copy & Close
                         </Button>
                     </View>
+                    </ScrollView>
                 </Modal>
 
                 <Modal

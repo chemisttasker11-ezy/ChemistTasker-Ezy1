@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { ahpraCooldownSeconds, getOnboardingDetail, recheckAhpra, subscribeAhpraErrors, type AhpraSummary } from '@chemisttasker/shared-core';
+import { getSessionGeneration } from '@/utils/authSession';
 
 type Recovery = {
   summary: AhpraSummary | null; loading: boolean; error: string; busy: boolean; seconds: number;
@@ -9,6 +10,7 @@ type Recovery = {
 const Context = createContext<Recovery | null>(null);
 
 export function AhpraProvider({ user, children }: { user: { id?: number; role: string } | null; children: React.ReactNode }) {
+  const sessionGeneration = getSessionGeneration();
   const role = user?.role === 'PHARMACIST' ? 'pharmacist' : user?.role === 'OTHER_STAFF' ? 'otherstaff' : user?.role === 'OWNER' ? 'owner' : null;
   const errorVersion = useRef(0);
   // Bumped on logout/user switch so a pending poll cannot write into the next user's state.
@@ -77,7 +79,7 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
     if ((summary?.state !== 'pending' && summary?.state !== 'suspended' && summary?.state !== 'not_found' && summary?.state !== 'type_not_accepted' && summary?.state !== 'review' && summary?.state !== 'unreadable') || !(until > Date.now())) return;
     const timer = setInterval(() => {
       // The last tick still refreshes so a lookup that finished near expiry shows up.
-      void refresh().catch(() => {});
+      if (sessionGeneration === getSessionGeneration()) void refresh().catch(() => {});
       if (Date.now() >= until) clearInterval(timer);
     }, 15000);
     return () => clearInterval(timer);
@@ -86,7 +88,7 @@ export function AhpraProvider({ user, children }: { user: { id?: number; role: s
   useEffect(() => {
     // Timers pause in the background; refresh on return so a finished lookup is not missed.
     if (summary?.state !== 'pending' && summary?.state !== 'suspended' && summary?.state !== 'not_found' && summary?.state !== 'type_not_accepted' && summary?.state !== 'review' && summary?.state !== 'unreadable') return;
-    const subscription = AppState.addEventListener('change', state => { if (state === 'active') void refresh().catch(() => {}); });
+    const subscription = AppState.addEventListener('change', state => { if (state === 'active' && sessionGeneration === getSessionGeneration()) void refresh().catch(() => {}); });
     return () => subscription.remove();
   }, [summary?.state, refresh]);
 

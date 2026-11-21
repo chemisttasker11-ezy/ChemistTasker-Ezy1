@@ -1,3 +1,4 @@
+@import '../shared/mobile-install-prompt.css';
 :root{
   /* ChemistTasker public design-system foundations. Legacy aliases stay mapped
      so the existing landing and later dashboard migration can move incrementally. */
@@ -520,3 +521,4 @@
 .hero-calculator-kicker{font-size:11px;color:#5222B8}
 @media(max-width:780px){.floating-card strong{font-size:13px}.floating-card span:not(.icon-box){font-size:12px}.hero-personas>a{font-size:12px}}
 @media(max-width:380px){.floating-card strong{font-size:13px}.floating-card span:not(.icon-box){font-size:12px}}
+

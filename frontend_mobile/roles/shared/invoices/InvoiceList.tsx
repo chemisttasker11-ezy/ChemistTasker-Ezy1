@@ -1,25 +1,28 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   Alert,
   FlatList,
-  Linking,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ActivityIndicator, Card, IconButton, Menu, Snackbar, Text } from 'react-native-paper';
+import { Button, Card, IconButton, Menu, Snackbar, Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useSegments } from 'expo-router';
 import {
   deleteInvoice,
+  fetchAllPages,
   getInvoices,
-  getInvoicePdfUrl,
   reportInvoiceIssue,
   sendInvoiceEmail,
   updateInvoice,
 } from '@chemisttasker/shared-core';
+import { shareLegacyInvoicePdf } from './shareLegacyInvoicePdf';
+import { useAuth } from '@/context/AuthContext';
 import MobileInvoiceStats from './MobileInvoiceStats';
+import { colors, font, radius, space, touch } from '@/constants/tokens';
 import FinanceWorkspace from './FinanceWorkspace';
 import {
   filterInvoicesByTimeframe,
@@ -43,6 +46,23 @@ type Invoice = {
 
 const PAGE_SIZE = 10;
 
+// DRF collection pagination is server-owned. Never report an empty invoice
+// history when page two or a later page has not been fetched.
+export async function fetchCompleteLegacyInvoices(): Promise<Invoice[]> {
+  const visited = new Set<string>();
+  return fetchAllPages<Invoice>(async (page) => {
+    if (page > 100) throw new Error('Invoice history exceeds the available page limit. Please narrow the server query.');
+    const data = await getInvoices({ page });
+    if (Array.isArray(data)) return data as Invoice[];
+    if (!data || !Array.isArray(data.results)) throw new Error('Unexpected legacy invoice list response.');
+    if (data.next) {
+      if (visited.has(data.next)) throw new Error('Legacy invoice pagination repeated a page.');
+      visited.add(data.next);
+    }
+    return { results: data.results as Invoice[], next: data.next };
+  });
+}
+
 type Props = { basePath?: string };
 
 export default function InvoiceList({ basePath }: Props) {
@@ -51,12 +71,17 @@ export default function InvoiceList({ basePath }: Props) {
   return (
     <FinanceWorkspace
       receivedMode={managerWorkspace}
-      existingTools={<LegacyInvoiceList basePath={basePath} />}
+      existingTools={(header) => <LegacyInvoiceList basePath={basePath} header={header} />}
     />
   );
 }
 
-function LegacyInvoiceList({ basePath }: Props) {
+function LegacyInvoiceList({ basePath, header }: Props & { header?: ReactNode }) {
+  const { user } = useAuth();
+  const shareAccount = React.useRef(user?.id);
+  shareAccount.current = user?.id;
+  const shareScope = React.useRef(0);
+  React.useEffect(() => () => { shareScope.current += 1; }, [user?.id]);
   const router = useRouter();
   const segments = useSegments();
   const role = (segments[0] as string) || 'pharmacist';
@@ -69,23 +94,24 @@ function LegacyInvoiceList({ basePath }: Props) {
   const [page, setPage] = useState(1);
   const [menuFor, setMenuFor] = useState<number | null>(null);
   const [snackbar, setSnackbar] = useState<string>('');
+  const [loadError, setLoadError] = useState('');
+  const requestGeneration = React.useRef(0);
   const [timeframe, setTimeframe] = useState<InvoiceTimeframe>('this_year');
 
   const load = useCallback(async () => {
+    const gen = ++requestGeneration.current;
     setLoading(true);
+    setLoadError('');
     try {
-      const data = await getInvoices();
-      const list = Array.isArray((data as any)?.results)
-        ? (data as any).results
-        : Array.isArray(data)
-        ? (data as any)
-        : [];
-      setInvoices(list);
+      const records = await fetchCompleteLegacyInvoices();
+      if (gen !== requestGeneration.current) return;
+      setInvoices(records);
     } catch (err: any) {
-      setSnackbar(err?.message || 'Failed to load invoices');
-      setInvoices([]);
+      if (gen !== requestGeneration.current) return;
+      // Preserve the last good list instead of inventing an empty history.
+      setLoadError(err?.message || 'Failed to load invoices');
     } finally {
-      setLoading(false);
+      if (gen === requestGeneration.current) setLoading(false);
     }
   }, []);
 
@@ -98,6 +124,7 @@ function LegacyInvoiceList({ basePath }: Props) {
 
   React.useEffect(() => {
     void load();
+    return () => { requestGeneration.current += 1; };
   }, [load]);
 
   const sorted = useMemo(() => {
@@ -131,12 +158,21 @@ function LegacyInvoiceList({ basePath }: Props) {
     return Number.isFinite(num) ? formatInvoiceCurrency(num) : String(val);
   };
 
-  const onOpenPdf = (id: number) => {
+  const [sharingPdfId, setSharingPdfId] = useState<number | null>(null);
+  const sharingPdfRef = React.useRef(false);
+  const onOpenPdf = async (id: number) => {
+    if (sharingPdfRef.current) return;
+    sharingPdfRef.current = true;
+    setSharingPdfId(id);
+    const generation = shareScope.current;
+    const account = user?.id;
     try {
-      const url = getInvoicePdfUrl(id);
-      Linking.openURL(url).catch(() => setSnackbar('Unable to open PDF'));
-    } catch {
-      setSnackbar('Unable to open PDF');
+      await shareLegacyInvoicePdf(id, () => account != null && shareAccount.current === account && shareScope.current === generation);
+    } catch (error: any) {
+      setSnackbar(error?.message || 'Unable to open invoice PDF');
+    } finally {
+      sharingPdfRef.current = false;
+      setSharingPdfId(null);
     }
   };
 
@@ -214,7 +250,10 @@ function LegacyInvoiceList({ basePath }: Props) {
     const statusLabel = financeManaged && String(item.status || '').toLowerCase() === 'draft' ? 'Saved' : (item.status || 'Unknown');
     const useWorkspace = () => {
       setMenuFor(null);
-      setSnackbar(`This invoice is managed in the ${isReceivedMode ? 'Received' : 'Invoices'} tab.`);
+      // finance_record_id is the managed record's primary key, not the
+      // historical invoice id: open the first-party review drawer directly.
+      if (!item.finance_record_id) return;
+      router.push(`${resolvedBase}?invoice=${item.finance_record_id}` as any);
     };
     return (
     <TouchableOpacity
@@ -267,7 +306,7 @@ function LegacyInvoiceList({ basePath }: Props) {
               {financeManaged ? (
                 <Menu.Item
                   leadingIcon="information-outline"
-                  title={`Use ${isReceivedMode ? 'Received' : 'Invoices'} tab`}
+                  title={`Open in ${isReceivedMode ? 'Received' : 'Invoices'}`}
                   onPress={useWorkspace}
                 />
               ) : !isReceivedMode ? (
@@ -304,14 +343,23 @@ function LegacyInvoiceList({ basePath }: Props) {
                   }
                 }}
               /> : null}
-              <Menu.Item
-                leadingIcon="file-pdf-box"
-                title="Open PDF"
-                onPress={() => {
-                  setMenuFor(null);
-                  onOpenPdf(item.id);
-                }}
-              />
+              {financeManaged ? (
+                <Menu.Item
+                  leadingIcon="file-pdf-box"
+                  title="View or share in Finance"
+                  onPress={useWorkspace}
+                />
+              ) : (
+                <Menu.Item
+                  leadingIcon="file-pdf-box"
+                  title={sharingPdfId === item.id ? 'Preparing PDF…' : 'Open PDF'}
+                  disabled={sharingPdfId != null}
+                  onPress={() => {
+                    setMenuFor(null);
+                    void onOpenPdf(item.id);
+                  }}
+                />
+              )}
               {!financeManaged && (isReceivedMode ? (
                 <Menu.Item
                   leadingIcon="alert-circle-outline"
@@ -341,6 +389,13 @@ function LegacyInvoiceList({ basePath }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
+        <FlatList
+          data={loading && !refreshing ? [] : paginated}
+          keyExtractor={item => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          renderItem={renderItem}
+          ListHeaderComponent={<View>
+            {header}
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text variant="headlineMedium" style={styles.headerTitle}>
@@ -354,19 +409,19 @@ function LegacyInvoiceList({ basePath }: Props) {
         </View>
 
       </View>
-
-      {loading && !refreshing ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#4F46E5" />
-        </View>
-      ) : (
-        <FlatList
-          data={paginated}
-          keyExtractor={item => String(item.id)}
-          contentContainerStyle={styles.listContent}
-          renderItem={renderItem}
-          ListHeaderComponent={
-            <MobileInvoiceStats
+            {loading && !refreshing ? <View style={styles.loader}><ActivityIndicator size="large" color="#4F46E5" /></View> : null}
+            {loadError ? <Card style={styles.errorCard}>
+              <Card.Content style={{ gap: space.sm }}>
+                <Text accessibilityRole="alert" variant="titleSmall" style={{ color: colors.status.red.fg }}>
+                  Invoice history could not refresh
+                </Text>
+                <Text style={{ color: colors.textPrimary }}>{loadError}</Text>
+                <Button mode="outlined" contentStyle={{ minHeight: touch.min }} onPress={() => void load()}>
+                  Try again
+                </Button>
+              </Card.Content>
+            </Card> : null}
+            {!loading || refreshing ? <MobileInvoiceStats
               invoices={sorted}
               timeframe={timeframe}
               mode={isReceivedMode ? 'received' : 'sent'}
@@ -374,8 +429,8 @@ function LegacyInvoiceList({ basePath }: Props) {
                 setPage(1);
                 setTimeframe(value);
               }}
-            />
-          }
+            /> : null}
+          </View>}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4F46E5" />
           }
@@ -383,7 +438,7 @@ function LegacyInvoiceList({ basePath }: Props) {
           onEndReached={() => {
             if (paginated.length < filtered.length) setPage(p => p + 1);
           }}
-          ListEmptyComponent={
+          ListEmptyComponent={loadError || (loading && !refreshing) ? undefined : (
             <View style={styles.empty}>
               <Text variant="titleMedium">No invoices yet</Text>
               <Text variant="bodyMedium" style={styles.sub}>
@@ -392,9 +447,8 @@ function LegacyInvoiceList({ basePath }: Props) {
                   : 'Generated invoices will appear here.'}
               </Text>
             </View>
-          }
+          )}
         />
-      )}
 
       <Snackbar visible={!!snackbar} onDismiss={() => setSnackbar('')} duration={2500}>
         {snackbar}
@@ -415,7 +469,7 @@ const statusStyle = (status?: string) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.pageBg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -424,15 +478,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerCopy: { flex: 1 },
-  headerTitle: { fontWeight: '700' },
-  headerSubtitle: { color: '#6B7280' },
+  headerTitle: { fontFamily: font.outfit.medium, color: colors.textPrimary },
+  headerSubtitle: { color: colors.textSecondary },
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingHorizontal: 12, paddingBottom: 12, gap: 10 },
-  card: {
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    elevation: 1,
-  },
+  card: { borderRadius: radius.card, backgroundColor: colors.surfaceBg, elevation: 0, borderWidth: 1, borderColor: colors.border },
+  errorCard: { marginBottom: space.md, backgroundColor: colors.status.red.bg, borderColor: colors.status.red.fg, borderWidth: 1, borderRadius: radius.card },
   cardContent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   row: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   iconBox: {

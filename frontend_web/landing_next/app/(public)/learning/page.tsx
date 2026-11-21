@@ -44,7 +44,7 @@ export default function LearningPage() {
   const loadArticles = useCallback(async () => {
     setState('loading');
     try {
-      const data = await chemistTaskerApi.publicContent.listArticles({ topic: 'learning' }) as ArticleResponse;
+      const data = await chemistTaskerApi.publicContent.listArticles({ topic: 'career' }) as ArticleResponse;
       setArticles(data.results || []);
       setState('ready');
     } catch {

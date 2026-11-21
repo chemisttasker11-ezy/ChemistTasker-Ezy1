@@ -1,15 +1,28 @@
 import React from 'react';
-import { View, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import {
-  ActivityIndicator,
   Button,
   Card,
   Checkbox,
-  Chip,
   Divider,
-  IconButton,
   Text,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
+import {
+  Store,
+  Share2,
+  Pencil,
+  Trash2,
+  MapPin,
+  Calendar,
+  Users,
+  Heart,
+  ChevronUp,
+  CreditCard,
+} from 'lucide-react-native';
+import { Pill } from '@/components/ui/Pill';
+import { colors as tokenColors, font, radius, space, touch } from '@/constants/tokens';
+import { ShiftTermsSummary } from '../ShiftTermsSummary';
 import type { Dispatch, SetStateAction } from 'react';
 import type {
   EscalationLevelKey,
@@ -17,10 +30,12 @@ import type {
   ShiftInterest,
   ShiftMemberStatus,
 } from '@chemisttasker/shared-core';
+import { getShiftAudienceLevel } from '@chemisttasker/shared-core';
 
 import EscalationStepper from './components/Escalation/EscalationStepper';
 import PublicLevelView from './components/Candidates/PublicLevelView';
 import CommunityLevelView from './components/Candidates/CommunityLevelView';
+import CandidatesSkeleton from './components/CandidatesSkeleton';
 import {
   PUBLIC_LEVEL_KEY,
   deriveLevelSequence,
@@ -47,11 +62,14 @@ import { styles } from './styles';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
+const humanize = (value: string) => value.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+
 type DataProps = {
   orderedShifts: Shift[];
   tabData: Record<string, any>;
   counterOffersByShift: Record<number, any[]>;
   counterOffersLoadingByShift: Record<number, boolean>;
+  counterOffersErrorByShift?: Record<number, string | null>;
 };
 
 type StateProps = {
@@ -83,7 +101,9 @@ type ActionProps = {
   handleLevelChange: (shift: Shift, level: EscalationLevelKey) => void;
   handleEscalate: (shiftId: number, level: EscalationLevelKey) => Promise<boolean>;
   loadTabDataForShift: (shift: Shift, level: EscalationLevelKey) => Promise<any>;
+  loadCounterOffers: (shiftId: number) => Promise<void>;
   loadShifts: () => Promise<any>;
+  onShiftLayout?: (shiftId: number, y: number) => void;
   handleRevealInterest: (shift: Shift, interest: ShiftInterest) => Promise<void>;
   handleSlotSelection: (shiftId: number, slotId: number) => void;
   handleReviewOffer: (shift: Shift, offer: any, tabDataState: any, slotId: number | null) => Promise<void>;
@@ -108,6 +128,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
     tabData,
     counterOffersByShift,
     counterOffersLoadingByShift,
+    counterOffersErrorByShift = {},
   } = data;
   const {
     expandedShifts,
@@ -137,7 +158,9 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
     handleLevelChange,
     handleEscalate,
     loadTabDataForShift,
+    loadCounterOffers,
     loadShifts,
+    onShiftLayout,
     handleRevealInterest,
     handleSlotSelection,
     handleReviewOffer,
@@ -154,6 +177,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                     const isExpanded = expandedShifts.has(shift.id);
                     const isSingleUserShift = Boolean((shift as any).singleUserOnly);
                     const shiftLevel = getCurrentLevelKey(shift);
+                    const audience = getShiftAudienceLevel(shiftLevel);
                     const selectedLevel = selectedLevelByShift[shift.id] ?? shiftLevel;
                     const tabKey = getTabKey(shift.id, selectedLevel);
                     const currentTabData = tabData[tabKey] || { loading: false };
@@ -163,6 +187,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                     );
                     const communityLevelKeys = viewableLevelKeys.filter(level => level !== PUBLIC_LEVEL_KEY);
                     const communityTabData = communityLevelKeys.map(level => tabData[getTabKey(shift.id, level)]);
+                    const communityDataError = communityTabData.find((data) => data?.error)?.error as string | undefined;
                     const communityDataLoading = communityLevelKeys.some((level, index) => {
                         const data = communityTabData[index];
                         return !data || data.loading;
@@ -173,6 +198,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                     const offers = counterOffersByShift[shift.id];
                     const counterOffersLoaded = Object.prototype.hasOwnProperty.call(counterOffersByShift, shift.id);
                     const counterOffersLoading = counterOffersLoadingByShift[shift.id] ?? false;
+                    const counterOffersError = counterOffersErrorByShift[shift.id];
                     const slotIds = getSlotIds(shift);
                     const consolidatedMembersBySlot = slotIds.reduce<Record<number, ShiftMemberStatus[]>>((acc, slotId) => {
                         acc[slotId] = dedupeMembers(communityLevelKeys.flatMap((level, index) => (
@@ -286,6 +312,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                     const effectivePaymentOfferIds = selectedPaymentOfferIds;
                     const paymentUnitCount = effectivePaymentOfferIds.length;
                     const showPaymentRequired = paymentRequiredOffers.length > 0;
+                    const updatedSlotCount = Object.values(slotHasUpdatesByShift[shift.id] ?? {}).filter(Boolean).length;
                     const candidatesCount = countUniquePeople([
                         ...dedupeMembers(allMembers),
                         ...allInterests,
@@ -348,6 +375,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                             )}
                             <Card
                                 style={styles.shiftCard}
+                                onLayout={(event) => onShiftLayout?.(shift.id, event.nativeEvent.layout.y)}
                             >
                             <View style={[styles.cardAccent, { backgroundColor: cardBorderColor }]} />
 
@@ -361,7 +389,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                     <View
                                         style={[styles.pharmacyMark, { backgroundColor: cardBorderColor }]}
                                     >
-                                        <IconButton icon="storefront" size={28} iconColor="#fff" style={styles.markIcon} />
+                                        <Store size={22} color="#fff" />
                                     </View>
                                     <View style={styles.cardTitleBlock}>
                                         <Text style={styles.cardTitle} numberOfLines={2}>
@@ -374,102 +402,132 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                         ) : null}
                                     </View>
                                     <View style={styles.headerActions}>
-                                        <IconButton
-                                            icon="share-variant"
-                                            size={20}
+                                        <TouchableOpacity
                                             onPress={(event) => {
                                                 event.stopPropagation();
                                                 handleShare(shift);
                                             }}
                                             disabled={sharingShiftId === shift.id}
-                                            style={styles.actionButton}
-                                        />
-                                        <IconButton
-                                            icon="pencil"
-                                            size={20}
+                                            style={localStyles.iconTouchTarget}
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Share shift link"
+                                        >
+                                            <Share2 size={18} color={tokenColors.textMuted} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
                                             onPress={(event) => {
                                                 event.stopPropagation();
                                                 handleEditShift(shift);
                                             }}
-                                            style={styles.actionButton}
-                                        />
-                                        <IconButton
-                                            icon="delete"
-                                            size={20}
+                                            style={localStyles.iconTouchTarget}
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Edit shift"
+                                        >
+                                            <Pencil size={18} color={tokenColors.textMuted} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
                                             onPress={(event) => {
                                                 event.stopPropagation();
                                                 setDeleteConfirmDialog({ open: true, shiftId: shift.id });
                                             }}
                                             disabled={actionLoading[`delete_${shift.id}`]}
-                                            style={styles.actionButton}
-                                        />
+                                            style={localStyles.iconTouchTarget}
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Delete shift"
+                                        >
+                                            <Trash2 size={18} color={actionLoading[`delete_${shift.id}`] ? tokenColors.textMuted : '#DC2626'} />
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
 
                                 {hasBadges ? (
                                     <View style={styles.badgeRow}>
                                         {roleNeeded && (
-                                            <Chip
-                                                style={[styles.primaryBadge, { backgroundColor: cardBorderColor }]}
-                                                textStyle={styles.primaryBadgeText}
-                                            >
-                                                {roleNeeded}
-                                            </Chip>
+                                            <Pill label={humanize(String(roleNeeded))} tone="violet" />
                                         )}
                                         {employmentType && (
-                                            <Chip mode="outlined" style={styles.outlineBadge}>
-                                                {employmentType}
-                                            </Chip>
+                                            <Pill label={humanize(String(employmentType))} tone="neutral" />
                                         )}
                                         {isUrgent && (
-                                            <Chip style={styles.urgentBadge} textStyle={styles.urgentBadgeText}>
-                                                Urgent
-                                            </Chip>
+                                            <Pill label="Urgent" tone="red" />
                                         )}
                                     </View>
                                 ) : null}
 
                                 <View style={styles.metaRow}>
+                                    <MapPin size={14} color={tokenColors.textMuted} style={{ marginRight: 4 }} />
                                     <Text style={styles.location} numberOfLines={1}>
                                         {location}
                                     </Text>
                                 </View>
 
+                                <View style={{ marginTop: space.sm }}>
+                                    <ShiftTermsSummary shift={shift} />
+                                </View>
+
                                 <View style={styles.statsRow}>
-                                        <View style={styles.statBox}>
-                                            <IconButton icon="calendar-month" size={18} iconColor={customTheme.colors.primary} style={styles.statIcon} />
+                                    <View style={styles.statBox}
+                                        accessible accessibilityLabel={`${slotsCount || '-'} slots`}
+                                        accessibilityHint="Dates in this shift. Each date is filled separately.">
+                                        <Calendar size={16} color={tokenColors.primary} style={styles.statIcon} />
                                         <View>
                                             <Text style={styles.statValue}>{slotsCount || '-'}</Text>
                                             <Text style={styles.statLabel}>Slots</Text>
                                         </View>
-                                        </View>
-                                        <View style={styles.statDivider} />
-                                        <View style={styles.statBox}>
-                                        <IconButton icon="account-group-outline" size={18} iconColor={customTheme.colors.primary} style={styles.statIcon} />
+                                    </View>
+                                    <View style={styles.statDivider} />
+                                    <View style={styles.statBox}
+                                        accessible accessibilityLabel={`${candidatesCount} candidates`}
+                                        accessibilityHint="Everyone who responded or was invited, across all dates and audiences.">
+                                        <Users size={16} color={tokenColors.primary} style={styles.statIcon} />
                                         <View>
                                             <Text style={styles.statValue}>{candidatesCount}</Text>
                                             <Text style={styles.statLabel}>Candidates</Text>
                                         </View>
-                                        </View>
-                                        <View style={styles.statDivider} />
-                                        <View style={styles.statBox}>
-                                        <IconButton icon="heart-outline" size={18} iconColor={customTheme.colors.primary} style={styles.statIcon} />
+                                    </View>
+                                    <View style={styles.statDivider} />
+                                    <View style={styles.statBox}
+                                        accessible accessibilityLabel={`${interestsCount} interested`}
+                                        accessibilityHint="Said yes or sent an offer, and are waiting for your review.">
+                                        <Heart size={16} color={tokenColors.primary} style={styles.statIcon} />
                                         <View>
                                             <Text style={styles.statValue}>{interestsCount}</Text>
-                                            <Text style={styles.statLabel}>Interests</Text>
+                                            <Text style={styles.statLabel}>Interested</Text>
                                         </View>
                                     </View>
                                 </View>
                                 </TouchableOpacity>
 
+                                <View style={localStyles.statusBar}>
+                                    <View style={localStyles.statusPills}>
+                                        {audience ? (
+                                            <View accessible accessibilityRole="text"
+                                                accessibilityHint={`Visible now to ${audience.reach}.${audience.scope === 'internal' ? ' Escalate inside the card to reach more people.' : ''}`}>
+                                                <Pill tone={audience.scope === 'platform' ? 'cyan' : 'violet'}
+                                                    label={`${audience.scope === 'platform' ? 'Platform' : 'Internal'} · ${audience.label}`} />
+                                            </View>
+                                        ) : null}
+                                        {interestsCount > 0 ? (
+                                            <Pill label={`${interestsCount} waiting for review`} tone="cyan" />
+                                        ) : null}
+                                        {showPaymentRequired ? <Pill label="Payment required" tone="red" /> : null}
+                                        {updatedSlotCount > 0 ? <Pill label="New activity" tone="amber" /> : null}
+                                    </View>
+                                    <Button
+                                        mode="text"
+                                        accessibilityRole="button"
+                                        accessibilityState={{ expanded: isExpanded }}
+                                        onPress={() => toggleShiftExpansion(shift.id)}
+                                        style={localStyles.manageCandidates}
+                                    >
+                                        {isExpanded ? 'Hide candidates' : 'Manage candidates'}
+                                    </Button>
+                                </View>
+
                                 {isDedicated ? (
                                     <View style={styles.directBadgeRow}>
-                                        <Chip style={styles.directBadge} textStyle={styles.directBadgeText}>
-                                            Direct / Private
-                                        </Chip>
-                                        <Chip mode="outlined" style={styles.pendingBadge} textStyle={styles.pendingBadgeText}>
-                                            Pending
-                                        </Chip>
+                                        <Pill label="Direct / Private" tone="violet" />
+                                        <Pill label="Pending" tone="amber" />
                                     </View>
                                 ) : null}
 
@@ -504,14 +562,16 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                         <Divider style={styles.divider} />
 
                                         {showPaymentRequired && (
-                                            <View style={styles.paymentRequiredBox}>
-                                                <Text style={styles.paymentRequiredTitle}>
-                                                    Payments Required
-                                                </Text>
-                                                <Text style={styles.paymentRequiredText}>
+                                            <View style={localStyles.paymentBox}>
+                                                <View style={localStyles.paymentHeader}>
+                                                    <CreditCard size={18} color="#B91C1C" />
+                                                    <Text style={localStyles.paymentTitle}>Payments Required</Text>
+                                                    <Pill label={`${paymentUnitCount} payable`} tone="red" />
+                                                </View>
+                                                <Text style={localStyles.paymentSubtitle}>
                                                     {isSingleUserShift
                                                         ? `${paymentRequiredOffers.length} bundle payment option${paymentRequiredOffers.length === 1 ? '' : 's'}`
-                                                        : `${paymentUnitCount} selected from ${paymentRequiredOffers.length} payment option${paymentRequiredOffers.length === 1 ? '' : 's'}`} | ${paymentUnitCount * 30} AUD
+                                                        : `${paymentUnitCount} selected from ${paymentRequiredOffers.length} payment option${paymentRequiredOffers.length === 1 ? '' : 's'}`} · ${paymentUnitCount * 30} AUD
                                                 </Text>
                                                 <View style={styles.paymentSlotList}>
                                                     {paymentRequiredOffers.map((item) => {
@@ -520,7 +580,7 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                                         return (
                                                             <TouchableOpacity
                                                                 key={`${shift.id}-${item.offerId}`}
-                                                                style={styles.paymentSlotRow}
+                                                                style={[styles.paymentSlotRow, localStyles.paymentRowMinHeight]}
                                                                 disabled={isSingleUserShift}
                                                                 onPress={() => {
                                                                     setPaymentSlotSelection((prev) => {
@@ -559,41 +619,56 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                                                             </>
                                                                         )}
                                                                 </View>
-                                                                <Chip compact>Payment pending</Chip>
+                                                                <Pill label="Payment pending" tone="amber" />
                                                             </TouchableOpacity>
                                                         );
                                                     })}
                                                 </View>
                                                 <View style={styles.paymentButtonRow}>
-                                                    <Button
-                                                        mode="contained"
-                                                        buttonColor={customTheme.colors.error}
-                                                        style={styles.paymentButton}
+                                                    <TouchableOpacity
+                                                        style={[localStyles.payButton, localStyles.stripeButton, paymentUnitCount === 0 && localStyles.buttonDisabled]}
                                                         disabled={paymentUnitCount === 0}
                                                         onPress={() => handlePayWithStripe(shift, effectivePaymentOfferIds)}
+                                                        accessibilityRole="button"
                                                     >
-                                                        {isSingleUserShift ? 'Pay with Stripe' : 'Pay selected with Stripe'}
-                                                    </Button>
-                                                    <Button
-                                                        mode="contained"
-                                                        buttonColor="#4F46E5"
-                                                        style={styles.paymentButton}
-                                                        loading={pillPayingShiftId === shift.id}
+                                                        <Text style={localStyles.stripeButtonText}>
+                                                            {isSingleUserShift ? 'Pay with Stripe' : 'Pay selected with Stripe'}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        style={[localStyles.payButton, localStyles.pillsButton, (paymentUnitCount === 0 || pillPayingShiftId === shift.id) && localStyles.buttonDisabled]}
                                                         disabled={paymentUnitCount === 0 || pillPayingShiftId === shift.id}
                                                         onPress={() => handlePayWithPills(shift, effectivePaymentOfferIds)}
+                                                        accessibilityRole="button"
                                                     >
-                                                        {isSingleUserShift ? 'Pay with Pills' : 'Pay selected with Pills'}
-                                                    </Button>
+                                                        {pillPayingShiftId === shift.id ? (
+                                                            <ActivityIndicator size="small" color="#fff" />
+                                                        ) : (
+                                                            <Text style={localStyles.pillsButtonText}>
+                                                                {isSingleUserShift ? 'Pay with Pills' : 'Pay selected with Pills'}
+                                                            </Text>
+                                                        )}
+                                                    </TouchableOpacity>
                                                 </View>
                                             </View>
                                         )}
 
                                         {currentTabData.loading ? (
-                                            <ActivityIndicator style={{ padding: 20 }} />
+                                            <CandidatesSkeleton />
+                                        ) : currentTabData.error ? (
+                                            <View style={{ padding: space.md }}>
+                                                <Text>{String(currentTabData.error)}</Text>
+                                                <Button onPress={() => void loadTabDataForShift(shift, selectedLevel)}>Retry candidates</Button>
+                                            </View>
                                         ) : selectedLevel === PUBLIC_LEVEL_KEY ? (
                                             <>
-                                                {counterOffersLoading || !counterOffersLoaded ? (
-                                                    <ActivityIndicator style={{ padding: 20 }} />
+                                                {counterOffersError ? (
+                                                    <View style={{ padding: space.md }}>
+                                                        <Text>{counterOffersError}</Text>
+                                                        <Button onPress={() => void loadCounterOffers(shift.id)}>Retry counter offers</Button>
+                                                    </View>
+                                                ) : counterOffersLoading || !counterOffersLoaded ? (
+                                                    <CandidatesSkeleton />
                                                 ) : (
                                                     <PublicLevelView
                                                         shift={shift}
@@ -614,8 +689,15 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                                         buzzLoadingOfferId={buzzLoadingOfferId}
                                                     />
                                                 )}
-                                                {communityDataLoading ? (
-                                                    <ActivityIndicator style={{ padding: 20 }} />
+                                                {communityDataError ? (
+                                                    <View style={{ padding: space.md }}>
+                                                        <Text>{String(communityDataError)}</Text>
+                                                        <Button onPress={() => communityLevelKeys.forEach((level) => {
+                                                            if (tabData[getTabKey(shift.id, level)]?.error) void loadTabDataForShift(shift, level);
+                                                        })}>Retry member lists</Button>
+                                                    </View>
+                                                ) : communityDataLoading ? (
+                                                    <CandidatesSkeleton />
                                                 ) : (
                                                     <CommunityLevelView
                                                         shift={shift}
@@ -637,8 +719,15 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                                 )}
                                             </>
                                         ) : (
-                                            communityDataLoading ? (
-                                                <ActivityIndicator style={{ padding: 20 }} />
+                                            communityDataError ? (
+                                                <View style={{ padding: space.md }}>
+                                                    <Text>{String(communityDataError)}</Text>
+                                                    <Button onPress={() => communityLevelKeys.forEach((level) => {
+                                                        if (tabData[getTabKey(shift.id, level)]?.error) void loadTabDataForShift(shift, level);
+                                                    })}>Retry member lists</Button>
+                                                </View>
+                                            ) : communityDataLoading ? (
+                                                <CandidatesSkeleton />
                                             ) : (
                                                 <CommunityLevelView
                                                     shift={shift}
@@ -658,6 +747,15 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
                                                 />
                                             )
                                         )}
+                                        <TouchableOpacity
+                                            style={localStyles.collapseButton}
+                                            onPress={() => toggleShiftExpansion(shift.id)}
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Collapse shift card"
+                                        >
+                                            <ChevronUp size={20} color={tokenColors.textMuted} />
+                                            <Text style={localStyles.collapseText}>Collapse details</Text>
+                                        </TouchableOpacity>
                                     </>
                                 )}
                             </Card.Content>
@@ -668,3 +766,85 @@ export default function ActiveShiftCards({ data, state, actions }: Props) {
     </>
   );
 }
+
+const localStyles = StyleSheet.create({
+  statusBar: { borderTopWidth: 1, borderColor: tokenColors.border, paddingVertical: space.sm, paddingHorizontal: space.md, gap: space.sm },
+  statusPills: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.xs },
+  manageCandidates: { minHeight: touch.min, alignSelf: 'flex-end', justifyContent: 'center' },
+  iconTouchTarget: {
+    minHeight: touch.min,
+    minWidth: touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentBox: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: radius.card,
+    padding: space.md,
+    marginVertical: space.sm,
+  },
+  paymentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    marginBottom: space.xs,
+  },
+  paymentTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#991B1B',
+    flex: 1,
+  },
+  paymentSubtitle: {
+    fontSize: 12,
+    color: '#7F1D1D',
+    marginBottom: space.sm,
+  },
+  paymentRowMinHeight: {
+    minHeight: touch.min,
+    alignItems: 'center',
+  },
+  payButton: {
+    minHeight: touch.min,
+    borderRadius: radius.control,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    paddingHorizontal: space.sm,
+  },
+  stripeButton: {
+    backgroundColor: '#DC2626',
+  },
+  stripeButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  pillsButton: {
+    backgroundColor: tokenColors.primary,
+  },
+  pillsButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  collapseButton: {
+    minHeight: touch.min,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.xs,
+    paddingVertical: space.sm,
+    marginTop: space.xs,
+  },
+  collapseText: {
+    fontSize: 12,
+    color: tokenColors.textMuted,
+    fontWeight: '500',
+  },
+});

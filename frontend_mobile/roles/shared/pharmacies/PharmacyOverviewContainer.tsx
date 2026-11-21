@@ -19,6 +19,7 @@ import {
     updatePharmacyClaim,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '../../../context/AuthContext';
+import { useGuardedNavigation } from '../forms/UnsavedChangesRegistryProvider';
 import PharmaciesListView from './PharmaciesListView';
 import PharmacyForm from './PharmacyForm';
 import PharmacyDetailView from './PharmacyDetailView';
@@ -74,6 +75,7 @@ export default function PharmacyOverviewContainer() {
     const pathname = usePathname();
     const isOwner = pathname?.startsWith('/owner') ?? false;
     const { user } = useAuth();
+    const guardedNavigation = useGuardedNavigation();
 
     // State
     const [view, setView] = useState<ViewType>('list');
@@ -303,15 +305,18 @@ export default function PharmacyOverviewContainer() {
         setSnackbar({ message: 'Pharmacy saved successfully', visible: true });
     };
 
-    const handleFormCancel = () => {
+    // Swapping the view unmounts the form without a removal event: ask its guard first (dirty or saving).
+    const handleFormCancel = () => guardedNavigation(() => {
         setView('list');
         setSelectedPharmacy(null);
-    };
+    });
 
     const handleBack = () => {
         if (view === 'detail' || view === 'form-create' || view === 'form-edit') {
-            setView('list');
-            setSelectedPharmacy(null);
+            guardedNavigation(() => {
+                setView('list');
+                setSelectedPharmacy(null);
+            });
         }
     };
 
@@ -371,6 +376,7 @@ export default function PharmacyOverviewContainer() {
                         onMembershipsChanged={() => reloadPharmacyMemberships(selectedPharmacy.id)}
                         onAdminsChanged={() => reloadPharmacyMemberships(selectedPharmacy.id)}
                         loading={loading}
+                        onEdit={() => handleEditPharmacy(selectedPharmacy)}
                     />
                 );
 

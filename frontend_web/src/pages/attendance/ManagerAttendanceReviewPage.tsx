@@ -30,7 +30,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Check, ClipboardCheck, History, PencilLine, RefreshCw, X } from "lucide-react";
-import { attendance, fetchPharmaciesService, formatAttendanceMinutes } from "@chemisttasker/shared-core";
+import { attendance, correctionTimestamp, fetchPharmaciesService, formatAttendanceMinutes } from "@chemisttasker/shared-core";
 import PageHeader from "../../components/ui/PageHeader";
 import KioskEvidenceReview from "./KioskEvidenceReview";
 import DashboardContentState from "../../components/dashboard/DashboardContentState";
@@ -38,7 +38,7 @@ import { InitialsAvatar } from "../../components/ui/InitialsAvatar";
 import { Pill } from "../../components/ui/Pill";
 import { type StatusTone } from "../../components/ui/tone";
 import { humanizeEnum } from "../../utils/labels";
-import { correctionTimestamp } from "./correctionTimestamp";
+
 
 dayjs.extend(utc);
 dayjs.extend(timezone);

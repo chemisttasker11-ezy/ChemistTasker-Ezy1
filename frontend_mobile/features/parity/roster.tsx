@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Text } from 'react-native-paper';
-import { DatePickerInput } from 'react-native-paper-dates';
+import { GuardedDatePickerInput as DatePickerInput } from '@/components/security/GuardedModal';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { fetchRosterOwnerMembersService, fetchWorkerShiftRequestsService, isRosterMemberEligibleForRole, rosterMemberLabel, rosterMemberUserId, rosterV2, createAsyncScope, reviewRosterSelection, prepareRosterPublication, updateRosterShiftService, workforce, type RosterPharmacyMember, type RosterPublicationAttempt, type RosterValidationResult, type WorkerShiftRequest } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
 import { asArray, dateFromIso, dateLabel, errorMessage, isoDate, idempotencyKey, replaceUnderscore, startOfWeek, toNumber } from './utils';
+import { BrandLoader } from '@/components/ui';
 
 type RosterScreen =
   | 'workspace'
@@ -462,6 +463,7 @@ function RosterSelectionScreen({ screen, pharmacyId, pharmacyName, weekStart, se
         {vacant.map((row:any,index:number)=><View key={'vacant'+(row.id||index)} style={{gap:4}}><DataRow title={replaceUnderscore(row.role || row.role_needed || 'Open role')} subtitle={slotSummary(row)} status={isRowUnpublished(row) ? "Unpublished" : "Vacant"} />{renderShiftActions(row)}</View>)}
       </Section>}
       {screen === 'workspace' ? <Section title="Roster tools">
+        <ScreenLink title="Roster operations" subtitle="Manage existing assignments, open shifts and legacy cover requests." onPress={() => router.push('/manager/roster/operations' as any)} />
         <ScreenLink title="Calendar" subtitle="Week-by-week schedule." onPress={() => router.push('/manager/roster/calendar' as any)} />
         <ScreenLink title="By staff" subtitle="Review allocations by worker." onPress={() => router.push('/manager/roster/staff' as any)} />
         <ScreenLink title="Coverage requirements" subtitle="Minimum role coverage by weekday." onPress={() => router.push('/manager/roster/coverage' as any)} />
@@ -565,7 +567,7 @@ function ShiftEditor({ pharmacyId, pharmacyName, weekStart, period, ensurePeriod
           return <Chip key={member.id || id} selected={userId===id} onPress={()=>setUserId(id)}>{rosterMemberLabel(member)}</Chip>;
         })}
       </View>
-      {membersLoading?<Text variant="bodySmall" style={{color:palette.muted}}>Loading eligible members…</Text>:null}
+      {membersLoading?<BrandLoader size={24} accessibilityLabel="Loading eligible members…" />:null}
       {!membersLoading&&!eligibleMembers.length?<Text variant="bodySmall" style={{color:palette.muted}}>No eligible active members were returned for this role.</Text>:null}
     </Section>
     <Button mode="contained" loading={busy} disabled={busy||!date||!start||!end} onPress={()=>void save()}>{editing ? 'Save shift changes' : 'Create draft shift'}</Button>

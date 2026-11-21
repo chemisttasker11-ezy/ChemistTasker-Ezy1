@@ -1,8 +1,10 @@
+import { ResponsiveSegmentedButtons as SegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 import { type Dispatch, type SetStateAction } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Button, Chip, SegmentedButtons, Surface, Switch, Text } from 'react-native-paper';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Button, Chip, Surface, Switch, Text } from 'react-native-paper';
+import { Check } from 'lucide-react-native';
 import { type ShiftEscalationPlan } from '@chemisttasker/shared-core';
+import { colors, radius, space, touch, type } from '@/constants/tokens';
 import { type VisibilityDates, type VisibilityTier } from './PostShiftScreen.helpers';
 import { styles } from './PostShiftScreen.styles';
 
@@ -24,8 +26,10 @@ type Props = {
   initialAudience: string;
   setInitialAudience: Setter<string>;
   notifyPharmacyStaff: boolean;
+  showNotifyPharmacyStaff: boolean;
   setNotifyPharmacyStaff: Setter<boolean>;
   notifyFavoriteStaff: boolean;
+  showNotifyFavoriteStaff: boolean;
   setNotifyFavoriteStaff: Setter<boolean>;
   notifyChainMembers: boolean;
   showNotifyChainMembers: boolean;
@@ -33,6 +37,7 @@ type Props = {
   escalationDates: VisibilityDates;
   setEscalationDates: Setter<VisibilityDates>;
   setEscalationPicker: Setter<EscalationPickerState>;
+  setEscalationTimePicker: Setter<EscalationPickerState>;
 };
 
 /** Same plain names as the web step, widest last. */
@@ -57,13 +62,15 @@ const formatWhen = (value: string) => {
 
 export default function PostShiftVisibilityStep({
   isEmbedded, canPostAnonymously, hideName, setHideName, allowedVis, initialAudience, setInitialAudience,
-  notifyPharmacyStaff, setNotifyPharmacyStaff, notifyFavoriteStaff, setNotifyFavoriteStaff, notifyChainMembers,
-  setNotifyChainMembers, showNotifyChainMembers, escalationDates, setEscalationDates, setEscalationPicker,
+  notifyPharmacyStaff, showNotifyPharmacyStaff, setNotifyPharmacyStaff, notifyFavoriteStaff, showNotifyFavoriteStaff, setNotifyFavoriteStaff, notifyChainMembers,
+  setNotifyChainMembers, showNotifyChainMembers, escalationDates, setEscalationDates, setEscalationPicker, setEscalationTimePicker,
   escalationPlan, setEscalationPlan,
 }: Props) {
   const startIdx = allowedVis.indexOf(initialAudience as VisibilityTier);
   const later = startIdx > -1 ? allowedVis.slice(startIdx + 1) : [];
   const { mode, everyHours: autoHours } = escalationPlan;
+  const scheduled = later.map(tier => escalationDates[KEY[tier]]).filter((date): date is string => Boolean(date));
+  const outOfOrder = scheduled.some((date, index) => index > 0 && new Date(date).getTime() <= new Date(scheduled[index - 1]).getTime());
 
   const applyAuto = (hours: number) => {
     setEscalationPlan(current => ({ ...current, everyHours: hours }));
@@ -75,8 +82,8 @@ export default function PostShiftVisibilityStep({
   };
 
   const notify = [
-    { key: 'pharmacy', visible: initialAudience !== 'FULL_PART_TIME', checked: notifyPharmacyStaff, label: 'Email and notify your pharmacy team', set: setNotifyPharmacyStaff },
-    { key: 'favourites', visible: ['LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN', 'PLATFORM'].includes(initialAudience), checked: notifyFavoriteStaff, label: 'Email and notify your favourite staff', set: setNotifyFavoriteStaff },
+    { key: 'pharmacy', visible: showNotifyPharmacyStaff, checked: notifyPharmacyStaff, label: 'Email and notify your pharmacy team', set: setNotifyPharmacyStaff },
+    { key: 'favourites', visible: showNotifyFavoriteStaff, checked: notifyFavoriteStaff, label: 'Email and notify your favourite staff', set: setNotifyFavoriteStaff },
     { key: 'chain', visible: showNotifyChainMembers, checked: notifyChainMembers, label: 'Email and notify your chain members', set: setNotifyChainMembers },
   ].filter(item => item.visible);
 
@@ -84,7 +91,7 @@ export default function PostShiftVisibilityStep({
     <Pressable key={key} onPress={() => set(value => !value)} accessibilityRole="switch" accessibilityState={{ checked }} style={[s.row, checked && s.rowOn]}>
       <View style={{ flex: 1 }}>
         <Text style={s.title}>{label}</Text>
-        {hint ? <Text style={s.muted}>{hint}</Text> : null}
+        {hint ? <Text style={[s.muted, checked && s.mutedOn]}>{hint}</Text> : null}
       </View>
       <Switch value={checked} onValueChange={value => set(value)} />
     </Pressable>
@@ -101,18 +108,18 @@ export default function PostShiftVisibilityStep({
         <>
           <Text style={s.h2}>Who sees it first?</Text>
           <Text style={s.muted}>Start small if you like; you can open it to more people later.</Text>
-          <View accessibilityRole="radiogroup" style={{ gap: 8, marginTop: 12 }}>
+          <View accessibilityRole="radiogroup" style={{ gap: space.xs, marginTop: space.sm }}>
             {allowedVis.map((tier, index) => {
               const on = initialAudience === tier;
               return (
-                <Pressable key={tier} onPress={() => setInitialAudience(tier)} accessibilityRole="radio" accessibilityState={{ checked: on }}
+                <Pressable key={tier} onPress={() => { if (tier !== initialAudience) setInitialAudience(tier); }} accessibilityRole="radio" accessibilityState={{ checked: on }}
                   accessibilityLabel={AUDIENCE[tier].label} style={[s.card, on && s.cardOn]}>
                   <View style={[s.badge, on && s.badgeOn]}>
-                    {on ? <MaterialCommunityIcons name="check" size={16} color="#FFFFFF" /> : <Text style={s.badgeText}>{index + 1}</Text>}
+                    {on ? <Check size={16} color={colors.surfaceBg} strokeWidth={2.5} /> : <Text style={s.badgeText}>{index + 1}</Text>}
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.title}>{AUDIENCE[tier].label}</Text>
-                    <Text style={s.muted}>{AUDIENCE[tier].hint}</Text>
+                    <Text style={[s.muted, on && s.mutedOn]}>{AUDIENCE[tier].hint}</Text>
                   </View>
                 </Pressable>
               );
@@ -125,20 +132,39 @@ export default function PostShiftVisibilityStep({
         <View style={s.section}>
           <Text style={s.h2}>Still not filled? Open it up later</Text>
           <Text style={s.muted}>The audience widens one group at a time, and only while nobody has shown interest.</Text>
-          <SegmentedButtons value={mode} onValueChange={value => chooseMode(value as Mode)} style={{ marginTop: 12 }}
-            buttons={[{ value: 'auto', label: 'Automatic' }, { value: 'custom', label: 'Choose dates' }, { value: 'off', label: "Don't widen" }]} />
+          <SegmentedButtons value={mode} onValueChange={value => { if (value !== mode) chooseMode(value as Mode); }} style={{ marginTop: space.sm, minHeight: touch.min }}
+            buttons={[
+              {
+                value: 'auto',
+                label: 'Automatic',
+                style: { minHeight: touch.min },
+                labelStyle: { textAlignVertical: 'center' },
+              },
+              {
+                value: 'custom',
+                label: 'Choose dates',
+                style: { minHeight: touch.min },
+                labelStyle: { textAlignVertical: 'center' },
+              },
+              {
+                value: 'off',
+                label: "Don't widen",
+                style: { minHeight: touch.min },
+                labelStyle: { textAlignVertical: 'center' },
+              },
+            ]} />
           {mode === 'auto' ? (
             <View style={s.chips}>
               <Text style={s.title}>Next group every</Text>
               {AUTO_STEPS.map(hours => (
-                <Chip key={hours} selected={autoHours === hours} mode={autoHours === hours ? 'flat' : 'outlined'} onPress={() => applyAuto(hours)}>
+                <Chip key={hours} selected={autoHours === hours} mode={autoHours === hours ? 'flat' : 'outlined'} onPress={() => { if (hours !== autoHours) applyAuto(hours); }}>
                   {hours < 24 ? `${hours} hours` : hours === 24 ? '1 day' : `${hours / 24} days`}
                 </Chip>
               ))}
             </View>
           ) : null}
           {mode !== 'off' ? (
-            <View style={{ marginTop: 12 }}>
+            <View style={{ marginTop: space.sm }}>
               {[allowedVis[startIdx], ...later].map((tier, index, all) => {
                 const first = index === 0;
                 const when = first ? '' : escalationDates[KEY[tier]] || '';
@@ -146,23 +172,36 @@ export default function PostShiftVisibilityStep({
                   <View key={tier} style={s.stage}>
                     <View style={{ alignItems: 'center' }}>
                       <View style={[s.badge, (first || when) && s.badgeOn]}>
-                        <Text style={[s.badgeText, (first || when) ? { color: '#FFFFFF' } : null]}>{index + 1}</Text>
+                        <Text style={[s.badgeText, (first || when) ? { color: colors.surfaceBg } : null]}>{index + 1}</Text>
                       </View>
                       {index < all.length - 1 ? <View style={s.line} /> : null}
                     </View>
-                    <View style={{ flex: 1, paddingBottom: 14 }}>
+                    <View style={{ flex: 1, paddingBottom: space.md }}>
                       <Text style={s.title}>{AUDIENCE[tier].label}</Text>
                       <Text style={s.muted}>{first ? 'As soon as you post' : when ? formatWhen(when) : 'Not scheduled'}</Text>
                       {!first && mode === 'custom' ? (
-                        <Button mode="outlined" compact icon="calendar" style={{ alignSelf: 'flex-start', marginTop: 6 }}
-                          onPress={() => setEscalationPicker({ key: KEY[tier], open: true })}>
-                          {when ? 'Change date' : 'Pick a date'}
-                        </Button>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, marginTop: space.xxs }}>
+                          <Button mode="outlined" compact icon="calendar" contentStyle={{ minHeight: touch.min }}
+                            onPress={() => setEscalationPicker({ key: KEY[tier], open: true })}>
+                            {when ? 'Change date' : 'Pick a date'}
+                          </Button>
+                          {when ? (
+                            <Button mode="outlined" compact icon="clock-outline" contentStyle={{ minHeight: touch.min }}
+                              onPress={() => setEscalationTimePicker({ key: KEY[tier], open: true })}>
+                              Change time
+                            </Button>
+                          ) : null}
+                        </View>
                       ) : null}
                     </View>
                   </View>
                 );
               })}
+              {outOfOrder ? (
+                <Text accessibilityRole="alert" style={{ color: colors.status.red.fg, marginTop: space.md }}>
+                  Each group should open after the one before it. Check the dates and times above.
+                </Text>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -171,7 +210,7 @@ export default function PostShiftVisibilityStep({
       {!isEmbedded && (notify.length > 0 || canPostAnonymously) ? (
         <View style={s.section}>
           <Text style={s.h2}>When it goes live</Text>
-          <View style={{ gap: 6, marginTop: 8 }}>
+          <View style={{ gap: space.xxs, marginTop: space.xs }}>
             {notify.map(item => switchRow(item.key, item.label, item.checked, item.set))}
             {canPostAnonymously ? switchRow('anon', 'Hide the pharmacy name', hideName, setHideName, 'Only the pharmacy suburb is shown.') : null}
           </View>
@@ -182,18 +221,19 @@ export default function PostShiftVisibilityStep({
 }
 
 const s = StyleSheet.create({
-  h2: { fontSize: 16, fontWeight: '700', color: '#06214A' },
-  title: { fontSize: 15, fontWeight: '600', color: '#111827' },
-  muted: { fontSize: 13, color: '#4B5563', marginTop: 2 },
-  section: { marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
-  card: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' },
-  cardOn: { borderColor: '#3C18A8', backgroundColor: '#EFE9FD' },
-  badge: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF2F8' },
-  badgeOn: { backgroundColor: '#5222B8' },
-  badgeText: { fontSize: 13, fontWeight: '700', color: '#4B5563' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 12 },
-  stage: { flexDirection: 'row', gap: 12 },
-  line: { flex: 1, width: 2, minHeight: 20, backgroundColor: '#E5E7EB', marginVertical: 4 },
-  row: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, borderRadius: 12 },
-  rowOn: { backgroundColor: '#EFE9FD' },
+  h2: { fontSize: type.labelLarge.fontSize, fontWeight: '700', color: colors.textPrimary },
+  title: { fontSize: type.bodyMedium.fontSize, fontWeight: '600', color: colors.textPrimary },
+  muted: { fontSize: type.bodySmall.fontSize, color: colors.textSecondary, marginTop: space.xxs },
+  mutedOn: { color: colors.tone.violet.fg },
+  section: { marginTop: space.lg, paddingTop: space.md, borderTopWidth: 1, borderTopColor: colors.border },
+  card: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.control, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceBg },
+  cardOn: { borderColor: colors.primary, backgroundColor: colors.tone.violet.bg },
+  badge: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.subtleBg },
+  badgeOn: { backgroundColor: colors.primary },
+  badgeText: { fontSize: type.labelSmall.fontSize, fontWeight: '700', color: colors.textSecondary },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.xs, marginTop: space.sm },
+  stage: { flexDirection: 'row', gap: space.md },
+  line: { flex: 1, width: 2, minHeight: 20, backgroundColor: colors.border, marginVertical: space.xxs },
+  row: { minHeight: touch.min, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, borderRadius: radius.control },
+  rowOn: { backgroundColor: colors.tone.violet.bg },
 });

@@ -3,7 +3,6 @@ import { ScrollView, View, StyleSheet, TouchableOpacity, Image, Alert } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import {
-  ActivityIndicator,
   Button,
   Chip,
   Card,
@@ -18,6 +17,7 @@ import {
   IconButton,
   Menu,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import {

@@ -16,6 +16,7 @@ import {
   getSlotDurationHours,
   type RateType,
 } from './PostShiftScreen.helpers';
+import { colors, touch, space } from '@/constants/tokens';
 import { styles } from './PostShiftScreen.styles';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
@@ -140,7 +141,8 @@ export default function PostShiftPayRateStep({
 
     return (
       <View style={styles.slotRatePreviewPanel}>
-        <Text style={styles.label}>Rate for each date</Text>
+        <Text style={styles.label} accessibilityRole="header">Rate for each date</Text>
+        <Text style={styles.helper}>Change any date that pays differently.</Text>
         {expandedSlots.map((slot, index) => {
           const row = slotRateRows[index] ?? {
             rate: '',
@@ -203,7 +205,7 @@ export default function PostShiftPayRateStep({
                 </Text>
               </View>
               {row.status === 'error' && row.error ? (
-                <Text style={{ color: '#B91C1C', fontSize: 12 }}>
+                <Text style={{ color: colors.status.red.fg, fontSize: 12 }}>
                   {row.error}
                 </Text>
               ) : null}
@@ -216,11 +218,12 @@ export default function PostShiftPayRateStep({
 
   return (
     <Surface style={styles.card} elevation={1}>
-      <Text style={styles.label}>Pay</Text>
+      <Text style={styles.label} accessibilityRole="header">How they are paid</Text>
 
       {!isLocumLike ? (
         <>
-          <Text style={[styles.label, { marginTop: 16 }]}>Salary Range</Text>
+          <Text style={[styles.label, { marginTop: 16 }]} accessibilityRole="header">Pay</Text>
+          <Text style={styles.helper}>Shown to applicants as a range.</Text>
           <View style={styles.pills}>
             {(['HOURLY', 'ANNUAL'] as const).map((mode) => {
               const selected = ftptPayMode === mode;
@@ -228,7 +231,7 @@ export default function PostShiftPayRateStep({
                 <Chip
                   key={mode}
                   selected={selected}
-                  onPress={() => setFtptPayMode(mode)}
+                  onPress={() => { if (mode !== ftptPayMode) setFtptPayMode(mode); }}
                   style={chipStyle(selected)}
                   textStyle={chipTextStyle(selected)}
                 >
@@ -287,6 +290,7 @@ export default function PostShiftPayRateStep({
         </>
       ) : roleNeeded === 'PHARMACIST' ? (
         <>
+          <Text style={styles.label} accessibilityRole="header">How is the rate set?</Text>
           <View style={styles.pills}>
             {(['FLEXIBLE', 'FIXED', 'PHARMACIST_PROVIDED'] as RateType[]).map(
               (mode) => {
@@ -295,7 +299,7 @@ export default function PostShiftPayRateStep({
                   <Chip
                     key={mode}
                     selected={selected}
-                    onPress={() => setRateType(mode)}
+                    onPress={() => { if (mode !== rateType) setRateType(mode); }}
                     style={chipStyle(selected)}
                     textStyle={chipTextStyle(selected)}
                   >
@@ -319,7 +323,7 @@ export default function PostShiftPayRateStep({
                 <Chip
                   key={preference}
                   selected={selected}
-                  onPress={() => setPaymentPreference(preference)}
+                  onPress={() => { if (preference !== paymentPreference) setPaymentPreference(preference); }}
                   style={chipStyle(selected)}
                   textStyle={chipTextStyle(selected)}
                 >
@@ -330,7 +334,7 @@ export default function PostShiftPayRateStep({
           </View>
 
           <TouchableOpacity
-            style={styles.checkboxRow}
+            style={[styles.checkboxRow, { minHeight: touch.min }]}
             onPress={() => setLocumSuperIncluded((value) => !value)}
           >
             <Checkbox
@@ -405,6 +409,7 @@ export default function PostShiftPayRateStep({
                 loading={savingPharmacyRates}
                 disabled={savingPharmacyRates || !pharmacyId}
                 style={styles.defaultRatesButton}
+                contentStyle={{ minHeight: touch.min }}
               >
                 Save as this pharmacy's usual rates
               </Button>
@@ -415,7 +420,9 @@ export default function PostShiftPayRateStep({
         </>
       ) : (
         <>
+          <Text style={styles.label} accessibilityRole="header">Award rate</Text>
           <TouchableOpacity
+            style={{ minHeight: touch.min, justifyContent: 'center' }}
             onPress={() => Linking.openURL(GOVERNMENT_AWARD_GUIDE_URL)}
           >
             <Text style={styles.helper}>Rate is set by government award</Text>
@@ -430,7 +437,7 @@ export default function PostShiftPayRateStep({
                 <Chip
                   key={preference}
                   selected={selected}
-                  onPress={() => setPaymentPreference(preference)}
+                  onPress={() => { if (preference !== paymentPreference) setPaymentPreference(preference); }}
                   style={chipStyle(selected)}
                   textStyle={chipTextStyle(selected)}
                 >
@@ -441,7 +448,7 @@ export default function PostShiftPayRateStep({
           </View>
 
           <TouchableOpacity
-            style={styles.checkboxRow}
+            style={[styles.checkboxRow, { minHeight: touch.min }]}
             onPress={() => setLocumSuperIncluded((value) => !value)}
           >
             <Checkbox

@@ -1,5 +1,9 @@
 """Chat API: conversations, messages, reactions, participants and shift contacts."""
 import logging
+import mimetypes
+import os
+
+from django.http import FileResponse, Http404
 
 log = logging.getLogger(__name__)
 
@@ -491,14 +495,7 @@ class ConversationViewSet(mixins.ListModelMixin,
         Payload: { "target": "message", "message_id": 123 }
         """
         conv = self.get_object()
-        # A user can (historically) have multiple Participant rows in the same conversation.
-        # Pick the first match instead of raising MultipleObjectsReturned.
-        my_part = (
-            Participant.objects
-            .filter(conversation=conv, membership__user=request.user)
-            .order_by('id')
-            .first()
-        )
+        my_part = authorized_participant(conv.pk, request.user.pk)
         if not my_part:
             return Response({"detail": "Not a participant of this conversation."}, status=status.HTTP_403_FORBIDDEN)
         
@@ -578,7 +575,7 @@ class ConversationViewSet(mixins.ListModelMixin,
     @action(detail=True, methods=['get', 'post'])
     def messages(self, request, pk=None):
         conv = self.get_object()
-        my_part = Participant.objects.filter(conversation=conv, membership__user=request.user).first()
+        my_part = authorized_participant(conv.pk, request.user.pk)
         if not my_part:
             return Response({"detail": "Not a participant of this conversation."}, status=status.HTTP_403_FORBIDDEN)
         
@@ -586,7 +583,7 @@ class ConversationViewSet(mixins.ListModelMixin,
             qs = conv.messages.select_related('sender__user').order_by('-created_at')
             page = self.paginate_queryset(qs)
             ser = MessageSerializer(page if page is not None else qs, many=True, context={'request': request})
-            return self.get_paginated_response(ser.data) if page else Response(ser.data)
+            return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
 
         data = request.data or {}
         body = sanitize_chat_text(data.get('body') or '')
@@ -621,7 +618,7 @@ class ConversationViewSet(mixins.ListModelMixin,
     @action(detail=True, methods=['post'])
     def read(self, request, pk=None):
         conv = self.get_object()
-        part = Participant.objects.filter(conversation=conv, membership__user=request.user).first()
+        part = authorized_participant(conv.pk, request.user.pk)
         if not part:
             return Response({"detail": "Not a participant."}, status=status.HTTP_404_NOT_FOUND)
         part.last_read_at = timezone.now()
@@ -633,6 +630,31 @@ class ConversationViewSet(mixins.ListModelMixin,
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=True, methods=['get'], url_path='attachment')
+    def attachment(self, request, pk=None):
+        """Stream a file only to a currently authorized room participant.
+
+        Never redirect to the storage URL: Azure SAS links, public blob paths
+        and Django /media/ URLs must not bypass a revoked membership.
+        """
+        message = self.get_object()  # get_queryset enforces active room access.
+        if message.is_deleted or not message.attachment:
+            raise Http404
+        filename = os.path.basename(message.attachment_filename or message.attachment.name)
+        media_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+        inline = media_type in {'image/png', 'image/jpeg', 'image/gif', 'image/webp'}
+        try:
+            file = message.attachment.open('rb')
+            response = FileResponse(
+                file, as_attachment=not inline, filename=filename, content_type=media_type,
+            )
+        except (OSError, ValueError):
+            raise Http404
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['Content-Security-Policy'] = "default-src 'none'; sandbox"
+        return response
 
     def get_queryset(self):
         user = self.request.user
@@ -702,7 +724,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         """
         message = self.get_object()
         
-        my_participant = message.conversation.participants.filter(membership__user=request.user).first()
+        my_participant = authorized_participant(message.conversation_id, request.user.pk)
         if not my_participant or message.sender != my_participant.membership:
             raise PermissionDenied("You can only edit your own messages.")
 
@@ -733,7 +755,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         """
         message = self.get_object()
         
-        my_participant = message.conversation.participants.filter(membership__user=request.user).first()
+        my_participant = authorized_participant(message.conversation_id, request.user.pk)
         if not my_participant or message.sender != my_participant.membership:
             raise PermissionDenied("You can only delete your own messages.")
 

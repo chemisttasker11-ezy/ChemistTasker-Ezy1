@@ -41,12 +41,13 @@ function Feed({hub,label,initial}:{hub:string;label:string;initial:Page<PublicPo
  const [query,setQuery]=useState('');const [search,setSearch]=useState('');const [searchOpen,setSearchOpen]=useState(false);
  const [body,setBody]=useState('');const [composerOpen,setComposerOpen]=useState(false);const [allowed,setAllowed]=useState(false);
  const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [polls,setPolls]=useState<Page<Poll>>();const [pollPage,setPollPage]=useState(1);
+ const requestGeneration=useRef(0);
  const textRef=useRef<HTMLTextAreaElement>(null);const fileRef=useRef<HTMLInputElement>(null);
  const meName=`${session.user?.first_name||''} ${session.user?.last_name||''}`.trim();
- const reload=useCallback(async()=>setFeed(await chemistTaskerApi.publicContent.listCommunityPosts(hub,{page,q:search}) as Page<PublicPost>),[hub,page,search,session.status]);
+ const reload=useCallback(async()=>{const ticket=++requestGeneration.current;try{const result=await chemistTaskerApi.publicContent.listCommunityPosts(hub,{page,q:search}) as Page<PublicPost>;if(ticket===requestGeneration.current)setFeed(result);}catch(e){if(ticket===requestGeneration.current)setError((e as Error).message);}},[hub,page,search,session.status]);
  useEffect(()=>{if(!draftKey)return;const draft=sessionStorage.getItem(draftKey)||'';setBody(draft);if(draft)setComposerOpen(true);},[draftKey]);
  const loadPolls=useCallback(async()=>setPolls(await chemistTaskerApi.publicContent.listCommunityPolls(hub,{page:pollPage}) as Page<Poll>),[hub,pollPage]);
- useEffect(()=>{reload().catch(e=>setError(e.message));},[reload]);useEffect(()=>{loadPolls().catch(e=>setError(e.message));},[loadPolls]);
+ useEffect(()=>{void reload();return()=>{requestGeneration.current++;};},[reload]);useEffect(()=>{loadPolls().catch(e=>setError(e.message));},[loadPolls]);
  useEffect(()=>{chemistTaskerApi.publicContent.listHubs().then(h=>setAllowed(!!h.find(x=>x.key===hub)?.can_interact)).catch(e=>setError(e.message));},[hub,session.status]);
  function openComposer(){setComposerOpen(true);setTimeout(()=>textRef.current?.focus(),0);}
  function addFiles(selected:File[]){const tooLarge=selected.find(file=>file.size>15*1024*1024);if(tooLarge){setError(`${tooLarge.name} is larger than the 15 MB attachment limit.`);return;}setError('');setFiles(prev=>[...prev,...selected]);setComposerOpen(true);}
@@ -76,7 +77,7 @@ function Feed({hub,label,initial}:{hub:string;label:string;initial:Page<PublicPo
      <button role="tab" aria-selected={tab==='about'} onClick={()=>setTab('about')}>About</button>
      <Link href="/hubs">Discover hubs</Link>
     </div>
-    {tab==='discussion'&&(searchOpen||search?<form className="ct-tab-search" role="search" onSubmit={e=>{e.preventDefault();setSearch(query);setPage(1);}}><Search size={16} aria-hidden="true"/><input autoFocus aria-label="Search this group" placeholder="Search this group" value={query} onChange={e=>setQuery(e.target.value)} maxLength={200}/>{(query||search)&&<button type="button" aria-label="Clear search" onClick={()=>{setQuery('');setSearch('');setSearchOpen(false);setPage(1);}}><X size={16}/></button>}</form>:<button className="ct-icon-button" aria-label="Search this group" onClick={()=>setSearchOpen(true)}><Search size={18}/></button>)}
+    {tab==='discussion'&&(searchOpen||search?<form className="ct-tab-search" role="search" onSubmit={e=>{e.preventDefault();if(query!==search||page!==1)requestGeneration.current++;setSearch(query);setPage(1);}}><Search size={16} aria-hidden="true"/><input autoFocus aria-label="Search this group" placeholder="Search this group" value={query} onChange={e=>setQuery(e.target.value)} maxLength={200}/>{(query||search)&&<button type="button" aria-label="Clear search" onClick={()=>{if(search||page!==1)requestGeneration.current++;setQuery('');setSearch('');setSearchOpen(false);setPage(1);}}><X size={16}/></button>}</form>:<button className="ct-icon-button" aria-label="Search this group" onClick={()=>setSearchOpen(true)}><Search size={18}/></button>)}
    </div>
   </header>
   {error&&<p role="alert" className="ct-message">{error}</p>}
@@ -105,7 +106,7 @@ function Feed({hub,label,initial}:{hub:string;label:string;initial:Page<PublicPo
     {search&&<p className="ct-muted" role="status">Showing posts matching “{search}”.</p>}
     {feed.results.length===0&&<div className="ct-card ct-empty"><MessageCircle size={32}/><h2>{search?'No posts match':'No conversations yet'}</h2><p>{search?'Try another word.':'A thoughtful question can start something useful.'}</p>{allowed&&!search&&<button className="ct-primary" onClick={openComposer}>Write a post</button>}</div>}
     {feed.results.map(post=><section className="ct-card ct-social-post" key={post.id}><PostEntry post={post} feed onChange={reload}/></section>)}
-    <Paging page={page} next={!!feed.next} onPage={setPage}/>
+    <Paging page={page} next={!!feed.next} onPage={n=>{requestGeneration.current++;setPage(n);}}/>
     {!!polls?.results.length&&<section className="ct-card"><h2 className="ct-section-title"><BarChart3 size={18} aria-hidden="true"/> Community polls</h2>{polls.results.map(p=>{const total=p.options.reduce((s,o)=>s+o.votes,0);return <div key={p.id} className="ct-poll"><h3>{p.question}</h3>{p.options.map(o=><button className="ct-poll-option" key={o.id} disabled={busy||!p.can_interact||p.is_closed} onClick={()=>void vote(p.id,o.id)} style={{['--pct' as string]:`${total?Math.round(o.votes/total*100):0}%`}}><span>{o.text}</span><span>{o.votes} {o.votes===1?'vote':'votes'}</span></button>)}{p.is_closed&&<p className="ct-muted">Voting closed</p>}</div>;})}<Paging page={pollPage} next={!!polls.next} onPage={setPollPage}/></section>}
    </div>
   </div>}

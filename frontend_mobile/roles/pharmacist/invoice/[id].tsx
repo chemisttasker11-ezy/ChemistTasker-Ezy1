@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, Linking, ScrollView } from 'react-native';
-import { Text, Card, ActivityIndicator, Button, IconButton, Chip, Divider } from 'react-native-paper';
+import { Text, Card, Button, IconButton, Chip, Divider } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getInvoiceDetail, getInvoicePdfUrl, sendInvoiceEmail } from '@chemisttasker/shared-core';
 import { SafeAreaView } from 'react-native-safe-area-context';

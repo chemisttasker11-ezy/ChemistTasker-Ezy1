@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Modal } from 'react-native';
+import { GuardedModal as Modal } from '@/components/security/GuardedModal';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { Button, Chip, TextInput, Divider, Text, IconButton } from 'react-native-paper';
 
 export type ShiftFilters = {

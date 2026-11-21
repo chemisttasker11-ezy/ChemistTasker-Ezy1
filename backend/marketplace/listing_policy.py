@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from django.conf import settings
+
 from organizations.models import PharmacyAdmin
 
 from .models import MarketplaceCategory, MarketplaceListing
@@ -105,4 +107,4 @@ def listing_options_for(user) -> dict:
         elif PharmacyAdmin.objects.filter(user=user, is_active=True, pharmacy__verified=True).exists():
             ethical_candidate = True
 
-    return {**access.payload(), "role_guidance": ROLE_GUIDANCE.get(role, []), "personal_categories": personal_categories, "pharmacy_categories": pharmacy_categories, "ethical_entry_available": ethical_candidate, "seller_policy_version": "2026-09-17", "rules": {"ordinary_pharmacy_assets_owner_only": True, "medicine_private_only": True, "admin_ordinary_asset_authority": False}}
+    return {**access.payload(), "role_guidance": ROLE_GUIDANCE.get(role, []), "personal_categories": personal_categories, "pharmacy_categories": pharmacy_categories, "ethical_entry_available": ethical_candidate, "new_listings_enabled": settings.MARKETPLACE_ALL_WRITES_ENABLED and settings.MARKETPLACE_NEW_LISTINGS_ENABLED, "seller_policy_version": "2026-09-17", "rules": {"ordinary_pharmacy_assets_owner_only": True, "medicine_private_only": True, "admin_ordinary_asset_authority": False}}

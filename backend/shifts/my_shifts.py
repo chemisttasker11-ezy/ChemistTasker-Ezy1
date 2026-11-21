@@ -12,6 +12,7 @@ class MyConfirmedShiftsViewSet(BaseShiftViewSet):
     """
     Shifts I’m assigned to that haven’t ended yet.
     """
+    read_only_create = True
     serializer_class   = MyShiftSerializer
     permission_classes = [IsPharmacistOrOtherStaff]
 
@@ -42,6 +43,7 @@ class MyHistoryShiftsViewSet(BaseShiftViewSet):
     """
     Shifts I’m assigned to that have already ended.
     """
+    read_only_create = True
     serializer_class   = MyShiftSerializer
     permission_classes = [IsPharmacistOrOtherStaff]
 

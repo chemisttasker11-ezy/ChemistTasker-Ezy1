@@ -7,7 +7,9 @@ export {
   getCommunityShifts,
   getPublicShifts,
   getActiveShifts,
+  getActiveShiftsPage,
   getConfirmedShifts,
+  getConfirmedShiftsPage,
   getHistoryShifts,
   getShiftCounterOffers,
   getShiftCounterOffersBatch,
@@ -15,9 +17,11 @@ export {
   acceptShiftCounterOffer,
   rejectShiftCounterOffer,
   fetchActiveShifts,
+  fetchAllActiveShifts,
   fetchCommunityShifts,
   fetchPublicShifts,
   fetchConfirmedShifts,
+  fetchAllConfirmedShifts,
   fetchShiftCounterOffersService,
   fetchShiftCounterOffersBatchService,
   submitShiftCounterOfferService,
@@ -35,6 +39,8 @@ export * from './visibility';
 export * from './workProfile';
 export * from './draftSlots';
 export * from './postingDraft';
+export * from './audience';
+export * from './postingWindow';
 export * from './descriptionTemplates';
 export * from './skillPresets';
 // Draft previews (post shift review) render an unsaved payload through the same mapping as API responses.

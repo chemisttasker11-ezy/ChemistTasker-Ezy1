@@ -10,7 +10,65 @@ from onboarding.verification.policy import under_18, verification_summary
 from onboarding.verification.schema import VerificationSummarySerializer
 
 
+class PublicAvailabilityDaysField(serializers.JSONField):
+    """Public slots only; keep the web/mobile aliases and legacy date-only entries."""
+
+    slot_fields = {
+        "date": ((str,), serializers.DateField()),
+        "start_time": ((str, type(None)), serializers.TimeField(allow_null=True)),
+        "end_time": ((str, type(None)), serializers.TimeField(allow_null=True)),
+        "startTime": ((str, type(None)), serializers.TimeField(allow_null=True)),
+        "endTime": ((str, type(None)), serializers.TimeField(allow_null=True)),
+        "is_all_day": ((bool,), serializers.BooleanField()),
+        "isAllDay": ((bool,), serializers.BooleanField()),
+        "notes": ((str,), serializers.CharField(allow_blank=True, trim_whitespace=False)),
+    }
+
+    def public_slot(self, entry, *, sanitize=False):
+        if isinstance(entry, str):
+            self.slot_fields["date"][1].run_validation(entry)
+            return entry
+        if not isinstance(entry, dict) or "date" not in entry:
+            raise serializers.ValidationError("Each public slot requires a date.")
+        result = {}
+        for name, (types, field) in self.slot_fields.items():
+            if name in entry:
+                value = entry[name]
+                try:
+                    if type(value) not in types:
+                        raise serializers.ValidationError({name: "Invalid public slot value type."})
+                    field.run_validation(value)
+                except serializers.ValidationError:
+                    if not sanitize or name == "date":
+                        raise
+                    continue
+                result[name] = value
+        return result
+
+    def to_internal_value(self, data):
+        data = super().to_internal_value(data)
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except ValueError:
+                raise serializers.ValidationError("Invalid JSON list.")
+        if not isinstance(data, list):
+            raise serializers.ValidationError("Expected a list of public slots.")
+        return [self.public_slot(entry) for entry in data]
+
+    def to_representation(self, value):
+        result = []
+        for entry in value if isinstance(value, list) else []:
+            try:
+                result.append(self.public_slot(entry, sanitize=True))
+            except serializers.ValidationError:
+                # Malformed legacy JSON must not escape through public projections.
+                continue
+        return result
+
+
 class ExplorerPostReadSerializer(serializers.ModelSerializer):
+    availability_days = PublicAvailabilityDaysField(read_only=True)
     explorer_name = serializers.SerializerMethodField()
     explorer_user_id = serializers.SerializerMethodField()
     explorer_role_type = serializers.SerializerMethodField()
@@ -197,6 +255,8 @@ class PublicExplorerPostReadSerializer(ExplorerPostReadSerializer):
 
 
 class ExplorerPostWriteSerializer(serializers.ModelSerializer):
+    availability_days = PublicAvailabilityDaysField(required=False)
+
     class Meta:
         model = ExplorerPost
         fields = [
@@ -270,13 +330,6 @@ class ExplorerPostWriteSerializer(serializers.ModelSerializer):
                                                        matchable_only=True, software_only=field == 'software')
                     except serializers.ValidationError as error:
                         raise serializers.ValidationError({field: error.detail})
-        availability_days = attrs.get("availability_days")
-        if isinstance(availability_days, str):
-            try:
-                attrs["availability_days"] = json.loads(availability_days)
-            except Exception:
-                raise serializers.ValidationError({"availability_days": "Invalid JSON list."})
-
         post_kind = attrs.get("post_kind", getattr(self.instance, "post_kind", None))
         existing_work_types = getattr(self.instance, "work_types", []) if self.instance else []
         work_types = list(attrs.get("work_types") if "work_types" in attrs else (existing_work_types or []))
@@ -289,7 +342,7 @@ class ExplorerPostWriteSerializer(serializers.ModelSerializer):
             attrs["availability_summary"] = "Open to anytime"
             attrs["availability_notice"] = None
         elif post_kind == "AVAILABILITY":
-            availability_days = list(attrs.get("availability_days") or [])
+            availability_days = list(attrs.get("availability_days", getattr(self.instance, "availability_days", [])) or [])
             attrs["availability_days"] = availability_days
             attrs["availability_mode"] = "CASUAL_CALENDAR" if availability_days else None
             attrs["availability_summary"] = attrs.get("availability_summary") or None

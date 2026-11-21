@@ -1,19 +1,24 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Pressable, RefreshControl } from 'react-native';
-import { Text, Surface, Icon, IconButton, Badge, ActivityIndicator } from 'react-native-paper';
+import React, { useRef, useState, useCallback } from 'react';
+import { View, StyleSheet, FlatList, Pressable, RefreshControl, DeviceEventEmitter } from 'react-native';
+import { Text, Surface, Icon, IconButton, Badge, Button } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotifications, markNotificationsAsRead } from '@chemisttasker/shared-core';
-import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useAdminCan } from '@/context/AdminWorkspaceContext';
 import {
   resolveCalendarNotificationRoute,
   resolveChatNotificationRoomId,
   resolveHubNotificationRoute,
   resolveMembershipNotificationRoute,
   resolveShiftNotificationRoute,
+  resolveWorkforceNotificationRoute,
 } from '@/utils/notificationNavigation';
 import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { shiftPersonaFromPath } from '@/roles/shared/shifts/shiftSurface';
+import { NOTIFICATIONS_READ_EVENT } from './events';
+import { colors, font, radius, space, touch } from '@/constants/tokens';
 
 type Notification = {
   id: number;
@@ -28,20 +33,64 @@ type Notification = {
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, hasCapability } = useAuth();
+  // /admin/notifications opens admin routes even though a delegated admin's role is PHARMACIST, OWNER etc.
+  const persona = shiftPersonaFromPath(usePathname());
+  const adminCan = useAdminCan();
+  const accountId = String(user?.id ?? 'signed-out');
+  const visibleAccount = useRef(accountId);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [readError, setReadError] = useState('');
+  const [olderError, setOlderError] = useState('');
+  const [nextPage, setNextPage] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const moreLoadingRef = useRef(false);
+  const locallyReadIds = useRef(new Set<number>());
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  // Only the newest list response may set rows: an older one would restore rows from before a mark-read.
+  const generation = useRef(0);
+  const refreshGeneration = useRef(0);
+  const renderedAccount = useRef(accountId);
+  if (renderedAccount.current !== accountId) {
+    renderedAccount.current = accountId;
+    generation.current += 1;
+    refreshGeneration.current += 1;
+  }
+  const currentAccount = () => visibleAccount.current === accountId && renderedAccount.current === accountId;
 
-  // Refresh when screen gains focus and mark any unread as read.
+  // Load on every focus (the first one included) and mark any unread as read.
   useFocusEffect(
     useCallback(() => {
-      fetchNotifications(true); // mark all as read when opening
-    }, [])
+      // A focus change is not an identity change. Keep previously loaded rows
+      // and confirmed local receipts if only this same account returns.
+      const changedAccount = visibleAccount.current !== accountId;
+      generation.current += 1;
+      refreshGeneration.current += 1;
+      if (changedAccount) {
+        visibleAccount.current = accountId;
+        locallyReadIds.current.clear();
+        setNotifications([]);
+        setNextPage(null);
+        setReadError('');
+        setLoadError('');
+        setOlderError('');
+      }
+      moreLoadingRef.current = false;
+      setLoadingMore(false);
+      setRefreshing(false);
+      if (user?.id != null) void fetchNotifications(true, 1);
+      else { setNotifications([]); setLoading(false); }
+      return () => {
+        generation.current += 1;
+        refreshGeneration.current += 1;
+        moreLoadingRef.current = false;
+        setLoadingMore(false);
+        setRefreshing(false);
+      };
+    }, [accountId])
   );
 
   const normalizeNotification = (raw: any): Notification => ({
@@ -55,47 +104,102 @@ export default function NotificationsScreen() {
     payload: raw.payload ?? {},
   });
 
-  const fetchNotifications = async (markAllRead = false) => {
+  const fetchNotifications = async (markVisibleRead = false, page = 1) => {
+    const first = page === 1;
+    if (!first && moreLoadingRef.current) return;
+    const request = first ? ++generation.current : generation.current;
+    if (first) {
+      setLoading(true);
+      setLoadError('');
+      setOlderError('');
+      // Keep existing page and next-page information until a successful refresh;
+      // only a real account change may invalidate those cached rows.
+      moreLoadingRef.current = false;
+      setLoadingMore(false);
+    } else {
+      moreLoadingRef.current = true;
+      setLoadingMore(true);
+      setOlderError('');
+    }
     try {
-      const response = await getNotifications();
-      const list = Array.isArray((response as any)?.results)
-        ? (response as any).results
-        : Array.isArray(response)
-          ? (response as any)
-          : [];
-      const normalized = list.map(normalizeNotification);
-      setNotifications(normalized);
-      if (markAllRead) {
+      const response = await getNotifications(page);
+      if (request !== generation.current || !currentAccount()) return;
+      if (!Array.isArray(response) && !Array.isArray((response as any)?.results)) {
+        throw new Error('Unexpected notifications response.');
+      }
+      const rows = Array.isArray(response) ? response : response.results;
+      const normalized = rows.map(normalizeNotification).map((n: Notification) =>
+        locallyReadIds.current.has(n.id) ? { ...n, readAt: n.readAt || new Date().toISOString() } : n
+      );
+      setNotifications(previous => first ? normalized : [
+        ...previous,
+        ...normalized.filter((n: Notification) => !previous.some(row => row.id === n.id)),
+      ]);
+      setNextPage(!Array.isArray(response) && response.next ? page + 1 : null);
+      if (markVisibleRead) {
         const unreadIds = normalized.filter((n: Notification) => !n.readAt).map((n: Notification) => n.id);
         if (unreadIds.length) {
-          setNotifications((prev) =>
-            prev.map((n: Notification) => (unreadIds.includes(n.id) ? { ...n, readAt: new Date().toISOString() } : n))
-          );
-          void markNotificationsAsRead(unreadIds);
+          // Do not tell the shell or the user that a read was recorded until
+          // the server actually confirms the mutation.
+          try {
+            await markNotificationsAsRead(unreadIds);
+            if (request !== generation.current || !currentAccount()) return;
+            unreadIds.forEach(id => locallyReadIds.current.add(id));
+            setNotifications(previous => previous.map(row =>
+              locallyReadIds.current.has(row.id) ? { ...row, readAt: row.readAt || new Date().toISOString() } : row
+            ));
+            setReadError('');
+            DeviceEventEmitter.emit(NOTIFICATIONS_READ_EVENT);
+          } catch (failure: any) {
+            if (request === generation.current && currentAccount()) setReadError(failure?.message || 'Notifications could not be marked as read.');
+          }
         }
       }
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
+    } catch (failure: any) {
+      if (request !== generation.current || !currentAccount()) return;
+      if (first) setLoadError(failure?.message || 'Unable to load notifications.');
+      else setOlderError(failure?.message || 'Unable to load older notifications.');
     } finally {
-      setLoading(false);
+      if (request === generation.current && currentAccount()) {
+        if (first) setLoading(false);
+        else { setLoadingMore(false); moreLoadingRef.current = false; }
+      }
     }
   };
 
   const onRefresh = async () => {
+    const token = ++refreshGeneration.current;
+    const owner = accountId;
     setRefreshing(true);
-    await fetchNotifications();
-    setRefreshing(false);
+    await fetchNotifications(true, 1);
+    if (currentAccount() && owner === accountId && token === refreshGeneration.current) {
+      setRefreshing(false);
+    }
   };
 
   const markAsRead = async (id: number) => {
+    const request = generation.current;
+    const owner = accountId;
+    if (!currentAccount()) return;
     try {
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
-      );
       await markNotificationsAsRead([id]);
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
+      if (request !== generation.current || owner !== accountId || !currentAccount()) return;
+      locallyReadIds.current.add(id);
+      setNotifications(previous =>
+        previous.map(row => row.id === id ? { ...row, readAt: row.readAt || new Date().toISOString() } : row)
+      );
+      setReadError('');
+      DeviceEventEmitter.emit(NOTIFICATIONS_READ_EVENT);
+    } catch (failure: any) {
+      if (request === generation.current && owner === accountId && currentAccount()) {
+        setReadError(failure?.message || 'Unable to mark the notification as read.');
+      }
     }
+  };
+
+  const loadOlder = () => {
+    if (nextPage == null || moreLoadingRef.current || loading || refreshing) return;
+    void fetchNotifications(true, nextPage);
   };
 
   const getIconForType = (type: string) => {
@@ -120,22 +224,35 @@ export default function NotificationsScreen() {
       payload: item.payload,
     });
     if (roomId) {
-      router.push(getMessageDetailRoute(user?.role, roomId) as any);
+      router.push(getMessageDetailRoute(user?.role, roomId, persona) as any);
       return;
     }
     const route = resolveShiftNotificationRoute({
       actionUrl: item.actionUrl,
       payload: item.payload,
       userRole: user?.role ?? null,
+      persona,
+      adminCan,
     });
     if (route) {
       router.push(route as any);
+      return;
+    }
+    const workforceRoute = resolveWorkforceNotificationRoute({
+      actionUrl: item.actionUrl,
+      payload: item.payload,
+      canManageRoster: (pharmacyId) => hasCapability('MANAGE_ROSTER', pharmacyId),
+    });
+    if (workforceRoute !== undefined) {
+      if (workforceRoute) router.push(workforceRoute as any);
       return;
     }
     const calendarRoute = resolveCalendarNotificationRoute({
       actionUrl: item.actionUrl,
       payload: item.payload,
       userRole: user?.role ?? null,
+      persona,
+      adminCan,
     });
     if (calendarRoute) {
       router.push(calendarRoute as any);
@@ -145,6 +262,8 @@ export default function NotificationsScreen() {
       actionUrl: item.actionUrl,
       payload: item.payload,
       userRole: user?.role ?? null,
+      persona,
+      adminCan,
     });
     if (hubRoute) {
       router.push(hubRoute as any);
@@ -154,6 +273,8 @@ export default function NotificationsScreen() {
       actionUrl: item.actionUrl,
       payload: item.payload,
       userRole: user?.role ?? null,
+      persona,
+      adminCan,
     });
     if (membershipRoute) {
       router.push(membershipRoute as any);
@@ -161,6 +282,7 @@ export default function NotificationsScreen() {
     }
   };
 
+  const shownNotifications = currentAccount() ? notifications : [];
   const renderItem = ({ item }: { item: Notification }) => (
     <Surface
       style={[styles.notificationItem, !item.readAt && styles.unreadItem]}
@@ -174,7 +296,7 @@ export default function NotificationsScreen() {
       >
         <View style={styles.iconContainer} importantForAccessibility="no-hide-descendants">
           <Surface style={styles.iconSurface} elevation={0}>
-            <Icon source={getIconForType(item.type)} size={24} color="#6366F1" />
+            <Icon source={getIconForType(item.type)} size={24} color={colors.primary} />
           </Surface>
           {!item.readAt && <Badge size={8} style={styles.unreadDot} />}
         </View>
@@ -199,7 +321,7 @@ export default function NotificationsScreen() {
           icon="check"
           size={20}
           onPress={() => markAsRead(item.id)}
-          iconColor="#6B7280"
+          iconColor={colors.textSecondary}
           accessibilityLabel="Mark notification as read"
           accessibilityRole="button"
         />
@@ -209,18 +331,39 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {loading ? (
+      {!currentAccount() || (loading && shownNotifications.length === 0 && !loadError) ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
-          data={notifications}
+          data={shownNotifications}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContent}
+          onEndReachedThreshold={0.5}
+          onEndReached={loadOlder}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={
+          ListHeaderComponent={loadError || readError ? <Surface elevation={0} style={styles.errorCard}>
+            {loadError ? <>
+              <Text accessibilityRole="alert" style={styles.errorTitle}>Could not load notifications</Text>
+              <Text style={styles.errorBody}>{loadError}</Text>
+              <Button mode="outlined" contentStyle={styles.retryTouch} onPress={() => void fetchNotifications(true, 1)}>Try again</Button>
+            </> : null}
+            {readError ? <>
+              <Text accessibilityRole="alert" style={styles.errorTitle}>Read status could not be saved</Text>
+              <Text style={styles.errorBody}>{readError}</Text>
+              <Button mode="outlined" contentStyle={styles.retryTouch} onPress={() => void fetchNotifications(true, 1)}>Retry read status</Button>
+            </> : null}
+          </Surface> : undefined}
+          ListFooterComponent={nextPage != null || olderError || loadingMore ? <View style={styles.footer}>
+            {olderError ? <Text accessibilityRole="alert" style={styles.errorBody}>{olderError}</Text> : null}
+            <Button mode="outlined" contentStyle={styles.retryTouch} loading={loadingMore}
+              disabled={loadingMore || nextPage == null} onPress={loadOlder}>
+              {olderError ? 'Retry older notifications' : 'Load older notifications'}
+            </Button>
+          </View> : undefined}
+          ListEmptyComponent={loadError ? undefined : (
             <View style={styles.emptyState}>
               <Text variant="titleMedium" style={styles.emptyTitle}>
                 No notifications
@@ -229,7 +372,7 @@ export default function NotificationsScreen() {
                 You&apos;re all caught up!
               </Text>
             </View>
-          }
+          )}
         />
       )}
     </SafeAreaView>
@@ -237,51 +380,48 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: colors.pageBg },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   listContent: {
-    padding: 16,
+    padding: space.lg,
   },
   notificationItem: {
     flexDirection: 'row',
-    marginBottom: 12,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    marginBottom: space.md,
+    borderRadius: radius.card,
+    backgroundColor: colors.surfaceBg,
     alignItems: 'center',
     overflow: 'hidden',
   },
   notificationAction: {
     flex: 1,
-    minHeight: 68,
-    padding: 12,
+    minHeight: touch.min + 20,
+    padding: space.md,
     flexDirection: 'row',
     alignItems: 'center',
   },
   unreadItem: {
-    backgroundColor: '#F5F7FF',
+    backgroundColor: colors.tone.violet.bg,
     borderLeftWidth: 4,
-    borderLeftColor: '#6366F1',
+    borderLeftColor: colors.primary,
   },
   iconContainer: {
     position: 'relative',
     marginRight: 12,
   },
   iconSurface: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 20,
+    backgroundColor: colors.tone.violet.bg,
+    borderRadius: radius.card,
   },
   unreadDot: {
     position: 'absolute',
     top: 0,
     right: 0,
-    backgroundColor: '#EF4444',
+    backgroundColor: colors.status.red.solid,
   },
   contentContainer: {
     flex: 1,
@@ -292,27 +432,26 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   title: {
-    fontWeight: '600',
-    color: '#111827',
+    fontFamily: font.inter.semiBold,
+    color: colors.textPrimary,
     flex: 1,
     marginRight: 8,
   },
-  time: {
-    color: '#9CA3AF',
-  },
-  message: {
-    color: '#6B7280',
-  },
+  time: { color: colors.textSecondary },
+  message: { color: colors.textSecondary },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
   },
   emptyTitle: {
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#111827',
+    fontFamily: font.outfit.medium,
+    marginBottom: space.sm,
+    color: colors.textPrimary,
   },
-  emptyText: {
-    color: '#6B7280',
-  },
+  emptyText: { color: colors.textSecondary },
+  footer: { paddingVertical: space.lg, alignItems: 'center', gap: space.sm },
+  errorCard: { borderRadius: radius.card, padding: space.lg, backgroundColor: colors.status.red.bg, borderColor: colors.status.red.fg, borderWidth: 1, marginBottom: space.md, gap: space.sm },
+  errorTitle: { color: colors.status.red.fg, fontFamily: font.inter.semiBold },
+  errorBody: { color: colors.textPrimary },
+  retryTouch: { minHeight: touch.min },
 });

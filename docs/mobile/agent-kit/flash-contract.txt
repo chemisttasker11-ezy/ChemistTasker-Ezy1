@@ -1,0 +1,29 @@
+
+COMPLETION CONTRACT (binding; the reviewer rejects any reply that breaks it)
+A. Do the WHOLE brief as directed. Every numbered item and every plan line in scope ends DONE with file:line. No partial
+   work, no "left for later", no stubs or TODOs. Stop early only if an item truly needs a file outside the allowed list
+   or a backend/shared-core change: then write "NOT DONE: <item> - <exact reason>" and finish everything else.
+B. Before you reply, self-review every file you changed against this checklist (these are the gaps reviewers found in
+   earlier waves; each one costs a full extra round):
+   1. Latest request wins: a generation/sequence check guards success, catch AND finally; it is bumped on scope change,
+      id change, retry and unmount; a superseded request never writes state, clears busy for others or navigates.
+   2. Failure is never "empty": a failed load shows ContentState with retry; never turn an error into [] / null / "none".
+   3. Lists are complete: paginated endpoints (DRF pages at 50) use shared-core fetchAllPages or a load-more using next.
+   4. Scope: state is keyed by surface.scopeKey (+ the item id); stale data from another pharmacy/workspace/shift is
+      cleared before the new load shows.
+   5. Persona: routes come from the capability-guarded active persona (shiftSurface / notificationNavigation), never
+      from the account role alone; delegated admins stay in /admin; allowed users keep access (check each persona).
+   6. Expo params: useLocalSearchParams returns a new object each render; key effects by the param VALUES; apply
+      prefills once; never override what the user changed.
+   7. Busy states: released on success, error and supersede; one action never blocks unrelated ones.
+   8. Honest copy: status text follows the server result (e.g. ACCEPTED_AWAITING_PAYMENT is not "confirmed").
+   9. Dialogs: close the previous dialog before opening the next; no hidden dialog keeps an action reachable.
+   10. Query params and payloads: forward existing params (e.g. referral_code/event_id/shift_id) through every hop; never
+       change service calls, payloads or guards.
+   11. Pure logic: precedence/branching rules live in pure functions with node tests AND the screen imports those same
+       functions (no test-only helpers).
+   12. Kit: tokens only, Lucide, 44pt targets, AA text, no new @react-navigation import, CRLF kept in every file.
+C. Sibling paths: for every function, hook or pattern you change, grep the allowed files for the same pattern and fix
+   every copy, not just the line named.
+D. Reply format: a checklist table "item | file:line | how verified" covering every brief item and B1-B12 (write "n/a"
+   with a reason where it does not apply), then the gate output lines, then the two closing blocks.

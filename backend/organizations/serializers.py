@@ -6,6 +6,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from drf_spectacular.utils import extend_schema_field, OpenApiTypes
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin, PharmacyClaim
+from access_control.admin_roles import validate_admin_user_for_api
 from users.serializers import UserProfileSerializer
 from django.db import transaction
 from organizations.access import org_wide_admin_organization_ids, user_can_edit_pharmacy_record, user_can_manage_pharmacy
@@ -66,6 +67,8 @@ def anonymize_pharmacy_detail(detail: dict | None) -> dict | None:
         'name': 'Anonymous Pharmacy',
         'suburb': suburb,
     }
+    if detail.get('timezone'):
+        masked['timezone'] = detail['timezone']
     if state is not None:
         masked['state'] = state
     if postcode is not None:
@@ -715,6 +718,8 @@ class PharmacyAdminSerializer(serializers.ModelSerializer):
 
         if not user or not pharmacy:
             raise serializers.ValidationError("user and pharmacy are required.")
+
+        validate_admin_user_for_api(user, assignment=self.instance, changes=attrs)
 
         existing = PharmacyAdmin.objects.filter(
             user=user,

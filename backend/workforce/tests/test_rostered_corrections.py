@@ -212,7 +212,7 @@ class WorkforceRosteredCorrectionContracts(WorkforceRosteredCorrectionFixture, T
 
         # Scoped organization manager with ROSTER_MANAGER authority
         User = get_user_model()
-        scoped_user = User.objects.create(username="wf_scoped_lead", email="scoped-lead@example.invalid", role="EXPLORER")
+        scoped_user = User.objects.create(username="wf_scoped_lead", email="scoped-lead@example.invalid", role="PHARMACIST")
         scoped = OrganizationMembership.objects.create(
             user=scoped_user,
             organization=self.org,

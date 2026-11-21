@@ -20,6 +20,7 @@ from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from worker_finance.permissions import CanAccessFinance
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from django.apps import apps
@@ -56,7 +57,7 @@ class PrivateFinanceMixin:
 
 
 class OwnedViewSet(PrivateFinanceMixin, viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanAccessFinance]
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
 
     def get_queryset(self):
@@ -150,10 +151,10 @@ def pdf_response(record, document=None):
 
 
 class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanAccessFinance]
 
     def owned(self, request, pk, lock=False):
-        qs = Invoice.objects.select_related('customer', 'user').filter(user=request.user)
+        qs = Invoice.objects.select_related('customer', 'user').filter(user=request.user, request_key__isnull=False)
         if lock:
             qs = qs.select_for_update(of=('self',))
         return get_object_or_404(qs, pk=pk)
@@ -329,7 +330,7 @@ class InvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
 class ReceivedInvoiceViewSet(PrivateFinanceMixin, viewsets.ViewSet):
     """Owner/admin view of internal invoices sent by workers."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanAccessFinance]
 
     def _managed_pharmacies(self, user):
         # Local import avoids a module import cycle while reusing the same
@@ -597,10 +598,11 @@ class ExpenseViewSet(OwnedViewSet):
 
 @never_cache
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def receipt_download(request, pk):
     receipt = get_object_or_404(Receipt, pk=pk, expense__owner=request.user)
-    response = HttpResponse(bytes(receipt.content), content_type='application/octet-stream')
+    # media_type was set from the file's sniffed signature at upload, never from the client.
+    response = HttpResponse(bytes(receipt.content), content_type=receipt.media_type)
     response['Content-Disposition'] = content_disposition_header(True, receipt.filename)
     response['Cache-Control'] = 'private, no-store'
     response['X-Content-Type-Options'] = 'nosniff'
@@ -609,7 +611,7 @@ def receipt_download(request, pk):
 
 @never_cache
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def calculate_hours(request):
     try:
         start = datetime.fromisoformat(str(request.data.get('start')))
@@ -622,7 +624,7 @@ def calculate_hours(request):
 
 @never_cache
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def bas_worksheet(request):
     try:
         start, end = (date.fromisoformat(request.query_params[key]) for key in ('start', 'end'))
@@ -655,7 +657,7 @@ def bas_worksheet(request):
         if expense.tax_code == 'GST' and expense.amount > Decimal('82.50') and not expense.evidence_confirmed:
             review.append(expense.pk)
     legacy = Invoice.objects.filter(user=request.user, request_key__isnull=True).count()
-    return Response({'start': start, 'end': end, 'basis': basis, 'G1': str(sales), '1A': str(gst), '1B': str(credit),
+    response = Response({'start': start, 'end': end, 'basis': basis, 'G1': str(sales), '1A': str(gst), '1B': str(credit),
                      'estimated_gst_net': str(gst - credit), 'expenses_needing_evidence': review,
                      'excluded_legacy_invoice_count': legacy, 'lodgement_ready': False,
                      'warnings': ['GST worksheet only, not a complete BAS or tax advice.',
@@ -663,3 +665,5 @@ def bas_worksheet(request):
                                   'Legacy invoices, bank feeds, credit notes, prepayments, PAYG, WET, LCT and adjustments are not included.',
                                   'Review GST registration dates, tax coding, evidence and business-use allocation with your adviser.',
                                   'Cash-basis expenses currently require one full-payment date; partial supplier payments need manual review.']})
+    patch_vary_headers(response, ('Authorization', 'Cookie'))
+    return response

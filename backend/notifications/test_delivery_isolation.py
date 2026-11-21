@@ -48,6 +48,25 @@ class NotificationDeliveryIsolationTests(TestCase):
         self.assertEqual(events.call_count, 4)
         self.assertEqual(Notification.objects.count(), 2)
 
+    def test_expo_http_and_ticket_failure_are_observed_without_mutating_durable_rows(self):
+        from notifications.services import _send_expo_push
+        from types import SimpleNamespace
+        tokens = ["ExponentPushToken[observability-test]"]
+        with mock.patch("notifications.services.requests.post") as post, mock.patch("notifications.services.logger") as logger:
+            post.return_value = SimpleNamespace(status_code=503)
+            _send_expo_push(tokens, "Alert", "Body")
+            logger.warning.assert_called_once()
+            self.assertNotIn(tokens[0], str(logger.warning.call_args))
+            post.assert_called_once()
+        with mock.patch("notifications.services.requests.post") as post, mock.patch("notifications.services.logger") as logger:
+            post.return_value = SimpleNamespace(status_code=200, json=lambda: {
+                "data": [{"status": "error", "details": {"error": "DeviceNotRegistered"}}]
+            })
+            _send_expo_push(tokens, "Alert", "Body")
+            logger.warning.assert_called_once()
+            self.assertNotIn(tokens[0], str(logger.warning.call_args))
+            post.assert_called_once()
+
     def test_success_retains_payload_active_tokens_and_active_recipient_filter(self):
         self.users[1].is_active = False
         self.users[1].save(update_fields=["is_active"])

@@ -108,6 +108,7 @@ function TimesheetCard({ row, onOpen }: { row: TimesheetRow; onOpen: () => void 
 export default function TimesheetsPage() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const initialPharmacy = Number(params.get('pharmacy_id') || params.get('pharmacy') || '') || null;
+  const initialTimesheet = Number(params.get('timesheet') || '') || null;
   const [pharmacies, setPharmacies] = useState<Array<{ id: number; name: string }>>([]);
   const [pharmaciesState, setPharmaciesState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [pharmacyId, setPharmacyId] = useState<number | null>(initialPharmacy);
@@ -121,7 +122,7 @@ export default function TimesheetsPage() {
   const [rowsFailed, setRowsFailed] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [selectedTimesheetId, setSelectedTimesheetId] = useState<number | null>(null);
+  const [selectedTimesheetId, setSelectedTimesheetId] = useState<number | null>(initialTimesheet);
   const [busy, setBusy] = useState<Busy>('');
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');

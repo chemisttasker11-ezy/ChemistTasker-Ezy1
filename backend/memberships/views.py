@@ -1,5 +1,6 @@
 """Membership API: memberships, invite links, magic-link information, applications and a user's own memberships."""
 from memberships.employment_port import employment_services
+from access_control.admin_roles import validate_admin_user_for_api
 from rest_framework import mixins, permissions, status, viewsets
 from memberships.models import Membership, MembershipApplication, MembershipInviteLink  # noqa: F401  (MembershipApplication: ownership contract)
 from organizations.models import (
@@ -427,6 +428,8 @@ class MyMembershipsViewSet(viewsets.ReadOnlyModelViewSet):
             # the same user -> membership lock order.
             User.objects.select_for_update().only("pk").get(pk=request.user.pk)
             membership = self._get_owned_membership(pk, for_update=True)
+            if PharmacyAdmin.objects.filter(membership=membership).exists():
+                validate_admin_user_for_api(membership.user)
             if membership.status != Membership.Status.PENDING:
                 return Response({'detail': 'Only pending invitations can be accepted.'}, status=status.HTTP_400_BAD_REQUEST)
             active_count = _count_active_memberships(request.user, exclude_membership_id=membership.pk)

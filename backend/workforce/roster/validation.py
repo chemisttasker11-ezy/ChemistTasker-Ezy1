@@ -8,6 +8,7 @@ from memberships.models import Membership
 from shifts.models import ShiftSlotAssignment
 from talent.models import UserAvailability
 from organizations.timezone import get_pharmacy_timezone
+from users.presentation import user_display_name
 
 
 def work_interval(pharmacy, work_date, start_time, end_time):
@@ -22,7 +23,7 @@ def work_interval(pharmacy, work_date, start_time, end_time):
 def worker_issues(pharmacy, worker, work_date, start_time, end_time, role, exclude_assignment_id=None):
     """Validate planning/replacement eligibility; attendance has its own locum exception."""
     errors, warnings = [], []
-    name = worker.get_full_name() or worker.username
+    name = user_display_name(worker)
 
     def error(kind, message, **details):
         errors.append({"type": kind, "message": message, "user_id": worker.pk,

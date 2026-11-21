@@ -8,6 +8,7 @@ from notifications.models import Notification
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from worker_finance.permissions import CanAccessFinance
 from rest_framework.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import api_view, permission_classes
@@ -66,7 +67,7 @@ def _invoice_queryset_for_user(user):
 
 
 class InvoiceListView(generics.ListCreateAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanAccessFinance]
     serializer_class = InvoiceSerializer
 
     def get_queryset(self):
@@ -80,7 +81,7 @@ class InvoiceListView(generics.ListCreateAPIView):
 
 
 class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanAccessFinance]
     serializer_class = InvoiceSerializer
     lookup_field = 'pk'
 
@@ -141,7 +142,7 @@ class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class GenerateInvoiceView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanAccessFinance]
 
     def post(self, request):
         data = request.data
@@ -203,7 +204,7 @@ class GenerateInvoiceView(APIView):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def preview_generated_invoice(request):
     try:
         return Response(preview_invoice_generation(request.user, request.data))
@@ -213,7 +214,7 @@ def preview_generated_invoice(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def preview_invoice_lines(request, shift_id):
     try:
         shift = Shift.objects.get(id=shift_id)
@@ -231,7 +232,7 @@ def preview_invoice_lines(request, shift_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def invoice_pdf_view(request, invoice_id):
     invoice = get_object_or_404(_invoice_queryset_for_user(request.user), pk=invoice_id)
 
@@ -242,7 +243,7 @@ def invoice_pdf_view(request, invoice_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def send_invoice_email(request, invoice_id):
     from invoicing.tasks import queue_invoice_email, validate_email_payload
     from worker_finance.invoice_bridge import preparation_failed, reserve_delivery
@@ -329,7 +330,7 @@ def send_invoice_email(request, invoice_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def report_invoice_issue(request, invoice_id):
     invoice = get_object_or_404(_invoice_queryset_for_user(request.user), pk=invoice_id)
     if invoice.user_id == request.user.id:

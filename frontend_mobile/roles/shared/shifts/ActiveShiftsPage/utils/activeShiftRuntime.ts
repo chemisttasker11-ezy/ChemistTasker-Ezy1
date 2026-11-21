@@ -20,6 +20,29 @@ export const getSlotIds = (shift: Shift): number[] => {
         .filter((id: number | null): id is number => id != null);
 };
 
+/** Parse notification ids as positive integers, never as untrusted slot indexes. */
+export const positiveShiftLinkId = (raw: unknown): number | null => {
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if ((typeof value !== 'string' && typeof value !== 'number') || !/^[1-9]\d*$/.test(String(value))) return null;
+    const id = Number(value);
+    return Number.isSafeInteger(id) ? id : null;
+};
+
+/** Only select a slot confirmed to belong to the retrieved authorized shift. */
+export const getDeepLinkedShiftSlotId = (shift: Shift, requestedSlotId: number | null): number | null => {
+    const slotIds = getSlotIds(shift);
+    return requestedSlotId != null && slotIds.includes(requestedSlotId)
+        ? requestedSlotId : slotIds[0] ?? null;
+};
+
+/** Keep Post Shift inside the worker's authorized owner/organization/admin shell. */
+export const getPosterPostShiftPath = (persona: string | null, pharmacyId: number | null): string | null => {
+    if (persona === 'owner') return '/owner/post-shift';
+    if (persona === 'organization') return '/organization/post-shift';
+    if (persona === 'admin' && pharmacyId != null) return `/admin/${pharmacyId}/post-shift`;
+    return null;
+};
+
 export const slotHasAwaitingPayment = (slot: any): boolean => {
     return Boolean(slot?.awaitingPayment ?? slot?.awaiting_payment);
 };
@@ -245,3 +268,124 @@ export const getCandidateUserId = (record: any): number | null => {
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
 };
+
+export const getShiftPharmacyId = (shift: Shift | null | undefined): number | null => {
+    if (!shift) return null;
+    const shiftAny = shift as any;
+    const raw =
+        shiftAny?.pharmacyDetail?.id ??
+        shiftAny?.pharmacy_detail?.id ??
+        shiftAny?.pharmacyId ??
+        shiftAny?.pharmacy_id ??
+        shiftAny?.pharmacy ??
+        null;
+    return toFiniteNumber(raw);
+};
+
+/** A linked shift's poster detail; a fully booked shift leaves the active list (404), so its confirmed detail. */
+export async function loadLinkedPosterShift(
+    shiftId: number,
+    active: (id: number) => Promise<Shift>,
+    confirmed: (id: number) => Promise<Shift>,
+): Promise<{ shift: Shift; booked: boolean }> {
+    try {
+        return { shift: await active(shiftId), booked: false };
+    } catch (error: any) {
+        if ((error?.status ?? error?.response?.status) !== 404) throw error;
+        return { shift: await confirmed(shiftId), booked: true };
+    }
+}
+
+/** The pharmacy to select for a linked shift, or null. The manager-scoped detail returned it, so the user manages it. */
+export const linkedShiftPharmacyToSelect = (shift: Shift, selectedPharmacyId: number | null, persona: string | null): number | null => {
+    // The admin scope is the admin assignment, not WorkspaceContext.
+    if (persona !== 'owner' && persona !== 'organization') return null;
+    const pharmacyId = getShiftPharmacyId(shift);
+    return pharmacyId != null && selectedPharmacyId != null && pharmacyId !== selectedPharmacyId ? pharmacyId : null;
+};
+
+export const filterShiftsByPharmacy = (shifts: Shift[], pharmacyId: number | null): Shift[] => {
+    if (pharmacyId == null) return shifts;
+    return shifts.filter((shift) => getShiftPharmacyId(shift) === pharmacyId);
+};
+
+export const isCandidateLevelVisible = (
+    targetLevel: string,
+    currentLevel: string,
+    allowedLevels?: string[] | null
+): boolean => {
+    const ALL_LEVELS = ['FULL_PART_TIME', 'LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN', 'PLATFORM'];
+    const allowedSet = new Set((allowedLevels || []).filter((l) => ALL_LEVELS.includes(l)));
+    const levels = allowedSet.size ? ALL_LEVELS.filter((l) => allowedSet.has(l)) : ALL_LEVELS;
+    const currentIdx = levels.indexOf(currentLevel);
+    const visibleLevels = currentIdx === -1 ? levels : levels.slice(0, currentIdx + 1);
+    return visibleLevels.includes(targetLevel);
+};
+
+export type SignatureMergeResult = {
+    mergedSeen: Record<string, string>;
+    updatesByShift: Record<number, Record<number, boolean>>;
+};
+
+export const mergeSlotSignatures = (
+    seen: Record<string, string>,
+    signatures: Record<string, { shiftId: number; slotId: number; signature: string }>
+): SignatureMergeResult => {
+    const mergedSeen = { ...seen };
+    const updatesByShift: Record<number, Record<number, boolean>> = {};
+
+    Object.entries(signatures).forEach(([key, { shiftId, slotId, signature }]) => {
+        const previous = seen[key];
+        if (previous == null) {
+            mergedSeen[key] = signature;
+            return;
+        }
+        if (previous !== signature) {
+            if (!updatesByShift[shiftId]) updatesByShift[shiftId] = {};
+            updatesByShift[shiftId][slotId] = true;
+        }
+    });
+
+    return { mergedSeen, updatesByShift };
+};
+
+export const getNextGeneration = (
+    generations: Record<string | number, number>,
+    key: string | number
+): number => {
+    const k = String(key);
+    const next = (generations[k] ?? 0) + 1;
+    generations[k] = next;
+    return next;
+};
+
+export const isLatestGeneration = (
+    generations: Record<string | number, number>,
+    key: string | number,
+    generation: number
+): boolean => {
+    return generations[String(key)] === generation;
+};
+
+export const buildActiveShiftsScopeKey = (
+    scopeKey: string,
+    shiftId?: number | null
+): string => {
+        return shiftId != null ? `${scopeKey}:shift:${shiftId}` : `${scopeKey}:all`;
+};
+
+
+/** Only a measured row from the currently authorized workspace can be scrolled into view. */
+export const getLinkedShiftScrollY = (
+    measurement: { shiftId: number; scopeKey: string; y: number } | null,
+    shiftId: number | null,
+    scopeKey: string,
+): number | null => {
+    if (shiftId == null || !measurement || measurement.shiftId !== shiftId || measurement.scopeKey !== scopeKey) return null;
+    return Number.isFinite(measurement.y) ? Math.max(0, measurement.y - 16) : null;
+};
+
+/** Preserve state identity when a recomputation produces the same values. */
+export function unchangedSlotState<T>(previous: T, next: T): T {
+    return JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
+}

@@ -37,6 +37,12 @@ export default function Login() {
     const target = returnDestination();
     if (target) rememberDestination(target);
     if (session.status === 'authenticated') {
+      // A browser-session handoff must not bypass a pending mobile check.
+      const verifiedUser = session.user as {is_mobile_verified?: boolean; mobile_check_skipped?: boolean} | null;
+      if (verifiedUser?.is_mobile_verified === false && !verifiedUser.mobile_check_skipped) {
+        navigate('/mobile-verify');
+        return;
+      }
       const lastBounce = sessionStorage.getItem('ct:last-login-redirect');
       const now = Date.now();
       if (lastBounce && now - Number(lastBounce) < 3000) {
@@ -85,11 +91,19 @@ export default function Login() {
       // Only the short-lived access token is intentionally exposed to JS memory.
       login(access, refresh || '', userInfo, rememberMe);
       announceSession('login');
-      const destination=returnDestination();
-      if(destination){rememberDestination(destination);finishDestination(destination);return;}
 
+      // Verify identity before resuming an externally supplied return path.
+      // returnDestination invokes browser-session.safeNext (same-origin paths only).
+      const destination = returnDestination();
       if (!userInfo?.is_mobile_verified && !userInfo?.mobile_check_skipped) {
+        if (destination) rememberDestination(destination);
         navigate('/mobile-verify');
+        return;
+      }
+      // Preserve the existing owner setup gate before following its public QR.
+      if (destination && userInfo.role !== 'OWNER') {
+        rememberDestination(destination);
+        finishDestination(destination);
         return;
       }
 
@@ -111,6 +125,11 @@ export default function Login() {
           navigate(ownerSetup.nextPath);
           return;
         }
+      }
+      if (destination) {
+        rememberDestination(destination);
+        finishDestination(destination);
+        return;
       }
 
       const personaKey =

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import {
-  ActivityIndicator,
   Button,
   Card,
   Chip,
@@ -12,15 +11,18 @@ import {
   Text,
   TextInput,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import {
+  finance,
   getInvoiceDetail,
-  getInvoicePdfUrl,
   reportInvoiceIssue,
   sendInvoiceEmail,
   updateInvoice,
 } from '@chemisttasker/shared-core';
+import { shareLegacyInvoicePdf } from './shareLegacyInvoicePdf';
+import { useAuth } from '@/context/AuthContext';
 
 type LineItem = {
   id?: number | string;
@@ -89,10 +91,15 @@ type Props = { basePath?: string };
 export default function InvoiceDetail({ basePath }: Props) {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
+  const { user } = useAuth();
+  const shareAccount = React.useRef(user?.id);
+  shareAccount.current = user?.id;
+  const shareScope = React.useRef(0);
+  useEffect(() => () => { shareScope.current += 1; }, [user?.id]);
   const segments = useSegments();
   const role = (segments[0] as string) || 'pharmacist';
   const resolvedBase = basePath || `/${role}/invoice`;
-  const isReceivedMode = role === 'owner';
+  const isReceivedMode = ['owner', 'organization', 'admin'].includes(String(role).toLowerCase());
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -101,33 +108,59 @@ export default function InvoiceDetail({ basePath }: Props) {
   const [sending, setSending] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [snackbar, setSnackbar] = useState('');
-
-  const load = useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
-    try {
-      const data = (await getInvoiceDetail(Number(id))) as Invoice;
-      setInvoice(data);
-      const items = Array.isArray(data.line_items) ? data.line_items : [];
-      setLineItems(
-        items.map(li => ({
-          ...li,
-          quantity: Number(li.quantity ?? 0),
-          unit_price: Number(li.unit_price ?? 0),
-          discount: Number(li.discount ?? 0),
-          total: Number(li.total ?? 0),
-        })),
-      );
-    } catch (err: any) {
-      setSnackbar(err?.message || 'Failed to load invoice');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let live = true;
+    setInvoice(null);
+    setLineItems([]);
+    setSnackbar('');
+    setLoading(true);
+    // A managed finance invoice must open the same revision-aware workspace as web.
+    // The legacy detail editor remains for genuinely legacy invoices only.
+    const numericId = typeof id === 'string' && /^[1-9]\d*$/.test(id) ? Number(id) : NaN;
+    if (!Number.isSafeInteger(numericId)) {
+      setSnackbar('Invalid invoice link.');
+      setLoading(false);
+      return;
+    }
+    const openInvoice = async () => {
+      try {
+        if (isReceivedMode) await finance.receivedInvoice(numericId);
+        else await finance.invoice(numericId);
+        if (live) router.replace(`${resolvedBase}?invoice=${numericId}` as any);
+      } catch (managedError: any) {
+        if (!live) return;
+        // Only an explicit 404 permits the historical legacy route.
+        const status = managedError?.response?.status ?? managedError?.status;
+        if (status !== 404) {
+          const detail = managedError?.response?.data?.detail;
+          setSnackbar(typeof detail === 'string' && detail.trim() ? detail :
+            managedError?.message || 'The managed finance lookup failed. Try again.');
+          return;
+        }
+        try {
+          const data = (await getInvoiceDetail(numericId)) as Invoice;
+          if (!live) return;
+          setInvoice(data);
+          const items = Array.isArray(data.line_items) ? data.line_items : [];
+          setLineItems(items.map(li => ({
+            ...li,
+            quantity: Number(li.quantity ?? 0),
+            unit_price: Number(li.unit_price ?? 0),
+            discount: Number(li.discount ?? 0),
+            total: Number(li.total ?? 0),
+          })));
+        } catch (err: any) {
+          if (live) setSnackbar(err?.message || 'Failed to load invoice');
+        }
+      } finally {
+        if (live) setLoading(false);
+      }
+    };
+    void openInvoice();
+    return () => { live = false; };
+  }, [id, isReceivedMode, resolvedBase, router, user?.id, loadAttempt]);
 
   const recalc = useCallback((li: LineItem) => {
     const total =
@@ -257,10 +290,19 @@ export default function InvoiceDetail({ basePath }: Props) {
     }
   };
 
-  const handleOpenPdf = () => {
-    if (!invoice?.id) return;
-    const url = getInvoicePdfUrl(invoice.id);
-    Linking.openURL(url).catch(() => setSnackbar('Unable to open PDF'));
+  const [sharingPdf, setSharingPdf] = useState(false);
+  const handleOpenPdf = async () => {
+    if (!invoice?.id || sharingPdf) return;
+    setSharingPdf(true);
+    try {
+      const generation = shareScope.current;
+      const account = user?.id;
+      await shareLegacyInvoicePdf(invoice.id, () => account != null && shareAccount.current === account && shareScope.current === generation);
+    } catch (err: any) {
+      setSnackbar(err?.message || 'Unable to open invoice PDF');
+    } finally {
+      setSharingPdf(false);
+    }
   };
 
   const handleReportIssue = async () => {
@@ -293,6 +335,8 @@ export default function InvoiceDetail({ basePath }: Props) {
         </View>
         <View style={styles.errorBox}>
           <Text variant="titleMedium">Unable to load invoice</Text>
+          <Text accessibilityRole="alert">{snackbar || 'The invoice may no longer be available to this account.'}</Text>
+          <Button mode="outlined" onPress={() => setLoadAttempt(previous => previous + 1)}>Try again</Button>
         </View>
       </SafeAreaView>
     );
@@ -663,7 +707,7 @@ export default function InvoiceDetail({ basePath }: Props) {
               Mark as unpaid
             </Button>
           ) : null}
-          <Button mode="outlined" icon="file-pdf-box" onPress={handleOpenPdf} style={styles.actionBtn}>
+          <Button mode="outlined" icon="file-pdf-box" onPress={() => void handleOpenPdf()} loading={sharingPdf} disabled={sharingPdf} style={styles.actionBtn}>
             Open PDF
           </Button>
           {isReceivedMode ? (

@@ -1,0 +1,343 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+
+function loadTs(path, imports = {}) {
+  const { outputText } = ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
+  });
+  const result = {};
+  vm.runInNewContext(outputText, {
+    exports: result,
+    URL,
+    URLSearchParams,
+    require: (name) => {
+      assert.ok(name in imports, `Unexpected import: ${name}`);
+      return imports[name];
+    },
+  });
+  return result;
+}
+
+const plain = (val) => JSON.parse(JSON.stringify(val));
+
+const runtime = loadTs('./ActiveShiftsPage/utils/activeShiftRuntime.ts', {
+  '@chemisttasker/shared-core': {},
+});
+const surface = loadTs('./shiftSurface.ts');
+
+const {
+  getShiftPharmacyId,
+  filterShiftsByPharmacy,
+  positiveShiftLinkId,
+  getDeepLinkedShiftSlotId,
+  isCandidateLevelVisible,
+  mergeSlotSignatures,
+  getNextGeneration,
+  isLatestGeneration,
+  buildActiveShiftsScopeKey,
+  getLinkedShiftScrollY,
+} = runtime;
+
+const { resolveShiftSurface } = surface;
+
+// ==========================================
+// 1. Candidate Level Visibility
+// ==========================================
+test('candidate level visibility: earlier levels are visible, future levels are hidden', () => {
+  // When shift is at LOCUM_CASUAL, FULL_PART_TIME and LOCUM_CASUAL are viewable; PLATFORM is not
+  assert.equal(isCandidateLevelVisible('FULL_PART_TIME', 'LOCUM_CASUAL'), true);
+  assert.equal(isCandidateLevelVisible('LOCUM_CASUAL', 'LOCUM_CASUAL'), true);
+  assert.equal(isCandidateLevelVisible('OWNER_CHAIN', 'LOCUM_CASUAL'), false);
+  assert.equal(isCandidateLevelVisible('ORG_CHAIN', 'LOCUM_CASUAL'), false);
+  assert.equal(isCandidateLevelVisible('PLATFORM', 'LOCUM_CASUAL'), false);
+
+  // When shift reaches PLATFORM, all levels in the sequence are viewable
+  assert.equal(isCandidateLevelVisible('FULL_PART_TIME', 'PLATFORM'), true);
+  assert.equal(isCandidateLevelVisible('LOCUM_CASUAL', 'PLATFORM'), true);
+  assert.equal(isCandidateLevelVisible('OWNER_CHAIN', 'PLATFORM'), true);
+  assert.equal(isCandidateLevelVisible('ORG_CHAIN', 'PLATFORM'), true);
+  assert.equal(isCandidateLevelVisible('PLATFORM', 'PLATFORM'), true);
+
+  // At FULL_PART_TIME, only FULL_PART_TIME is viewable
+  assert.equal(isCandidateLevelVisible('FULL_PART_TIME', 'FULL_PART_TIME'), true);
+  assert.equal(isCandidateLevelVisible('LOCUM_CASUAL', 'FULL_PART_TIME'), false);
+});
+
+test('candidate level visibility: precedence swap test fails', () => {
+  // Swapping target level and current level changes visibility result
+  const current = 'LOCUM_CASUAL';
+  const target = 'PLATFORM';
+  assert.equal(isCandidateLevelVisible(target, current), false, 'target PLATFORM is not visible when shift is at LOCUM_CASUAL');
+  assert.equal(isCandidateLevelVisible(current, target), true, 'target LOCUM_CASUAL is visible when shift is at PLATFORM');
+});
+
+test('candidate level visibility: respects allowedLevels restriction', () => {
+  const allowed = ['LOCUM_CASUAL', 'PLATFORM'];
+  // FULL_PART_TIME is excluded by allowedLevels
+  assert.equal(isCandidateLevelVisible('FULL_PART_TIME', 'PLATFORM', allowed), false);
+  assert.equal(isCandidateLevelVisible('LOCUM_CASUAL', 'PLATFORM', allowed), true);
+  assert.equal(isCandidateLevelVisible('PLATFORM', 'PLATFORM', allowed), true);
+});
+
+// ==========================================
+// 2. Slot Signature Merge & Update Tracking
+// ==========================================
+test('slot signature merge: baseline initialization creates signatures with no update flags', () => {
+  const seen = {};
+  const currentSignatures = {
+    '10:PLATFORM:1': { shiftId: 10, slotId: 1, signature: 'i:100:1#o:200:PENDING' },
+    '10:PLATFORM:2': { shiftId: 10, slotId: 2, signature: 'i:101:1#o:none' },
+  };
+
+  const { mergedSeen, updatesByShift } = mergeSlotSignatures(seen, currentSignatures);
+
+  assert.deepEqual(plain(mergedSeen), {
+    '10:PLATFORM:1': 'i:100:1#o:200:PENDING',
+    '10:PLATFORM:2': 'i:101:1#o:none',
+  });
+  // Baseline initialization must never show a false update dot
+  assert.deepEqual(plain(updatesByShift), {});
+});
+
+test('slot signature merge: detects changed signature and marks the exact slot updated', () => {
+  const seen = {
+    '10:PLATFORM:1': 'i:100:1#o:200:PENDING',
+    '10:PLATFORM:2': 'i:101:1#o:none',
+  };
+
+  // Slot 2 gets a new candidate interest, altering its signature
+  const nextSignatures = {
+    '10:PLATFORM:1': { shiftId: 10, slotId: 1, signature: 'i:100:1#o:200:PENDING' },
+    '10:PLATFORM:2': { shiftId: 10, slotId: 2, signature: 'i:101:1|102:0#o:none' },
+  };
+
+  const { mergedSeen, updatesByShift } = mergeSlotSignatures(seen, nextSignatures);
+
+  // Slot 1 has no changes
+  assert.equal(updatesByShift[10]?.[1], undefined);
+  // Slot 2 has an update
+  assert.equal(updatesByShift[10]?.[2], true);
+  // Seen remains intact until marked seen
+  assert.equal(mergedSeen['10:PLATFORM:2'], 'i:101:1#o:none');
+});
+
+test('slot signature merge: multi-shift isolation', () => {
+  const seen = {
+    '10:PLATFORM:1': 'sig10_1',
+    '20:PLATFORM:5': 'sig20_5',
+  };
+
+  const nextSignatures = {
+    '10:PLATFORM:1': { shiftId: 10, slotId: 1, signature: 'sig10_1' },
+    '20:PLATFORM:5': { shiftId: 20, slotId: 5, signature: 'sig20_5_changed' },
+  };
+
+  const { updatesByShift } = mergeSlotSignatures(seen, nextSignatures);
+
+  assert.equal(updatesByShift[10], undefined, 'shift 10 had no updates');
+  assert.equal(updatesByShift[20]?.[5], true, 'shift 20 slot 5 marked updated');
+});
+
+// ==========================================
+// 3. Scope Keying & Pharmacy Filtering
+// ==========================================
+test('pharmacy filtering: extracts pharmacy ID from diverse backend representations', () => {
+  assert.equal(getShiftPharmacyId({ pharmacyDetail: { id: 42 } }), 42);
+  assert.equal(getShiftPharmacyId({ pharmacy_detail: { id: 55 } }), 55);
+  assert.equal(getShiftPharmacyId({ pharmacyId: 17 }), 17);
+  assert.equal(getShiftPharmacyId({ pharmacy_id: 23 }), 23);
+  assert.equal(getShiftPharmacyId({ pharmacy: 8 }), 8);
+  assert.equal(getShiftPharmacyId(null), null);
+  assert.equal(getShiftPharmacyId({}), null);
+});
+
+test('pharmacy filtering: scopes shift lists by pharmacy ID', () => {
+  const shifts = [
+    { id: 1, pharmacyDetail: { id: 4 } },
+    { id: 2, pharmacyDetail: { id: 9 } },
+    { id: 3, pharmacy_detail: { id: 4 } },
+    { id: 4, pharmacy: 7 },
+  ];
+
+  // When pharmacyId is null (all pharmacies)
+  assert.equal(filterShiftsByPharmacy(shifts, null).length, 4);
+
+  // When scoped to pharmacy 4
+  const scoped4 = filterShiftsByPharmacy(shifts, 4);
+  assert.equal(scoped4.length, 2);
+  assert.deepEqual(scoped4.map(s => s.id), [1, 3]);
+
+  // When scoped to pharmacy 9
+  const scoped9 = filterShiftsByPharmacy(shifts, 9);
+  assert.equal(scoped9.length, 1);
+  assert.equal(scoped9[0].id, 2);
+
+  // When scoped to a pharmacy with no shifts
+  const scoped99 = filterShiftsByPharmacy(shifts, 99);
+  assert.equal(scoped99.length, 0);
+
+  // Empty list returns empty list
+  assert.equal(filterShiftsByPharmacy([], 4).length, 0);
+});
+
+test('scope keying: surface keys differ per scope and persona for isolated caching', () => {
+  const ownerPharm4 = resolveShiftSurface({ pathname: '/owner/shifts', role: 'OWNER', userId: 1, selectedPharmacyId: 4 });
+  const ownerPharm9 = resolveShiftSurface({ pathname: '/owner/shifts', role: 'OWNER', userId: 1, selectedPharmacyId: 9 });
+  const adminPharm7 = resolveShiftSurface({
+    pathname: '/admin/shifts', role: 'PHARMACY_ADMIN', userId: 3, adminPharmacyId: 7,
+  });
+
+  assert.equal(ownerPharm4.scopeKey, 'owner:all:4:1');
+  assert.equal(ownerPharm9.scopeKey, 'owner:all:9:1');
+  assert.equal(adminPharm7.scopeKey, 'admin:all:7:3');
+
+  // Changing pharmacy scope produces distinct keys, preventing stale response leakage
+  assert.notEqual(ownerPharm4.scopeKey, ownerPharm9.scopeKey);
+  assert.notEqual(ownerPharm4.scopeKey, adminPharm7.scopeKey);
+});
+// ==========================================
+// 4. Request Generations & Scope Key Isolation
+// ==========================================
+test('request generations: tracks generation per key independently and increments sequentially', () => {
+  const generations = {};
+  const genA1 = getNextGeneration(generations, 'shift_1');
+  const genB1 = getNextGeneration(generations, 'shift_2');
+  const genA2 = getNextGeneration(generations, 'shift_1');
+
+  assert.equal(genA1, 1);
+  assert.equal(genB1, 1);
+  assert.equal(genA2, 2);
+
+  // shift_1 at genA1 is stale
+  assert.equal(isLatestGeneration(generations, 'shift_1', genA1), false);
+  // shift_1 at genA2 is current
+  assert.equal(isLatestGeneration(generations, 'shift_1', genA2), true);
+  // shift_2 at genB1 is current
+  assert.equal(isLatestGeneration(generations, 'shift_2', genB1), true);
+  // unrecorded generation or key is never latest
+  assert.equal(isLatestGeneration(generations, 'shift_3', 1), false);
+});
+
+test('request generations: race condition resolution lets latest generation win', () => {
+  const generations = {};
+  // Call 1 initiates
+  const call1Gen = getNextGeneration(generations, 'candidates_42_PLATFORM');
+  // Call 2 initiates before Call 1 finishes
+  const call2Gen = getNextGeneration(generations, 'candidates_42_PLATFORM');
+
+  // When Call 1 arrives late, it must be rejected
+  assert.equal(isLatestGeneration(generations, 'candidates_42_PLATFORM', call1Gen), false);
+  // When Call 2 arrives, it must be accepted
+  assert.equal(isLatestGeneration(generations, 'candidates_42_PLATFORM', call2Gen), true);
+});
+
+test('scope keying: buildActiveShiftsScopeKey binds surface scope with shiftId', () => {
+  const allShiftsKey = buildActiveShiftsScopeKey('owner:all:4:1', null);
+  const shift42Key = buildActiveShiftsScopeKey('owner:all:4:1', 42);
+  const shift99Key = buildActiveShiftsScopeKey('owner:all:4:1', 99);
+  const otherScopeKey = buildActiveShiftsScopeKey('owner:all:9:1', 42);
+
+  assert.equal(allShiftsKey, 'owner:all:4:1:all');
+  assert.equal(shift42Key, 'owner:all:4:1:shift:42');
+  assert.equal(shift99Key, 'owner:all:4:1:shift:99');
+
+  // Key differs when shiftId changes (preventing shift-detail card/dialog bleed)
+  assert.notEqual(shift42Key, shift99Key);
+  assert.notEqual(shift42Key, allShiftsKey);
+
+  // Key differs when scopeKey changes (preventing pharmacy/workspace switch bleed)
+  assert.notEqual(shift42Key, otherScopeKey);
+});
+
+test('W3 Shift Centre notification links select only valid shift-owned slots', () => {
+  assert.equal(positiveShiftLinkId('52'), 52);
+  assert.equal(positiveShiftLinkId(['52']), 52);
+  for (const invalid of [undefined, '', '0', '-4', '3.2', 'abc', '1e3', '9007199254740993']) {
+    assert.equal(positiveShiftLinkId(invalid), null);
+  }
+  const shift = { id: 52, slots: [{ id: 101 }, { id: 102 }] };
+  assert.equal(getDeepLinkedShiftSlotId(shift, 102), 102);
+  assert.equal(getDeepLinkedShiftSlotId(shift, 999), 101);
+  assert.equal(getDeepLinkedShiftSlotId(shift, null), 101);
+  assert.equal(getDeepLinkedShiftSlotId({ id: 9, slots: [] }, 102), null);
+});
+
+test('W3d poster Post Shift action stays in the correct persona shell', () => {
+  const { getPosterPostShiftPath } = runtime;
+  assert.equal(getPosterPostShiftPath('owner', null), '/owner/post-shift');
+  assert.equal(getPosterPostShiftPath('organization', 9), '/organization/post-shift');
+  assert.equal(getPosterPostShiftPath('admin', 9), '/admin/9/post-shift');
+  assert.equal(getPosterPostShiftPath('admin', null), null);
+  assert.equal(getPosterPostShiftPath('pharmacist', 9), null);
+  assert.equal(getPosterPostShiftPath('explorer', null), null);
+});
+
+// A deep-link must never reuse another shift/workspace's measured scroll position.
+test('linked shift scroll offset is isolated by shift and workspace', () => {
+  const offset = { shiftId: 41, scopeKey: 'pharmacy:7', y: 186 };
+  assert.equal(getLinkedShiftScrollY(offset, 41, 'pharmacy:7'), 170);
+  assert.equal(getLinkedShiftScrollY({ ...offset, y: 8 }, 41, 'pharmacy:7'), 0);
+  assert.equal(getLinkedShiftScrollY(offset, 42, 'pharmacy:7'), null);
+  assert.equal(getLinkedShiftScrollY(offset, 41, 'pharmacy:8'), null);
+  assert.equal(getLinkedShiftScrollY(null, 41, 'pharmacy:7'), null);
+  assert.equal(getLinkedShiftScrollY({ ...offset, y: NaN }, 41, 'pharmacy:7'), null);
+});
+
+test('a linked shift loads the confirmed detail when the active one 404s, and names the pharmacy to select (O4 N1)', async () => {
+  const { loadLinkedPosterShift, linkedShiftPharmacyToSelect } = runtime;
+  const notFound = Object.assign(new Error('gone'), { status: 404 });
+  const calls = [];
+  const active = async (id) => { calls.push(`active:${id}`); throw notFound; };
+  const confirmed = async (id) => { calls.push(`confirmed:${id}`); return { id, pharmacyDetail: { id: 9 } }; };
+  assert.deepEqual(plain(await loadLinkedPosterShift(78, active, confirmed)), { shift: { id: 78, pharmacyDetail: { id: 9 } }, booked: true });
+  assert.deepEqual(calls, ['active:78', 'confirmed:78']);
+  assert.deepEqual(plain(await loadLinkedPosterShift(78, async (id) => ({ id }), confirmed)), { shift: { id: 78 }, booked: false });
+  // Other failures are not a booked shift.
+  await assert.rejects(loadLinkedPosterShift(78, async () => { throw Object.assign(new Error('down'), { status: 500 }); }, confirmed), /down/);
+
+  const brisbane = { id: 78, pharmacyDetail: { id: 9 } };
+  assert.equal(linkedShiftPharmacyToSelect(brisbane, 4, 'owner'), 9);
+  assert.equal(linkedShiftPharmacyToSelect(brisbane, 4, 'organization'), 9);
+  assert.equal(linkedShiftPharmacyToSelect(brisbane, 9, 'owner'), null);
+  assert.equal(linkedShiftPharmacyToSelect(brisbane, null, 'owner'), null);
+  // The admin scope is the admin assignment, never switched from a link.
+  assert.equal(linkedShiftPharmacyToSelect(brisbane, 4, 'admin'), null);
+  assert.equal(linkedShiftPharmacyToSelect({ id: 78 }, 4, 'owner'), null);
+});
+
+test('the Shift Centre detail switches to the linked pharmacy and sends booked shifts to Confirmed', () => {
+  const src = readFileSync(new URL('./ActiveShiftsPage/index.tsx', import.meta.url), 'utf8');
+  const hook = readFileSync(new URL('./ActiveShiftsPage/hooks/useShiftsData.ts', import.meta.url), 'utf8');
+  assert.match(hook, /loadLinkedPosterShift\(shiftId, fetchPosterShiftDetailService, fetchConfirmedShiftDetailService\)/);
+  assert.match(src, /linkedShiftPharmacyToSelect\(linked\.shift, selectedPharmacyId, surface\.persona\)/);
+  assert.match(src, /router\.replace\(shiftRoute\(surface\.persona, \{ section: 'confirmed' \}\) as any\)/);
+});
+
+
+test('slot signature recomputation preserves state identity until values change', () => {
+  const previous = { 1: { 2: true } };
+  assert.equal(runtime.unchangedSlotState(previous, { 1: { 2: true } }), previous);
+  const changed = { 1: { 2: false } };
+  assert.equal(runtime.unchangedSlotState(previous, changed), changed);
+  const seen = { '1:PUBLIC:2': 'baseline' };
+  const result = mergeSlotSignatures(seen, {});
+  assert.equal(runtime.unchangedSlotState(seen, result.mergedSeen), seen);
+});
+
+// Exercise mounted Shift Centre and real ActiveShiftCards in standard mobile CI.
+import '../../../scripts/m5-active-shifts.test.cjs';
+
+// M5-02 mounted network/platform workspace parity tests.
+import '../../../scripts/m5-shift-centre.test.cjs';
+
+// Combine M5-04 native Post Shift mounted regression acceptance.
+import '../../../scripts/m5-post-shift-components.test.cjs';
+
+// Run M5-05 mounted native Post Shift visual assertions in the standard mobile gate.
+import '../../../scripts/m5-post-shift-look.test.cjs';
+
+// Mounted same-render business-action regressions for M5-02 candidate workspace.
+import '../../../scripts/m5-shift-actions.test.cjs';

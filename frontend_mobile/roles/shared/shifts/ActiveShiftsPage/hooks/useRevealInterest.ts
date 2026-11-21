@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Shift, ShiftInterest, revealShiftInterestService, EscalationLevelKey } from '@chemisttasker/shared-core';
 import { TabDataState } from '../types';
 
@@ -8,8 +8,10 @@ export function useRevealInterest(
     showSnackbar: (msg: string) => void
 ) {
     const [revealingInterestId, setRevealingInterestId] = useState<number | null>(null);
+    // Same-render taps share the in-flight reveal: one tap = one request, and the latest tap still gets the result.
+    const pendingReveals = useRef<Map<string, Promise<any>>>(new Map());
 
-    const revealInterest = useCallback(
+    const reveal = useCallback(
         async (shift: Shift, interest: ShiftInterest, levelKey: EscalationLevelKey) => {
             if (interest.userId == null) {
                 showSnackbar('Unable to reveal this interest.');
@@ -56,6 +58,18 @@ export function useRevealInterest(
             }
         },
         [getTabKey, setTabData, showSnackbar]
+    );
+
+    const revealInterest = useCallback(
+        (shift: Shift, interest: ShiftInterest, levelKey: EscalationLevelKey) => {
+            const key = `${shift.id}_${interest.userId}_${interest.slotId ?? 'all'}`;
+            const pending = pendingReveals.current.get(key);
+            if (pending) return pending;
+            const request = reveal(shift, interest, levelKey).finally(() => pendingReveals.current.delete(key));
+            pendingReveals.current.set(key, request);
+            return request;
+        },
+        [reveal]
     );
 
     return { revealInterest, revealingInterestId };

@@ -1,7 +1,8 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { ActivityIndicator, Text } from 'react-native-paper';
+import { Text } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { getPharmacyById, fetchPharmacyAdminsService, PharmacyDTO, MembershipDTO, PharmacyAdminDTO, updatePharmacy } from '@chemisttasker/shared-core';
 import { fetchMembershipsForPharmacy } from '@/roles/shared/pharmacies/membershipApi';
 import PharmacyDetailView from '@/roles/shared/pharmacies/PharmacyDetailView';

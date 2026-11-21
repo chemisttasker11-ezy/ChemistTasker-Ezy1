@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Checkbox, HelperText, Text } from 'react-native-paper';
 import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared-core';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
+import { BrandLoader } from '@/components/ui';
 
 const INTEREST_CHOICES: Array<{ value: string; label: string }> = [
   { value: 'SHADOWING', label: 'Shadowing' },
@@ -64,6 +65,7 @@ export default function ExplorerInterestsScreen() {
       } else {
         setError(err?.message || 'Failed to save interests.');
       }
+      return false;
     } finally {
       setSaving(false);
     }
@@ -72,7 +74,7 @@ export default function ExplorerInterestsScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
-        <View style={styles.loader}><Text>Loading interests...</Text></View>
+        <View style={styles.loader}><BrandLoader size={44} accessibilityLabel="Loading interests…" /></View>
       </SafeAreaView>
     );
   }

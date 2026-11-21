@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, TextInput, IconButton, Surface, ActivityIndicator } from 'react-native-paper';
+import { Text, TextInput, IconButton, Surface } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getRoomMessages, sendRoomMessage, markRoomAsRead } from '@chemisttasker/shared-core';
 import { useAuth } from '../../../context/AuthContext';
 import { fetchWsTicket } from '../../../utils/apiClient';
+import { getSessionGeneration } from '../../../utils/authSession';
 
 interface MessageDisplay {
   id: number;
@@ -37,10 +39,12 @@ export default function PharmacistMessageDetailScreen() {
   }, [id]);
 
   const fetchMessages = useCallback(async () => {
+    const generation = getSessionGeneration();
     const roomId = parseRoomId();
     if (!roomId) return;
     try {
       const data = await getRoomMessages(roomId);
+      if (generation !== getSessionGeneration()) return;
       const list = Array.isArray((data as any)?.results)
         ? (data as any).results
         : Array.isArray(data)
@@ -70,11 +74,13 @@ export default function PharmacistMessageDetailScreen() {
     // WebSocket live updates
     const roomId = parseRoomId();
     let isCancelled = false;
+    const sessionGeneration = getSessionGeneration();
+    const currentSession = () => !isCancelled && sessionGeneration === getSessionGeneration();
     const setupWs = async () => {
-      if (!roomId) return;
+      if (!currentSession() || !roomId) return;
       try {
         const ticket = await fetchWsTicket();
-        if (isCancelled || !ticket) return;
+        if (!currentSession() || !ticket) return;
 
         const base = process.env.EXPO_PUBLIC_API_URL || '';
         const httpBase = base.endsWith('/api') ? base.slice(0, -4) : base || 'http://localhost:8000';
@@ -91,6 +97,7 @@ export default function PharmacistMessageDetailScreen() {
         wsRef.current = ws;
         reconnectAttempts.current = 0;
         ws.onmessage = (event) => {
+          if (!currentSession()) return;
           try {
             const payload = JSON.parse(event.data);
             if (payload?.type === 'chat.message' || payload?.type === 'message.created') {
@@ -114,7 +121,7 @@ export default function PharmacistMessageDetailScreen() {
           reconnectAttempts.current = attempt;
           const delay = Math.min(30000, 1000 * 2 ** attempt);
           setTimeout(() => {
-            if (wsRef.current === ws && !isCancelled) {
+            if (wsRef.current === ws && currentSession()) {
               wsRef.current = null;
               void fetchMessages();
               void setupWs();
@@ -129,7 +136,7 @@ export default function PharmacistMessageDetailScreen() {
 
     // fallback polling
     pollRef.current = setInterval(() => {
-      if (!isCancelled) fetchMessages().catch(() => { });
+      if (currentSession()) fetchMessages().catch(() => { });
     }, 5000) as unknown as number;
 
     return () => {
@@ -243,6 +250,7 @@ export default function PharmacistMessageDetailScreen() {
               right={
                 <TextInput.Icon
                   icon="send"
+                  accessibilityLabel="Send message"
                   onPress={sendMessage}
                   disabled={sending || !newMessage.trim()}
                   color={newMessage.trim() ? '#6366F1' : '#9CA3AF'}

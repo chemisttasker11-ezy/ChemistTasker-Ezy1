@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django import forms
+from access_control.admin_roles import validate_admin_user
 from .models import User, OrganizationMembership, ContactMessage
 
 
@@ -11,8 +13,24 @@ class UserAdmin(admin.ModelAdmin):
     exclude = ('groups', 'user_permissions')
 
 
+class OrganizationMembershipForm(forms.ModelForm):
+    class Meta:
+        model = OrganizationMembership
+        fields = '__all__'
+
+    def clean(self):
+        cleaned = super().clean()
+        user = cleaned.get('user')
+        if user and 'pharmacies' in cleaned:
+            validate_admin_user(user, assignment=self.instance, changes={
+                **cleaned, 'pharmacies': cleaned['pharmacies'],
+            })
+        return cleaned
+
+
 @admin.register(OrganizationMembership)
 class OrganizationMembershipAdmin(admin.ModelAdmin):
+    form = OrganizationMembershipForm
     list_display = ['user', 'organization', 'role', 'region']
     list_filter = ['role', 'organization']
     search_fields = ['user__email', 'organization__name']

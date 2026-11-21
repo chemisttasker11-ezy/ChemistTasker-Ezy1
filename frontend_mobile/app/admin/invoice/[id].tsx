@@ -1,5 +1,6 @@
+import { FinanceAccess } from '@/components/FinanceAccess';
 import InvoiceDetail from '@/roles/shared/invoices/InvoiceDetail';
 
 export default function AdminInvoiceDetailScreen() {
-  return <InvoiceDetail basePath="/admin/invoice" />;
+  return <FinanceAccess><InvoiceDetail basePath="/admin/invoice" /></FinanceAccess>;
 }

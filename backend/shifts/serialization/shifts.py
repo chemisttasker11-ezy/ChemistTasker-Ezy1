@@ -7,6 +7,7 @@ from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from shifts.models import Shift, ShiftDescriptionTemplate, ShiftOffer
 from shifts.escalation import allowed_tiers
 from shifts.pricing import expand_shift_slots
+from shifts.selectors import slot_occurrence_ended
 from django.utils import timezone
 from organizations.access import user_can_manage_pharmacy
 from organizations.timezone import get_pharmacy_timezone
@@ -407,11 +408,7 @@ class ShiftSerializer(serializers.ModelSerializer):
             slot_date = entry.get('date')
             if not slot or not slot_date:
                 continue
-            slot_is_future = (
-                slot_date > today
-                or (slot_date == today and slot.end_time >= now.time())
-            )
-            if not slot_is_future:
+            if slot_occurrence_ended(slot_date, slot.start_time, slot.end_time, today, now.time()):
                 continue
             if (slot.id, slot_date) in assigned_pairs:
                 continue

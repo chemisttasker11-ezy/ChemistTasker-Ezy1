@@ -1,6 +1,8 @@
+import { ResponsiveSegmentedButtons as SegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, StyleSheet, View, Alert } from 'react-native';
-import { Text, Card, TextInput, Button, ActivityIndicator, Chip, SegmentedButtons, IconButton, HelperText } from 'react-native-paper';
+import { Text, Card, TextInput, Button, Chip, IconButton, HelperText } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -183,7 +185,6 @@ export default function NewInvoiceScreen() {
                                 { value: 'external', label: 'External' },
                             ]}
                             style={styles.segmentButtons}
-                            theme={{ colors: { secondaryContainer: '#EEF2FF', onSecondaryContainer: '#6366F1' } }}
                         />
                     </Card.Content>
                 </Card>

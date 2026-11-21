@@ -112,6 +112,7 @@ async function mount({ onboarding, source, preview, sharedSuperRate = SUPER_GUAR
   };
   const imports = {
     react: hooks,
+    '@/components/ui/ResponsiveSegmentedButtons': { ResponsiveSegmentedButtons: 'ResponsiveSegmentedButtons' },
     'react/jsx-runtime': { jsx: (type, props) => ({ type: String(type), props }), jsxs: (type, props) => ({ type: String(type), props }) },
     'react-native': native,
     'react-native-paper': { ...Object.fromEntries(['ActivityIndicator', 'Button', 'Chip', 'HelperText', 'IconButton', 'SegmentedButtons', 'Snackbar', 'Switch', 'Text', 'TextInput'].map(name => [name, name])), Card, Menu },
@@ -128,6 +129,7 @@ async function mount({ onboarding, source, preview, sharedSuperRate = SUPER_GUAR
     vm.runInNewContext(outputText, {
       exports, console, FormData, setTimeout: fn => { timers.set(++timerId, fn); return timerId; }, clearTimeout: id => timers.delete(id),
       require(name) {
+        if (name === '@/components/ui/BrandActivityIndicator') return { BrandActivityIndicator: 'ActivityIndicator' };
         if (name === './invoiceGeneration') return load('invoiceGeneration.ts');
         assert.ok(name in imports, `Unmocked screen dependency: ${name}`);
         return imports[name];
@@ -335,7 +337,7 @@ test('external invoice editing and save preserve legacy-rounded amounts supplied
       subtotal: '4.54', gst_amount: '0.00', super_amount: '0.00', total: '4.54',
     };
   } });
-  await ui.change(ui.all('SegmentedButtons')[0], 'external');
+  await ui.change(ui.all('ResponsiveSegmentedButtons')[0], 'external');
   await ui.change(ui.all('TextInput').find(node => node.props.label === 'Bill to name'), 'External pharmacy');
   await ui.change(ui.all('TextInput').find(node => node.props.label === 'Bill to email'), 'accounts@example.invalid');
   await ui.change(ui.all('Switch')[0], false);

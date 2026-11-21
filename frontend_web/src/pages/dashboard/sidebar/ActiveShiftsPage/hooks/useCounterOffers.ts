@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
     acceptShiftCounterOfferService,
+    fetchShiftCounterOffersBatchService,
     fetchShiftCounterOffersService,
     rejectShiftCounterOfferService,
 } from '@chemisttasker/shared-core';
@@ -34,6 +35,26 @@ export function useCounterOffers() {
             setCounterOffersByShift(prev => ({ ...prev, [shiftId]: [] }));
         } finally {
             setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: false }));
+        }
+    }, []);
+
+    // The listed shifts in one request per 100 ids (the server's batch cap): one request per shift exhausted the user throttle.
+    const loadCounterOffersBatch = useCallback(async (shiftIds: number[]) => {
+        const flag = (ids: number[], value: boolean) =>
+            setCounterOffersLoadingByShift(prev => ({ ...prev, ...Object.fromEntries(ids.map(id => [id, value])) }));
+        flag(shiftIds, true);
+        for (let start = 0; start < shiftIds.length; start += 100) {
+            const chunk = shiftIds.slice(start, start + 100);
+            let byShift: Record<number, any[]> = {};
+            try {
+                byShift = await fetchShiftCounterOffersBatchService(chunk);
+            } catch (error) {
+                console.error('Failed to load counter offers', error);
+            }
+            // A shift the server leaves out has no offers this user may see.
+            setCounterOffersByShift(prev => ({ ...prev, ...Object.fromEntries(chunk.map(id => [id,
+                (byShift[id] || []).filter((offer: any) => String(offer?.status ?? '').toUpperCase() === 'PENDING')])) }));
+            flag(chunk, false);
         }
     }, []);
 
@@ -102,6 +123,7 @@ export function useCounterOffers() {
         counterOffersByShift,
         counterOffersLoadingByShift,
         loadCounterOffers,
+        loadCounterOffersBatch,
         acceptOffer,
         rejectOffer,
         counterActionLoading,

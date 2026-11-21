@@ -60,7 +60,8 @@ export type ShiftsBoardProps = {
     onApplyAll: (shift: Shift) => Promise<void> | void;
     onApplySlot: (shift: Shift, slotId: number) => Promise<void> | void;
     onApplySlots?: (shift: Shift, slotIds: number[]) => Promise<void> | void;
-    onSubmitCounterOffer?: (payload: ShiftCounterOfferPayload) => Promise<void> | void;
+    onSubmitCounterOffer?: (payload: ShiftCounterOfferPayload, key?: string) => Promise<{ id: number }> | { id: number };
+    counterOfferGuard?: () => boolean;
     onRejectShift?: (shift: Shift) => Promise<void> | void;
     onRejectSlot?: (shift: Shift, slotId: number) => Promise<void> | void;
     onRejectSlots?: (shift: Shift, slotIds: number[]) => Promise<void> | void;
@@ -70,6 +71,7 @@ export type ShiftsBoardProps = {
     filters?: FilterConfig;
     onRefresh?: () => Promise<void> | void;
     totalCount?: number;
+    pageExclusions?: number;
     page?: number;
     pageSize?: number;
     onPageChange?: (page: number) => void;

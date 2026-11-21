@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, AppState, type AppStateStatus } from 'react-native';
-import { useIsFocused } from '@react-navigation/native';
+import { AccessibilityInfo, AppState } from 'react-native';
+import { useIsFocused } from 'expo-router';
 
 /**
  * Allows decorative motion only while its route is visible, the app is active,
@@ -8,7 +8,7 @@ import { useIsFocused } from '@react-navigation/native';
  */
 export function useAnimationEnabled() {
   const isFocused = useIsFocused();
-  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  const [appState, setAppState] = useState(AppState.currentState);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(true);
 
   useEffect(() => {

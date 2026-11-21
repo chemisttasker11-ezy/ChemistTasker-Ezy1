@@ -1,7 +1,9 @@
-import { getExplorerPosts } from './domains/talent/api';
+import { getExplorerPosts, getExplorerPostDetail } from './domains/talent/api';
 import { asList, camelCaseKeysDeep } from './utils/serialization';
+import { getSessionGeneration } from './transport/application';
 
-export async function getExplorerPostForEditing() {
+export async function getExplorerPostForEditing(id?: number) {
+  if (id !== undefined) return camelCaseKeysDeep(await getExplorerPostDetail(id));
   const posts = asList(await getExplorerPosts({ mine: true }));
   return posts.length ? camelCaseKeysDeep(posts[0]) : null;
 }
@@ -66,11 +68,18 @@ export function canPublishTalent(
 export async function loadAllTalentPages<T>(
   fetchPage: (page: number) => Promise<TalentPage<T>>,
   concurrency = 4,
+  onPage?: (rows: readonly T[]) => void,
 ): Promise<T[]> {
+  const generation = getSessionGeneration();
+  const assertSession = () => {
+    if (generation !== getSessionGeneration()) throw new Error('Session changed during pagination');
+  };
   const first = await fetchPage(1);
-  if (Array.isArray(first)) return first;
+  assertSession();
+  if (Array.isArray(first)) { onPage?.(first); return first; }
 
   const rows = Array.isArray(first?.results) ? [...first.results] : [];
+  onPage?.(rows.slice());
   if (!rows.length) return rows;
 
   const count = Number(first.count ?? rows.length);
@@ -80,6 +89,7 @@ export async function loadAllTalentPages<T>(
   const batchSize = Math.max(1, Math.floor(concurrency));
 
   for (let start = 2; start <= pageCount; start += batchSize) {
+    assertSession();
     const pages = await Promise.all(
       Array.from(
         { length: Math.min(batchSize, pageCount - start + 1) },
@@ -87,9 +97,12 @@ export async function loadAllTalentPages<T>(
       ),
     );
     for (const page of pages) {
+      assertSession();
       rows.push(...(Array.isArray(page) ? page : page.results ?? []));
+      onPage?.(rows.slice());
     }
   }
 
+  assertSession();
   return rows;
 }

@@ -12,6 +12,7 @@ from workforce.models import (
     TimesheetPeriod,
 )
 from workforce.permissions import can_manage_pharmacy, can_view_worker_timesheet, require_manage_pharmacy
+from users.presentation import user_display_name
 from workforce.timesheet_builder import ensure_period_timesheets
 from workforce.timesheet_checks import _latest_revision, effective_open_checks
 from workforce.timesheet_core import _hash
@@ -99,21 +100,29 @@ def reopen_timesheet(timesheet, user, reason: str):
 
 
 def decide_check(check, user, decision: str, reason: str):
-    timesheet = check.revision.timesheet
-    require_manage_pharmacy(user, timesheet.period.pharmacy)
-    source_required = {"MISSING_CLOCK_IN", "MISSING_CLOCK_OUT", "UNRESOLVED_PROVISIONAL_ATTENDANCE"}
-    if check.code in source_required and decision in {TimesheetCheckDecision.Decision.RESOLVED, TimesheetCheckDecision.Decision.WAIVED}:
-        raise ValidationError("This blocker must be corrected at the attendance source; it cannot be waived from the timesheet.")
-    if decision not in TimesheetCheckDecision.Decision.values:
-        raise ValidationError("Invalid check decision.")
-    if decision in {TimesheetCheckDecision.Decision.RESOLVED, TimesheetCheckDecision.Decision.WAIVED} and not (reason or "").strip():
-        raise ValidationError("A reason is required to resolve or waive a timesheet check.")
-    return TimesheetCheckDecision.objects.create(
-        timesheet_check=check,
-        decision=decision,
-        reason=(reason or "").strip(),
-        decided_by=user,
-    )
+    # Check decisions can change approval readiness. Lock the period before the
+    # timesheet, as all approval and period-freeze writers do.
+    with transaction.atomic():
+        timesheet, period = _locked_timesheet_and_period(check.revision.timesheet)
+        require_manage_pharmacy(user, period.pharmacy)
+        if period.status == TimesheetPeriod.Status.LOCKED:
+            raise ValidationError("Locked periods cannot change timesheet check decisions.")
+        current = _latest_revision(timesheet)
+        if not current or check.revision_id != current.pk:
+            raise ValidationError("This check belongs to an earlier revision. Refresh and review the current timesheet.")
+        source_required = {"MISSING_CLOCK_IN", "MISSING_CLOCK_OUT", "UNRESOLVED_PROVISIONAL_ATTENDANCE"}
+        if check.code in source_required and decision in {TimesheetCheckDecision.Decision.RESOLVED, TimesheetCheckDecision.Decision.WAIVED}:
+            raise ValidationError("This blocker must be corrected at the attendance source; it cannot be waived from the timesheet.")
+        if decision not in TimesheetCheckDecision.Decision.values:
+            raise ValidationError("Invalid check decision.")
+        if decision in {TimesheetCheckDecision.Decision.RESOLVED, TimesheetCheckDecision.Decision.WAIVED} and not (reason or "").strip():
+            raise ValidationError("A reason is required to resolve or waive a timesheet check.")
+        return TimesheetCheckDecision.objects.create(
+            timesheet_check=check,
+            decision=decision,
+            reason=(reason or "").strip(),
+            decided_by=user,
+        )
 
 
 def add_comment(timesheet, user, body: str, worker_visible=True):
@@ -122,12 +131,41 @@ def add_comment(timesheet, user, body: str, worker_visible=True):
     if not (body or "").strip():
         raise ValidationError("Comment cannot be empty.")
     revision = _latest_revision(timesheet)
-    return TimesheetComment.objects.create(
+    comment = TimesheetComment.objects.create(
         timesheet=timesheet,
         revision=revision,
         author=user,
         body=body.strip(),
         worker_visible=bool(worker_visible) if can_manage_pharmacy(user, timesheet.period.pharmacy) else True,
+    )
+    if user.pk == timesheet.user_id:
+        _notify_correction_request(timesheet, comment)
+    return comment
+
+
+def _notify_correction_request(timesheet, comment):
+    """A worker's comment is a correction request: tell the managers who can act on this timesheet."""
+    from notifications.services import notify_users
+    from workforce.leave_service import pharmacy_manager_users
+    period = timesheet.period
+    pharmacy = period.pharmacy
+    recipient_ids = [
+        manager.pk for manager in pharmacy_manager_users(pharmacy)
+        if manager.pk != comment.author_id and can_manage_pharmacy(manager, pharmacy)
+    ]
+    if not recipient_ids:
+        return
+    worker_name = user_display_name(comment.author)
+    transaction.on_commit(
+        lambda: notify_users(
+            recipient_ids,
+            title=f"Timesheet correction request: {pharmacy.name}",
+            body=f"{worker_name} asked for a correction to their timesheet for {period.start_date} to {period.end_date}.",
+            action_url=f"/dashboard/workforce/timesheets?timesheet={timesheet.pk}",
+            payload={"timesheet_id": timesheet.pk, "comment_id": comment.pk, "pharmacy_id": pharmacy.pk,
+                     "notification_kind": "timesheet_correction_request"},
+        ),
+        robust=True,
     )
 
 

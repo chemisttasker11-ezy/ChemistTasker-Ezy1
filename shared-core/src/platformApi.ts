@@ -1,5 +1,5 @@
 import type { ApiClient, ApiClientConfig, ApiQuery, ApiRequestOptions } from './transport/client';
-import { createApiClient } from './transport/client';
+import { ApiError, createApiClient } from './transport/client';
 import { PLATFORM_ENDPOINTS } from './constants/platformEndpoints';
 import { API_ENDPOINTS } from './constants/endpoints';
 import type {
@@ -57,6 +57,19 @@ const domain = (client: ApiClient): DomainApi => ({ request: client.request });
 
 export function createChemistTaskerApi(config: ApiClientConfig) {
   const client = createApiClient(config);
+  const publicGet = async <T>(path: string, query?: ApiQuery): Promise<T> => {
+    const generation = config.getSessionGeneration?.();
+    const token = await config.getAuthToken?.();
+    if (!token) return client.get<T>(path, query, { auth: false, retryAuth: false });
+    if (generation !== config.getSessionGeneration?.()) throw new Error('Session changed during request');
+    const optionalClient = createApiClient({ ...config, getAuthToken: () => token, onAuthFailure: undefined });
+    try {
+      return await optionalClient.get<T>(path, query, { retryAuth: false });
+    } catch (error) {
+      if (generation !== config.getSessionGeneration?.() || !(error instanceof ApiError) || error.status !== 401) throw error;
+      return optionalClient.get<T>(path, query, { auth: false, retryAuth: false });
+    }
+  };
 
   return {
     client,
@@ -69,12 +82,12 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
     },
 
     publicContent: {
-      listHubs: () => client.get<PublicHubSummary[]>(PLATFORM_ENDPOINTS.publicHub.community, undefined, { auth: false }),
+      listHubs: () => publicGet<PublicHubSummary[]>(PLATFORM_ENDPOINTS.publicHub.community),
       getSitemap: <T = Array<{ loc: string; lastmod?: string }>>() => client.get<T>(PLATFORM_ENDPOINTS.publicHub.sitemap, undefined, { auth: false }),
-      listCommunityPosts: (hub: string, query?: ApiQuery) => client.get<ApiPage<PublicHubPost>>(PLATFORM_ENDPOINTS.publicHub.communityPosts(hub), query, { auth: false }),
-      listCommunityPolls: (hub: string, query?: ApiQuery) => client.get<ApiPage<PublicHubPoll>>(PLATFORM_ENDPOINTS.publicHub.communityPolls(hub), query, { auth: false }),
-      getPost: (id: number) => client.get<PublicHubPost>(PLATFORM_ENDPOINTS.publicHub.post(id), undefined, { auth: false }),
-      listPostComments: (id: number, query?: ApiQuery) => client.get<ApiPage<PublicHubComment>>(PLATFORM_ENDPOINTS.publicHub.postComments(id), query, { auth: false }),
+      listCommunityPosts: (hub: string, query?: ApiQuery) => publicGet<ApiPage<PublicHubPost>>(PLATFORM_ENDPOINTS.publicHub.communityPosts(hub), query),
+      listCommunityPolls: (hub: string, query?: ApiQuery) => publicGet<ApiPage<PublicHubPoll>>(PLATFORM_ENDPOINTS.publicHub.communityPolls(hub), query),
+      getPost: (id: number) => publicGet<PublicHubPost>(PLATFORM_ENDPOINTS.publicHub.post(id)),
+      listPostComments: (id: number, query?: ApiQuery) => publicGet<ApiPage<PublicHubComment>>(PLATFORM_ENDPOINTS.publicHub.postComments(id), query),
       reportPost: (id: number, body: { reason: string; comment_id?: number }) => client.post<DetailResponse>(PLATFORM_ENDPOINTS.publicHub.postReport(id), body),
       reportBoardItem: (kind: 'talent' | 'jobs', id: number, reason: string) => client.post<DetailResponse>(PLATFORM_ENDPOINTS.publicHub.boardReport(kind, id), { reason }),
       listArticles: (query?: ApiQuery) => client.get<ApiPage<PublicArticle>>(PLATFORM_ENDPOINTS.publicHub.articles, query, { auth: false }),
@@ -114,10 +127,10 @@ export function createChemistTaskerApi(config: ApiClientConfig) {
       getDashboard: () => client.get<MarketplaceDashboardListing[]>(PLATFORM_ENDPOINTS.marketplace.dashboard),
       getEligibility: (id: string, query?: ApiQuery) => client.get<{ can_enquire: boolean; can_manage: boolean; blocker: unknown }>(PLATFORM_ENDPOINTS.marketplace.eligibility(id), query),
       createListing: (body: MarketplaceListingWrite) => client.post<MarketplaceOwnedListing>(PLATFORM_ENDPOINTS.marketplace.listings, body),
-      updateListing: (id: string, body: Partial<MarketplaceListingWrite> & { expected_version: number }) => client.patch<MarketplaceOwnedListing>(PLATFORM_ENDPOINTS.marketplace.listing(id), body),
-      actOnListing: (id: string, action: 'submit' | 'withdraw', expectedVersion: number) => client.post<{ publication_status: string; availability_status: string; version: number }>(PLATFORM_ENDPOINTS.marketplace.listingAction(id, action), { expected_version: expectedVersion }),
-      updateAudience: (id: string, body: { expected_version: number; current_circle: string; maximum_circle?: string; schedule?: Array<{ target_circle: string; due_at: string }> }) => client.post<{ current_circle: string; maximum_circle: string; version: number }>(PLATFORM_ENDPOINTS.marketplace.audience(id), body),
-      uploadImage: (id: string, body: FormData) => client.post<{ id: number; moderation_status: string }>(PLATFORM_ENDPOINTS.marketplace.images(id), body),
+      updateListing: (id: string, body: Partial<MarketplaceListingWrite> & { expected_version: number }, key?: string) => client.patch<MarketplaceOwnedListing>(PLATFORM_ENDPOINTS.marketplace.listing(id), body, key ? { headers: { 'Idempotency-Key': key } } : {}),
+      actOnListing: (id: string, action: 'submit' | 'withdraw', expectedVersion: number, key?: string) => client.post<{ publication_status: string; availability_status: string; version: number }>(PLATFORM_ENDPOINTS.marketplace.listingAction(id, action), { expected_version: expectedVersion }, key ? { headers: { 'Idempotency-Key': key } } : {}),
+      updateAudience: (id: string, body: { expected_version: number; current_circle: string; maximum_circle?: string; schedule?: Array<{ target_circle: string; due_at: string }> }, key?: string) => client.post<{ current_circle: string; maximum_circle: string; version: number }>(PLATFORM_ENDPOINTS.marketplace.audience(id), body, key ? { headers: { 'Idempotency-Key': key } } : {}),
+      uploadImage: (id: string, body: FormData, key?: string) => client.post<{ id: number; moderation_status: string }>(PLATFORM_ENDPOINTS.marketplace.images(id), body, key ? { headers: { 'Idempotency-Key': key } } : {}),
       deleteImage: (id: number) => client.delete<void>(PLATFORM_ENDPOINTS.marketplace.image(id)),
       createEnquiry: (id: string, body: { buying_pharmacy?: number | null; client_request_id: string; terms?: Record<string, unknown>; message?: string }) => client.post<{ id: string; state: string; version: number }>(PLATFORM_ENDPOINTS.marketplace.enquiries(id), body),
       createInternalTransfer: (id: string, body: { destination_pharmacy: number; transport_terms?: Record<string, unknown> }) => client.post<{ id: number; state: string; version: number }>(PLATFORM_ENDPOINTS.marketplace.internalTransfers(id), body),

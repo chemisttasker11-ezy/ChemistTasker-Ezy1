@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureApi, logoutSession, skipMobileOverseas } from './api';
+import { API_ENDPOINTS } from './constants/endpoints';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -54,7 +55,9 @@ function mobileProvider(os = 'ios') {
   const exports: any = {};
   const mocks: Record<string, any> = {
     react: { ...react, default: react },
-    'react-native': { Platform: { OS: os }, Alert: { alert: vi.fn() } },
+    'react-native': { Platform: { OS: os }, Alert: { alert: vi.fn() }, AppState: { addEventListener: () => ({ remove() {} }) } },
+    // AuthContext re-verifies an offline start on reconnect (172622e8).
+    '@react-native-community/netinfo': { default: { addEventListener: () => () => {} } },
     '@chemisttasker/shared-core': { getOnboarding: onboarding, logoutSession: logout },
     '../utils/authSession': env.session,
     '../utils/nativeIdentityTransport': { nativeIdentityTransport: { currentUser } },
@@ -93,7 +96,13 @@ function mobileClient() {
   const source = readFileSync(new URL('../../frontend_mobile/utils/apiClient.ts', import.meta.url), 'utf8');
   const mocks: Record<string, any> = {
     axios: { default: { create: () => client, CanceledError: Error } },
-    '@chemisttasker/shared-core': { reportAhpraError: () => undefined },
+    // This VM runs the real mobile API client against the canonical endpoint contract.
+    // A partial mock without API_ENDPOINTS crashed at import time, before any session assertion.
+    '@chemisttasker/shared-core': {
+      reportAhpraError: () => undefined,
+      API_ENDPOINTS,
+      AHPRA_UNREADABLE_MESSAGE: 'AHPRA registration information could not be read.',
+    },
     'react-native': { Platform: { OS: 'ios' } },
     './authSession': env.session,
     './browserAuth': {},

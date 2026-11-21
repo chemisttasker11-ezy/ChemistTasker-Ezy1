@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { Building2, Heart, Network, Sparkles, Store } from 'lucide-react';
-import type { EscalationLevelKey } from '@chemisttasker/shared-core';
+import { SHIFT_AUDIENCE_LEVELS, type EscalationLevelKey, type ShiftAudienceKey } from '@chemisttasker/shared-core';
 
 export type AudienceScope = 'internal' | 'platform';
 
@@ -15,13 +15,18 @@ export type AudienceLevel = {
 };
 
 /** Escalation order: the shift is offered to each audience in turn, internal first. */
-export const AUDIENCE_LEVELS: AudienceLevel[] = [
-    { key: 'FULL_PART_TIME', label: 'My Pharmacy', reach: 'your full-time and part-time team', scope: 'internal', icon: Building2 },
-    { key: 'LOCUM_CASUAL', label: 'Favourites', reach: 'your favourite locums and casuals', scope: 'internal', icon: Heart },
-    { key: 'OWNER_CHAIN', label: 'Chain', reach: 'staff across your other pharmacies', scope: 'internal', icon: Store },
-    { key: 'ORG_CHAIN', label: 'Organization', reach: 'members of your organisation', scope: 'internal', icon: Network, requiresOrganization: true },
-    { key: 'PLATFORM', label: 'ChemistTasker', reach: 'verified professionals across ChemistTasker', scope: 'platform', icon: Sparkles },
-];
+const ICONS: Record<ShiftAudienceKey, LucideIcon> = {
+    FULL_PART_TIME: Building2,
+    LOCUM_CASUAL: Heart,
+    OWNER_CHAIN: Store,
+    ORG_CHAIN: Network,
+    PLATFORM: Sparkles,
+};
+
+export const AUDIENCE_LEVELS: AudienceLevel[] = SHIFT_AUDIENCE_LEVELS.map((level) => ({
+    ...level,
+    icon: ICONS[level.key],
+}));
 
 export const getAudienceLevel = (key: unknown): AudienceLevel | undefined =>
     AUDIENCE_LEVELS.find((level) => level.key === key);

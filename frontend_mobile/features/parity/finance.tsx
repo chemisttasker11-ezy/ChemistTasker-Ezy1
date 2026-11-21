@@ -1,7 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { getSessionGeneration } from '@/utils/authSession';
+import { ReceiptShareSession } from './receiptShare';
 import { Button, Chip, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import { nativeFileBytes } from './nativeFileBytes';
@@ -91,7 +95,13 @@ export function FinanceParityScreen({screen}:{screen:FinanceScreen}) {
   };
 
   if(screen==='customers') return <ParityPage title={titles[screen]} subtitle="Reusable billing contacts for invoices." {...common} right={<IconButton icon="plus" onPress={()=>router.push('/finance/customers/new' as any)}/>}>
-    <Section title="Saved customers">{customers.length?customers.map(c=><DataRow key={c.id} title={c.name||c.legal_name} subtitle={`${c.email||'No invoice email'} · ${c.payment_terms_days}-day terms · ABN ${c.abn||'not supplied'}`} status={c.active?'Active':'Inactive'} onPress={()=>router.push(`/finance/customers/new?id=${c.id}` as any)}/>):<EmptyState title="No customers" body="Create a customer before issuing invoices." actionLabel="Create customer" onAction={()=>router.push('/finance/customers/new' as any)}/>}</Section>
+    <Button mode="outlined" onPress={()=>router.push('/finance' as any)}>Open Finance workspace for CSV exports</Button>
+    <Section title="Saved customers">{customers.length?customers.map(c=><DataRow key={c.id} title={c.name||c.legal_name}
+      subtitle={`${c.email||'No invoice email'} · ${c.payment_terms_days}-day terms · ABN ${c.abn||'not supplied'}`+
+      (c.abn_checked_at && c.abn_result
+        ? ` · ABR: ${String(c.abn_result.entity_name||'Entity unknown')} · Status ${String(c.abn_result.abn_status||'Unknown')} · ${c.abn_result.abn_gst_registered===true?'GST registered':'GST not registered'} · Checked ${dateLabel(c.abn_checked_at)} · ABR does not prove ownership`
+        : '')}
+      status={c.active?'Active':'Inactive'} onPress={()=>router.push(`/finance/customers/new?id=${c.id}` as any)}/>):<EmptyState title="No customers" body="Create a customer before issuing invoices." actionLabel="Create customer" onAction={()=>router.push('/finance/customers/new' as any)}/>}</Section>
   </ParityPage>;
 
   if(screen==='items') return <ParityPage title={titles[screen]} subtitle="Reusable invoice line items and tax treatment." {...common} right={<IconButton icon="plus" onPress={()=>router.push('/finance/items/new' as any)}/>}>
@@ -102,6 +112,7 @@ export function FinanceParityScreen({screen}:{screen:FinanceScreen}) {
   </ParityPage>;
 
   if(screen==='expenses') return <ParityPage title={titles[screen]} subtitle="Business expenses, evidence and GST treatment." {...common} right={<IconButton icon="plus" onPress={()=>router.push('/finance/expenses/new' as any)}/>}>
+    <Button mode="outlined" onPress={()=>router.push('/finance' as any)}>Open Finance workspace for CSV exports</Button>
     <MetricGrid items={[{label:'Expenses',value:expenses.length},{label:'Evidence missing',value:expenses.filter(e=>!e.evidence_confirmed).length,tone:expenses.some(e=>!e.evidence_confirmed)?'warning':'success'}]}/>
     <Section title="Expenses">{expenses.length?expenses.map(e=><DataRow key={e.id} title={e.supplier||e.description} subtitle={`${e.description} · ${money(e.amount)} · ${e.incurred_on}`} status={e.receipts?.length?`${e.receipts.length} receipt(s)`:'No receipt'} onPress={()=>router.push(`/finance/expenses/new?id=${e.id}` as any)}/>):<EmptyState title="No expenses" body="Record business expenses and attach evidence for your GST worksheet."/>}</Section>
   </ParityPage>;
@@ -139,7 +150,13 @@ function CustomerEditor({customer,loading,error,onSaved}:{customer?:FinanceCusto
     <Field label="Display name" value={form.name} onChangeText={v=>patch('name',v)}/>
     <Field label="Legal entity name" value={form.legal_name} onChangeText={v=>patch('legal_name',v)}/>
     <Field label="ABN" value={form.abn} keyboardType="numeric" onChangeText={v=>patch('abn',v)}/>
-    {customer?.abn_checked_at?<InfoNote title="ABN checked">{dateLabel(customer.abn_checked_at)}</InfoNote>:null}
+    {customer?.abn_checked_at && customer.abn_result && form.abn===customer.abn
+      ? <InfoNote title="ABR lookup evidence">
+          {String(customer.abn_result.entity_name||'Entity name unavailable')} · {String(customer.abn_result.entity_type||'Entity type unavailable')} · ABN status: {String(customer.abn_result.abn_status||'Unknown')} ·
+          {customer.abn_result.abn_gst_registered===true?' GST registered':' GST not registered'} · Checked {dateLabel(customer.abn_checked_at)}.
+          This public registry result does not establish ownership of the ABN or confirm the customer identity.
+        </InfoNote>
+      : null}
     <Field label="Accounts contact" value={form.contact_name} onChangeText={v=>patch('contact_name',v)}/>
     <Field label="Invoice email" value={form.email} keyboardType="email-address" onChangeText={v=>patch('email',v)}/>
     <Field label="Phone" value={form.phone} keyboardType="phone-pad" onChangeText={v=>patch('phone',v)}/>
@@ -205,39 +222,111 @@ function ExpenseEditor({expense,loading,error,onSaved}:{expense?:FinanceExpense;
 function ExpenseReceipt({expense,loading,error,onReload}:{expense?:FinanceExpense;loading:boolean;error:string;onReload:()=>Promise<void>}) {
   const router=useRouter();
   const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
+  const uploadInFlight=useRef(false);
   const upload=async()=>{
-    if(!expense)return;setBusy(true);setLocalError('');
+    if(!expense || uploadInFlight.current)return;uploadInFlight.current=true;setBusy(true);setLocalError('');
+    const generation=getSessionGeneration();let assetUri:string|undefined;
     try{
       const permission=await ImagePicker.requestCameraPermissionsAsync();
       const result=permission.granted?await ImagePicker.launchCameraAsync({mediaTypes:['images'],quality:0.85}):await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:0.85});
       if(result.canceled)return;
-      const asset=result.assets[0];const blob=await (await fetch(asset.uri)).blob();
+      const asset=result.assets[0];assetUri=asset.uri;const blob=await (await fetch(asset.uri)).blob();
+      if(generation!==getSessionGeneration())return;
       await finance.uploadReceipt(expense.id,blob,asset.fileName||`receipt-${Date.now()}.jpg`);
+      if(generation!==getSessionGeneration())return;
       await onReload();
-    }catch(e){setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{setBusy(false);}
+    }catch(e){if(generation===getSessionGeneration())setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}uploadInFlight.current=false;if(generation===getSessionGeneration())setBusy(false);}
+  };
+  const attachFile=async()=>{
+    if(!expense || uploadInFlight.current)return;uploadInFlight.current=true;setBusy(true);setLocalError('');
+    const generation=getSessionGeneration();let assetUri:string|undefined;
+    try{
+      const result=await DocumentPicker.getDocumentAsync({type:['application/pdf','image/png','image/jpeg'],copyToCacheDirectory:true});
+      if(result.canceled)return;
+      const asset=result.assets[0];assetUri=asset.uri;const blob=await (await fetch(asset.uri)).blob();
+      if(generation!==getSessionGeneration())return;
+      await finance.uploadReceipt(expense.id,blob,asset.name);
+      if(generation!==getSessionGeneration())return;
+      await onReload();
+    }catch(e){if(generation===getSessionGeneration())setLocalError(errorMessage(e,'Unable to upload receipt.'));}finally{if(assetUri?.startsWith('file://')){try{new File(assetUri).delete();}catch{}}uploadInFlight.current=false;if(generation===getSessionGeneration())setBusy(false);}
   };
   return <ParityPage title="Expense receipt" subtitle="Capture or attach evidence to this expense." loading={loading} error={error||localError}>
     {!expense?<EmptyState title="Expense not found" body="The requested expense is unavailable."/>:<>
       <DataRow title={expense.supplier} subtitle={`${expense.description} · ${money(expense.amount)}`} status={expense.evidence_confirmed?'Evidence confirmed':'Evidence pending'}/>
-      <Button mode="contained" icon="camera" loading={busy} onPress={()=>void upload()}>Capture / add receipt</Button>
+      <Button mode="contained" icon="camera" loading={busy} disabled={busy} onPress={()=>void upload()}>Capture / add receipt</Button>
+      <Button mode="outlined" accessibilityLabel="Attach receipt file" contentStyle={{minHeight:44}} disabled={busy} onPress={()=>void attachFile()}>Attach PDF or image</Button>
       <Section title="Receipts">{expense.receipts?.length?expense.receipts.map(r=><DataRow key={r.id} title={r.filename} subtitle={`${Math.ceil(r.size/1024)} KB · ${dateLabel(r.created_at)}`} onPress={()=>router.push(`/finance/receipts/${r.id}` as any)}/>):<EmptyState title="No receipts" body="Add at least one receipt when evidence is required."/>}</Section>
     </>}
   </ParityPage>;
 }
 
 function ReceiptScreen({receiptId,loading,error}:{receiptId:number;loading:boolean;error:string}) {
-  const [busy,setBusy]=useState(false),[localError,setLocalError]=useState('');
-  const open=async()=>{setBusy(true);setLocalError('');try{const blob=await finance.receipt(receiptId);const bytes=await nativeFileBytes(blob);const file=new File(Paths.cache,`receipt-${receiptId}`);file.create({overwrite:true});file.write(bytes);if(await Sharing.isAvailableAsync())await Sharing.shareAsync(file.uri,{dialogTitle:'Receipt'});}catch(e){setLocalError(errorMessage(e));}finally{setBusy(false);}};
-  return <ParityPage title="Receipt" subtitle="Download or share the stored finance evidence." loading={loading} error={error||localError}><InfoNote title="Receipt evidence">Receipt files remain protected by the authenticated finance API.</InfoNote><Button mode="contained" icon="share-variant" loading={busy} onPress={()=>void open()}>Open / share receipt</Button></ParityPage>;
+  const { user } = useAuth();
+  const accountScope = String(user?.id ?? user?.email ?? user?.username ?? 'anonymous');
+  return <ReceiptScreenInner key={`${accountScope}:${receiptId}`} accountScope={accountScope} receiptId={receiptId} loading={loading} error={error} />;
+}
+
+export function ReceiptScreenInner({accountScope,receiptId,loading,error}:{accountScope:string;receiptId:number;loading:boolean;error:string}) {
+  const [busy, setBusy] = useState(false);
+  const [localError, setLocalError] = useState('');
+  const sessionRef = useRef<ReceiptShareSession | null>(null);
+  if (!sessionRef.current) sessionRef.current = new ReceiptShareSession();
+
+  useEffect(() => {
+    return () => {
+      sessionRef.current?.invalidate();
+    };
+  }, []);
+
+  const open = async () => {
+    if (sessionRef.current?.isBusy) return;
+    setBusy(true);
+    setLocalError('');
+    const res = await sessionRef.current!.openReceipt(accountScope, receiptId);
+    if (!sessionRef.current || !sessionRef.current.isBusy) {
+      setBusy(false);
+    }
+    if (!res.ok && res.error && res.error !== 'Operation already in progress') {
+      setLocalError(res.error);
+    }
+  };
+
+  return (
+    <ParityPage
+      title="Receipt"
+      subtitle="Download or share the stored finance evidence."
+      loading={loading}
+      error={error || localError}
+    >
+      <InfoNote title="Receipt evidence">
+        Receipt files remain protected by the authenticated finance API.
+      </InfoNote>
+      <Button
+        mode="contained"
+        icon="share-variant"
+        loading={busy}
+        disabled={busy || loading}
+        onPress={() => void open()}
+      >
+        Open / share receipt
+      </Button>
+    </ParityPage>
+  );
 }
 
 function BasScreen() {
+  const router=useRouter();
   const [start,setStart]=useState(`${financeToday().slice(0,4)}-01-01`),[end,setEnd]=useState(financeToday()),[basis,setBasis]=useState<'cash'|'accrual'>('cash'),[worksheet,setWorksheet]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const calculate=async()=>{setBusy(true);setError('');try{setWorksheet(await finance.worksheet(start,end,basis));}catch(e){setError(errorMessage(e));}finally{setBusy(false);}};
+  const worksheetGen=useRef(0);
+  useEffect(()=>()=>{worksheetGen.current+=1;},[]);
+  const invalidate=()=>{worksheetGen.current+=1;setWorksheet(null);};
+  const calculate=async()=>{const request=++worksheetGen.current;setBusy(true);setError('');try{const result=await finance.worksheet(start,end,basis);if(request===worksheetGen.current)setWorksheet(result);}catch(e){if(request===worksheetGen.current)setError(errorMessage(e));}finally{setBusy(false);}};
   return <ParityPage title="GST / BAS worksheet" subtitle="Estimate GST fields from supported ChemistTasker finance records." error={error}>
-    <InfoNote title="Estimate only" tone="warning">This worksheet is not a lodged BAS and may exclude legacy invoices or unsupported adjustments.</InfoNote>
-    <Field label="Start (YYYY-MM-DD)" value={start} onChangeText={setStart}/><Field label="End (YYYY-MM-DD)" value={end} onChangeText={setEnd}/><ChoiceChips value={basis} onChange={v=>setBasis(v as any)} options={[{value:'cash',label:'Cash'},{value:'accrual',label:'Accrual'}]}/><Button mode="contained" loading={busy} onPress={()=>void calculate()}>Calculate worksheet</Button>
-    {worksheet?<MetricGrid items={[{label:'G1',value:money(worksheet.G1)},{label:'1A',value:money(worksheet['1A'])},{label:'1B',value:money(worksheet['1B'])},{label:'Estimated GST net',value:money(worksheet.estimated_gst_net),tone:'primary'}]}/>:null}
+    <InfoNote title="Estimate only" tone="warning">DRAFT: Not a complete BAS. This worksheet is not a lodged BAS and may exclude legacy invoices or unsupported adjustments.</InfoNote>
+    <Button mode="outlined" onPress={()=>router.push('/finance' as any)}>Open Finance workspace for draft CSV export</Button>
+    <Field label="Start (YYYY-MM-DD)" value={start} onChangeText={v=>{setStart(v);invalidate();}}/><Field label="End (YYYY-MM-DD)" value={end} onChangeText={v=>{setEnd(v);invalidate();}}/><ChoiceChips value={basis} onChange={v=>{setBasis(v as any);invalidate();}} options={[{value:'cash',label:'Cash'},{value:'accrual',label:'Accrual'}]}/><Button mode="contained" loading={busy} onPress={()=>void calculate()}>Calculate worksheet</Button>
+    {worksheet?<><MetricGrid items={[{label:'G1',value:money(worksheet.G1)},{label:'1A',value:money(worksheet['1A'])},{label:'1B',value:money(worksheet['1B'])},{label:'Estimated GST net',value:money(worksheet.estimated_gst_net),tone:'primary'}]}/>
+      <InfoNote title="Excluded legacy invoices">{String(worksheet.excluded_legacy_invoice_count||0)} legacy invoice(s) excluded. Review the warnings and evidence before any BAS lodgement.</InfoNote></>:null}
     {worksheet?.warnings?.length?<Section title="Warnings">{worksheet.warnings.map((w:string,i:number)=><DataRow key={i} title={w} status="Review"/>)}</Section>:null}
   </ParityPage>;
 }

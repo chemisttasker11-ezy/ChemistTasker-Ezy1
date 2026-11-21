@@ -1,9 +1,10 @@
 """Talent-owned cleanup for account deletion and newcomer conversion."""
 from django.db.models import Q
-from talent.models import ExplorerPost
+from talent.models import ExplorerPost, PitchCreateRequest
 
 
 def delete_user_posts(user):
+    PitchCreateRequest.objects.filter(author=user).delete()
     return ExplorerPost.objects.filter(Q(author_user=user) | Q(explorer_profile__user=user)).delete()
 
 

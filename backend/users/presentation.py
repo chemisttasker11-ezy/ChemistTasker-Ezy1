@@ -17,6 +17,11 @@ def _resolve_user_profile_photo(user):
     return None
 
 
+def user_display_name(user):
+    """Full name, else username, else email: an invited staff member can have neither name nor username."""
+    return user.get_full_name() or user.username or user.email
+
+
 def _split_chat_display_name(value):
     parts = (value or "").strip().split()
     if not parts:

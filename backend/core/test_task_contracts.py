@@ -190,11 +190,21 @@ class TaskIdentityContractTests(SimpleTestCase):
         for pattern in settings.CELERY_TASK_ROUTES:
             self.assertTrue(any(fnmatchcase(name, pattern) for name in registered), pattern)
 
-    def test_beat_entries_are_unchanged(self):
+    def test_beat_entries_preserve_legacy_and_include_pitch_receipt_cleanup(self):
+        from celery.schedules import crontab
+
         beat = celery_app().conf.beat_schedule
+        expected = {
+            **LEGACY_BEAT,
+            "cleanup-pitch-receipts-daily": ("talent.tasks.cleanup_expired_pitch_receipts", {}),
+        }
         self.assertEqual(
             {key: (entry["task"], entry.get("options", {})) for key, entry in beat.items()},
-            LEGACY_BEAT,
+            expected,
+        )
+        self.assertEqual(
+            beat["cleanup-pitch-receipts-daily"]["schedule"],
+            crontab(hour=2, minute=30),
         )
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)

@@ -6,6 +6,7 @@ export type FinanceMoney = string;
 export interface FinanceConfig {
   baseURL: string;
   getToken: () => string | null | undefined | Promise<string | null | undefined>;
+  getSessionGeneration?: () => number;
   refreshToken?: () => string | null | undefined | Promise<string | null | undefined>;
   onAuthFailure?: () => void | Promise<void>;
   credentials?: RequestCredentials;
@@ -84,6 +85,7 @@ import { financeApi } from './domains/finance/api';
  * to its domain operations so Vite/mobile use one authenticated request engine.
  */
 export const finance = financeApi;
+export { csvCell, renderFinanceCsv, invoiceCsvRows, expenseCsvRows, worksheetCsvRows } from './domains/finance/csv';
 
 /**
  * Backwards-compatible no-op. configureApi() now configures the authenticated

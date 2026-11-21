@@ -19,6 +19,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Count, Q
 from shifts.pricing import get_locked_rate_for_slot
 from shifts.limits import enforce_public_shift_daily_limit
+from shifts.posting import validate_posting_window
 from shifts.notifications import notify_shift_users
 from shifts.engagement import keep_accepted_terms, staff_assignment_defaults
 from shifts.assignment import guard_roster_assignment
@@ -436,6 +437,8 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
         requesting_user = request.user
         if not managed_pharmacies_for(requesting_user).filter(pk=pharmacy.pk).exists():
             return Response({'detail': 'Permission denied: Not authorized to create shifts for this pharmacy.'}, status=status.HTTP_403_FORBIDDEN)
+
+        validate_posting_window(pharmacy, [{'date': slot_date}])
 
         rate_kwargs = {
             'rate_type': None,

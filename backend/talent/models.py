@@ -127,6 +127,24 @@ class ExplorerPost(models.Model):
         return latest_date >= (today or timezone.localdate())
 
 
+class PitchCreateRequest(models.Model):
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    operation = models.CharField(max_length=32, default='talent.pitch.create')
+    key = models.UUIDField()
+    fingerprint = models.CharField(max_length=64)
+    fingerprint_version = models.PositiveSmallIntegerField(default=1)
+    post = models.ForeignKey(ExplorerPost, null=True, on_delete=models.SET_NULL)
+    original_post_id = models.PositiveBigIntegerField(null=True)
+    response_status = models.PositiveSmallIntegerField(default=201)
+    response_body = models.JSONField(null=True)
+    response_headers = models.JSONField(default=dict)
+    created_at = models.DateTimeField(default=timezone.now)
+    replay_expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['author', 'operation', 'key'], name='talent_pitch_request_unique')]
+
+
 class ExplorerPostReaction(models.Model):
     """
     Simple 'like' for now (one per user per post).
@@ -179,3 +197,18 @@ class UserAvailability(models.Model):
     def __str__(self):
         times = "All Day" if self.is_all_day else f"{self.start_time}-{self.end_time}"
         return f"{self.user.username} available {times} on {self.date}"
+
+
+class SavedProfessionalContact(models.Model):
+    """Private account-scoped bookmark of a public talent/org identity; never a membership."""
+    class Kind(models.TextChoices):
+        WORKER_LISTING = "WORKER_LISTING", "Worker listing"
+        ORGANIZATION = "ORGANIZATION", "Organisation"
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_professional_contacts")
+    kind = models.CharField(max_length=24, choices=Kind.choices)
+    reference = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "kind", "reference"], name="talent_saved_contact_unique")]
+        indexes = [models.Index(fields=["user", "-created_at"], name="talent_saved_contact_user_date")]

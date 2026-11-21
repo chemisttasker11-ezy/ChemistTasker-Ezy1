@@ -1,7 +1,9 @@
 import { createFriendPillReferralService } from '@chemisttasker/shared-core';
+import { getSessionGeneration } from '@/utils/authSession';
 import { fetchPillBalanceService } from '@chemisttasker/shared-core';
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, ScrollView, Share, StyleSheet, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { openWebPage } from '@/features/explore/webLinks';
 import {
   Avatar,
   Button,
@@ -22,6 +24,7 @@ import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { deleteAccount } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
+import { orgCapabilities } from '@/roles/shared/dashboard/ManagerHome';
 import apiClient from '@/utils/apiClient';
 
 const webBaseUrl = 'https://www.chemisttasker.com.au';
@@ -42,11 +45,13 @@ const getOrganizationName = (user: any) => {
 export default function OrganizationProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const can = orgCapabilities(user);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [referralLoading, setReferralLoading] = useState(false);
+  const referralLifetime = useRef(0);
+  useEffect(() => () => { referralLifetime.current += 1; }, []);
   const [pillSummary, setPillSummary] = useState({ balance: 0, shift_post_cost: 0 });
 
   const appVersion = typeof Constants?.expoConfig?.version === 'string' ? Constants.expoConfig.version : '';
@@ -84,18 +89,22 @@ export default function OrganizationProfileScreen() {
   }, []);
 
   const shareFriendReferral = async () => {
+    const lifetime = referralLifetime.current;
+    const sessionGeneration = getSessionGeneration();
+    const current = () => referralLifetime.current === lifetime && sessionGeneration === getSessionGeneration();
     setReferralLoading(true);
     try {
       const data = await createFriendPillReferralService({});
+      if (!current()) return;
       const code = data?.referral_code;
       if (!code) throw new Error('Referral code was not returned.');
       const baseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || webBaseUrl;
       const url = `${baseUrl.replace(/\/+$/, '')}/register?referral_code=${encodeURIComponent(code)}`;
       await Share.share({ message: url, url });
     } catch (err: any) {
-      Alert.alert('Referral failed', err?.response?.data?.detail || err?.message || 'Failed to create referral link.');
+      if (current()) Alert.alert('Referral failed', err?.response?.data?.detail || err?.message || 'Failed to create referral link.');
     } finally {
-      setReferralLoading(false);
+      if (current()) setReferralLoading(false);
     }
   };
 
@@ -105,20 +114,23 @@ export default function OrganizationProfileScreen() {
       description: 'Manage organization members, roles, and pharmacy access',
       icon: 'account-plus-outline',
       route: '/organization/invite',
+      visible: can.invite,
     },
     {
       title: 'Manage Pharmacies',
       description: 'Open organization pharmacies and store-level teams',
       icon: 'store-outline',
       route: '/organization/pharmacies',
+      visible: can.pharmacies,
     },
     {
       title: 'Pill Rewards',
       description: `${pillSummary.balance} pills available`,
       icon: 'pill',
       route: '/organization/pills',
+      visible: true,
     },
-  ];
+  ].filter((item) => item.visible);
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
@@ -177,19 +189,15 @@ export default function OrganizationProfileScreen() {
             <List.Item
               title="Notifications"
               left={(props) => <List.Icon {...props} icon="bell" />}
-              right={() => (
-                <Switch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
-                  color="#6366F1"
-                />
-              )}
+              right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => router.push('/notifications' as any)}
             />
             <Divider />
             <List.Item
               title="App Settings"
               left={(props) => <List.Icon {...props} icon="cog" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => router.push('/app-preferences' as any)}
             />
           </Surface>
         </View>
@@ -208,14 +216,14 @@ export default function OrganizationProfileScreen() {
               title="Terms of Service"
               left={(props) => <List.Icon {...props} icon="file-document" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => Linking.openURL(`${webBaseUrl}/terms-of-service`)}
+              onPress={() => openWebPage('/terms-of-service').catch(() => Alert.alert('Website unavailable', 'Please try again.'))}
             />
             <Divider />
             <List.Item
               title="Privacy Policy"
               left={(props) => <List.Icon {...props} icon="shield-check" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => Linking.openURL(`${webBaseUrl}/privacy-policy`)}
+              onPress={() => openWebPage('/privacy-policy').catch(() => Alert.alert('Website unavailable', 'Please try again.'))}
             />
           </Surface>
         </View>

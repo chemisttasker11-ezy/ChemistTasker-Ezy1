@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, HelperText, RadioButton, Text, TextInput } from 'react-native-paper';
+import { Button, HelperText, RadioButton, Text, TextInput } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
+import { RootPageHeader } from '@/components/RootPageHeader';
 import { useRouter } from 'expo-router';
 import { attendance } from '@chemisttasker/shared-core';
 
@@ -38,9 +40,10 @@ export default function AttendancePinScreen() {
     } catch (e: any) { setSaveError(e?.payload?.error || e?.message || 'PIN was not saved. Try again.'); }
     finally { setSaving(false); }
   };
-  return <SafeAreaView style={styles.page}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-    <Button icon="arrow-left" onPress={() => router.back()}>Back</Button>
-    <Text variant="headlineMedium">Attendance PIN</Text>
+  return <SafeAreaView style={styles.page} edges={['left', 'right', 'bottom']}>
+    <RootPageHeader title="Attendance PIN" disabled={saving} />
+    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <Text variant="headlineMedium">Attendance PIN</Text>
     <Text>Choose your pharmacy, then set a 4 to 6 digit PIN for its attendance terminal. This is separate from your account password.</Text>
     {loading && <ActivityIndicator accessibilityLabel="Loading pharmacy memberships" />}
     {!!loadError && <><HelperText type="error" accessibilityLiveRegion="polite">{loadError}</HelperText><Button onPress={load}>Reload pharmacies</Button></>}

@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, FlatList, ScrollView } from 'react-native';
 import { Searchbar, Button, Text, Divider, Chip, IconButton, Menu, useTheme } from 'react-native-paper';
 import type { ChatRoom } from './types';
@@ -18,6 +18,9 @@ type Props = {
   onRefresh: () => void;
   canCreate: boolean;
   canPin: boolean;
+  pharmacyTeams?: Array<{ id: number; name: string }>;
+  onOpenPharmacyTeam?: (pharmacyId: number) => void;
+  openingPharmacyId?: number | null;
   shiftContacts?: any[];
   onSelectShiftContact?: (contact: any) => void;
   onDeleteRoom?: (room: ChatRoom) => void;
@@ -38,6 +41,9 @@ export default function ChatSidebar({
   onRefresh,
   canCreate,
   canPin,
+  pharmacyTeams = [],
+  onOpenPharmacyTeam,
+  openingPharmacyId = null,
   shiftContacts = [],
   onSelectShiftContact,
   onDeleteRoom,
@@ -71,44 +77,26 @@ export default function ChatSidebar({
     return { pinned, groupChats, dmChats };
   }, [filtered]);
 
-  const findMatchingRoomForShift = useCallback(
-    (contact: any): ChatRoom | null => {
-      const name = (displayNameFromUser(contact?.user) || '').toLowerCase();
-      const email = (contact?.user?.email || '').toLowerCase();
-      return (
-        rooms.find((r) => {
-          if (r.type !== 'DM') return false;
-          const title = (r.title || '').toLowerCase();
-          const pharmacyName = (r as any)?.pharmacy?.name?.toLowerCase?.() || '';
-          const matchTitle = title === name || title === email || title === pharmacyName;
-          const matchPartial = title === email || title === name || pharmacyName === name;
-          return matchTitle || matchPartial;
-        }) || null
-      );
-    },
-    [rooms],
-  );
-
+  // Contact identity must be resolved by the backend using the real user ID.
+  // Matching a room by display name/email could open another worker's DM when names collide.
   const shiftItems = useMemo(() => {
-    return (shiftContacts || []).map((c, idx) => {
-      const match = findMatchingRoomForShift(c);
-      const display = displayNameFromUser(c.user) || c.pharmacy_name || 'Shift Contact';
+    return (shiftContacts || []).map((contact, index) => {
+      const display = displayNameFromUser(contact.user) || contact.pharmacy_name || 'Shift Contact';
+      const userId = contact?.user?.id;
       return {
-        key: `shift-${idx}`,
-        contact: c,
-        room: match ?? ({
-          id: -100000 - idx,
+        key: `shift-${userId ?? index}-${contact?.shift_id ?? index}`,
+        contact,
+        room: {
+          id: -100000 - index,
           title: display,
           type: 'GROUP',
           unread_count: 0,
-          updated_at: c.shift_date,
+          updated_at: contact.shift_date,
           last_message: undefined,
-        } as any),
-        display,
-        matched: !!match,
+        } as ChatRoom,
       };
     });
-  }, [shiftContacts, findMatchingRoomForShift]);
+  }, [shiftContacts]);
 
   const listForFilter = useMemo(() => {
     if (filter === 'group') return grouped.groupChats;
@@ -165,7 +153,20 @@ export default function ChatSidebar({
         </Chip>
       </View>
 
-      {listForFilter.length === 0 ? (
+      {pharmacyTeams.length > 0 && (filter === 'all' || filter === 'group') ? (
+        <View style={styles.teamSection}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.onSurfaceVariant }]}>Pharmacy teams</Text>
+          <Text style={[styles.teamHint, { color: theme.colors.onSurfaceVariant }]}>Open your pharmacy’s shared team conversation</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamChips}>
+            {pharmacyTeams.map(pharmacy => (
+              <Chip key={pharmacy.id} mode="outlined" icon="account-group" disabled={openingPharmacyId != null} onPress={() => onOpenPharmacyTeam?.(pharmacy.id)} accessibilityLabel={`Open ${pharmacy.name} team chat`}>
+                {openingPharmacyId === pharmacy.id ? 'Opening…' : pharmacy.name}
+              </Chip>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+      {listForFilter.length === 0 && !(pharmacyTeams.length > 0 && (filter === 'all' || filter === 'group')) ? (
         <View style={styles.empty}>
           <Text>No conversations found</Text>
         </View>
@@ -179,7 +180,8 @@ export default function ChatSidebar({
                   key={`p-${item.id}`}
                   room={item}
                   onPress={onSelect}
-                  onTogglePin={canPin ? onTogglePin : () => {}}
+                  onTogglePin={onTogglePin}
+                  canPin={canPin}
                   onDelete={onDeleteRoom}
                   onEdit={onEditRoom}
                   onManageMembers={onManageGroup}
@@ -199,7 +201,8 @@ export default function ChatSidebar({
                   key={`g-${item.id}`}
                   room={item}
                   onPress={onSelect}
-                  onTogglePin={canPin ? onTogglePin : () => {}}
+                  onTogglePin={onTogglePin}
+                  canPin={canPin}
                   onDelete={onDeleteRoom}
                   onEdit={onEditRoom}
                   onManageMembers={onManageGroup}
@@ -214,14 +217,13 @@ export default function ChatSidebar({
           {filter === 'shift' && shiftItems.length > 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.colors.onSurfaceVariant }]}>Shifts</Text>
-              {shiftItems.map(({ key, room, contact, matched }) => (
+              {shiftItems.map(({ key, room, contact }) => (
                 <ChatListItem
                   key={key}
                   room={room}
-                  onPress={() =>
-                    matched && room?.id ? onSelect(room) : onSelectShiftContact && onSelectShiftContact(contact)
-                  }
+                  onPress={() => onSelectShiftContact?.(contact)}
                   onTogglePin={() => {}}
+                  canPin={false}
                   canEditDelete={false}
                 />
               ))}
@@ -237,7 +239,8 @@ export default function ChatSidebar({
                   key={`dm-${item.id}`}
                   room={item}
                   onPress={onSelect}
-                  onTogglePin={canPin ? onTogglePin : () => {}}
+                  onTogglePin={onTogglePin}
+                  canPin={canPin}
                   onDelete={onDeleteRoom}
                   onEdit={onEditRoom}
                   onManageMembers={onManageGroup}
@@ -279,6 +282,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 0,
   },
+  teamSection: { paddingVertical: 12, gap: 8 },
+  teamHint: { fontSize: 12 },
+  teamChips: { gap: 8, paddingVertical: 4 },
   section: { paddingVertical: 6 },
   sectionTitle: { fontWeight: '700' },
 });

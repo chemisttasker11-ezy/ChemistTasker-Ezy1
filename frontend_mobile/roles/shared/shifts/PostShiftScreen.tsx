@@ -1,21 +1,27 @@
-import { buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, getShiftPostingOwnerAdjustedRate, type ShiftPostingDraft } from '@chemisttasker/shared-core';
+import { ApiError, buildShiftPostingPayload, buildShiftPostingPreview, validateShiftPostingDraft, haveShiftPostingSlotRatesChanged, getShiftPostingOwnerAdjustedRate, shiftPostingDateWindow, splitPostableDates, type ShiftPostingDraft } from '@chemisttasker/shared-core';
+import { getApiConfig } from '@chemisttasker/shared-core';
+import { isTerminalIntentError, mobilePendingIntentStore } from '../talent-board/pendingPitch';
 import NativeShiftBoardPreview from './NativeShiftBoardPreview';
 import { expandShiftDraftSlots, reconcileShiftDraftRateRows } from '@chemisttasker/shared-core';
 import { normalizeWorkloadTags, pharmacySoftwareDefaults, mergeSoftwareDefaults, type SupportEntry } from '@chemisttasker/shared-core';
 import skillsRegistry from '@chemisttasker/shared-core/skills_registry.json';
 import { normalizeShiftRequirements, canNotifyShiftChainMembers, isPrivateShiftBooking, automaticShiftEscalationDates, type ShiftEscalationPlan } from '@chemisttasker/shared-core';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { Alert, View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import {
     Text,
     Button,
     HelperText,
     Snackbar,
 } from 'react-native-paper';
-import { DatePickerModal } from 'react-native-paper-dates';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { GuardedDatePickerModal as DatePickerModal, GuardedTimePickerModal as TimePickerModal } from '@/components/security/GuardedModal';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '@/context/AuthContext';
+import { ContentState } from '@/components/ui';
+import { space } from '@/constants/tokens';
+import { useShiftSurface } from './useShiftSurface';
+import { shiftRoute } from './shiftSurface';
 import {
     fetchPharmaciesService,
     fetchWorkerShiftDetailService,
@@ -23,7 +29,7 @@ import {
     updateOwnerShiftService,
     calculateShiftRates,
 } from '@chemisttasker/shared-core';
-import { listShiftDescriptionTemplates, saveShiftDescriptionTemplate, updatePharmacy } from '@chemisttasker/shared-core';
+import { listShiftDescriptionTemplates, saveShiftDescriptionTemplate, deleteShiftDescriptionTemplate, updatePharmacy } from '@chemisttasker/shared-core';
 
 import {
     BASE_STEP_ORDER,
@@ -41,9 +47,28 @@ import {
     pharmacyHoursForDate,
     toIsoDate,
     toLocalIsoDate,
+    pharmacyPostingDate,
+    withEscalationDate,
+    withEscalationTime,
+    getEscalationClock,
     normalizePrefillRole,
+    parsePostShiftSearchParams,
+    pickScopedPharmacyId,
+    pickRetryPostShiftPharmacyId,
+    canAccessPostShift,
+    type PostShiftRawParams,
+    AppliedPrefills,
+    computePrefillPlan,
+    computeResetFormPrefills,
+    type PostShiftFormResetOptions,
+    getStablePostShiftParamsKey,
+    runPostShiftInitChain,
+    shouldTriggerPostShiftInit,
+    type PostShiftInitScope,
+    validateSlotEntries,
 } from './PostShiftScreen.helpers';
 import { styles } from './PostShiftScreen.styles';
+import { useUnsavedChangesGuard } from '../forms/useUnsavedChangesGuard';
 import PostShiftDetailsStep from './PostShiftDetailsStep';
 import PostShiftSkillsStep from './PostShiftSkillsStep';
 import PostShiftVisibilityStep from './PostShiftVisibilityStep';
@@ -53,10 +78,44 @@ import PostShiftTimetableStep from './PostShiftTimetableStep';
 
 export default function PostShiftScreen() {
     const router = useRouter();
-    const params = useLocalSearchParams<{ edit?: string; dates?: string; date?: string; role?: string; role_needed?: string; start_time?: string; end_time?: string; dedicated_user?: string; embedded?: string }>();
-    const editingId = params?.edit ? Number(params.edit) : null;
+    const params = useLocalSearchParams<PostShiftRawParams>();
+    const surface = useShiftSurface();
+    const { user, hasCapability } = useAuth();
+    const paramsKey = useMemo(() => getStablePostShiftParamsKey(params), [
+        params?.edit,
+        params?.pharmacyId,
+        params?.pharmacy_id,
+        params?.pharmacy,
+        params?.dates,
+        params?.slot_dates,
+        params?.date,
+        params?.slot_date,
+        params?.role_needed,
+        params?.role,
+        params?.start_time,
+        params?.start,
+        params?.end_time,
+        params?.end,
+        params?.dedicated_user,
+        params?.dedicated_user_id,
+        params?.visibility,
+        params?.employment_type,
+        params?.embedded,
+    ]);
+    const parsedParams = useMemo(() => parsePostShiftSearchParams(params), [paramsKey]);
+    const { editingId, routePharmacyId, isEmbedded } = parsedParams;
+    const hasAccess = canAccessPostShift(surface, routePharmacyId, hasCapability);
+
     const loadedVisibilityRef = React.useRef<string | null>(null);
-    const isEmbedded = params?.embedded === '1';
+    const loadGenRef = React.useRef(0);
+    const appliedPrefillsRef = React.useRef<AppliedPrefills>({});
+
+    useEffect(() => {
+        return () => {
+            loadGenRef.current += 1;
+        };
+    }, [editingId, surface.scopedPharmacyId]);
+    const [loadError, setLoadError] = useState<{ kind: 'pharmacies' | 'shift' | 'access'; message: string } | null>(null);
 
     const [pharmacies, setPharmacies] = useState<PharmacyOption[]>([]);
     const [pharmacyId, setPharmacyId] = useState<number | ''>('');
@@ -77,26 +136,42 @@ export default function PostShiftScreen() {
     const [rateType, setRateType] = useState<RateType>('FLEXIBLE');
     const [ownerBonus, setOwnerBonus] = useState('');
     const [slots, setSlots] = useState<SlotEntry[]>([]);
-    const [slotDate, setSlotDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [slotDate, setSlotDate] = useState<string>(() => toLocalIsoDate(new Date()));
     const [selectedDates, setSelectedDates] = useState<string[]>([]);
     const [selectedDateTimes, setSelectedDateTimes] = useState<Record<string, { startTime: string; endTime: string }>>({});
     const [slotStart, setSlotStart] = useState('09:00');
     const [slotEnd, setSlotEnd] = useState('17:00');
+    const liveTimesRef = React.useRef({ startTime: '09:00', endTime: '17:00' });
+    liveTimesRef.current = { startTime: slotStart, endTime: slotEnd };
     const [slotRecurring, setSlotRecurring] = useState(false);
     const [slotRecurringDays, setSlotRecurringDays] = useState<number[]>([]);
-    const [slotRecurringEnd, setSlotRecurringEnd] = useState<string>(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+    const [slotRecurringEnd, setSlotRecurringEnd] = useState<string>(() => toLocalIsoDate(new Date(Date.now() + 7 * 86400000)));
     const [slotDatePickerOpen, setSlotDatePickerOpen] = useState(false);
     const [recurringEndPickerOpen, setRecurringEndPickerOpen] = useState(false);
     const [escalationPicker, setEscalationPicker] = useState<{ key: keyof VisibilityDates | null; open: boolean }>({ key: null, open: false });
+    const [escalationTimePicker, setEscalationTimePicker] = useState<{ key: keyof VisibilityDates | null; open: boolean }>({ key: null, open: false });
+    // A custom schedule is not applied until both the date and clock are confirmed.
+    const [pendingEscalationDate, setPendingEscalationDate] = useState<string | null>(null);
     const [escalationDates, setEscalationDates] = useState<VisibilityDates>({});
     const [description, setDescription] = useState('');
     const [descriptionTemplate, setDescriptionTemplate] = useState<ShiftDescriptionTemplate | null>(null);
     const [descriptionTemplateLoading, setDescriptionTemplateLoading] = useState(false);
+    const [descriptionTemplateError, setDescriptionTemplateError] = useState('');
+    const [templateRetry, setTemplateRetry] = useState(0);
     const [descriptionTemplateSaving, setDescriptionTemplateSaving] = useState(false);
     const [descriptionTemplateAutoAppliedKey, setDescriptionTemplateAutoAppliedKey] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const postingBusyRef = React.useRef(false);
+    const postingScopeRef = React.useRef(`${surface.scopeKey}:${editingId ?? 'new'}`);
+    postingScopeRef.current = `${surface.scopeKey}:${editingId ?? 'new'}`;
+    useEffect(() => () => {
+        postingScopeRef.current = 'disposed';
+    }, []);
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
+    // The route change waits for visible native success feedback. This ref is
+    // read only inside event handlers, never during React rendering.
+    const postSuccessDestinationRef = React.useRef<string | null>(null);
     const [pharmacyMenuVisible, setPharmacyMenuVisible] = useState(false);
     const [activeStep, setActiveStep] = useState<StepKey>('details');
     const [calendarMonthAnchor, setCalendarMonthAnchor] = useState<Date>(new Date());
@@ -119,6 +194,7 @@ export default function PostShiftScreen() {
     const [ratePublicHoliday, setRatePublicHoliday] = useState('');
     const [rateEarlyMorning, setRateEarlyMorning] = useState('');
     const [rateLateNight, setRateLateNight] = useState('');
+    const manualRateEdits = React.useRef<{ pharmacyId: number | ''; fields: Set<string> }>({ pharmacyId: '', fields: new Set() });
 
     // FT/PT specific
     const [ftptPayMode, setFtptPayMode] = useState<'HOURLY' | 'ANNUAL'>('HOURLY');
@@ -159,12 +235,16 @@ export default function PostShiftScreen() {
         [isLocumLike]
     );
     const canSubmit = useMemo(() => Boolean(pharmacyId && (!isLocumLike || slots.length > 0)), [pharmacyId, isLocumLike, slots.length]);
+    const initialSlotsJsonRef = React.useRef<string | null>(null);
+    const initialRatesJsonRef = React.useRef<string | null>(null);
 
-    const resetForm = useCallback(() => {
-        const todayIso = new Date().toISOString().split('T')[0];
-        setCalendarMonthAnchor(new Date(`${todayIso}T00:00:00`));
+    const resetForm = useCallback((options?: PostShiftFormResetOptions) => {
+        const resetTimes = options?.times ?? liveTimesRef.current;
+        const prefillState = computeResetFormPrefills(parsedParams, options, resetTimes);
+        const todayIso = toLocalIsoDate(new Date());
+        setCalendarMonthAnchor(new Date(`${prefillState.slotDate || todayIso}T00:00:00`));
         setPharmacyId('');
-        setRoleNeeded('PHARMACIST');
+        setRoleNeeded(prefillState.roleNeeded);
         setEmploymentType('LOCUM');
         setWorkloadTags([]);
         setSupportOnShift([]);
@@ -175,21 +255,23 @@ export default function PostShiftScreen() {
         setHasTravel(false); setHasAccommodation(false); setIsUrgent(false); setFlexibleTiming(false);
         setInitialAudience('');
         setRateType('FLEXIBLE');
+        manualRateEdits.current = { pharmacyId: '', fields: new Set() };
         setOwnerBonus('');
         setDescription('');
         setDescriptionTemplate(null);
         setDescriptionTemplateAutoAppliedKey(null);
         setDescriptionTemplateLoading(false);
         setDescriptionTemplateSaving(false);
-        setSlots([]);
-        setSlotDate(todayIso);
-        setSelectedDates([]);
-        setSelectedDateTimes({});
-        setSlotStart('09:00');
-        setSlotEnd('17:00');
+        setDescriptionTemplateError('');
+        setSlots(prefillState.slots);
+        setSlotDate(prefillState.slotDate);
+        setSelectedDates(prefillState.selectedDates);
+        setSelectedDateTimes(prefillState.selectedDateTimes);
+        setSlotStart(prefillState.slotStart);
+        setSlotEnd(prefillState.slotEnd);
         setSlotRecurring(false);
         setSlotRecurringDays([]);
-        setSlotRecurringEnd(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+        setSlotRecurringEnd(toLocalIsoDate(new Date(Date.now() + 7 * 86400000)));
         setEscalationDates({});
         setEscalationPlan({ mode: 'off', everyHours: 24 });
         setToast('');
@@ -214,20 +296,24 @@ export default function PostShiftScreen() {
         setMinAnnual('');
         setMaxAnnual('');
         setSavingPharmacyRates(false);
-        setDedicatedUserId(null);
+        setDedicatedUserId(prefillState.dedicatedUserId);
         initialSlotsJsonRef.current = null;
         initialRatesJsonRef.current = null;
-    }, []);
+    }, [parsedParams]);
 
     // Reset escalation dates when the initial audience changes, mirroring web behaviour
     const hasInitialAudienceRun = React.useRef(false);
-    const initialSlotsJsonRef = React.useRef<string | null>(null);
-    const initialRatesJsonRef = React.useRef<string | null>(null);
+    const recoveryAudience = React.useRef<string | null>(null);
     useEffect(() => {
         // Skip the first run so preloaded escalation dates are kept when editing
         if (!hasInitialAudienceRun.current) {
             hasInitialAudienceRun.current = true;
             return;
+        }
+        if (recoveryAudience.current !== null) {
+            const hydratedAudience = recoveryAudience.current;
+            recoveryAudience.current = null;
+            if (initialAudience === hydratedAudience) return;
         }
         setEscalationDates({});
     }, [initialAudience]);
@@ -256,10 +342,16 @@ export default function PostShiftScreen() {
         () => pharmacies.find((x) => x.id === pharmacyId),
         [pharmacyId, pharmacies]
     );
+    const pharmacyToday = () => pharmacyPostingDate(selectedPharmacy?.timezone, new Date(), selectedPharmacy?.state, selectedPharmacy?.postcode);
+    const postingWindow = shiftPostingDateWindow(pharmacyToday());
     const getDefaultTimesForDate = useCallback(
-        (date: string, fallback: SlotTime = { startTime: slotStart, endTime: slotEnd }) =>
-            pharmacyHoursForDate(selectedPharmacy, date, fallback),
-        [selectedPharmacy, slotEnd, slotStart]
+        (date: string, fallback?: SlotTime) =>
+            pharmacyHoursForDate(
+                selectedPharmacy,
+                date,
+                fallback ?? { startTime: liveTimesRef.current.startTime, endTime: liveTimesRef.current.endTime }
+            ),
+        [selectedPharmacy]
     );
     const slotDateHours = useMemo(
         () => (slotDate ? getDefaultTimesForDate(slotDate) : null),
@@ -278,28 +370,43 @@ export default function PostShiftScreen() {
 
     useEffect(() => {
         if (!selectedPharmacy || editingId) return;
+        const edits = manualRateEdits.current;
+        if (edits.pharmacyId !== pharmacyId) {
+            manualRateEdits.current = { pharmacyId, fields: new Set() };
+        }
+        const touched = manualRateEdits.current.fields;
         const normalize = (val: any) => (val === undefined || val === null || val === '' ? '' : String(val));
         const defaultRateType = (selectedPharmacy as any).default_rate_type || (selectedPharmacy as any).defaultRateType || 'FLEXIBLE';
-
-        setRateType(defaultRateType);
-        setRateWeekday(normalize((selectedPharmacy as any).rate_weekday ?? (selectedPharmacy as any).rateWeekday));
-        setRateSaturday(normalize((selectedPharmacy as any).rate_saturday ?? (selectedPharmacy as any).rateSaturday));
-        setRateSunday(normalize((selectedPharmacy as any).rate_sunday ?? (selectedPharmacy as any).rateSunday));
-        setRatePublicHoliday(normalize((selectedPharmacy as any).rate_public_holiday ?? (selectedPharmacy as any).ratePublicHoliday));
-        setRateEarlyMorning(normalize((selectedPharmacy as any).rate_early_morning ?? (selectedPharmacy as any).rateEarlyMorning));
-        setRateLateNight(normalize((selectedPharmacy as any).rate_late_night ?? (selectedPharmacy as any).rateLateNight));
-    }, [selectedPharmacy, editingId]);
+        // A late refresh of the pharmacy's defaults may not overwrite rates
+        // the manager has already changed in the active Post Shift form.
+        if (!touched.has('rateType')) setRateType(defaultRateType);
+        if (!touched.has('rateWeekday')) setRateWeekday(normalize((selectedPharmacy as any).rate_weekday ?? (selectedPharmacy as any).rateWeekday));
+        if (!touched.has('rateSaturday')) setRateSaturday(normalize((selectedPharmacy as any).rate_saturday ?? (selectedPharmacy as any).rateSaturday));
+        if (!touched.has('rateSunday')) setRateSunday(normalize((selectedPharmacy as any).rate_sunday ?? (selectedPharmacy as any).rateSunday));
+        if (!touched.has('ratePublicHoliday')) setRatePublicHoliday(normalize((selectedPharmacy as any).rate_public_holiday ?? (selectedPharmacy as any).ratePublicHoliday));
+        if (!touched.has('rateEarlyMorning')) setRateEarlyMorning(normalize((selectedPharmacy as any).rate_early_morning ?? (selectedPharmacy as any).rateEarlyMorning));
+        if (!touched.has('rateLateNight')) setRateLateNight(normalize((selectedPharmacy as any).rate_late_night ?? (selectedPharmacy as any).rateLateNight));
+    }, [selectedPharmacy, editingId, pharmacyId]);
 
     // New shifts start with the pharmacy's own software (one per category) as preferred experience, by registry ID.
     const softwareDefaults = React.useRef<string[]>([]);
+    const recoverySoftwarePharmacy = React.useRef<number | null>(null);
     useEffect(() => {
         if (editingId || !selectedPharmacy || !roleNeeded) return;
         const next = pharmacySoftwareDefaults(skillsRegistry as any, roleNeeded as any, (selectedPharmacy as any).software || []);
         const previous = softwareDefaults.current;
         softwareDefaults.current = next;
+        if (recoverySoftwarePharmacy.current === Number(pharmacyId)) {
+            recoverySoftwarePharmacy.current = null;
+            return;
+        }
+        recoverySoftwarePharmacy.current = null;
         setNiceToHave(current => mergeSoftwareDefaults(current, mustHave, previous, next));
     }, [selectedPharmacy, roleNeeded, editingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Match the web Post Shift audience and one-time notification policy.
+    const showNotifyPharmacyStaff = !isPrivateBooking && !editingId && ['FULL_PART_TIME', 'LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN', 'PLATFORM'].includes(initialAudience);
+    const showNotifyFavoriteStaff = !isPrivateBooking && !editingId && ['LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN', 'PLATFORM'].includes(initialAudience);
     const showNotifyChainMembers = !isPrivateBooking && !editingId && canNotifyShiftChainMembers(allowedVis, initialAudience);
     const escalationTierKey = allowedVis.join(',');
     useEffect(() => {
@@ -309,8 +416,10 @@ export default function PostShiftScreen() {
         }
     }, [escalationTierKey, initialAudience, escalationPlan.mode, escalationPlan.everyHours, isPrivateBooking]); // eslint-disable-line react-hooks/exhaustive-deps
     useEffect(() => {
+        if (!showNotifyPharmacyStaff) setNotifyPharmacyStaff(false);
+        if (!showNotifyFavoriteStaff) setNotifyFavoriteStaff(false);
         if (!showNotifyChainMembers) setNotifyChainMembers(false);
-    }, [showNotifyChainMembers]);
+    }, [showNotifyPharmacyStaff, showNotifyFavoriteStaff, showNotifyChainMembers]);
 
     // Ensure initial audience stays within allowed tiers
     useEffect(() => {
@@ -342,193 +451,142 @@ export default function PostShiftScreen() {
         }
     }, [allowedVis, pharmacyId, editingId]);
 
-    const loadPharmacies = useCallback(async () => {
-        try {
-            const data = await fetchPharmaciesService({});
-            const list = Array.isArray((data as any)?.results)
-                ? (data as any).results
-                : Array.isArray(data)
-                    ? data
-                    : [];
-            // Keep full objects so allowed_escalation_levels/chain/org flags flow through
-            setPharmacies(list as PharmacyOption[]);
-            if (!editingId && list.length > 0) {
-                setPharmacyId((current) => current || Number(list[0].id));
-            }
-            setPharmaciesLoaded(true);
-        } catch {
-            setError('Unable to load pharmacies');
+    const hydrateShift = useCallback((data: any, currentPharmacies: PharmacyOption[], gen: number, options?: { rateDefaults?: boolean }) => {
+        if (gen !== loadGenRef.current) return;
+        const pharmacyValue =
+            data.pharmacy_detail?.id ??
+            data.pharmacyDetail?.id ??
+            data.pharmacy ??
+            data.pharmacy_id ??
+            '';
+        const hydratedPharmacyId = typeof pharmacyValue === 'object' && pharmacyValue !== null
+            ? Number((pharmacyValue as any).id)
+            : Number(pharmacyValue);
+        if (surface.persona === 'admin' && surface.scopedPharmacyId != null &&
+            hydratedPharmacyId !== surface.scopedPharmacyId) {
+            setLoadError({ kind: 'access', message: 'You do not have access to this shift.' });
+            setError('You do not have access to this shift.');
+            router.back();
+            return;
         }
-    }, []);
-
-    const loadShift = useCallback(async () => {
-        if (!editingId) return;
-        try {
-            const data: any = await fetchWorkerShiftDetailService(editingId);
-            setPharmacyId(
-                data.pharmacy_detail?.id ??
-                data.pharmacyDetail?.id ??
-                data.pharmacy ??
-                data.pharmacy_id ??
-                ''
-            );
-            const pharmacyValue =
-                data.pharmacy_detail?.id ??
-                data.pharmacyDetail?.id ??
-                data.pharmacy ??
-                data.pharmacy_id ??
-                '';
-            const pharmacyDefaults = pharmacies.find((item: any) => Number(item.id) === Number(pharmacyValue));
-            // Ensure the pharmacy from the shift exists in the options list (matches web behavior of showing current pharmacy)
-            if (data.pharmacy_detail || data.pharmacyDetail) {
-                const detail = data.pharmacy_detail ?? data.pharmacyDetail;
-                setPharmacies((prev) => {
-                    const exists = prev.some((p) => p.id === detail.id);
-                    return exists ? prev : [...prev, detail];
-                });
-            }
-            setRoleNeeded(data.role_needed ?? data.roleNeeded ?? data.role ?? 'PHARMACIST');
-            setEmploymentType(data.employment_type ?? data.employmentType ?? 'LOCUM');
-            const vis = data.visibility ?? '';
-            setInitialAudience(vis);
-            loadedVisibilityRef.current = vis;
-            setWorkloadTags(normalizeWorkloadTags(skillsRegistry as any, Array.isArray(data.workload_tags ?? data.workloadTags) ? (data.workload_tags ?? data.workloadTags) : []));
-            setSupportOnShift(data.support_on_shift ?? data.supportOnShift ?? []);
-            setDescription(data.description ?? '');
-            setHideName(Boolean(data.post_anonymously ?? data.postAnonymously));
-            setSingleUserOnly(Boolean(data.single_user_only ?? data.singleUserOnly));
-            setHasTravel(Boolean(data.hasTravel ?? data.has_travel));
-            setHasAccommodation(Boolean(data.hasAccommodation ?? data.has_accommodation));
-            setIsUrgent(Boolean(data.isUrgent ?? data.is_urgent));
-            setFlexibleTiming(Boolean(data.flexibleTiming ?? data.flexible_timing));
-            setMustHave(normalizeShiftRequirements(skillsRegistry as any, Array.isArray(data.must_have ?? data.mustHave) ? (data.must_have ?? data.mustHave) : []));
-            setNiceToHave(normalizeShiftRequirements(skillsRegistry as any, Array.isArray(data.nice_to_have ?? data.niceToHave) ? (data.nice_to_have ?? data.niceToHave) : []));
-            const escalations =
-                typeof (data.escalation_dates ?? data.escalationDates) === 'object' && (data.escalation_dates ?? data.escalationDates)
-                    ? (data.escalation_dates ?? data.escalationDates)
-                    : {
-                        locum_casual: data.escalate_to_locum_casual ?? data.escalateToLocumCasual,
-                        owner_chain: data.escalate_to_owner_chain ?? data.escalateToOwnerChain,
-                        org_chain: data.escalate_to_org_chain ?? data.escalateToOrgChain,
-                        platform: data.escalate_to_platform ?? data.escalateToPlatform,
-                    };
-            setEscalationDates(escalations);
-            setEscalationPlan({ mode: Object.values(escalations).some(Boolean) ? 'custom' : 'off', everyHours: 24 });
-            setDedicatedUserId(typeof data.dedicatedUser === 'number' ? data.dedicatedUser : typeof data.dedicated_user === 'number' ? data.dedicated_user : null);
-            const initOwnerBonus = toRateInputString(getShiftPostingOwnerAdjustedRate(data));
-            setOwnerBonus(initOwnerBonus);
-            const rateTypeValue = data.rate_type ?? data.rateType;
-            if (rateTypeValue === 'PHARMACIST_PROVIDED') {
-                setRateType('PHARMACIST_PROVIDED');
-            } else if (rateTypeValue === 'FIXED') {
-                setRateType('FIXED');
-            } else {
-                setRateType('FLEXIBLE');
-            }
-            const initWeekday = toRateInputString(firstPresent(data.rate_weekday, data.rateWeekday, (pharmacyDefaults as any)?.rate_weekday, (pharmacyDefaults as any)?.rateWeekday));
-            setRateWeekday(initWeekday);
-            const initSaturday = toRateInputString(firstPresent(data.rate_saturday, data.rateSaturday, (pharmacyDefaults as any)?.rate_saturday, (pharmacyDefaults as any)?.rate_saturday));
-            setRateSaturday(initSaturday);
-            const initSunday = toRateInputString(firstPresent(data.rate_sunday, data.rateSunday, (pharmacyDefaults as any)?.rate_sunday, (pharmacyDefaults as any)?.rateSunday));
-            setRateSunday(initSunday);
-            const initPublicHoliday = toRateInputString(firstPresent(data.rate_public_holiday, data.ratePublicHoliday, (pharmacyDefaults as any)?.rate_public_holiday, (pharmacyDefaults as any)?.ratePublicHoliday));
-            setRatePublicHoliday(initPublicHoliday);
-            const initEarlyMorning = toRateInputString(firstPresent(data.rate_early_morning, data.rateEarlyMorning, (pharmacyDefaults as any)?.rate_early_morning, (pharmacyDefaults as any)?.rateEarlyMorning));
-            setRateEarlyMorning(initEarlyMorning);
-            const initLateNight = toRateInputString(firstPresent(data.rate_late_night, data.rateLateNight, (pharmacyDefaults as any)?.rate_late_night, (pharmacyDefaults as any)?.rateLateNight));
-            setRateLateNight(initLateNight);
-            setPaymentPreference((data.payment_preference ?? data.paymentPreference ?? 'ABN') === 'TFN' ? 'TFN' : 'ABN');
-            const detailSuper = data.super_percent ?? data.superPercent;
-            if (detailSuper === null || detailSuper === undefined || detailSuper === '') {
-                setLocumSuperIncluded(true);
-                setSuperPercent('');
-            } else {
-                const superNumber = Number(detailSuper);
-                setLocumSuperIncluded(superNumber > 0);
-                setSuperPercent(String(detailSuper));
-            }
-            const parsedSlots = Array.isArray(data.slots)
-                ? data.slots.map((s: any) => ({
-                    date: s.date ?? s.slot_date ?? s.shift_date ?? '',
-                    startTime: s.startTime ?? s.start_time ?? '',
-                    endTime: s.endTime ?? s.end_time ?? '',
-                    isRecurring: Boolean(s.is_recurring ?? s.isRecurring),
-                    recurringDays: Array.isArray(s.recurring_days ?? s.recurringDays) ? s.recurring_days ?? s.recurringDays : [],
-                    recurringEndDate: s.recurringEndDate ?? s.recurring_end_date ?? '',
-                }))
-                : [];
-            setSlots(parsedSlots);
-            const expanded = expandShiftDraftSlots(parsedSlots);
-            const rawSlots = Array.isArray(data.slots) ? data.slots : [];
-            const initialSlotRateRows = expanded.map((s) => {
-                const source = rawSlots[s.sourceIndex];
-                const rate = toRateInputString(getSlotRateValue(source));
-                return { rate, status: rate ? 'success' as const : 'idle' as const, dirty: Boolean(rate) };
+        const pharmacyDefaults = currentPharmacies.find((item: any) => Number(item.id) === Number(pharmacyValue));
+        if (data.pharmacy_detail || data.pharmacyDetail) {
+            const detail = data.pharmacy_detail ?? data.pharmacyDetail;
+            setPharmacies((prev) => {
+                const exists = prev.some((p) => p.id === detail.id);
+                return exists ? prev : [...prev, detail];
             });
-            setSlotRateRows(initialSlotRateRows);
-            initialSlotsJsonRef.current = JSON.stringify(parsedSlots);
-            initialRatesJsonRef.current = JSON.stringify({
-                rateType: rateTypeValue || 'FLEXIBLE',
-                rateWeekday: initWeekday,
-                rateSaturday: initSaturday,
-                rateSunday: initSunday,
-                ratePublicHoliday: initPublicHoliday,
-                rateEarlyMorning: initEarlyMorning,
-                rateLateNight: initLateNight,
-                ownerBonus: initOwnerBonus,
-                slotRates: initialSlotRateRows.map((r) => r.rate),
-            });
-
-
-
-        } catch {
-            setError('Unable to load shift details');
         }
-    }, [editingId, pharmacies]);
-
-    useEffect(() => {
-        const initialize = async () => {
-            if (!editingId) {
-                resetForm();
-            }
-            await loadPharmacies(); // This will set pharmaciesLoaded to true
-            if (editingId) {
-                // We need to wait for pharmacies to be loaded before loading the shift
-                // to ensure all dependencies like `allowedVis` are ready.
-                // The `pharmaciesLoaded` state change will trigger the next effect.
-            }
-        };
-        void initialize();
-    }, [editingId, loadPharmacies, resetForm]);
-
-    useEffect(() => { if (editingId && pharmaciesLoaded) { void loadShift(); } }, [editingId, pharmaciesLoaded, loadShift]);
+        if (gen !== loadGenRef.current) return;
+        setPharmacyId(pharmacyValue);
+        setRoleNeeded(data.role_needed ?? data.roleNeeded ?? data.role ?? 'PHARMACIST');
+        setEmploymentType(data.employment_type ?? data.employmentType ?? 'LOCUM');
+        const vis = data.visibility ?? '';
+        setInitialAudience(vis);
+        loadedVisibilityRef.current = vis;
+        setWorkloadTags(normalizeWorkloadTags(skillsRegistry as any, Array.isArray(data.workload_tags ?? data.workloadTags) ? (data.workload_tags ?? data.workloadTags) : []));
+        setSupportOnShift(data.support_on_shift ?? data.supportOnShift ?? []);
+        setDescription(data.description ?? '');
+        setHideName(Boolean(data.post_anonymously ?? data.postAnonymously));
+        setSingleUserOnly(Boolean(data.single_user_only ?? data.singleUserOnly));
+        setHasTravel(Boolean(data.hasTravel ?? data.has_travel));
+        setHasAccommodation(Boolean(data.hasAccommodation ?? data.has_accommodation));
+        setIsUrgent(Boolean(data.isUrgent ?? data.is_urgent));
+        setFlexibleTiming(Boolean(data.flexibleTiming ?? data.flexible_timing));
+        setMustHave(normalizeShiftRequirements(skillsRegistry as any, Array.isArray(data.must_have ?? data.mustHave) ? (data.must_have ?? data.mustHave) : []));
+        setNiceToHave(normalizeShiftRequirements(skillsRegistry as any, Array.isArray(data.nice_to_have ?? data.niceToHave) ? (data.nice_to_have ?? data.niceToHave) : []));
+        const escalations =
+            typeof (data.escalation_dates ?? data.escalationDates) === 'object' && (data.escalation_dates ?? data.escalationDates)
+                ? (data.escalation_dates ?? data.escalationDates)
+                : {
+                    locum_casual: data.escalate_to_locum_casual ?? data.escalateToLocumCasual,
+                    owner_chain: data.escalate_to_owner_chain ?? data.escalateToOwnerChain,
+                    org_chain: data.escalate_to_org_chain ?? data.escalateToOrgChain,
+                    platform: data.escalate_to_platform ?? data.escalateToPlatform,
+                };
+        setEscalationDates(escalations);
+        setEscalationPlan({ mode: Object.values(escalations).some(Boolean) ? 'custom' : 'off', everyHours: 24 });
+        setDedicatedUserId(typeof data.dedicatedUser === 'number' ? data.dedicatedUser : typeof data.dedicated_user === 'number' ? data.dedicated_user : null);
+        const initOwnerBonus = toRateInputString(getShiftPostingOwnerAdjustedRate(data));
+        setOwnerBonus(initOwnerBonus);
+        const rateTypeValue = data.rate_type ?? data.rateType;
+        if (rateTypeValue === 'PHARMACIST_PROVIDED') {
+            setRateType('PHARMACIST_PROVIDED');
+        } else if (rateTypeValue === 'FIXED') {
+            setRateType('FIXED');
+        } else {
+            setRateType('FLEXIBLE');
+        }
+        const rateDefaults = options?.rateDefaults === false ? undefined : pharmacyDefaults as any;
+        const initWeekday = toRateInputString(firstPresent(data.rate_weekday, data.rateWeekday, rateDefaults?.rate_weekday, rateDefaults?.rateWeekday));
+        setRateWeekday(initWeekday);
+        const initSaturday = toRateInputString(firstPresent(data.rate_saturday, data.rateSaturday, rateDefaults?.rate_saturday, rateDefaults?.rate_saturday));
+        setRateSaturday(initSaturday);
+        const initSunday = toRateInputString(firstPresent(data.rate_sunday, data.rateSunday, rateDefaults?.rate_sunday, rateDefaults?.rateSunday));
+        setRateSunday(initSunday);
+        const initPublicHoliday = toRateInputString(firstPresent(data.rate_public_holiday, data.ratePublicHoliday, rateDefaults?.rate_public_holiday, rateDefaults?.ratePublicHoliday));
+        setRatePublicHoliday(initPublicHoliday);
+        const initEarlyMorning = toRateInputString(firstPresent(data.rate_early_morning, data.rateEarlyMorning, rateDefaults?.rate_early_morning, rateDefaults?.rateEarlyMorning));
+        setRateEarlyMorning(initEarlyMorning);
+        const initLateNight = toRateInputString(firstPresent(data.rate_late_night, data.rateLateNight, rateDefaults?.rate_late_night, rateDefaults?.rateLateNight));
+        setRateLateNight(initLateNight);
+        setPaymentPreference((data.payment_preference ?? data.paymentPreference ?? 'ABN') === 'TFN' ? 'TFN' : 'ABN');
+        const detailSuper = data.super_percent ?? data.superPercent;
+        if (detailSuper === null || detailSuper === undefined || detailSuper === '') {
+            setLocumSuperIncluded(true);
+            setSuperPercent('');
+        } else {
+            const superNumber = Number(detailSuper);
+            setLocumSuperIncluded(superNumber > 0);
+            setSuperPercent(String(detailSuper));
+        }
+        const parsedSlots = Array.isArray(data.slots)
+            ? data.slots.map((s: any) => ({
+                date: s.date ?? s.slot_date ?? s.shift_date ?? '',
+                startTime: s.startTime ?? s.start_time ?? '',
+                endTime: s.endTime ?? s.end_time ?? '',
+                isRecurring: Boolean(s.is_recurring ?? s.isRecurring),
+                recurringDays: Array.isArray(s.recurring_days ?? s.recurringDays) ? s.recurring_days ?? s.recurringDays : [],
+                recurringEndDate: s.recurringEndDate ?? s.recurring_end_date ?? '',
+            }))
+            : [];
+        if (gen !== loadGenRef.current) return;
+        setSlots(parsedSlots);
+        const expanded = expandShiftDraftSlots(parsedSlots);
+        const rawSlots = Array.isArray(data.slots) ? data.slots : [];
+        const initialSlotRateRows = expanded.map((s) => {
+            const source = rawSlots[s.sourceIndex];
+            const rate = toRateInputString(getSlotRateValue(source));
+            return { rate, status: rate ? 'success' as const : 'idle' as const, dirty: Boolean(rate) };
+        });
+        setSlotRateRows(initialSlotRateRows);
+        initialSlotsJsonRef.current = JSON.stringify(parsedSlots);
+        initialRatesJsonRef.current = JSON.stringify({
+            rateType: rateTypeValue || 'FLEXIBLE',
+            rateWeekday: initWeekday,
+            rateSaturday: initSaturday,
+            rateSunday: initSunday,
+            ratePublicHoliday: initPublicHoliday,
+            rateEarlyMorning: initEarlyMorning,
+            rateLateNight: initLateNight,
+            ownerBonus: initOwnerBonus,
+            slotRates: initialSlotRateRows.map((r) => r.rate),
+        });
+    }, [router, surface.persona, surface.scopedPharmacyId]);
 
     const applyBookingPrefillFromParams = useCallback(() => {
-        if (editingId) return;
+        const plan = computePrefillPlan(appliedPrefillsRef.current, parsedParams, Boolean(editingId));
+        appliedPrefillsRef.current = plan.nextApplied;
 
-        const datesParam = params?.dates as unknown;
-        const singleDate = params?.date;
-        let parsedDates: string[] = [];
-        if (typeof datesParam === 'string') {
-            parsedDates = datesParam.split(',').map((d: string) => d.trim()).filter(Boolean);
-        } else if (Array.isArray(datesParam)) {
-            parsedDates = (datesParam as Array<string | number>)
-                .reduce<string[]>((acc, value) => [...acc, ...String(value).split(',')], [])
-                .map((d: string) => d.trim())
-                .filter(Boolean);
-        }
-        const uniqueDates = Array.from(new Set(parsedDates.length ? parsedDates : (singleDate ? [singleDate] : []))).sort();
-        const startParam = typeof params?.start_time === 'string' && params.start_time ? params.start_time.slice(0, 5) : slotStart;
-        const endParam = typeof params?.end_time === 'string' && params.end_time ? params.end_time.slice(0, 5) : slotEnd;
-
-        if (params?.start_time) {
-            setSlotStart(startParam);
-        }
-        if (params?.end_time) {
-            setSlotEnd(endParam);
+        if (plan.applyTimes) {
+            if (parsedParams.hasStartTime) setSlotStart(parsedParams.startTime);
+            if (parsedParams.hasEndTime) setSlotEnd(parsedParams.endTime);
         }
 
-        if (uniqueDates.length > 0) {
+        if (plan.applyDates) {
+            const uniqueDates = parsedParams.dates;
+            const startParam = parsedParams.hasStartTime ? parsedParams.startTime : liveTimesRef.current.startTime;
+            const endParam = parsedParams.hasEndTime ? parsedParams.endTime : liveTimesRef.current.endTime;
             setSlotDate(uniqueDates[0]);
             setCalendarMonthAnchor(new Date(`${uniqueDates[0]}T00:00:00`));
             setSelectedDates(uniqueDates);
@@ -551,23 +609,141 @@ export default function PostShiftScreen() {
             setActiveStep('details');
         }
 
-        const roleParam = params?.role_needed || params?.role;
-        const normalizedRole = typeof roleParam === 'string' ? normalizePrefillRole(roleParam) : '';
-        if (normalizedRole) {
-            setRoleNeeded(normalizedRole);
+        if (plan.applyRole && parsedParams.roleNeeded) {
+            setRoleNeeded(parsedParams.roleNeeded);
         }
-        const dedicated = params?.dedicated_user;
-        if (dedicated && typeof dedicated === 'string') {
-            const parsed = Number(dedicated);
-            if (!Number.isNaN(parsed)) {
-                setDedicatedUserId(parsed);
-            }
+        if (plan.applyVisibility && parsedParams.visibility) {
+            setInitialAudience(parsedParams.visibility);
         }
-    }, [editingId, params?.date, params?.dates, params?.dedicated_user, params?.end_time, params?.role, params?.role_needed, params?.start_time, slotEnd, slotStart]);
+        if (plan.applyEmploymentType && parsedParams.employmentType) {
+            setEmploymentType(parsedParams.employmentType);
+        }
+        if (plan.applyDedicatedUser && parsedParams.dedicatedUserId != null) {
+            setDedicatedUserId(parsedParams.dedicatedUserId);
+        }
+    }, [editingId, parsedParams]);
 
     useEffect(() => {
         applyBookingPrefillFromParams();
     }, [applyBookingPrefillFromParams]);
+
+    const runInitLoad = useCallback(async (preserveDraft = false) => {
+        const gen = ++loadGenRef.current;
+        setLoadError(null);
+        setLoading(true);
+        if (!editingId && !preserveDraft) {
+            resetForm({ preservePrefills: true });
+        }
+
+        const result = await runPostShiftInitChain({
+            isCurrent: () => gen === loadGenRef.current,
+            loadPharmacies: async () => {
+                const data = await fetchPharmaciesService({});
+                const list = Array.isArray((data as any)?.results)
+                    ? (data as any).results
+                    : Array.isArray(data)
+                        ? data
+                        : [];
+                return list as PharmacyOption[];
+            },
+            shouldLoadShift: Boolean(editingId),
+            loadShift: editingId
+                ? async () => {
+                    return await fetchWorkerShiftDetailService(editingId);
+                }
+                : undefined,
+        });
+
+        if (gen !== loadGenRef.current || result.status === 'aborted') {
+            return;
+        }
+
+        if (result.status === 'pharmacies_failed') {
+            setLoadError({ kind: 'pharmacies', message: 'Unable to load pharmacies' });
+            setError('Unable to load pharmacies');
+            setLoading(false);
+            return;
+        }
+
+        const pharmacyList = result.pharmacies;
+        setPharmacies(pharmacyList);
+        setPharmaciesLoaded(true);
+
+        if (result.status === 'shift_failed') {
+            setLoadError({ kind: 'shift', message: 'Unable to load shift details' });
+            setError('Unable to load shift details');
+            setLoading(false);
+            return;
+        }
+
+        if (result.status === 'pharmacies_loaded') {
+            if (!editingId && user?.id != null) {
+                try {
+                    const store = mobilePendingIntentStore(getApiConfig?.()?.baseURL ?? '', user.id, 'shift.create');
+                    const saved = await store.load();
+                    if (gen !== loadGenRef.current) return;
+                    const recovery = saved as typeof saved & { recovery?: boolean; pendingEdit?: Record<string, unknown> | null };
+                    if (recovery?.recovery && recovery.resultId) {
+                        const values = { ...recovery.exactPayload, ...recovery.pendingEdit };
+                        const hydratedPharmacyId = Number(values.pharmacy ?? values.pharmacy_id);
+                        manualRateEdits.current = { pharmacyId: hydratedPharmacyId, fields: new Set(['rateType', 'rateWeekday', 'rateSaturday', 'rateSunday', 'ratePublicHoliday', 'rateEarlyMorning', 'rateLateNight']) };
+                        recoverySoftwarePharmacy.current = hydratedPharmacyId;
+                        recoveryAudience.current = String(values.visibility ?? '');
+                        hydrateShift(values, pharmacyList, gen, { rateDefaults: false });
+                        setFtptPayMode(values.min_annual_salary != null || values.max_annual_salary != null ? 'ANNUAL' : 'HOURLY');
+                        setMinHourly(toRateInputString(values.min_hourly_rate));
+                        setMaxHourly(toRateInputString(values.max_hourly_rate));
+                        setMinAnnual(toRateInputString(values.min_annual_salary));
+                        setMaxAnnual(toRateInputString(values.max_annual_salary));
+                        setNotifyPharmacyStaff(Boolean(values.notify_pharmacy_staff));
+                        setNotifyFavoriteStaff(Boolean(values.notify_favorite_staff));
+                        setNotifyChainMembers(Boolean(values.notify_chain_members));
+                        setToast('Your last shift was posted but your changes did not save. Post saves them to that shift; Post another discards them.');
+                        setLoading(false);
+                        return;
+                    }
+                } catch { /* Submission reports unreadable recovery state. */ }
+            }
+            const nextPharmacy = pickScopedPharmacyId({
+                routePharmacyId,
+                scopedPharmacyId: surface.scopedPharmacyId,
+                pharmacies: pharmacyList,
+            });
+            setPharmacyId(current => preserveDraft
+                ? pickRetryPostShiftPharmacyId(current, nextPharmacy, pharmacyList)
+                : nextPharmacy);
+            applyBookingPrefillFromParams();
+            setLoading(false);
+            return;
+        }
+
+        if (result.status === 'success' && result.shift) {
+            hydrateShift(result.shift, pharmacyList, gen);
+            setLoading(false);
+        }
+    }, [applyBookingPrefillFromParams, editingId, hydrateShift, resetForm, routePharmacyId, surface.scopedPharmacyId, user?.id]);
+
+    const currentInitScope = useMemo<PostShiftInitScope>(() => ({
+        editingId,
+        routePharmacyId,
+        scopedPharmacyId: surface.scopedPharmacyId,
+    }), [editingId, routePharmacyId, surface.scopedPharmacyId]);
+
+    const prevInitScopeRef = React.useRef<PostShiftInitScope | null>(null);
+
+    useEffect(() => {
+        if (shouldTriggerPostShiftInit(prevInitScopeRef.current, currentInitScope)) {
+            prevInitScopeRef.current = currentInitScope;
+            void runInitLoad();
+        }
+    }, [currentInitScope, runInitLoad]);
+
+    const retryInitialLoad = useCallback(() => {
+        // Retrying the same scope must not erase the user's unsaved form edits or replay URL prefills.
+        prevInitScopeRef.current = currentInitScope;
+        void runInitLoad(true);
+    }, [currentInitScope, runInitLoad]);
+
 
     useFocusEffect(
         useCallback(() => {
@@ -575,10 +751,35 @@ export default function PostShiftScreen() {
         }, [applyBookingPrefillFromParams])
     );
 
+    // Guard pharmacy/role writes from stale callbacks after scope switches.
+    const templateScope = `${pharmacyId}:${roleNeeded}`;
+    const templateScopeRef = React.useRef(templateScope);
+    templateScopeRef.current = templateScope;
+    const templateMutationGen = React.useRef(0);
+    const rateMutationGen = React.useRef(0);
+    useEffect(() => {
+        templateMutationGen.current += 1;
+        rateMutationGen.current += 1;
+        setDescriptionTemplateSaving(false);
+        setSavingPharmacyRates(false);
+        return () => {
+            templateMutationGen.current += 1;
+            rateMutationGen.current += 1;
+        };
+    }, [templateScope]);
+
+    // Do not refetch the role template on each description keystroke.
+    // Read the newest user draft when an in-flight role-template request resolves.
+    const latestDescriptionRef = React.useRef(description);
+    latestDescriptionRef.current = description;
+    const latestTemplateAppliedKeyRef = React.useRef(descriptionTemplateAutoAppliedKey);
+    latestTemplateAppliedKeyRef.current = descriptionTemplateAutoAppliedKey;
+
     useEffect(() => {
         if (!pharmacyId || !roleNeeded) {
             setDescriptionTemplate(null);
             setDescriptionTemplateAutoAppliedKey(null);
+            setDescriptionTemplateError('');
             return;
         }
 
@@ -586,6 +787,9 @@ export default function PostShiftScreen() {
         const templateKey = `${pharmacyId}:${roleNeeded}`;
 
         const loadDescriptionTemplate = async () => {
+            // Never offer an old pharmacy/role template while the new scope loads.
+            setDescriptionTemplate(null);
+            setDescriptionTemplateError('');
             setDescriptionTemplateLoading(true);
             try {
                 const data = await listShiftDescriptionTemplates(Number(pharmacyId), roleNeeded);
@@ -596,15 +800,16 @@ export default function PostShiftScreen() {
                 if (
                     template?.description &&
                     !editingId &&
-                    !description.trim() &&
-                    descriptionTemplateAutoAppliedKey !== templateKey
+                    !latestDescriptionRef.current.trim() &&
+                    latestTemplateAppliedKeyRef.current !== templateKey
                 ) {
                     setDescription(template.description);
                     setDescriptionTemplateAutoAppliedKey(templateKey);
                 }
-            } catch {
+            } catch (failure: any) {
                 if (!cancelled) {
                     setDescriptionTemplate(null);
+                    setDescriptionTemplateError(failure?.message || 'Could not load the saved description.');
                 }
             } finally {
                 if (!cancelled) {
@@ -618,7 +823,7 @@ export default function PostShiftScreen() {
         return () => {
             cancelled = true;
         };
-    }, [pharmacyId, roleNeeded, editingId, description, descriptionTemplateAutoAppliedKey]);
+    }, [pharmacyId, roleNeeded, editingId, templateRetry]);
 
     const handleUseDescriptionTemplate = useCallback(() => {
         if (!descriptionTemplate?.description) return;
@@ -634,18 +839,53 @@ export default function PostShiftScreen() {
             setToast('Enter a description before saving it as a template');
             return;
         }
+        if (descriptionTemplateSaving || descriptionTemplateLoading || descriptionTemplateError) return;
+        const mutation = ++templateMutationGen.current;
+        const scope = templateScope;
+        const stillCurrent = () => mutation === templateMutationGen.current && templateScopeRef.current === scope;
         setDescriptionTemplateSaving(true);
         try {
             const data = await saveShiftDescriptionTemplate(Number(pharmacyId), roleNeeded, description);
+            if (!stillCurrent()) return;
             setDescriptionTemplate(data as ShiftDescriptionTemplate);
-            setDescriptionTemplateAutoAppliedKey(`${pharmacyId}:${roleNeeded}`);
+            setDescriptionTemplateAutoAppliedKey(scope);
             setToast('Description template saved for this role');
         } catch {
-            setToast('Unable to save description template');
+            if (stillCurrent()) setToast('Unable to save description template');
         } finally {
-            setDescriptionTemplateSaving(false);
+            if (stillCurrent()) setDescriptionTemplateSaving(false);
         }
-    }, [description, pharmacyId, roleNeeded]);
+    }, [description, descriptionTemplateSaving, descriptionTemplateLoading, descriptionTemplateError, pharmacyId, roleNeeded, templateScope]);
+
+    const handleDeleteDescriptionTemplate = useCallback(() => {
+        if (!descriptionTemplate?.id || descriptionTemplateSaving) return;
+        const selectedTemplateId = descriptionTemplate.id;
+        const scope = templateScope;
+        Alert.alert(
+            'Delete saved description?',
+            'This removes the reusable pharmacy-role template. Your current shift description will not be changed.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete template', style: 'destructive',
+                    onPress: () => {
+                        if (templateScopeRef.current !== scope) return;
+                        const mutation = ++templateMutationGen.current;
+                        const stillCurrent = () => mutation === templateMutationGen.current && templateScopeRef.current === scope;
+                        setDescriptionTemplateSaving(true);
+                        void deleteShiftDescriptionTemplate(selectedTemplateId)
+                            .then(() => {
+                                if (!stillCurrent()) return;
+                                setDescriptionTemplate(current => current?.id === selectedTemplateId ? null : current);
+                                setToast('Description template removed');
+                            })
+                            .catch(() => { if (stillCurrent()) setToast('Unable to delete description template'); })
+                            .finally(() => { if (stillCurrent()) setDescriptionTemplateSaving(false); });
+                    },
+                },
+            ],
+        );
+    }, [descriptionTemplate, descriptionTemplateSaving, templateScope]);
 
     const handleSavePharmacyRateDefaults = useCallback(async () => {
         if (!pharmacyId) {
@@ -657,6 +897,10 @@ export default function PostShiftScreen() {
             return;
         }
 
+        if (savingPharmacyRates) return;
+        const mutation = ++rateMutationGen.current;
+        const scope = templateScope;
+        const stillCurrent = () => mutation === rateMutationGen.current && templateScopeRef.current === scope;
         setSavingPharmacyRates(true);
         try {
             const payload = {
@@ -669,6 +913,7 @@ export default function PostShiftScreen() {
                 rate_late_night: rateLateNight || null,
             };
             const data = await updatePharmacy(Number(pharmacyId), payload);
+            if (!stillCurrent()) return;
             setPharmacies((current) =>
                 current.map((pharmacy) =>
                     Number(pharmacy.id) === Number(pharmacyId)
@@ -678,9 +923,9 @@ export default function PostShiftScreen() {
             );
             setToast('Pharmacy default rates updated');
         } catch {
-            setToast('Unable to update pharmacy default rates');
+            if (stillCurrent()) setToast('Unable to update pharmacy default rates');
         } finally {
-            setSavingPharmacyRates(false);
+            if (stillCurrent()) setSavingPharmacyRates(false);
         }
     }, [
         pharmacyId,
@@ -692,12 +937,18 @@ export default function PostShiftScreen() {
         rateType,
         rateWeekday,
         roleNeeded,
+        savingPharmacyRates,
+        templateScope,
     ]);
 
     const mergeSelectedDates = useCallback((incomingDates: string[]) => {
-        const todayIso = new Date().toISOString().split('T')[0];
-        const valid = incomingDates.filter((d) => d && d >= todayIso);
-        if (!valid.length) return;
+        // Today is read at call time: a wizard left open past midnight must not accept yesterday.
+        const { valid, past, late } = splitPostableDates(incomingDates, pharmacyToday());
+        if (!valid.length) {
+            if (past.length || late.length) setError('That date has passed. Pick today or later.');
+            return;
+        }
+        if (past.length || late.length) setToast('Past dates were left out.');
         setSelectedDates((prev) => Array.from(new Set([...prev, ...valid])).sort());
         setSelectedDateTimes((prev) => {
             const next = { ...prev };
@@ -716,7 +967,7 @@ export default function PostShiftScreen() {
             setSlotStart(latestHours.startTime);
             setSlotEnd(latestHours.endTime);
         }
-    }, [getDefaultTimesForDate]);
+    }, [getDefaultTimesForDate, selectedPharmacy]);
 
     const selectedDateObjects = useMemo(
         () => selectedDates.map((d) => new Date(`${d}T00:00:00`)),
@@ -850,6 +1101,12 @@ export default function PostShiftScreen() {
         entries: SlotEntry[],
         options?: { clearDates?: string[]; clearAllSelected?: boolean; resetRecurring?: boolean }
     ) => {
+        const error = validateSlotEntries(entries, pharmacyToday());
+        if (error) {
+            setError(error);
+            return false;
+        }
+
         const existingKeys = new Set(slots.map((s) => `${s.date}-${s.startTime}-${s.endTime}-${s.isRecurring}-${s.recurringDays.join(',')}`));
         const filtered = entries.filter(
             (entry) => !existingKeys.has(`${entry.date}-${entry.startTime}-${entry.endTime}-${entry.isRecurring}-${entry.recurringDays.join(',')}`)
@@ -881,30 +1138,13 @@ export default function PostShiftScreen() {
         if (options?.resetRecurring) {
             setSlotRecurring(false);
             setSlotRecurringDays([]);
-            setSlotRecurringEnd(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+            setSlotRecurringEnd(toLocalIsoDate(new Date(Date.now() + 7 * 86400000)));
         }
 
         return true;
     };
 
     const addManualSlot = () => {
-        if (!slotStart || !slotEnd) {
-            setError('Set a start and finish time.');
-            return false;
-        }
-        if (new Date(`1970-01-01T${slotEnd}:00`).getTime() <= new Date(`1970-01-01T${slotStart}:00`).getTime()) {
-            setError('The finish time must be after the start time.');
-            return false;
-        }
-        if (!slotDate) {
-            setError('Pick a date first.');
-            return false;
-        }
-        if (slotRecurring && (!slotRecurringEnd || slotRecurringDays.length === 0)) {
-            setError('Pick the weekdays and the date it repeats until.');
-            return false;
-        }
-
         return addSlotEntries([{
             date: slotDate,
             startTime: slotStart,
@@ -916,16 +1156,9 @@ export default function PostShiftScreen() {
     };
 
     const addSelectedDateSlot = (date: string) => {
-        const entry = {
+        return addSlotEntries([{
             date,
             ...(selectedDateTimes[date] || { startTime: slotStart, endTime: slotEnd }),
-        };
-        if (new Date(`1970-01-01T${entry.endTime}:00`).getTime() <= new Date(`1970-01-01T${entry.startTime}:00`).getTime()) {
-            setError('The finish time must be after the start time.');
-            return false;
-        }
-        return addSlotEntries([{
-            ...entry,
             isRecurring: false,
             recurringDays: [],
             recurringEndDate: '',
@@ -937,12 +1170,13 @@ export default function PostShiftScreen() {
             setError('Select at least one date from the calendar.');
             return false;
         }
-        if (new Date(`1970-01-01T${slotEnd}:00`).getTime() <= new Date(`1970-01-01T${slotStart}:00`).getTime()) {
-            setError('The finish time must be after the start time.');
+        const { valid, past, late } = splitPostableDates(selectedDates, pharmacyToday());
+        if (!valid.length) {
+            setError('That date has passed. Pick today or later.');
             return false;
         }
-        return addSlotEntries(
-            selectedDates.map((date) => ({
+        const added = addSlotEntries(
+            valid.map((date) => ({
                 date,
                 ...(selectedDateTimes[date] || { startTime: slotStart, endTime: slotEnd }),
                 isRecurring: false,
@@ -951,6 +1185,8 @@ export default function PostShiftScreen() {
             })),
             { clearAllSelected: true }
         );
+        if (added && (past.length || late.length)) setToast('Past dates were left out.');
+        return added;
     };
 
     const removeSlot = (index: number) => setSlots((prev) => prev.filter((_, i) => i !== index));
@@ -963,7 +1199,7 @@ export default function PostShiftScreen() {
         setSlotEnd(slot.endTime);
         setSlotRecurring(slot.isRecurring);
         setSlotRecurringDays(slot.recurringDays || []);
-        setSlotRecurringEnd(slot.recurringEndDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+        setSlotRecurringEnd(slot.recurringEndDate || toLocalIsoDate(new Date(Date.now() + 7 * 86400000)));
         setSelectedDates((prev) => (prev.includes(slot.date) ? prev : [...prev, slot.date].sort()));
         setSelectedDateTimes((prev) => ({
             ...prev,
@@ -1002,32 +1238,216 @@ export default function PostShiftScreen() {
         return currentRatesJson !== JSON.stringify(initialRates) || haveShiftPostingSlotRatesChanged(initialSlotRates, slotRateRows);
     };
 
-    const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff: !isPrivateBooking, showNotifyFavoriteStaff: !isPrivateBooking, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform }, slotsModified: areSlotsModified(), ratesModified: areRatesModified() });
+    // No dialog Save: posting validates and navigates on its own, so the prompt offers Keep editing / Discard only.
+    const draftSnapshot = {
+        pharmacyId, roleNeeded, employmentType, workloadTags, supportOnShift, mustHave, niceToHave, hasTravel, hasAccommodation,
+        isUrgent, flexibleTiming, singleUserOnly, hideName, initialAudience, rateType, ownerBonus, slots, selectedDates,
+        selectedDateTimes, slotStart, slotEnd, slotRecurring, slotRecurringDays, slotRecurringEnd, escalationDates, escalationPlan,
+        description, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, paymentPreference, locumSuperIncluded,
+        superPercent, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode,
+        minHourly, maxHourly, minAnnual, maxAnnual, dedicatedUserId,
+        // Server-calculated slot rates are not edits; only rates the user typed count.
+        slotRates: slotRateRows.map((row) => (row.dirty ? row.rate : '')),
+    };
+    const draftSnapshotRef = React.useRef('');
+    draftSnapshotRef.current = JSON.stringify(draftSnapshot);
+    const unsaved = useUnsavedChangesGuard(draftSnapshot, { saving: loading });
+    // Loads, prefills and pharmacy defaults fill the form in a cascade of effects; until the user's first edit after
+    // loading, the baseline follows them, so only the user's own edits make the draft dirty.
+    const touchedRef = React.useRef(false);
+    // Never during a save: markClean there is the save's success signal and would release the leave lock early.
+    useEffect(() => {
+        if (!touchedRef.current && !loading) unsaved.markClean(draftSnapshot);
+    });
+    // While hydrating the form takes no input, so an edit can never be absorbed into the baseline.
+    const hydrating = !loadError && (!pharmaciesLoaded || (Boolean(editingId) && initialSlotsJsonRef.current === null));
+    const markTouched = () => {
+        if (!hydrating) touchedRef.current = true;
+    };
+    // Wraps a data-change handler handed to a step so the user's edit freezes the baseline (UI-only setters stay unwrapped).
+    const edited = <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A) => {
+        markTouched();
+        return fn(...args);
+    };
+    const editedRate = <T,>(field: string, setter: React.Dispatch<React.SetStateAction<T>>) => (next: React.SetStateAction<T>) => {
+        if (manualRateEdits.current.pharmacyId !== pharmacyId) {
+            manualRateEdits.current = { pharmacyId, fields: new Set() };
+        }
+        manualRateEdits.current.fields.add(field);
+        markTouched();
+        setter(next);
+    };
+
+    const postingDraft = (): ShiftPostingDraft => ({ pharmacyId, roleNeeded, employmentType, description, workloadTags, supportOnShift, mustHave, niceToHave, dedicatedUserId, singleUserOnly, rateType, ownerBonus, paymentPreference, locumSuperIncluded, rateWeekday, rateSaturday, rateSunday, ratePublicHoliday, rateEarlyMorning, rateLateNight, ftptPayMode, minHourly, maxHourly, minAnnual, maxAnnual, superPercent, slots, expandedSlots, slotRateRows, canPostAnonymously, showNotifyPharmacyStaff, showNotifyFavoriteStaff, showNotifyChainMembers, notifyPharmacyStaff, notifyFavoriteStaff, notifyChainMembers, hasTravel, hasAccommodation, isUrgent, flexibleTiming, visibility: initialAudience, editingShiftId: editingId, postAnonymously: hideName, escalationDates: { LOCUM_CASUAL: escalationDates.locum_casual, OWNER_CHAIN: escalationDates.owner_chain, ORG_CHAIN: escalationDates.org_chain, PLATFORM: escalationDates.platform }, slotsModified: areSlotsModified(), ratesModified: areRatesModified() });
+
+    const recoveredShiftRef = React.useRef<{ id: number; scope: string; payload: Record<string, unknown> } | null>(null);
+    if (recoveredShiftRef.current?.scope !== postingScopeRef.current) recoveredShiftRef.current = null;
+
+    const anotherPost = async () => {
+        if (user?.id == null) return;
+        const store = mobilePendingIntentStore(getApiConfig?.()?.baseURL ?? '', user?.id, 'shift.create');
+        const actionScope = postingScopeRef.current;
+        let intent;
+        try { intent = await store.load(); } catch {
+            if (postingScopeRef.current !== actionScope) return;
+            Alert.alert('Review your shifts', 'Review your posted shifts first, then confirm to clear the unreadable saved request.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Confirm', onPress: () => { if (postingScopeRef.current === actionScope) void store.recoverCorruptAfterReview().then(() => { if (postingScopeRef.current === actionScope) setError(''); }).catch(() => { if (postingScopeRef.current === actionScope) setError('Unable to clear the saved request.'); }); } },
+            ]);
+            return;
+        }
+        if (intent && !intent.resultId && !(intent as typeof intent & { rejected?: boolean }).rejected) { setError('Recover the previous shift before posting another.'); return; }
+        if (intent?.resultId && (intent as typeof intent & { recovery?: boolean }).recovery) {
+            Alert.alert('Discard unsaved changes?', 'The shift was posted, but your changes were not saved.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Discard', style: 'destructive', onPress: () => { if (postingScopeRef.current === actionScope) void store.clear(intent.key).then(() => { if (postingScopeRef.current === actionScope) { resetForm(); recoveredShiftRef.current = null; postSuccessDestinationRef.current = null; setError(''); setToast(''); } }).catch(() => { if (postingScopeRef.current === actionScope) setError('Unable to clear the saved request.'); }); } },
+            ]);
+            return;
+        }
+        if (intent) await store.clear(intent.key);
+        resetForm();
+        recoveredShiftRef.current = null;
+        postSuccessDestinationRef.current = null;
+        setToast('');
+    };
 
     const handleSubmit = async () => {
+        const callbackScope = `${surface.scopeKey}:${editingId ?? 'new'}`;
+        if (postingScopeRef.current !== callbackScope) return;
+        // State alone cannot prevent two taps before React renders the loading flag.
+        // A second create POST may publish a duplicate shift, so lock synchronously.
+        if (postingBusyRef.current || postSuccessDestinationRef.current || !hasAccess || hydrating) return;
         setError('');
-        const validation = validateShiftPostingDraft(postingDraft());
-        if (validation) { setError(validation); return; }
+        const scope = postingScopeRef.current;
+        const stillCurrent = () => scope === postingScopeRef.current;
+        postingBusyRef.current = true;
         setLoading(true);
         try {
-            const payload = buildShiftPostingPayload(postingDraft());
-            if (editingId) {
-                await updateOwnerShiftService(editingId, payload);
-                setToast('Shift updated');
-            } else {
-                await createOwnerShiftService(payload);
-                setToast('Shift posted');
-                resetForm();
+            const draft = postingDraft();
+            const store = !editingId && user?.id != null
+                ? mobilePendingIntentStore(getApiConfig?.()?.baseURL ?? '', user.id, 'shift.create') : null;
+            let pending = store ? await store.load() : null;
+            if (!stillCurrent()) return;
+            const recovery = pending as (typeof pending & { recovery?: boolean; pendingEdit?: Record<string, unknown> | null });
+            if (pending?.resultId && store && !recovery?.recovery) {
+                await store.clear(pending.key);
+                if (!stillCurrent()) return;
+                pending = null;
             }
-            // Go back to the owner shift center (active tab is managed in-screen)
-            router.back();
+            if (recovery?.recovery && recovery.resultId && recovery.pendingEdit && store) {
+                const validation = validateShiftPostingDraft(draft);
+                if (validation) { setError(validation); return; }
+                const edit = buildShiftPostingPayload({ ...draft, editingShiftId: recovery.resultId, slotsModified: true, ratesModified: true });
+                const currentChanges = Object.fromEntries(Object.entries(edit).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(recovery.exactPayload[key])));
+                const changes = { ...currentChanges };
+                for (const key of Object.keys(recovery.pendingEdit)) {
+                    if (key in edit) changes[key] = edit[key];
+                }
+                const submittedSnapshot = draftSnapshotRef.current;
+                await store.saveRecovery(recovery.key, recovery.resultId, changes);
+                if (!stillCurrent()) return;
+                recoveredShiftRef.current = { id: recovery.resultId, scope, payload: recovery.exactPayload };
+                try { if (Object.keys(changes).length) await updateOwnerShiftService(recovery.resultId, changes); }
+                catch (error) { if (stillCurrent() && isTerminalIntentError?.(error)) await store.clear(recovery.key); throw error; }
+                if (!stillCurrent()) return;
+                await store.clear(recovery.key);
+                if (!stillCurrent()) return;
+                recoveredShiftRef.current = { id: recovery.resultId, scope, payload: { ...recovery.exactPayload, ...changes } };
+                setToast('Shift updated successfully!');
+                if (submittedSnapshot === draftSnapshotRef.current) unsaved.markClean();
+                return;
+            }
+            if ((pending as typeof pending & { rejected?: boolean })?.rejected) { setError('Start another post before submitting again.'); return; }
+            if (!pending || pending.resultId) {
+                const validation = validateShiftPostingDraft(draft);
+                if (validation) { setError(validation); return; }
+                if (!editingId && draft.slots.some((slot) => {
+                    const dates = [slot.date, ...(slot.isRecurring ? [slot.recurringEndDate || ''] : [])];
+                    return splitPostableDates(dates, pharmacyToday()).valid.length !== new Set(dates).size;
+                })) {
+                    setError('That date has passed. Pick today or later.');
+                    return;
+                }
+            }
+            const payload = buildShiftPostingPayload(draft);
+            if (recoveredShiftRef.current) {
+                const recovered = recoveredShiftRef.current;
+                const edit = buildShiftPostingPayload({ ...draft, editingShiftId: recovered.id, slotsModified: true, ratesModified: true });
+                const changes = Object.fromEntries(Object.entries(edit).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(recovered.payload[key])));
+                if (pending && store) await store.saveRecovery(pending.key, recovered.id, changes);
+                if (!stillCurrent()) return;
+                try { if (Object.keys(changes).length) await updateOwnerShiftService(recovered.id, changes); }
+                catch (error) { if (pending && store && stillCurrent() && isTerminalIntentError?.(error)) await store.clear(pending.key); throw error; }
+                if (!stillCurrent()) return;
+                if (pending && store) await store.clear(pending.key);
+                if (!stillCurrent()) return;
+                recovered.payload = payload;
+                setToast('Shift updated successfully!');
+            } else if (editingId) {
+                await updateOwnerShiftService(editingId, payload);
+                if (!stillCurrent()) return;
+                setToast('Shift updated successfully!');
+            } else {
+                if (user?.id == null) throw new Error('Sign in to post a shift.');
+                if (!store) throw new Error('Sign in to post a shift.');
+                const intent = pending ?? await store.acquire(payload as Record<string, unknown>);
+                if (!stillCurrent()) return;
+                let resultId = intent.resultId;
+                if (!resultId) {
+                    let result;
+                    try { result = await createOwnerShiftService(intent.exactPayload, intent.key); }
+                    catch (error) { if (stillCurrent() && isTerminalIntentError?.(error)) await store.reject(intent.key); throw error; }
+                    if (!stillCurrent()) return;
+                    if (pending) {
+                        const validation = validateShiftPostingDraft(draft);
+                        const edit = validation ? null : buildShiftPostingPayload({ ...draft, editingShiftId: result.id, slotsModified: true, ratesModified: true });
+                        const changes = edit && Object.fromEntries(Object.entries(edit).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(intent.exactPayload[key])));
+                        await store.saveRecovery(intent.key, result.id, changes);
+                    } else await store.settle(intent.key, result.id);
+                    resultId = result.id;
+                }
+                if (!stillCurrent()) return;
+                if (pending) {
+                    recoveredShiftRef.current = { id: resultId, scope, payload: intent.exactPayload };
+                    const validation = validateShiftPostingDraft(draft);
+                    if (validation) { setError(validation); return; }
+                    const edit = buildShiftPostingPayload({ ...draft, editingShiftId: resultId, slotsModified: true, ratesModified: true });
+                    const changes = Object.fromEntries(Object.entries(edit).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(intent.exactPayload[key])));
+                    await store.saveRecovery(intent.key, resultId, changes);
+                    if (!stillCurrent()) return;
+                    try { if (Object.keys(changes).length) await updateOwnerShiftService(resultId, changes); }
+                    catch (error) { if (stillCurrent() && isTerminalIntentError?.(error)) await store.clear(intent.key); throw error; }
+                    if (!stillCurrent()) return;
+                    recoveredShiftRef.current.payload = payload;
+                }
+                await store.clear(intent.key);
+                if (!stillCurrent()) return;
+                setToast('Shift posted successfully!');
+                // A successful new post starts a fresh form without inventing a backend draft state.
+                touchedRef.current = false;
+            }
+            unsaved.markClean();
+            postSuccessDestinationRef.current = surface.persona
+                ? shiftRoute(surface.persona, { section: 'active' })
+                : null;
+            // Do not replace here: it unmounts the Snackbar before it is visible.
         } catch (e: any) {
-            const msg = e?.response?.data?.detail || 'Unable to save shift';
-            setError(msg);
+            if (stillCurrent()) {
+                setError(e instanceof ApiError ? e.message : (e?.response?.data?.detail || 'Unable to save shift'));
+            }
         } finally {
-            setLoading(false);
+            postingBusyRef.current = false;
+            if (stillCurrent()) setLoading(false);
         }
     };
+
+    const dismissToast = () => {
+        const destination = postSuccessDestinationRef.current;
+        postSuccessDestinationRef.current = null;
+        setToast('');
+        if (destination) router.replace(destination as any);
+    };
+    const showingPostSuccess = toast === 'Shift posted successfully!' || toast === 'Shift updated successfully!';
 
     const chipStyle = (selected: boolean) => [styles.chip, selected ? styles.chipSelected : styles.chipUnselected];
     const chipTextStyle = (selected: boolean) => (selected ? styles.chipTextSelected : styles.chipText);
@@ -1037,28 +1457,31 @@ export default function PostShiftScreen() {
             case 'details':
                 return (
                     <PostShiftDetailsStep
-                        hasTravel={hasTravel} setHasTravel={setHasTravel} hasAccommodation={hasAccommodation} setHasAccommodation={setHasAccommodation} isUrgent={isUrgent} setIsUrgent={setIsUrgent}
+                        hasTravel={hasTravel} setHasTravel={edited(setHasTravel)} hasAccommodation={hasAccommodation} setHasAccommodation={edited(setHasAccommodation)} isUrgent={isUrgent} setIsUrgent={edited(setIsUrgent)}
                         pharmacyMenuVisible={pharmacyMenuVisible}
                         setPharmacyMenuVisible={setPharmacyMenuVisible}
                         pharmacies={pharmacies}
                         pharmacyId={pharmacyId}
-                        setPharmacyId={setPharmacyId}
+                        setPharmacyId={edited(setPharmacyId)}
                         roleNeeded={roleNeeded}
-                        setRoleNeeded={setRoleNeeded}
+                        setRoleNeeded={edited(setRoleNeeded)}
                         employmentType={employmentType}
-                        setEmploymentType={setEmploymentType}
+                        setEmploymentType={edited(setEmploymentType)}
                         getEmploymentLabel={getEmploymentLabel}
                         descriptionTemplateLoading={descriptionTemplateLoading}
+                        descriptionTemplateError={descriptionTemplateError}
+                        retryDescriptionTemplate={() => setTemplateRetry(current => current + 1)}
                         descriptionTemplate={descriptionTemplate}
                         descriptionTemplateSaving={descriptionTemplateSaving}
-                        handleUseDescriptionTemplate={handleUseDescriptionTemplate}
+                        handleUseDescriptionTemplate={edited(handleUseDescriptionTemplate)}
                         handleSaveDescriptionTemplate={handleSaveDescriptionTemplate}
+                        handleDeleteDescriptionTemplate={handleDeleteDescriptionTemplate}
                         description={description}
-                        setDescription={setDescription}
+                        setDescription={edited(setDescription)}
                         workloadTags={workloadTags}
-                        setWorkloadTags={setWorkloadTags}
+                        setWorkloadTags={edited(setWorkloadTags)}
             supportOnShift={supportOnShift}
-            setSupportOnShift={setSupportOnShift}
+            setSupportOnShift={edited(setSupportOnShift)}
                     />
                 );
             case 'skills':
@@ -1067,9 +1490,9 @@ export default function PostShiftScreen() {
                         pharmacySoftware={pharmacySoftwareDefaults(skillsRegistry as any, roleNeeded as any, (selectedPharmacy as any)?.software || [])}
                         roleNeeded={roleNeeded}
                         mustHave={mustHave}
-                        setMustHave={setMustHave}
+                        setMustHave={edited(setMustHave)}
                         niceToHave={niceToHave}
-                        setNiceToHave={setNiceToHave}
+                        setNiceToHave={edited(setNiceToHave)}
                     />
                 );
             case 'visibility':
@@ -1077,39 +1500,43 @@ export default function PostShiftScreen() {
                     <PostShiftVisibilityStep
                         isEmbedded={isPrivateBooking}
                         escalationPlan={escalationPlan}
-                        setEscalationPlan={setEscalationPlan}
+                        setEscalationPlan={edited(setEscalationPlan)}
                         canPostAnonymously={canPostAnonymously}
                         hideName={hideName}
-                        setHideName={setHideName}
+                        setHideName={edited(setHideName)}
                         allowedVis={allowedVis}
                         initialAudience={initialAudience}
-                        setInitialAudience={setInitialAudience}
+                        setInitialAudience={edited(setInitialAudience)}
                         notifyPharmacyStaff={notifyPharmacyStaff}
-                        setNotifyPharmacyStaff={setNotifyPharmacyStaff}
+                        showNotifyPharmacyStaff={showNotifyPharmacyStaff}
+                        setNotifyPharmacyStaff={edited(setNotifyPharmacyStaff)}
                         notifyFavoriteStaff={notifyFavoriteStaff}
-                        setNotifyFavoriteStaff={setNotifyFavoriteStaff}
+                        showNotifyFavoriteStaff={showNotifyFavoriteStaff}
+                        setNotifyFavoriteStaff={edited(setNotifyFavoriteStaff)}
                         notifyChainMembers={notifyChainMembers}
                         showNotifyChainMembers={showNotifyChainMembers}
-                        setNotifyChainMembers={setNotifyChainMembers}
+                        setNotifyChainMembers={edited(setNotifyChainMembers)}
                         escalationDates={escalationDates}
-                        setEscalationDates={setEscalationDates}
+                        setEscalationDates={edited(setEscalationDates)}
                         setEscalationPicker={setEscalationPicker}
+                        setEscalationTimePicker={setEscalationTimePicker}
                     />
                 );
             case 'timetable':
                 return (
                     <PostShiftTimetableStep
-                        flexibleTiming={flexibleTiming} setFlexibleTiming={setFlexibleTiming}
+                        flexibleTiming={flexibleTiming} setFlexibleTiming={edited(setFlexibleTiming)}
                         selectedDates={selectedDates}
-                        setSelectedDates={setSelectedDates}
+                        setSelectedDates={edited(setSelectedDates)}
                         slotDate={slotDate}
-                        setSlotDate={setSlotDate}
+                        setSlotDate={edited(setSlotDate)}
                         slotStart={slotStart}
-                        setSlotStart={setSlotStart}
+                        setSlotStart={edited(setSlotStart)}
                         slotEnd={slotEnd}
-                        setSlotEnd={setSlotEnd}
+                        setSlotEnd={edited(setSlotEnd)}
                         setSlotDatePickerOpen={setSlotDatePickerOpen}
                         slotDateHours={slotDateHours}
+                        postingWindow={postingWindow}
                         calendarMonthAnchor={calendarMonthAnchor}
                         setCalendarMonthAnchor={setCalendarMonthAnchor}
                         monthLabel={monthLabel}
@@ -1118,22 +1545,22 @@ export default function PostShiftScreen() {
                         slotDateSet={slotDateSet}
                         getDefaultTimesForDate={getDefaultTimesForDate}
                         selectedDateTimes={selectedDateTimes}
-                        setSelectedDateTimes={setSelectedDateTimes}
+                        setSelectedDateTimes={edited(setSelectedDateTimes)}
                         slotRecurring={slotRecurring}
-                        setSlotRecurring={setSlotRecurring}
+                        setSlotRecurring={edited(setSlotRecurring)}
                         slotRecurringDays={slotRecurringDays}
-                        toggleRecurringDay={toggleRecurringDay}
+                        toggleRecurringDay={edited(toggleRecurringDay)}
                         slotRecurringEnd={slotRecurringEnd}
                         setRecurringEndPickerOpen={setRecurringEndPickerOpen}
                         singleUserOnly={singleUserOnly}
-                        setSingleUserOnly={setSingleUserOnly}
+                        setSingleUserOnly={edited(setSingleUserOnly)}
                         closedSelectedDates={closedSelectedDates}
-                        addAllSelectedSlots={addAllSelectedSlots}
-                        addSelectedDateSlot={addSelectedDateSlot}
+                        addAllSelectedSlots={edited(addAllSelectedSlots)}
+                        addSelectedDateSlot={edited(addSelectedDateSlot)}
                         slots={slots}
-                        addManualSlot={addManualSlot}
-                        editSlot={editSlot}
-                        removeSlot={removeSlot}
+                        addManualSlot={edited(addManualSlot)}
+                        editSlot={edited(editSlot)}
+                        removeSlot={edited(removeSlot)}
                     />
                 );
             case 'payrate':
@@ -1142,48 +1569,55 @@ export default function PostShiftScreen() {
                         isLocumLike={isLocumLike}
                         roleNeeded={roleNeeded}
                         ftptPayMode={ftptPayMode}
-                        setFtptPayMode={setFtptPayMode}
+                        setFtptPayMode={edited(setFtptPayMode)}
                         minHourly={minHourly}
-                        setMinHourly={setMinHourly}
+                        setMinHourly={edited(setMinHourly)}
                         maxHourly={maxHourly}
-                        setMaxHourly={setMaxHourly}
+                        setMaxHourly={edited(setMaxHourly)}
                         minAnnual={minAnnual}
-                        setMinAnnual={setMinAnnual}
+                        setMinAnnual={edited(setMinAnnual)}
                         maxAnnual={maxAnnual}
-                        setMaxAnnual={setMaxAnnual}
+                        setMaxAnnual={edited(setMaxAnnual)}
                         superPercent={superPercent}
-                        setSuperPercent={setSuperPercent}
+                        setSuperPercent={edited(setSuperPercent)}
                         rateType={rateType}
-                        setRateType={setRateType}
+                        setRateType={editedRate('rateType', setRateType)}
                         paymentPreference={paymentPreference}
-                        setPaymentPreference={setPaymentPreference}
+                        setPaymentPreference={edited(setPaymentPreference)}
                         locumSuperIncluded={locumSuperIncluded}
-                        setLocumSuperIncluded={setLocumSuperIncluded}
+                        setLocumSuperIncluded={edited(setLocumSuperIncluded)}
                         hasOutsidePharmacyMemberAudience={hasOutsidePharmacyMemberAudience}
                         rateWeekday={rateWeekday}
-                        setRateWeekday={setRateWeekday}
+                        setRateWeekday={editedRate('rateWeekday', setRateWeekday)}
                         rateSaturday={rateSaturday}
-                        setRateSaturday={setRateSaturday}
+                        setRateSaturday={editedRate('rateSaturday', setRateSaturday)}
                         rateSunday={rateSunday}
-                        setRateSunday={setRateSunday}
+                        setRateSunday={editedRate('rateSunday', setRateSunday)}
                         ratePublicHoliday={ratePublicHoliday}
-                        setRatePublicHoliday={setRatePublicHoliday}
+                        setRatePublicHoliday={editedRate('ratePublicHoliday', setRatePublicHoliday)}
                         rateEarlyMorning={rateEarlyMorning}
-                        setRateEarlyMorning={setRateEarlyMorning}
+                        setRateEarlyMorning={editedRate('rateEarlyMorning', setRateEarlyMorning)}
                         rateLateNight={rateLateNight}
-                        setRateLateNight={setRateLateNight}
+                        setRateLateNight={editedRate('rateLateNight', setRateLateNight)}
                         handleSavePharmacyRateDefaults={handleSavePharmacyRateDefaults}
                         savingPharmacyRates={savingPharmacyRates}
                         pharmacyId={pharmacyId}
                         expandedSlots={expandedSlots}
                         slotRateRows={slotRateRows}
                         ownerBonus={ownerBonus}
-                        setOwnerBonus={setOwnerBonus}
-                        handleSlotRateChange={handleSlotRateChange}
+                        setOwnerBonus={edited(setOwnerBonus)}
+                        handleSlotRateChange={edited(handleSlotRateChange)}
                     />
                 );
             case 'review':
-                return <NativeShiftBoardPreview shift={buildShiftPostingPreview(postingDraft(), selectedPharmacy) as any} />;
+                return (
+                    <View style={{ gap: space.sm }}>
+                        <Text style={styles.helper} accessibilityRole="text">
+                            This is how your shift appears on the job board. Go back to change anything.
+                        </Text>
+                        <NativeShiftBoardPreview shift={buildShiftPostingPreview(postingDraft(), selectedPharmacy) as any} />
+                    </View>
+                );
             default: return null;
         }
     };
@@ -1202,9 +1636,52 @@ export default function PostShiftScreen() {
         if (stepIndex > 0) setActiveStep(stepOrder[stepIndex - 1]);
     };
 
+    if ((surface.ready && !hasAccess) || loadError?.kind === 'access') {
+        return (
+            <SafeAreaView style={styles.container} edges={['left', 'right']}>
+                <ContentState
+                    kind="forbidden"
+                    title="No access"
+                    description={loadError?.kind === 'access' ? loadError.message : "You don't have permission to post shifts in this workspace."}
+                    actionLabel="Go back"
+                    onAction={() => router.back()}
+                />
+            </SafeAreaView>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <SafeAreaView style={styles.container} edges={['left', 'right']}>
+                <ContentState
+                    kind="error"
+                    title={loadError.kind === 'shift' ? 'Could not load shift' : 'Could not load pharmacies'}
+                    description="Check your connection, then try again."
+                    actionLabel="Try again"
+                    onAction={retryInitialLoad}
+                />
+            </SafeAreaView>
+        );
+    }
+
+    if (pharmaciesLoaded && pharmacies.length === 0) {
+        return (
+            <SafeAreaView style={styles.container} edges={['left', 'right']}>
+                <ContentState
+                    kind="empty"
+                    title="No pharmacies available"
+                    description="You need to add or claim a pharmacy before posting a shift."
+                    actionLabel="Go back"
+                    onAction={() => router.back()}
+                />
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container} edges={['left', 'right']}>
-            <ScrollView contentContainerStyle={[styles.content, isEmbedded && styles.contentEmbedded]} style={{ flex: 1 }}>
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <ScrollView contentContainerStyle={[styles.content, isEmbedded && styles.contentEmbedded]} style={{ flex: 1 }} pointerEvents={hydrating ? 'none' : 'auto'}>
                 {!isEmbedded ? (
                     <>
                         <Text variant="headlineMedium" style={styles.title}>
@@ -1223,8 +1700,18 @@ export default function PostShiftScreen() {
 
                 {error ? <HelperText type="error" accessibilityLiveRegion="polite" style={{ fontSize: 14, fontWeight: '600' }}>{error}</HelperText> : null}
 
-                <View style={styles.navRow}>
-                    <Button mode="outlined" onPress={goBack} disabled={stepIndex === 0}>Back</Button>
+            </ScrollView>
+
+                <View style={[styles.navRow, styles.stickyFooter]}>
+                    <Button
+                        mode="outlined"
+                        onPress={goBack}
+                        disabled={stepIndex === 0}
+                        style={styles.navBtnOutlined}
+                        contentStyle={styles.navBtnContent}
+                    >
+                        Back
+                    </Button>
                     {stepIndex < stepOrder.length - 1 ? (
                         <Button
                             mode="contained"
@@ -1235,26 +1722,45 @@ export default function PostShiftScreen() {
                                 }
                                 goNext();
                             }}
-                            style={styles.primaryBtn}
+                            style={[styles.primaryBtn, styles.navBtnPrimary]}
+                            contentStyle={styles.navBtnContent}
                             labelStyle={styles.primaryBtnText}
                         >
                             Next
                         </Button>
                     ) : (
-                        <Button mode="contained" onPress={handleSubmit} disabled={!canSubmit || loading} loading={loading} style={styles.primaryBtn} labelStyle={styles.primaryBtnText}>
+                        <Button
+                            mode="contained"
+                            onPress={handleSubmit}
+                            disabled={!canSubmit || loading || showingPostSuccess}
+                            loading={loading}
+                            style={[styles.primaryBtn, styles.navBtnPrimary]}
+                            contentStyle={styles.navBtnContent}
+                            labelStyle={styles.primaryBtnText}
+                        >
                             {editingId ? 'Update Shift' : (isEmbedded ? 'Send Booking Request' : 'Post Shift')}
                         </Button>
                     )}
                 </View>
-            </ScrollView>
+            </KeyboardAvoidingView>
 
-            <Snackbar visible={!!toast} onDismiss={() => setToast('')} duration={2500}>
+            {!editingId && <Button onPress={anotherPost} disabled={loading}>Post another</Button>}
+            <Snackbar
+                visible={!!toast}
+                onDismiss={dismissToast}
+                action={showingPostSuccess && !editingId ? { label: 'Post another', onPress: anotherPost } : showingPostSuccess ? { label: 'View shifts', onPress: dismissToast } : undefined}
+                duration={2500}
+            >
                 {toast}
             </Snackbar>
 
             <DatePickerModal
                 mode="multiple"
                 locale="en"
+                validRange={{
+                    startDate: new Date(`${postingWindow.minIso}T00:00:00`),
+                    endDate: new Date(`${postingWindow.maxIso}T23:59:59`),
+                }}
                 visible={slotDatePickerOpen}
                 onDismiss={() => setSlotDatePickerOpen(false)}
                 dates={selectedDateObjects}
@@ -1264,22 +1770,31 @@ export default function PostShiftScreen() {
                         : params?.date
                             ? [params.date]
                             : [];
-                    mergeSelectedDates(
-                        pickedDates
-                            .filter(Boolean)
-                            .map((d) => d.toISOString().split('T')[0])
-                    );
+                    const pickedIsos = pickedDates
+                        .filter(Boolean)
+                        .map((d) => toLocalIsoDate(d));
+                    const { valid } = splitPostableDates(pickedIsos, pharmacyToday());
+                    if (valid.some((d) => !selectedDateSet.has(d))) markTouched();
+                    mergeSelectedDates(pickedIsos);
                     setSlotDatePickerOpen(false);
                 }}
             />
             <DatePickerModal
                 mode="single"
                 locale="en"
+                validRange={{
+                    startDate: new Date(`${postingWindow.minIso}T00:00:00`),
+                    endDate: new Date(`${postingWindow.maxIso}T23:59:59`),
+                }}
                 visible={recurringEndPickerOpen}
                 onDismiss={() => setRecurringEndPickerOpen(false)}
-                date={new Date(slotRecurringEnd)}
+                date={toIsoDate(slotRecurringEnd) ?? new Date()}
                 onConfirm={({ date }) => {
-                    if (date) setSlotRecurringEnd(date.toISOString().split('T')[0]);
+                    const iso = date ? toLocalIsoDate(date) : undefined;
+                    if (iso && iso !== slotRecurringEnd) {
+                        markTouched();
+                        setSlotRecurringEnd(iso);
+                    }
                     setRecurringEndPickerOpen(false);
                 }}
             />
@@ -1290,10 +1805,36 @@ export default function PostShiftScreen() {
                 onDismiss={() => setEscalationPicker({ key: null, open: false })}
                 date={escalationPicker.key && escalationDates[escalationPicker.key] ? new Date(escalationDates[escalationPicker.key] as string) : new Date()}
                 onConfirm={({ date }) => {
-                    if (date && escalationPicker.key) {
-                        setEscalation(escalationPicker.key, date.toISOString().split('T')[0]);
+                    const key = escalationPicker.key;
+                    if (date && key) {
+                        setPendingEscalationDate(withEscalationDate(date, escalationDates[key]));
+                        // Date and time are one decision. Cancel must never schedule a default 09:00 silently.
+                        setEscalationTimePicker({ key, open: true });
                     }
                     setEscalationPicker({ key: null, open: false });
+                }}
+            />
+            <TimePickerModal
+                locale="en"
+                visible={escalationTimePicker.open}
+                onDismiss={() => {
+                    setPendingEscalationDate(null);
+                    setEscalationTimePicker({ key: null, open: false });
+                }}
+                hours={getEscalationClock(pendingEscalationDate ?? (escalationTimePicker.key ? escalationDates[escalationTimePicker.key] : null)).hours}
+                minutes={getEscalationClock(pendingEscalationDate ?? (escalationTimePicker.key ? escalationDates[escalationTimePicker.key] : null)).minutes}
+                use24HourClock
+                onConfirm={({ hours, minutes }) => {
+                    const key = escalationTimePicker.key;
+                    if (key) {
+                        const next = withEscalationTime(pendingEscalationDate ?? escalationDates[key], hours, minutes);
+                        if (next && next !== escalationDates[key]) {
+                            markTouched();
+                            setEscalation(key, next);
+                        }
+                    }
+                    setPendingEscalationDate(null);
+                    setEscalationTimePicker({ key: null, open: false });
                 }}
             />
         </SafeAreaView>

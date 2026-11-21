@@ -238,9 +238,10 @@ class ShiftOfferSerializer(serializers.ModelSerializer):
         if not can_view:
             return None
         from django.core.exceptions import ValidationError as DjangoValidationError
-        from shifts.engagement import build_shift_engagement_terms
+        from shifts.engagement import build_shift_engagement_terms, shift_engagement_terms_version
         try:
-            return build_shift_engagement_terms(shift=obj.shift, user=obj.user, offer=obj)
+            terms = build_shift_engagement_terms(shift=obj.shift, user=obj.user, offer=obj)
+            return {**terms, "terms_version": shift_engagement_terms_version(terms)}
         except (DjangoValidationError, serializers.ValidationError) as exc:
             # the terms are blocked by a rule the worker or the pharmacy can fix: show which one
             detail = getattr(exc, 'message_dict', None) or getattr(exc, 'detail', None) or str(exc)

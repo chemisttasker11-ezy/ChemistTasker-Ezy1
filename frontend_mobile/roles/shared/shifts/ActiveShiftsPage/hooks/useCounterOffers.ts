@@ -1,14 +1,30 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
     acceptShiftCounterOfferService,
+    fetchShiftCounterOffersBatchService,
     fetchShiftCounterOffersService,
     rejectShiftCounterOfferService,
 } from '@chemisttasker/shared-core';
+import { getNextGeneration, isLatestGeneration } from '../utils/activeShiftRuntime';
 
-export function useCounterOffers() {
+export function useCounterOffers(scopeKey?: string) {
     const [counterOffersByShift, setCounterOffersByShift] = useState<Record<number, any[]>>({});
     const [counterOffersLoadingByShift, setCounterOffersLoadingByShift] = useState<Record<number, boolean>>({});
+    const [counterOffersErrorByShift, setCounterOffersErrorByShift] = useState<Record<number, string | null>>({});
     const [counterActionLoading, setCounterActionLoading] = useState<number | null>(null);
+    const generationsRef = useRef<Record<string, number>>({});
+    // State updates are asynchronous; one synchronous lock per offer stops same-render double accepts/rejects.
+    const pendingOffers = useRef<Set<number>>(new Set());
+    useEffect(() => {
+        // Scope switch invalidates stale responses, previous pharmacy offers and errors.
+        Object.keys(generationsRef.current).forEach(key => { generationsRef.current[key] += 1; });
+        setCounterOffersByShift({});
+        setCounterOffersLoadingByShift({});
+        setCounterOffersErrorByShift({});
+        return () => {
+            Object.keys(generationsRef.current).forEach(key => { generationsRef.current[key] += 1; });
+        };
+    }, [scopeKey]);
 
     const resolveOfferSlotId = useCallback((offer: any): number | null => {
         const offerSlots = offer?.slots || offer?.offer_slots || [];
@@ -22,23 +38,61 @@ export function useCounterOffers() {
     }, []);
 
     const loadCounterOffers = useCallback(async (shiftId: number) => {
+        const genKey = String(shiftId);
+        const generation = getNextGeneration(generationsRef.current, genKey);
+        setCounterOffersByShift(prev => { const next = { ...prev }; delete next[shiftId]; return next; });
         setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: true }));
+        setCounterOffersErrorByShift(prev => ({ ...prev, [shiftId]: null }));
         try {
             const offers = await fetchShiftCounterOffersService(shiftId);
+            if (!isLatestGeneration(generationsRef.current, genKey, generation)) return;
             const pendingOffers = (offers || []).filter(
                 (offer: any) => String(offer?.status ?? '').toUpperCase() === 'PENDING'
             );
             setCounterOffersByShift(prev => ({ ...prev, [shiftId]: pendingOffers }));
-        } catch (error) {
+            setCounterOffersErrorByShift(prev => ({ ...prev, [shiftId]: null }));
+        } catch (error: any) {
+            if (!isLatestGeneration(generationsRef.current, genKey, generation)) return;
             console.error('Failed to load counter offers', error);
             setCounterOffersByShift(prev => ({ ...prev, [shiftId]: [] }));
+            setCounterOffersErrorByShift(prev => ({ ...prev, [shiftId]: error?.message || 'Failed to load counter offers' }));
         } finally {
-            setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: false }));
+            if (isLatestGeneration(generationsRef.current, genKey, generation)) {
+                setCounterOffersLoadingByShift(prev => ({ ...prev, [shiftId]: false }));
+            }
+        }
+    }, []);
+
+    // The visible shifts in one request per 100 ids (the server's batch cap): one request per shift exhausted the user throttle.
+    const loadCounterOffersBatch = useCallback(async (shiftIds: number[]) => {
+        const requests = shiftIds.map(id => ({ id, generation: getNextGeneration(generationsRef.current, String(id)) }));
+        const flag = (ids: number[], value: boolean) =>
+            setCounterOffersLoadingByShift(prev => ({ ...prev, ...Object.fromEntries(ids.map(id => [id, value])) }));
+        flag(shiftIds, true);
+        for (let start = 0; start < requests.length; start += 100) {
+            const chunk = requests.slice(start, start + 100);
+            let byShift: Record<number, any[]> = {};
+            let failure: string | null = null;
+            try {
+                byShift = await fetchShiftCounterOffersBatchService(chunk.map(item => item.id));
+            } catch (error: any) {
+                console.error('Failed to load counter offers', error);
+                failure = error?.message || 'Failed to load counter offers';
+            }
+            const current = chunk.filter(item => isLatestGeneration(generationsRef.current, String(item.id), item.generation)).map(item => item.id);
+            if (current.length === 0) continue;
+            // A shift the server leaves out has no offers this user may see.
+            setCounterOffersByShift(prev => ({ ...prev, ...Object.fromEntries(current.map(id => [id,
+                (byShift[id] || []).filter((offer: any) => String(offer?.status ?? '').toUpperCase() === 'PENDING')])) }));
+            setCounterOffersErrorByShift(prev => ({ ...prev, ...Object.fromEntries(current.map(id => [id, failure])) }));
+            flag(current, false);
         }
     }, []);
 
     const acceptOffer = useCallback(
         async (payload: { offer: any; shiftId: number; slotId: number | null }, onSuccess?: () => void) => {
+            if (pendingOffers.current.has(payload.offer.id)) return null;
+            pendingOffers.current.add(payload.offer.id);
             setCounterActionLoading(payload.offer.id);
             try {
                 const resolvedSlotId = payload.slotId ?? resolveOfferSlotId(payload.offer);
@@ -66,6 +120,7 @@ export function useCounterOffers() {
                 const detail = (error as any)?.data?.detail || (error as any)?.message || 'Failed to accept offer';
                 return { ok: false, detail };
             } finally {
+                pendingOffers.current.delete(payload.offer.id);
                 setCounterActionLoading(null);
             }
         },
@@ -74,6 +129,8 @@ export function useCounterOffers() {
 
     const rejectOffer = useCallback(
         async (payload: { offer: any; shiftId: number }, onSuccess?: () => void) => {
+            if (pendingOffers.current.has(payload.offer.id)) return;
+            pendingOffers.current.add(payload.offer.id);
             setCounterActionLoading(payload.offer.id);
             try {
                 await rejectShiftCounterOfferService({
@@ -84,6 +141,7 @@ export function useCounterOffers() {
             } catch (error) {
                 console.error('Failed to reject counter offer', error);
             } finally {
+                pendingOffers.current.delete(payload.offer.id);
                 setCounterActionLoading(null);
             }
         },
@@ -103,7 +161,9 @@ export function useCounterOffers() {
     return {
         counterOffersByShift,
         counterOffersLoadingByShift,
+        counterOffersErrorByShift,
         loadCounterOffers,
+        loadCounterOffersBatch,
         acceptOffer,
         rejectOffer,
         counterActionLoading,

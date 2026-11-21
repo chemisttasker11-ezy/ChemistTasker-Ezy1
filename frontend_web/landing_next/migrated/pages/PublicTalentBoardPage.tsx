@@ -15,7 +15,7 @@ import AuthLayout from "../layouts/AuthLayout";
 import {useAuth} from "../contexts/AuthContext";
 import TalentBoard from "./dashboard/sidebar/TalentBoard";
 import { API_BASE_URL } from "../constants/api";
-import { browserPublicTalentFeed } from '@chemisttasker/shared-core';
+import { browserPublicTalentFeed, normalizePublicTalentPost } from '@chemisttasker/shared-core';
 import { loadAllTalentPages } from "./dashboard/sidebar/TalentBoard/hooks/loadAllTalentPages";
 import { setCanonical, setPageMeta, setSocialMeta } from "../utils/seo";
 
@@ -25,6 +25,11 @@ export default function PublicTalentBoardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [publicReturnPath, setPublicReturnPath] = useState('/talent/public-board');
+  useEffect(() => {
+    // Preserve the published QR code reference across sign-in and registration.
+    setPublicReturnPath(window.location.pathname + window.location.search);
+  }, []);
   const [loginReason, setLoginReason] = useState<"like" | "calendar" | "booking" | null>(null);
 
   useEffect(() => {
@@ -52,30 +57,11 @@ export default function PublicTalentBoardPage() {
       const list = await loadAllTalentPages(async (page) => {
         return browserPublicTalentFeed({ baseUrl: API_BASE_URL }, page, 200);
       });
-      const mapped = list.map((post: any) => ({
-        ...post,
-        authorUserId: post.author_user_id ?? post.authorUserId ?? null,
-        roleTitle: post.role_title ?? post.roleTitle ?? null,
-        roleCategory: post.role_category ?? post.roleCategory ?? null,
-        workTypes: post.work_types ?? post.workTypes ?? null,
-        postKind: post.post_kind ?? post.postKind ?? null,
-        coverageRadiusKm: post.coverage_radius_km ?? post.coverageRadiusKm ?? null,
-        openToTravel: post.open_to_travel ?? post.openToTravel ?? null,
-        availabilityMode: post.availability_mode ?? post.availabilityMode ?? null,
-        availabilitySummary: post.availability_summary ?? post.availabilitySummary ?? null,
-        availabilityDays: post.availability_days ?? post.availabilityDays ?? null,
-        availabilityNotice: post.availability_notice ?? post.availabilityNotice ?? null,
-        locationState: post.location_state ?? post.locationState ?? null,
-        locationSuburb: post.location_suburb ?? post.locationSuburb ?? null,
-        locationPostcode: post.location_postcode ?? post.locationPostcode ?? null,
-        referenceCode: post.reference_code ?? post.referenceCode ?? null,
-        explorerRoleType: post.explorer_role_type ?? post.explorerRoleType ?? null,
-        explorerUserId: post.explorer_user_id ?? post.explorerUserId ?? null,
-        explorerProfileId: post.explorer_profile ?? post.explorerProfile ?? null,
-        ratingAverage: post.rating_average ?? post.ratingAverage ?? null,
-        ratingCount: post.rating_count ?? post.ratingCount ?? null,
-      }));
-      setPosts(mapped);
+      const mapped = list.map(normalizePublicTalentPost);
+      // QR codes identify a single published listing; the public endpoint still
+      // owns visibility, and an unknown/hidden reference yields no candidates.
+      const requestedRef = new URLSearchParams(window.location.search).get('reference_code');
+      setPosts(requestedRef ? mapped.filter(post => post.referenceCode === requestedRef) : mapped);
     } catch (err: any) {
       setError(err?.message || "Failed to load talent feed.");
       setPosts([]);
@@ -136,8 +122,8 @@ export default function PublicTalentBoardPage() {
             </Box>
             {!user && (
               <Stack direction="row" spacing={1}>
-                <Button component={RouterLink} to="/register?next=%2Ftalent%2Fpublic-board" variant="outlined">Create account</Button>
-                <Button component={RouterLink} to="/login?next=%2Ftalent%2Fpublic-board" variant="contained">Log in</Button>
+                <Button component={RouterLink} to={`/register?next=${encodeURIComponent(publicReturnPath)}`} variant="outlined">Create account</Button>
+                <Button component={RouterLink} to={`/login?next=${encodeURIComponent(publicReturnPath)}`} variant="contained">Log in</Button>
               </Stack>
             )}
           </Stack>
@@ -162,10 +148,10 @@ export default function PublicTalentBoardPage() {
           </DialogContent>
           <DialogActions>
             <Button onClick={closeLoginDialog}>Cancel</Button>
-            <Button component={RouterLink} to="/register?next=%2Ftalent%2Fpublic-board" variant="outlined">
+            <Button component={RouterLink} to={`/register?next=${encodeURIComponent(publicReturnPath)}`} variant="outlined">
               Create account
             </Button>
-            <Button component={RouterLink} to="/login?next=%2Ftalent%2Fpublic-board" variant="contained">
+            <Button component={RouterLink} to={`/login?next=${encodeURIComponent(publicReturnPath)}`} variant="contained">
               Log in
             </Button>
           </DialogActions>

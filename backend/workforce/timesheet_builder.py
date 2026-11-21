@@ -11,6 +11,7 @@ from workforce.models import Timesheet, TimesheetCheck, TimesheetPeriod, Timeshe
 from workforce.timesheet_checks import _compare_roster_and_actual, _latest_revision
 from workforce.timesheet_core import _check, _hash, _local_date, _minutes, _period_bounds, _serialize_dt
 from workforce.timesheet_data import _active_membership, _attach_employment_engagements, _contracted_minutes, _modern_leave, _pending_leave_count, _roster_rows, _session_rows, _worker_ids_for_period
+from users.presentation import user_display_name
 
 
 def ensure_period_timesheets(period):
@@ -174,7 +175,7 @@ def _timesheet_projection(timesheet, period, *, timezone_name=None):
         "checks": [{**c, "work_date": str(c["work_date"]) if c["work_date"] else None} for c in checks],
     }
     snapshot = {
-        "worker": {"id": timesheet.user_id, "name": timesheet.user.get_full_name() or timesheet.user.username},
+        "worker": {"id": timesheet.user_id, "name": user_display_name(timesheet.user)},
         "pharmacy": {
             "id": period.pharmacy_id,
             "name": period.pharmacy.name,

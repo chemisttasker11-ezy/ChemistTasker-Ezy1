@@ -34,6 +34,9 @@ class EditorialSeedGuardTests(TestCase):
             call_command('seed_editorial_content', '--allow-production', stdout=StringIO())
         self.assertTrue(ContentAdministrator.objects.filter(user__email='seed@example.test').exists())
         self.assertTrue(Article.objects.filter(status='published').exists())
+        topics = set(Article.objects.values_list('topic', flat=True))
+        self.assertLessEqual(topics, {value for value, _ in Article.TOPIC_CHOICES})
+        self.assertIn('career', topics)  # the learning pages list the 'career' topic
 
 
 def payload(title='A pharmacy perspective', slug='pharmacy-perspective'):

@@ -1,5 +1,6 @@
+import { FinanceAccess } from '@/components/FinanceAccess';
 import InvoiceList from '@/roles/shared/invoices/InvoiceList';
 
 export default function AdminInvoiceScreen() {
-  return <InvoiceList basePath="/admin/invoice" />;
+  return <FinanceAccess><InvoiceList basePath="/admin/invoice" /></FinanceAccess>;
 }

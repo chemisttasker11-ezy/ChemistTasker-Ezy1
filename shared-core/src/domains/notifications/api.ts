@@ -47,3 +47,25 @@ export function registerPushDeviceToken(token: string, platform: 'ios' | 'androi
         body: JSON.stringify({ token, platform }),
     });
 }
+
+
+/** Server-authoritative, user-scoped Expo push notification preferences. */
+export interface NotificationPushPreferences {
+  push_messages: boolean;
+  push_tasks: boolean;
+  push_work_notes: boolean;
+  push_alerts: boolean;
+  quiet_hours_enabled: boolean;
+  quiet_start: string;
+  quiet_end: string;
+  time_zone: string;
+}
+export function getNotificationPushPreferences() {
+  return fetchApi<NotificationPushPreferences>('/notification-push-preferences/');
+}
+export function updateNotificationPushPreferences(data: Partial<NotificationPushPreferences>) {
+  return fetchApi<NotificationPushPreferences>('/notification-push-preferences/', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}

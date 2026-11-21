@@ -1,24 +1,38 @@
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Text, TextInput, Button, Surface } from 'react-native-paper';
+import React, { useRef, useState } from 'react';
+import { View, type TextInputInstance } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { passwordResetConfirm } from '@chemisttasker/shared-core';
-import AuthLayout from '../components/AuthLayout';
+import AuthLayout, { AuthLink, AuthNotice } from '../components/AuthLayout';
+import { Button, TextField } from '@/components/ui';
+import { space } from '@/constants/tokens';
 import { useAuth } from '../context/AuthContext';
 
 export default function ResetPasswordScreen() {
     const router = useRouter();
     const { logout } = useAuth();
-    const { uid, token } = useLocalSearchParams<{ uid: string; token: string }>();
+    const params = useLocalSearchParams<{ uid?: string | string[]; token?: string | string[] }>();
+    // A repeated query key arrives as an array; only a non-empty string is a usable link part.
+    const uid = typeof params.uid === 'string' && params.uid ? params.uid : '';
+    const token = typeof params.token === 'string' && params.token ? params.token : '';
 
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState('');
+    const [logoutFailed, setLogoutFailed] = useState(false);
     const [loading, setLoading] = useState(false);
+    const confirmRef = useRef<TextInputInstance>(null);
 
     const handleSubmit = async () => {
+        if (loading) return;
+        // The keyboard's Go key submits too, so the handler checks what the button alone cannot.
+        if (!uid || !token) {
+            setError('This reset link is incomplete. Request a new one from Forgot password.');
+            return;
+        }
+        if (!newPassword || !confirmPassword) {
+            setError('Please fill in all fields');
+            return;
+        }
         if (newPassword !== confirmPassword) {
             setError('Passwords do not match');
             return;
@@ -27,101 +41,92 @@ export default function ResetPasswordScreen() {
         setError('');
         try {
             await passwordResetConfirm({
-                uid: uid ?? '',
-                token: token ?? '',
+                uid,
+                token,
                 new_password1: newPassword,
                 new_password2: confirmPassword,
             });
+        } catch (resetErr: any) {
+            setError(resetErr?.message || 'Failed to reset password. The link may be invalid or expired.');
+            setLoading(false);
+            return;
+        }
+
+        try {
             await logout();
-            router.replace('/login');
+            router.replace({ pathname: '/login', params: { reset: '1' } } as any);
         } catch {
-            setError('Failed to reset password. The link may be invalid or expired.');
+            // Password change succeeded, but follow-up logout failed (e.g. HttpOnly web cookie session revocation failed).
+            // Do NOT show as failed. Show honest password changed / check sign out state and login action.
+            setLogoutFailed(true);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <AuthLayout title="Set a New Password">
-            {error ? (
-                <Surface style={styles.errorContainer} elevation={1}>
-                    <Text style={styles.errorText}>{error}</Text>
-                </Surface>
-            ) : null}
+        <AuthLayout
+            title="Set a new password"
+            subtitle="Choose a new password for your account. You'll sign in with it next."
+            onBack={router.canGoBack() ? () => router.back() : undefined}
+            backDisabled={loading}
+            footer={<AuthLink label="Back to login" onPress={() => router.replace('/login')} disabled={loading} />}
+        >
+            {error ? <AuthNotice tone="error" message={error} /> : null}
 
-            <TextInput
-                label="New Password"
-                value={newPassword}
-                onChangeText={setNewPassword}
-                mode="outlined"
-                style={styles.input}
-                secureTextEntry={!showPassword}
-                right={
-                    <TextInput.Icon
-                        icon={showPassword ? 'eye-off' : 'eye'}
-                        onPress={() => setShowPassword((v) => !v)}
+            {logoutFailed ? (
+                <View style={{ gap: space.md }}>
+                    <AuthNotice
+                        tone="info"
+                        message="Password updated successfully, but session sign-out could not be confirmed. Check your sign-out state before signing in."
                     />
-                }
-            />
-
-            <TextInput
-                label="Confirm New Password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                mode="outlined"
-                style={styles.input}
-                secureTextEntry={!showConfirmPassword}
-                right={
-                    <TextInput.Icon
-                        icon={showConfirmPassword ? 'eye-off' : 'eye'}
-                        onPress={() => setShowConfirmPassword((v) => !v)}
+                    <Button
+                        label="Go to login"
+                        onPress={() => router.replace({ pathname: '/login', params: { reset: '1' } } as any)}
+                        haptic="light"
                     />
-                }
-            />
+                </View>
+            ) : (
+                <>
+                    <TextField
+                        label="New password"
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                        secure
+                        textContentType="newPassword"
+                        autoComplete="new-password"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        returnKeyType="next"
+                        submitBehavior="submit"
+                        onSubmitEditing={() => confirmRef.current?.focus()}
+                        disabled={loading}
+                    />
 
-            <Button
-                mode="contained"
-                onPress={handleSubmit}
-                loading={loading}
-                disabled={loading}
-                style={styles.button}
-                contentStyle={styles.buttonContent}
-            >
-                Reset Password
-            </Button>
+                    <TextField
+                        ref={confirmRef}
+                        label="Confirm new password"
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        secure
+                        textContentType="newPassword"
+                        autoComplete="new-password"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        returnKeyType="go"
+                        onSubmitEditing={() => void handleSubmit()}
+                        disabled={loading}
+                    />
 
-            <View style={styles.backRow}>
-                <Button mode="text" onPress={() => router.replace('/login')} style={styles.backButton}>
-                    Back to login
-                </Button>
-            </View>
+                    <Button
+                        label="Reset password"
+                        busyLabel="Saving"
+                        onPress={() => void handleSubmit()}
+                        busy={loading}
+                        haptic="light"
+                    />
+                </>
+            )}
         </AuthLayout>
     );
 }
-
-const styles = StyleSheet.create({
-    input: {
-        backgroundColor: '#fff',
-    },
-    button: {
-        marginTop: 8,
-        borderRadius: 8,
-    },
-    buttonContent: {
-        paddingVertical: 8,
-    },
-    backRow: {
-        alignItems: 'center',
-    },
-    backButton: {
-        marginTop: 4,
-    },
-    errorContainer: {
-        backgroundColor: '#ffebee',
-        padding: 12,
-        borderRadius: 8,
-    },
-    errorText: {
-        color: '#c62828',
-    },
-});

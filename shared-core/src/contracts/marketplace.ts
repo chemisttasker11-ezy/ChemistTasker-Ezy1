@@ -39,6 +39,8 @@ export interface MarketplaceListingOptions extends MarketplaceAccess {
   personal_categories: MarketplaceCategory[];
   pharmacy_categories: MarketplaceCategory[];
   ethical_entry_available: boolean;
+  /** False while the server's MARKETPLACE_NEW_LISTINGS_ENABLED (or all-writes) switch is off; older servers omit it. */
+  new_listings_enabled?: boolean;
   seller_policy_version: string;
   rules: {
     ordinary_pharmacy_assets_owner_only: boolean;

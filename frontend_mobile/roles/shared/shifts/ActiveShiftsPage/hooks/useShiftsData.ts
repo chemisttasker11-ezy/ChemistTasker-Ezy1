@@ -1,44 +1,74 @@
 // useShiftsData hook
 // Mirrors web logic for loading active shifts
 
-import { useState, useEffect, useCallback } from 'react';
-import { Shift, fetchActiveShifts, fetchPosterShiftDetailService } from '@chemisttasker/shared-core';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { type Shift, fetchAllActiveShifts, fetchConfirmedShiftDetailService, fetchPosterShiftDetailService } from '@chemisttasker/shared-core';
+import { filterShiftsByPharmacy, getNextGeneration, isLatestGeneration, loadLinkedPosterShift } from '../utils/activeShiftRuntime';
+
+const EMPTY_SHIFTS: Shift[] = [];
 
 interface UseShiftsDataParams {
     selectedPharmacyId: number | null;
     shiftId?: number | null;
+    scopeKey?: string;
+    notificationKey?: string | null;
+    enabled?: boolean;
 }
 
-export function useShiftsData({ selectedPharmacyId: _selectedPharmacyId, shiftId }: UseShiftsDataParams) {
-    const [shifts, setShifts] = useState<Shift[]>([]);
+export function useShiftsData({ selectedPharmacyId, shiftId, scopeKey, notificationKey, enabled = true }: UseShiftsDataParams) {
+    const [shifts, setShifts] = useState<Shift[]>(EMPTY_SHIFTS);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    // The linked shift (shiftId) as the server returned it, before the pharmacy filter.
+    const [linked, setLinked] = useState<{ shift: Shift; booked: boolean } | null>(null);
+    const generationsRef = useRef<Record<string, number>>({});
 
     const loadShifts = useCallback(async () => {
+        const genKey = shiftId != null ? `shift_${shiftId}` : 'all';
+        const generation = getNextGeneration(generationsRef.current, genKey);
+        setShifts(EMPTY_SHIFTS); // Never show a previous pharmacy's rows during load/error.
         setLoading(true);
+        setError(null);
         try {
             if (shiftId != null) {
-                const detail = await fetchPosterShiftDetailService(shiftId);
-                setShifts(detail ? [detail] : []);
+                const found = await loadLinkedPosterShift(shiftId, fetchPosterShiftDetailService, fetchConfirmedShiftDetailService);
+                if (!isLatestGeneration(generationsRef.current, genKey, generation)) return;
+                setLinked(found);
+                const result = found.booked ? EMPTY_SHIFTS : filterShiftsByPharmacy([found.shift], selectedPharmacyId);
+                setShifts(result.length > 0 ? result : EMPTY_SHIFTS);
             } else {
-                const data = await fetchActiveShifts();
-                setShifts((data as Shift[]) || []);
+                const mapped = await fetchAllActiveShifts();
+                if (!isLatestGeneration(generationsRef.current, genKey, generation)) return;
+                const scoped = filterShiftsByPharmacy(mapped, selectedPharmacyId);
+                setShifts(scoped.length > 0 ? scoped : EMPTY_SHIFTS);
             }
-        } catch (error) {
-            console.error('Failed to load active shifts', error);
-            setShifts([]);
+        } catch (err: any) {
+            if (!isLatestGeneration(generationsRef.current, genKey, generation)) return;
+            console.error('Failed to load active shifts', err);
+            setError(err?.message || 'Failed to load active shifts');
         } finally {
-            setLoading(false);
+            if (isLatestGeneration(generationsRef.current, genKey, generation)) {
+                setLoading(false);
+            }
         }
-    }, [shiftId]);
+    }, [selectedPharmacyId, shiftId, scopeKey, notificationKey]);
 
     useEffect(() => {
+        // A surface without shift management never requests the poster list.
+        if (!enabled) return;
         loadShifts();
-    }, [loadShifts]);
+        return () => {
+            const genKey = shiftId != null ? `shift_${shiftId}` : 'all';
+            getNextGeneration(generationsRef.current, genKey);
+        };
+    }, [enabled, loadShifts, shiftId]);
 
     return {
         shifts,
         setShifts,
         loading,
+        error,
+        linked,
         loadShifts,
     };
 }

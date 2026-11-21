@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import dayjs from 'dayjs';
-import { expandShiftDraftSlots } from '@chemisttasker/shared-core';
+import { expandShiftDraftSlots, isValidShiftPostingTimeRange } from '@chemisttasker/shared-core';
 import { type PharmacyOption, type SlotEntry, type SlotTime, type CalendarEvent, type CalendarViewOption,
   toIsoDate, isValidDate, applyTimeToDate, formatSlotTime, pharmacyHoursForDate } from './helpers';
 
@@ -61,8 +61,16 @@ export function useShiftTimetable({ selectedPharmacy, editingShiftId, showSnackb
       if (!date) return [];
       const occurrenceIndex = counts.get(slot.sourceIndex) ?? 0;
       counts.set(slot.sourceIndex, occurrenceIndex + 1);
+      // Match the posting validator: midnight-crossing drafts finish on the next
+      // calendar date, not after an assumed 24-hour UTC interval (DST varies).
+      if (!isValidShiftPostingTimeRange(slot.startTime, slot.endTime)) return [];
       const start = applyTimeToDate(date, slot.startTime);
-      const end = applyTimeToDate(date, slot.endTime);
+      const endDate = new Date(date.getTime());
+      if (slot.endTime.slice(0, 5) < slot.startTime.slice(0, 5)) {
+        endDate.setDate(endDate.getDate() + 1);
+      }
+      const end = applyTimeToDate(endDate, slot.endTime);
+      if (!isValidDate(start) || !isValidDate(end) || end <= start) return [];
       return [{ id: `${slot.sourceIndex}-${occurrenceIndex}-${start.toISOString()}`,
         title: `${formatSlotTime(slot.startTime)} — ${formatSlotTime(slot.endTime)}`,
         start, end, resource: { slotIndex: slot.sourceIndex, occurrenceIndex } }];
@@ -219,8 +227,8 @@ export function useShiftTimetable({ selectedPharmacy, editingShiftId, showSnackb
       setTimetableError('Set a start and finish time.');
       return false;
     }
-    if (new Date(`1970-01-01T${slotEndTime}`) <= new Date(`1970-01-01T${slotStartTime}`)) {
-      setTimetableError('The finish time must be after the start time.');
+    if (!isValidShiftPostingTimeRange(slotStartTime, slotEndTime)) {
+      setTimetableError('Enter valid start and finish times.');
       return false;
     }
 
@@ -257,8 +265,8 @@ export function useShiftTimetable({ selectedPharmacy, editingShiftId, showSnackb
       setTimetableError('Set a start and finish time.');
       return false;
     }
-    if (new Date(`1970-01-01T${custom.endTime}`) <= new Date(`1970-01-01T${custom.startTime}`)) {
-      setTimetableError('The finish time must be after the start time.');
+    if (!isValidShiftPostingTimeRange(custom.startTime, custom.endTime)) {
+      setTimetableError('Enter valid start and finish times.');
       return false;
     }
     if (dayjs(date).isBefore(todayStart, 'day')) {
@@ -297,8 +305,8 @@ export function useShiftTimetable({ selectedPharmacy, editingShiftId, showSnackb
         setTimetableError('Set a start and finish time.');
         return false;
       }
-      if (new Date(`1970-01-01T${custom.endTime}`) <= new Date(`1970-01-01T${custom.startTime}`)) {
-        setTimetableError('Each selected day must have an end time after its start time.');
+      if (!isValidShiftPostingTimeRange(custom.startTime, custom.endTime)) {
+        setTimetableError('Each selected day must have valid start and finish times.');
         return false;
       }
       newEntries.push({

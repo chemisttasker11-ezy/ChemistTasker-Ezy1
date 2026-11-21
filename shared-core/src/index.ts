@@ -15,6 +15,9 @@ export * from './financePresentation';
 export * from './api';
 export { getMembershipErrorMessage } from './domains/memberships/errors';
 export * from './talent';
+export * from './domains/talent/pendingPitch';
+export { getApiConfig } from './transport/application';
+export { fetchAllPages } from './utils/serialization';
 
 // Request-scoped/shared transport. Use createApiClient/createChemistTaskerApi
 // for new cross-platform work (especially Next.js SSR).
@@ -60,6 +63,7 @@ export * from './policy/rosterPolicy';
 // Re-export pricing utils
 export * from './utils/pricing';
 export * from './utils/attendanceDisplay';
+export { correctionTimestamp, attendanceWallTime, isValidAttendanceLocal } from './utils/correctionTimestamp';
 
 // Shared mobile/desktop offline kiosk protocol.
 export * from './kioskProtocol';
@@ -79,6 +83,8 @@ export * from './domains/organizations/pharmacyMultipart';
 export * from './domains/shifts/skillPresets';
 export * from './domains/shifts/visibility';
 export * from './domains/shifts/postingDraft';
+export * from './domains/shifts/audience';
+export * from './domains/shifts/postingWindow';
 export * from './domains/shifts/descriptionTemplates';
 export * from './domains/shifts/workProfile';
 export * from './domains/shifts/draftSlots';

@@ -17,6 +17,7 @@ export {
   fetchRoomMessagesService,
   fetchRoomMessagesByUrl,
   sendRoomMessageService,
+  downloadChatAttachment,
   startDirectMessageByMembership,
   startDirectMessageByUser,
   fetchChatParticipants,

@@ -1,3 +1,5 @@
+import { View } from 'react-native';
+import { BrandLoader } from '@/components/ui/BrandLoader';
 import { Redirect } from 'expo-router';
 import { hasOrganizationAccess } from '@chemisttasker/shared-core';
 import { useAuth } from '../context/AuthContext';
@@ -16,7 +18,7 @@ export default function NotFoundRedirect() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
-    return null;
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><BrandLoader size={44} accessibilityLabel="Restoring session" /></View>;
   }
 
   return <Redirect href={getHomeRoute(user) as any} />;

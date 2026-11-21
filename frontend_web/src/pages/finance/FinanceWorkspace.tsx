@@ -1,4 +1,4 @@
-import { finance, financeStatus, type FinanceCustomer, type FinanceExpense, type FinanceInvoice, type FinanceItem, type FinanceWorksheet } from '@chemisttasker/shared-core';
+import { finance, financeStatus, invoiceCsvRows, expenseCsvRows, worksheetCsvRows, type FinanceCustomer, type FinanceExpense, type FinanceInvoice, type FinanceItem, type FinanceWorksheet } from '@chemisttasker/shared-core';
 import {
   Alert, Box, Button, CircularProgress,
   Divider,
@@ -65,6 +65,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [reviewAction, setReviewAction] = useState<ReviewAction | null>(null);
   const [worksheet, setWorksheet] = useState<FinanceWorksheet | null>(null);
+  const worksheetGen = useRef(0);
   const [periodStart, setPeriodStart] = useState(`${Number(today().slice(0, 4)) - (Number(today().slice(5, 7)) < 7 ? 1 : 0)}-07-01`);
   const [periodEnd, setPeriodEnd] = useState(today()); const [basis, setBasis] = useState<'cash' | 'accrual'>('cash');
 
@@ -92,7 +93,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const linkNew = params.get('new');
   const linkKey = `${linkInvoice ?? ''}|${linkShift ?? ''}|${linkNew ?? ''}`;
   const linkRequest = useRef(0);
-  useEffect(() => () => { linkRequest.current += 1; }, []);
+  useEffect(() => () => { linkRequest.current += 1; worksheetGen.current += 1; }, []);
   const setLink = (link: { invoice?: string | number; shift?: string | number; new?: boolean } | null) => {
     const opening = Boolean(link);
     setParams(current => {
@@ -178,11 +179,8 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
   const toReview = receivedInvoices.filter(invoice => receivedKey(invoice) === 'review').length;
   const needsChanges = invoices.filter(invoice => statusKey(invoice) === 'revision').length;
   const overdueCount = invoices.filter(invoice => statusKey(invoice) === 'overdue').length;
-  const invoiceCsv = () => downloadCsv('workspace-invoices.csv', [['Number', 'Kind', 'Customer', 'Date', 'Due', 'Worker or fund payable AUD', 'GST AUD', 'Paid AUD', 'Balance AUD', 'Status'],
-    ...visibleInvoices.map(invoice => [invoice.number, invoice.kind, invoice.payload.customer?.name || '', invoice.payload.invoice_date, invoice.payload.due_date,
-      invoice.calculation.payable, invoice.calculation.gst, invoice.paid, invoice.balance, invoice.status])]);
-  const expenseCsv = () => downloadCsv('workspace-expenses.csv', [['Supplier', 'Description', 'Incurred', 'Paid', 'Gross AUD', 'GST AUD', 'Creditable business use %', 'Estimated GST credit AUD', 'Reference'],
-    ...expenses.map(expense => [expense.supplier, expense.description, expense.incurred_on, expense.paid_on || '', expense.amount, expense.gst_amount, expense.business_use_percent, expense.gst_credit, expense.reference])]);
+  const invoiceCsv = () => downloadCsv('workspace-invoices.csv', invoiceCsvRows(visibleInvoices));
+  const expenseCsv = () => downloadCsv('workspace-expenses.csv', expenseCsvRows(expenses));
 
   if (editor?.kind === 'invoice') return <Box data-ct-tokens="" sx={{ maxWidth: 1600, mx: 'auto' }}><InvoiceComposer key={linkKey} initial={editor.value} prefillShiftId={editor.prefillShiftId} previous={serviceInvoices[0]} customers={customers} items={items} onClose={() => setLink(null)} onSaved={refreshAfterSave} /></Box>;
 
@@ -319,10 +317,10 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
           <Stack spacing={2.5}>
             <Alert severity="warning">A starting point only: not a full BAS, not lodged for you and not tax advice. Older invoices and unsupported adjustments are left out.</Alert>
             <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1.4fr auto' }, alignItems: 'center' }}>
-              <TextField type="date" label="Period start" InputLabelProps={{ shrink: true }} value={periodStart} onChange={event => { setPeriodStart(event.target.value); setWorksheet(null); }} />
-              <TextField type="date" label="Period end" InputLabelProps={{ shrink: true }} value={periodEnd} onChange={event => { setPeriodEnd(event.target.value); setWorksheet(null); }} />
-              <TextField select label="GST basis" value={basis} onChange={event => { setBasis(event.target.value as 'cash' | 'accrual'); setWorksheet(null); }}><MenuItem value="cash">Cash: payments received</MenuItem><MenuItem value="accrual">Accrual: invoices issued</MenuItem></TextField>
-              <Button variant="contained" disabled={busy} startIcon={busy ? <CircularProgress size={15} color="inherit" /> : undefined} onClick={() => void run(async () => setWorksheet(await finance.worksheet(periodStart, periodEnd, basis)))}>Calculate</Button>
+              <TextField type="date" label="Period start" InputLabelProps={{ shrink: true }} value={periodStart} onChange={event => { setPeriodStart(event.target.value); worksheetGen.current += 1; setWorksheet(null); }} />
+              <TextField type="date" label="Period end" InputLabelProps={{ shrink: true }} value={periodEnd} onChange={event => { setPeriodEnd(event.target.value); worksheetGen.current += 1; setWorksheet(null); }} />
+              <TextField select label="GST basis" value={basis} onChange={event => { setBasis(event.target.value as 'cash' | 'accrual'); worksheetGen.current += 1; setWorksheet(null); }}><MenuItem value="cash">Cash: payments received</MenuItem><MenuItem value="accrual">Accrual: invoices issued</MenuItem></TextField>
+              <Button variant="contained" disabled={busy} startIcon={busy ? <CircularProgress size={15} color="inherit" /> : undefined} onClick={() => void run(async () => { const request = ++worksheetGen.current; const result = await finance.worksheet(periodStart, periodEnd, basis); if (request === worksheetGen.current) setWorksheet(result); })}>Calculate</Button>
             </Box>
             {worksheet && <>
               <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 1, columnGap: 2, maxWidth: 520 }}>
@@ -333,7 +331,7 @@ export default function FinanceWorkspace({ receivedMode = false }: { receivedMod
               </Box>
               <Typography sx={rowMeta}>Older invoices left out: {worksheet.excluded_legacy_invoice_count}. Expenses to check for receipts: {worksheet.expenses_needing_evidence.length || 'none'}. These checks don't mean the period is ready to lodge.</Typography>
               {worksheet.warnings.map(warning => <Typography key={warning} sx={rowMeta}>{warning}</Typography>)}
-              <Button startIcon={<Download size={15} />} sx={{ alignSelf: 'flex-start' }} onClick={() => downloadCsv('gst-worksheet-DRAFT.csv', [['DRAFT ONLY', 'Not a complete BAS'], ['Start', worksheet.start], ['End', worksheet.end], ['Basis', worksheet.basis], ['G1', worksheet.G1], ['1A', worksheet['1A']], ['1B', worksheet['1B']], ['Estimated GST net', worksheet.estimated_gst_net], ['Excluded legacy invoices', worksheet.excluded_legacy_invoice_count]])}>Download worksheet (CSV)</Button>
+               <Button startIcon={<Download size={15} />} sx={{ alignSelf: 'flex-start' }} onClick={() => downloadCsv('gst-worksheet-DRAFT.csv', worksheetCsvRows(worksheet))}>Download worksheet (CSV)</Button>
             </>}
           </Stack>
         </SectionCard>}

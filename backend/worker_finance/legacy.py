@@ -5,6 +5,7 @@ permissions are performed by the selected DRF view, not by the routing lookup.
 The delegates preserve DRF's CSRF exemption at the outer URL callback; session
 CSRF enforcement remains the responsibility of the selected DRF authenticator.
 """
+from worker_finance.permissions import CanAccessFinance
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -19,7 +20,7 @@ Invoice = apps.get_model('invoicing', 'Invoice')
 
 @never_cache
 @api_view(['GET', 'PATCH', 'PUT', 'DELETE', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, CanAccessFinance])
 def managed_legacy(request, invoice_id, operation='detail'):
     record = get_object_or_404(Invoice, pk=invoice_id, user=request.user, request_key__isnull=False)
     if operation == 'pdf' and request.method == 'GET':

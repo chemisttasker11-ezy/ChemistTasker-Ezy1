@@ -1,3 +1,5 @@
+import { View } from 'react-native';
+import { BrandLoader } from '@/components/ui/BrandLoader';
 import { useEffect } from 'react';
 import { Redirect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
@@ -19,6 +21,6 @@ export default function PharmacistIndex() {
     }
   }, [user, isLoading, router]);
 
-  if (isLoading) return null;
+  if (isLoading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><BrandLoader size={44} accessibilityLabel="Loading workspace" /></View>;
   return <Redirect href="/pharmacist/dashboard" />;
 }

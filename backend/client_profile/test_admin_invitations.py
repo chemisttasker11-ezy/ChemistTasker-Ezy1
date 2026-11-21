@@ -153,26 +153,18 @@ class AdditionalAdminInvitationTests(TestCase):
         target.refresh_from_db()
         self.assertEqual(target.role, 'OWNER')
 
-    def test_existing_explorer_can_accept_new_pharmacy_admin_membership(self):
+    def test_existing_explorer_cannot_receive_pharmacy_admin_membership(self):
         target = get_user_model().objects.create_user(
             email='explorer-admin@example.com', password='Password123!', role='EXPLORER'
         )
         response = self.invite(target.email)
-        self.assertEqual(response.status_code, 201)
-        membership = Membership.objects.get(user=target, pharmacy=self.pharmacy)
-        assignment = PharmacyAdmin.objects.get(user=target, pharmacy=self.pharmacy)
-        self.assertEqual(membership.role, 'CONTACT')
-        self.assertEqual(membership.status, Membership.Status.PENDING)
-        self.assertFalse(assignment.is_active)
-        self.client.force_authenticate(user=target)
-        accepted = self.client.post(f'/api/v1/pharmacy-admins/{assignment.id}/accept-invitation/')
-        self.assertEqual(accepted.status_code, 200)
-        membership.refresh_from_db()
-        assignment.refresh_from_db()
+        # owner rule D96: explorers cannot be admins
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['detail'], 'Explorer accounts cannot be admins.')
+        self.assertFalse(Membership.objects.filter(user=target, pharmacy=self.pharmacy).exists())
+        self.assertFalse(PharmacyAdmin.objects.filter(user=target, pharmacy=self.pharmacy).exists())
+        target.refresh_from_db()
         self.assertEqual(target.role, 'EXPLORER')
-        self.assertEqual(membership.status, Membership.Status.ACCEPTED)
-        self.assertTrue(membership.is_active)
-        self.assertTrue(assignment.is_active)
 
     def test_rejecting_admin_does_not_remove_accepted_membership(self):
         target = get_user_model().objects.create_user(

@@ -94,7 +94,9 @@ def _revoke_user_tokens(user):
     transaction.on_commit(lambda: notify_auth_changed(user.id))
 
 
+@transaction.atomic
 def _anonymize_user(user):
+    user = type(user).objects.select_for_update().get(pk=user.pk)
     user_features().delete_talent_posts(user)
     original_email = (user.email or "").strip()
     update_fields = ["is_active", "deleted_at"]

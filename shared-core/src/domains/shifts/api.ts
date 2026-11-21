@@ -33,8 +33,14 @@ export function getPublicShifts(params?: Record<string, unknown>) {
 export function getActiveShifts() {
     return fetchApi<Collection<ShiftApi>>('/shifts/active/');
 }
+export function getActiveShiftsPage(page: number) {
+    return fetchApi<Collection<ShiftApi>>(`/shifts/active/?page=${page}`);
+}
 export function getConfirmedShifts() {
     return fetchApi<Collection<ShiftApi>>('/shifts/confirmed/');
+}
+export function getConfirmedShiftsPage(page: number) {
+    return fetchApi<Collection<ShiftApi>>(`/shifts/confirmed/?page=${page}`);
 }
 export function getHistoryShifts(params?: Record<string, unknown>) {
     return fetchApi<Collection<ShiftApi>>(`/shifts/history/${buildQuery(params)}`);
@@ -64,9 +70,10 @@ export function getShiftCounterOffersBatch(shiftIds: number[]) {
     const query = encodeURIComponent(ids.join(','));
     return fetchApi<Record<string, ShiftCounterOfferApi[]>>(`/shifts/counter-offers-batch/?shift_ids=${query}`);
 }
-export function createShiftCounterOffer(shiftId: number | string, data: unknown) {
+export function createShiftCounterOffer(shiftId: number | string, data: unknown, key?: string) {
     return fetchApi<ShiftCounterOfferApi>(`/shifts/${shiftId}/counter-offers/`, {
         method: 'POST',
+        headers: key ? { 'Idempotency-Key': key } : undefined,
         body: JSON.stringify(data),
     });
 }
@@ -94,6 +101,7 @@ export function acceptShiftOffer(offerId: number | string, data: ShiftOfferAccep
     const body = {
         engagement_terms_accepted: data?.engagementTermsAccepted ?? data?.engagement_terms_accepted ?? false,
         independent_contractor_status_confirmed: data?.independentContractorStatusConfirmed ?? data?.independent_contractor_status_confirmed ?? false,
+        ...(data?.termsVersion ? { terms_version: data.termsVersion } : {}),
     };
     return fetchApi(`/shift-offers/${offerId}/accept/`, {
         method: 'POST',
@@ -205,8 +213,8 @@ export function getOwnerShifts(params?: Record<string, unknown>) {
     const query = buildQuery(params);
     return fetchApi<Collection<OwnerShiftSummaryApi>>(`/shifts/owner/${query}`);
 }
-export function createOwnerShift(data: unknown) {
-    return fetchApi<ShiftApi>('/shifts/', { method: 'POST', body: JSON.stringify(data) });
+export function createOwnerShift(data: unknown, key?: string) {
+    return fetchApi<ShiftApi>('/shifts/', { method: 'POST', headers: key ? { 'Idempotency-Key': key } : undefined, body: JSON.stringify(data) });
 }
 export function updateOwnerShift(id: number | string, data: unknown) {
     return fetchApi<ShiftApi>(`/shifts/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
@@ -263,6 +271,10 @@ export async function fetchActiveShifts() {
     const data = await getActiveShifts();
     return asList(data).map(mapShift);
 }
+/** Returns all pages of the active shifts list, owned by the shared-core domain. */
+export async function fetchAllActiveShifts() {
+    return (await fetchAllPages((page) => getActiveShiftsPage(page))).map(mapShift);
+}
 export async function fetchActiveShiftDetailService(shiftId: number | string) {
     const data = await getActiveShiftDetail(shiftId);
     return mapShift(data);
@@ -286,6 +298,9 @@ export async function fetchPublicShiftDetailService(shiftId: number | string) {
 export async function fetchConfirmedShifts() {
     const data = await getConfirmedShifts();
     return asList(data).map(mapShift);
+}
+export async function fetchAllConfirmedShifts() {
+    return (await fetchAllPages((page) => getConfirmedShiftsPage(page))).map(mapShift);
 }
 export async function fetchConfirmedShiftDetailService(shiftId: number | string) {
     const data = await getConfirmedShiftDetail(shiftId);
@@ -360,7 +375,7 @@ export async function fetchShiftCounterOffersService(shiftId: number | string) {
 }
 export async function submitShiftCounterOfferService(payload: ShiftCounterOfferPayload & {
     travel_origin?: string;
-}) {
+}, key?: string) {
     const body = {
         request_travel: payload.requestTravel ?? false,
         travel_origin_input: payload.travelOrigin ?? payload.travel_origin ?? '',
@@ -373,7 +388,7 @@ export async function submitShiftCounterOfferService(payload: ShiftCounterOfferP
             proposed_rate: slot.proposedRate ?? null,
         })),
     };
-    const data = await createShiftCounterOffer(payload.shiftId, body);
+    const data = await createShiftCounterOffer(payload.shiftId, body, key);
     return mapShiftCounterOffer(data);
 }
 export async function acceptShiftCounterOfferService(payload: {
@@ -399,6 +414,17 @@ export async function fetchShiftOffersService(filters?: {
     const data = await fetchShiftOffers(query ? `?${query}` : '');
     return asList(data).map(camelCaseKeysDeep);
 }
+/** Owner shift centre must exhaust both accepted-offer pages through public SDK ownership. */
+export async function fetchDeferredPayrollOffersService() {
+    const statuses = ['ACCEPTED', 'ACCEPTED_AWAITING_PAYMENT'] as const;
+    const groups = await Promise.all(statuses.map((status) =>
+        fetchAllPages<ShiftOfferApi>((page) =>
+            fetchShiftOffers(`?status=${status}&page=${page}`)
+        )
+    ));
+    return groups.flat().map((offer) => camelCaseKeysDeep(offer));
+}
+
 export async function acceptShiftOfferService(offerId: number | string, payload: ShiftOfferAcceptancePayload = {}) {
     return camelCaseKeysDeep(await acceptShiftOffer(offerId, payload));
 }
@@ -480,8 +506,8 @@ export async function fetchOwnerShiftsService(filters?: Record<string, unknown>)
     const data = await getOwnerShifts(toOwnerShiftParams(filters));
     return asList(data).map(mapOwnerShiftSummary);
 }
-export async function createOwnerShiftService(payload: unknown) {
-    await createOwnerShift(payload);
+export async function createOwnerShiftService(payload: unknown, key?: string) {
+    return createOwnerShift(payload, key);
 }
 export async function updateOwnerShiftService(shiftId: number | string, payload: unknown) {
     await updateOwnerShift(shiftId, payload);

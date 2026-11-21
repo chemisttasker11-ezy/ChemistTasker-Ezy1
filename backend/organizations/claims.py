@@ -2,6 +2,7 @@
 from rest_framework import mixins, permissions, status, viewsets
 from organizations.membership_port import membership_operations
 from organizations.models import Pharmacy, PharmacyAdmin, PharmacyClaim
+from access_control.admin_roles import validate_admin_user_for_api
 from onboarding.models import OwnerOnboarding
 from notifications.models import Notification
 from rest_framework.response import Response
@@ -183,9 +184,10 @@ class OwnerOnboardingClaim(APIView):
         # A new account starts as a PHARMACY_MANAGER: admin dashboard first, no onboarding; the person may later
         # choose Pharmacist or Other Staff once. An existing account keeps its type.
         user, created = User.objects.get_or_create(
-            email=email,
-            defaults={'role': 'PHARMACY_MANAGER'}
+            email__iexact=email,
+            defaults={'email': email, 'role': 'PHARMACY_MANAGER'}
         )
+        validate_admin_user_for_api(user)
         temp_password = None
         if created:
             user.set_unusable_password()
@@ -243,11 +245,21 @@ class OwnerOnboardingClaim(APIView):
         }
 
     def post(self, request):
+        memberships = request.user.organization_memberships.select_related('organization').order_by('id')
+        # An explicit organisation target avoids silently acting for another
+        # membership of a multi-organisation account. Legacy web callers may
+        # omit this field to retain the established first-authorised fallback.
+        requested_org_id = request.data.get('organization_id')
+        if requested_org_id is not None:
+            if (isinstance(requested_org_id, bool)
+                    or not str(requested_org_id).isdigit()
+                    or int(requested_org_id) <= 0):
+                return Response({'detail': 'A valid organization_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            memberships = memberships.filter(organization_id=int(requested_org_id))
         membership = next(
             (
-                org_membership
-                for org_membership in request.user.organization_memberships.select_related('organization').order_by('id')
-                if OrgCapability.CLAIM_PHARMACY in membership_capabilities(org_membership)
+                row for row in memberships
+                if OrgCapability.CLAIM_PHARMACY in membership_capabilities(row)
             ),
             None,
         )

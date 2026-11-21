@@ -61,6 +61,7 @@ const config:NextConfig={
   // In development, redirects above take precedence for Vite-owned pages.
   ...['dashboard','onboarding','setup','kiosk','membership'].map(prefix=>({source:`/${prefix}/:path*`,destination:`${dashboard}/${prefix}/:path*`})),
   {source:'/kiosk',destination:`${dashboard}/kiosk`},
+  {source:'/share/qr',destination:`${dashboard}/share/qr`},
   ...['dashboard-assets','js','assets','images',...(isDev?['src','@vite','@id','@fs','node_modules','@react-refresh','landing_next/shared']:[])].map(prefix=>({source:`/${prefix}/:path*`,destination:`${dashboard}/${prefix}/:path*`})),
   {source:'/ws/:path*',destination:`${backend}/ws/:path*`},
   {source:'/media/:path*',destination:`${backend}/media/:path*`},

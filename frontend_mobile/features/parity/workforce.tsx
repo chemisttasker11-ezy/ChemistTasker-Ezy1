@@ -1,13 +1,14 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card, Checkbox, Chip, IconButton, Switch, Text } from 'react-native-paper';
-import { DatePickerInput } from 'react-native-paper-dates';
+import { GuardedDatePickerInput as DatePickerInput } from '@/components/security/GuardedModal';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { workforce } from '@chemisttasker/shared-core';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { useAuth } from '@/context/AuthContext';
+import { getSessionGeneration } from '@/utils/authSession';
 import { ActionButtons, ChoiceChips, DataRow, EmptyState, Field, InfoNote, MetricGrid, ParityPage, PharmacyRequired, ScreenLink, Section, palette } from './ParityUI';
 import { dateFromIso, errorMessage, isoDate, money, replaceUnderscore, toNumber } from './utils';
 
@@ -86,9 +87,14 @@ function usePharmacy() {
 
 export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
   const router = useRouter();
-  const { hasCapability } = useAuth();
+  const { hasCapability, user } = useAuth();
   const params = useLocalSearchParams<{ id?: string; membershipId?: string; supersedes?: string; edit?: string }>();
   const { pharmacyId, pharmacyName, missing, missingView } = usePharmacy();
+  const shareGeneration = useRef(0);
+  const shareScope = `${user?.id ?? 'signed-out'}:${pharmacyId ?? 'none'}`;
+  const shareScopeRef = useRef(shareScope);
+  shareScopeRef.current = shareScope;
+  useEffect(() => () => { shareGeneration.current += 1; }, [user?.id, pharmacyId]);
   const canReviewLeave = Boolean(pharmacyId && hasCapability('MANAGE_ROSTER', pharmacyId));
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -194,8 +200,13 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
       if (!selectedPeriodId || busy) return;
       setBusy(true);
       setError('');
+      const generation = shareGeneration.current;
+      const sessionGeneration = getSessionGeneration();
+      const current = () => user?.id != null && shareScopeRef.current === shareScope && generation === shareGeneration.current && sessionGeneration === getSessionGeneration();
+      let file: File | null = null;
       try {
         const rows = await workforce.listTimesheets(selectedPeriodId);
+        if (!current()) return;
         const list = Array.isArray(rows) ? rows : Array.isArray((rows as any)?.results) ? (rows as any).results : [];
         const approved = list.filter((row: any) => ['APPROVED', 'LOCKED'].includes(String(row.status || '').toUpperCase()));
         // Export verified hours computed from minutes; unsupported overtime and gross-pay fields are omitted.
@@ -214,16 +225,20 @@ export function WorkforceParityScreen({ screen }: { screen: WorkforceScreen }) {
             toHours(row.approved_leave_minutes),
           ].map(line).join(',')),
         ].join('\n');
-        const file = new File(Paths.cache, `chemisttasker-payroll-${selectedPeriodId}.csv`);
+        file = new File(Paths.cache, `chemisttasker-payroll-${selectedPeriodId}.csv`);
         file.create({ overwrite: true });
-        file.write(csv);
-        if (await Sharing.isAvailableAsync()) {
+        await file.write(csv);
+        if (!current()) return;
+        const available = await Sharing.isAvailableAsync();
+        if (!current()) return;
+        if (available) {
           await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: 'Export payroll-ready timesheets' });
         }
       } catch (e) {
-        setError(errorMessage(e, 'Unable to create payroll export.'));
+        if (current()) setError(errorMessage(e, 'Unable to create payroll export.'));
       } finally {
-        setBusy(false);
+        if (file) { try { file.delete(); } catch { /* best-effort cleanup */ } }
+        if (current()) setBusy(false);
       }
     };
     return (

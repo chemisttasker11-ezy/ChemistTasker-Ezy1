@@ -1,6 +1,7 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Card, Text, TouchableRipple } from 'react-native-paper';
+import { StyleSheet, View } from 'react-native';
+import { Card, Text } from 'react-native-paper';
+import { ResponsiveSegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 import {
   buildInvoiceStats,
   filterInvoicesByTimeframe,
@@ -48,21 +49,11 @@ export default function MobileInvoiceStats({ invoices, timeframe, onTimeframeCha
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-        {INVOICE_TIMEFRAMES.map((option) => {
-          const active = option.value === timeframe;
-          return (
-            <TouchableRipple
-              key={option.value}
-              borderless
-              style={[styles.filterChip, active && styles.filterChipActive]}
-              onPress={() => onTimeframeChange(option.value)}
-            >
-              <Text style={[styles.filterText, active && styles.filterTextActive]}>{option.label}</Text>
-            </TouchableRipple>
-          );
-        })}
-      </ScrollView>
+      <ResponsiveSegmentedButtons
+        value={timeframe}
+        onValueChange={(value) => onTimeframeChange(value as InvoiceTimeframe)}
+        buttons={INVOICE_TIMEFRAMES.map((option) => ({ value: option.value, label: ({ '30d': 'Last 30 days', '90d': 'Last 90 days', this_year: 'This year', all: 'All time' })[option.value] }))}
+      />
 
       <View style={styles.grid}>
         {cards.map((card) => (
@@ -98,30 +89,6 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#59677E',
     marginTop: 2,
-  },
-  filters: {
-    gap: 8,
-    paddingRight: 12,
-  },
-  filterChip: {
-    minWidth: 64,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#E6EAF2',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: '#FFFFFF',
-  },
-  filterChipActive: {
-    backgroundColor: '#5222B8',
-    borderColor: '#5222B8',
-  },
-  filterText: {
-    color: '#33445C',
-    fontWeight: '600',
-  },
-  filterTextActive: {
-    color: '#FFFFFF',
   },
   grid: {
     flexDirection: 'row',

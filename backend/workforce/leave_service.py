@@ -18,6 +18,7 @@ from users.org_roles import ORG_WIDE_ADMIN_ROLES
 
 from .models import WorkforceLeaveRequest
 from .permissions import can_manage_pharmacy
+from users.presentation import user_display_name
 
 
 ACTIVE_SLOT_STATUSES = {
@@ -55,7 +56,11 @@ def assignment_interval(assignment):
 
 
 def _slot_leave_recipients(row):
-    pharmacy = row.pharmacy
+    return pharmacy_manager_users(row.pharmacy)
+
+
+def pharmacy_manager_users(pharmacy):
+    """The owner, org-wide admins and active pharmacy admins of the pharmacy, once each."""
     users = []
     owner_user = getattr(getattr(pharmacy, "owner", None), "user", None)
     if owner_user:
@@ -165,7 +170,7 @@ def serialize_leave(row, *, include_manager_note=False):
         "pharmacy_id": row.pharmacy_id,
         "pharmacy_name": row.pharmacy.name,
         "user_id": row.user_id,
-        "worker_name": row.user.get_full_name() or row.user.username,
+        "worker_name": user_display_name(row.user),
         "membership_id": row.membership_id,
         "slot_assignment_id": row.slot_assignment_id,
         "leave_type": row.leave_type,

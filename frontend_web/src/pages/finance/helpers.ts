@@ -1,3 +1,4 @@
+import { csvCell, renderFinanceCsv } from '@chemisttasker/shared-core';
 export function today(): string {
   const value = new Date();
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
@@ -19,14 +20,9 @@ export function download(blob: Blob, filename: string): void {
   // Delay revocation until the browser has begun reading the object URL.
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-export function csvCell(value: string | number): string {
-  const text = String(value);
-  // Spreadsheet programs may ignore whitespace before a formula introducer.
-  const safe = /^[\s]*[=+@\-]/.test(text) || /^[\t\r\n]/.test(text) ? `'${text}` : text;
-  return `"${safe.replace(/"/g, '""')}"`;
-}
+export { csvCell };
 export function downloadCsv(filename: string, rows: (string | number)[][]): void {
-  download(new Blob(['\ufeff', rows.map(row => row.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }), filename);
+  download(new Blob([renderFinanceCsv(rows)], { type: 'text/csv;charset=utf-8' }), filename);
 }
 
 export const errorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Something went wrong. Please try again.';

@@ -4,8 +4,6 @@ import type { Dispatch, SetStateAction } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import {
   Button,
-  Chip,
-  IconButton,
   Menu,
   Surface,
   Text,
@@ -18,7 +16,10 @@ import {
   type PharmacyOption,
   type ShiftDescriptionTemplate,
 } from './PostShiftScreen.helpers';
+import { ChevronDown } from 'lucide-react-native';
+import { colors, touch, space } from '@/constants/tokens';
 import { styles } from './PostShiftScreen.styles';
+import { ResponsiveSegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
@@ -37,10 +38,13 @@ type Props = {
   setEmploymentType: Setter<string>;
   getEmploymentLabel: (value: string) => string;
   descriptionTemplateLoading: boolean;
+  descriptionTemplateError: string;
+  retryDescriptionTemplate: () => void;
   descriptionTemplate: ShiftDescriptionTemplate | null;
   descriptionTemplateSaving: boolean;
   handleUseDescriptionTemplate: () => void;
   handleSaveDescriptionTemplate: () => void | Promise<void>;
+  handleDeleteDescriptionTemplate: () => void;
   description: string;
   setDescription: Setter<string>;
   workloadTags: string[];
@@ -52,13 +56,6 @@ type Props = {
 const ROLE_LABELS: Record<string, string> = {
   PHARMACIST: 'Pharmacist', INTERN: 'Intern pharmacist', TECHNICIAN: 'Dispensary technician', ASSISTANT: 'Assistant', STUDENT: 'Pharmacy student',
 };
-
-const chipStyle = (selected: boolean) => [
-  styles.chip,
-  selected ? styles.chipSelected : styles.chipUnselected,
-];
-const chipTextStyle = (selected: boolean) =>
-  selected ? styles.chipTextSelected : styles.chipText;
 
 export default function PostShiftDetailsStep({
   hasTravel, setHasTravel, hasAccommodation, setHasAccommodation, isUrgent, setIsUrgent,
@@ -73,10 +70,13 @@ export default function PostShiftDetailsStep({
   setEmploymentType,
   getEmploymentLabel,
   descriptionTemplateLoading,
+  descriptionTemplateError,
+  retryDescriptionTemplate,
   descriptionTemplate,
   descriptionTemplateSaving,
   handleUseDescriptionTemplate,
   handleSaveDescriptionTemplate,
+  handleDeleteDescriptionTemplate,
   description,
   setDescription,
   workloadTags,
@@ -88,30 +88,10 @@ export default function PostShiftDetailsStep({
   return (
     <Surface style={styles.card} elevation={1}>
       <Text style={styles.label}>Who do you need?</Text>
-      <View style={styles.pills} accessibilityRole="radiogroup">
-        {ROLE_OPTIONS.map((role) => {
-          const selected = roleNeeded === role;
-          return (
-            <Chip key={role} selected={selected} onPress={() => setRoleNeeded(role)} accessibilityRole="radio"
-              accessibilityState={{ checked: selected }} style={chipStyle(selected)} textStyle={chipTextStyle(selected)}>
-              {ROLE_LABELS[role] ?? role}
-            </Chip>
-          );
-        })}
-      </View>
+      <ResponsiveSegmentedButtons accessibilityLabel="Who do you need?" value={roleNeeded} onValueChange={setRoleNeeded} buttons={ROLE_OPTIONS.map(role => ({ value: role, label: ROLE_LABELS[role] ?? role }))} />
 
       <Text style={styles.label}>Type of work</Text>
-      <View style={styles.pills}>
-        {EMPLOYMENT_TYPES.map((employment) => {
-          const selected = employmentType === employment || (employment === 'LOCUM' && employmentType === 'CASUAL');
-          return (
-            <Chip key={employment} selected={selected} onPress={() => setEmploymentType(employment)}
-              style={chipStyle(selected)} textStyle={chipTextStyle(selected)}>
-              {getEmploymentLabel(employment)}
-            </Chip>
-          );
-        })}
-      </View>
+      <ResponsiveSegmentedButtons accessibilityLabel="Type of work" value={employmentType === 'CASUAL' ? 'LOCUM' : employmentType} onValueChange={setEmploymentType} buttons={EMPLOYMENT_TYPES.map(employment => ({ value: employment, label: getEmploymentLabel(employment) }))} />
 
       {pharmacies.length > 1 ? (
         <>
@@ -122,13 +102,13 @@ export default function PostShiftDetailsStep({
             anchor={
               <TouchableOpacity style={styles.selector} onPress={() => setPharmacyMenuVisible(true)}>
                 <Text style={styles.selectorText}>{pharmacyName || 'Select pharmacy'}</Text>
-                <IconButton icon="chevron-down" size={18} />
+                <ChevronDown size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             }
           >
             {pharmacies.map((pharmacy) => (
               <Menu.Item key={pharmacy.id} title={pharmacy.name || `Pharmacy ${pharmacy.id}`}
-                onPress={() => { setPharmacyId(pharmacy.id); setPharmacyMenuVisible(false); }} />
+                onPress={() => { if (pharmacy.id !== pharmacyId) setPharmacyId(pharmacy.id); setPharmacyMenuVisible(false); }} />
             ))}
           </Menu>
         </>
@@ -136,7 +116,8 @@ export default function PostShiftDetailsStep({
         <Text style={styles.templateStatus}>Pharmacy: {pharmacyName || 'Loading…'}</Text>
       )}
 
-      <Text style={styles.label}>About the shift</Text>
+      <Text style={styles.label} accessibilityRole="header">About the shift</Text>
+      <Text style={styles.helper}>What should the person know before they apply?</Text>
       <TextInput
         mode="outlined"
         value={description}
@@ -147,34 +128,61 @@ export default function PostShiftDetailsStep({
         label="Description"
         placeholder="For example: busy community pharmacy, Webster packs on Tuesdays."
       />
+      {descriptionTemplateError ? (
+        <View style={{ gap: space.sm }} accessibilityRole="alert">
+          <Text style={{ color: colors.status.red.fg }}>
+            Saved description unavailable: {descriptionTemplateError}
+          </Text>
+          <Button mode="outlined" icon="refresh" contentStyle={{ minHeight: touch.min }}
+            onPress={retryDescriptionTemplate} disabled={descriptionTemplateLoading}>
+            Retry saved description
+          </Button>
+        </View>
+      ) : null}
       <View style={styles.templateActions}>
         {descriptionTemplate?.description ? (
-          <Button mode="text" compact onPress={handleUseDescriptionTemplate} style={styles.templateButton}>Use saved description</Button>
+          <Button mode="text" compact onPress={handleUseDescriptionTemplate} style={styles.templateButton} contentStyle={{ minHeight: touch.min }}>Use saved description</Button>
         ) : null}
         <Button
           mode="text"
           compact
           loading={descriptionTemplateSaving}
-          disabled={descriptionTemplateLoading || descriptionTemplateSaving || !pharmacyId || !roleNeeded || !description.trim()}
+          disabled={descriptionTemplateLoading || descriptionTemplateSaving || Boolean(descriptionTemplateError) || !pharmacyId || !roleNeeded || !description.trim()}
           onPress={handleSaveDescriptionTemplate}
           style={styles.templateButton}
+          contentStyle={{ minHeight: touch.min }}
         >
-          Save for future shifts
+          {descriptionTemplateSaving ? 'Saving…' : 'Save for future shifts'}
         </Button>
+        {descriptionTemplate?.id ? (
+          <Button
+            mode="text"
+            compact
+            textColor={colors.status.red.fg}
+            disabled={descriptionTemplateSaving || descriptionTemplateLoading}
+            onPress={handleDeleteDescriptionTemplate}
+            style={styles.templateButton}
+            contentStyle={{ minHeight: touch.min }}
+            accessibilityLabel="Delete saved description template"
+          >
+            Delete template
+          </Button>
+        ) : null}
       </View>
 
-      <Text style={styles.label}>On the day</Text>
+      <Text style={styles.label} accessibilityRole="header">On the day</Text>
+      <Text style={styles.helper}>Optional. Helps people judge the workload before they apply.</Text>
       <ShiftContextFields workload={workloadTags} support={supportOnShift}
         onWorkloadChange={setWorkloadTags} onSupportChange={setSupportOnShift} />
       <Text style={styles.label}>Extras</Text>
-      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
-        <Text>Travel provided</Text><Switch accessibilityLabel="Travel provided" value={hasTravel} onValueChange={setHasTravel} />
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',minHeight:touch.min,paddingVertical:space.xxs}}>
+        <Text style={{color:colors.textPrimary}}>Travel provided</Text><Switch accessibilityLabel="Travel provided" value={hasTravel} onValueChange={setHasTravel} />
       </View>
-      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
-        <Text>Accommodation provided</Text><Switch accessibilityLabel="Accommodation provided" value={hasAccommodation} onValueChange={setHasAccommodation} />
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',minHeight:touch.min,paddingVertical:space.xxs}}>
+        <Text style={{color:colors.textPrimary}}>Accommodation provided</Text><Switch accessibilityLabel="Accommodation provided" value={hasAccommodation} onValueChange={setHasAccommodation} />
       </View>
-      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
-        <Text>Urgent shift</Text><Switch accessibilityLabel="Urgent shift" value={isUrgent} onValueChange={setIsUrgent} />
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',minHeight:touch.min,paddingVertical:space.xxs}}>
+        <Text style={{color:colors.textPrimary}}>Urgent shift</Text><Switch accessibilityLabel="Urgent shift" value={isUrgent} onValueChange={setIsUrgent} />
       </View>
     </Surface>
   );

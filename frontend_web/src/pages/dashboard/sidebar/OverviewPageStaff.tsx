@@ -258,7 +258,7 @@ export default function OverviewPageStaff() {
         buttonLabel: "Invoices",
         onClick: () => navigate(`/dashboard/${roleSegment}/invoice`),
       }}
-      onOpenShifts={() => navigate(`/dashboard/${roleSegment}/shifts/confirmed`)}
+      onOpenShifts={() => navigate(isExplorer ? `/dashboard/${roleSegment}/shifts/public` : `/dashboard/${roleSegment}/shifts/confirmed`)}
       onOpenActivity={() => navigate(openShiftPath)}
     />
   );

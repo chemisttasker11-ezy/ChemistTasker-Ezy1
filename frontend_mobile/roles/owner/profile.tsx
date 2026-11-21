@@ -1,6 +1,9 @@
 import { createFriendPillReferralService } from '@chemisttasker/shared-core';
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Linking, Share } from 'react-native';
+import { getSessionGeneration } from '@/utils/authSession';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, ScrollView, Alert, Share } from 'react-native';
+import { BrandLoader } from '@/components/ui/BrandLoader';
+import { openWebPage } from '@/features/explore/webLinks';
 import { Text, Avatar, List, Button, Surface, Divider, Switch, IconButton, Card, Portal, Dialog, TextInput } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,13 +29,14 @@ export default function OwnerProfileScreen() {
   const { logout, refreshUser, updateUserProfilePhoto } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [referralLoading, setReferralLoading] = useState(false);
+  const referralLifetime = useRef(0);
+  useEffect(() => () => { referralLifetime.current += 1; }, []);
   const [subscriptionSummary, setSubscriptionSummary] = useState<{
     active: boolean;
     status: string;
@@ -157,18 +161,22 @@ export default function OwnerProfileScreen() {
   };
 
   const shareFriendReferral = async () => {
+    const lifetime = referralLifetime.current;
+    const sessionGeneration = getSessionGeneration();
+    const current = () => referralLifetime.current === lifetime && sessionGeneration === getSessionGeneration();
     setReferralLoading(true);
     try {
       const data = await createFriendPillReferralService({});
+      if (!current()) return;
       const code = data?.referral_code;
       if (!code) throw new Error('Referral code was not returned.');
       const baseUrl = process.env.EXPO_PUBLIC_WEB_URL?.trim() || webBaseUrl;
       const url = `${baseUrl.replace(/\/+$/, '')}/register?referral_code=${encodeURIComponent(code)}`;
       await Share.share({ message: url, url });
     } catch (err: any) {
-      Alert.alert('Referral failed', err?.response?.data?.detail || err?.message || 'Failed to create referral link.');
+      if (current()) Alert.alert('Referral failed', err?.response?.data?.detail || err?.message || 'Failed to create referral link.');
     } finally {
-      setReferralLoading(false);
+      if (current()) setReferralLoading(false);
     }
   };
 
@@ -176,7 +184,7 @@ export default function OwnerProfileScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.centerContent}>
-          <Text>Loading profile...</Text>
+          <BrandLoader size={44} accessibilityLabel="Loading profile…" />
         </View>
       </SafeAreaView>
     );
@@ -253,19 +261,15 @@ export default function OwnerProfileScreen() {
             <List.Item
               title="Notifications"
               left={props => <List.Icon {...props} icon="bell" />}
-              right={() => (
-                <Switch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
-                  color="#6366F1"
-                />
-              )}
+              right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => router.push('/notifications' as any)}
             />
             <Divider />
             <List.Item
               title="App Settings"
               left={props => <List.Icon {...props} icon="cog" />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => router.push('/app-preferences' as any)}
             />
           </Surface>
         </View>
@@ -285,7 +289,7 @@ export default function OwnerProfileScreen() {
               left={props => <List.Icon {...props} icon="file-document" />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
               onPress={() => {
-                Linking.openURL(`${webBaseUrl}/terms-of-service`);
+                openWebPage('/terms-of-service').catch(() => Alert.alert('Website unavailable', 'Please try again.'));
               }}
             />
             <Divider />
@@ -294,7 +298,7 @@ export default function OwnerProfileScreen() {
               left={props => <List.Icon {...props} icon="shield-check" />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
               onPress={() => {
-                Linking.openURL(`${webBaseUrl}/privacy-policy`);
+                openWebPage('/privacy-policy').catch(() => Alert.alert('Website unavailable', 'Please try again.'));
               }}
             />
           </Surface>

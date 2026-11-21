@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, StyleSheet, View, Alert } from 'react-native';
-import { Text, Button, ActivityIndicator, Chip, ProgressBar, IconButton } from 'react-native-paper';
+import { Text, Button, Chip, ProgressBar, IconButton } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { getOnboarding, updateOnboarding } from '@chemisttasker/shared-core';

@@ -1,6 +1,7 @@
 """Serializers for the chat API."""
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.urls import reverse
 
 User = get_user_model()
 
@@ -10,6 +11,7 @@ from rest_framework.exceptions import PermissionDenied
 from memberships.models import Membership
 from memberships.selectors import visible_memberships
 from chat.models import Conversation, Message, MessageReaction, Participant
+from chat.realtime import authorized_participant
 from users.presentation import _chat_member_identity
 
 
@@ -60,6 +62,9 @@ class ReactionSerializer(serializers.ModelSerializer):
 
 class MessageSerializer(serializers.ModelSerializer):
     sender = ChatMembershipSerializer(read_only=True)
+    # Do not expose FileField.url (possibly an Azure SAS or publicly served
+    # MEDIA_URL). Both legacy attachment and attachment_url are protected links.
+    attachment = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
     reactions = ReactionSerializer(many=True, read_only=True)
     attachment_filename = serializers.SerializerMethodField()
@@ -82,10 +87,12 @@ class MessageSerializer(serializers.ModelSerializer):
             data["attachment_filename"] = None
         return data
     def get_attachment_url(self, obj):
-        try:
-            return obj.attachment.url if obj.attachment else None
-        except Exception:
+        if obj.is_deleted or not obj.attachment:
             return None
+        return reverse('api_v1:message-attachment', kwargs={'pk': obj.pk})
+
+    def get_attachment(self, obj):
+        return self.get_attachment_url(obj)
  
     def get_attachment_filename(self, obj):
         if obj.attachment and hasattr(obj.attachment, 'name'):
@@ -96,7 +103,7 @@ class MessageSerializer(serializers.ModelSerializer):
     def get_is_pinned(self, obj):
         request = self.context.get("request")
         if request and hasattr(request, 'user') and request.user.is_authenticated:
-            part = Participant.objects.filter(conversation=obj.conversation, membership__user=request.user).first()
+            part = authorized_participant(obj.conversation_id, request.user.pk)
             if part and part.pinned_message_id:
                 return part.pinned_message_id == obj.id
         # Fallback to legacy conversation-level pin if present
@@ -159,7 +166,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
             self._participant_cache = {}
         cache_key = (request.user.id, obj.id)
         if cache_key not in self._participant_cache:
-            self._participant_cache[cache_key] = Participant.objects.filter(conversation=obj, membership__user=request.user).first()
+            self._participant_cache[cache_key] = authorized_participant(obj.pk, request.user.pk)
         return self._participant_cache[cache_key]
     
     def get_is_pinned(self, obj):
@@ -185,7 +192,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
             # fallback to legacy conversation-level pinned message
             pm = obj.pinned_message
             return MessageSerializer(pm, context=self.context).data if pm else None
-        part = Participant.objects.filter(conversation=obj, membership__user=request.user).first()
+        part = self._get_my_participant(obj)
         if part and part.pinned_message:
             return MessageSerializer(part.pinned_message, context=self.context).data
         # legacy fallback

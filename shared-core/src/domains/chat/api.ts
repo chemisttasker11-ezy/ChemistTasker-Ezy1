@@ -1,7 +1,7 @@
 import type { ChatRoomApi, ChatMessageApi, ChatUserApi } from '../../types';
 import type { Collection } from '../../contracts/common';
 /** Domain-owned operations extracted from the established shared API. */
-import { fetchApi } from '../../transport/application';
+import { fetchApi, performApiRequest } from '../../transport/application';
 import { mapChatMessage, mapChatParticipantRecord, mapChatRoom } from './mappers';
 /** Unread-only rooms must retain the backend's query-based filter. */
 export function getUnreadRoomSummary() {
@@ -108,6 +108,14 @@ export async function fetchRoomMessagesByUrl(url: string) {
         messages: list.map(mapChatMessage),
         next: data?.next ?? null,
     };
+}
+/** Protected binary chat attachment. A caller cannot supply an arbitrary URL.
+ * The API authorizes the current participant for each read, even after revocation.
+ */
+export async function downloadChatAttachment(messageId: number): Promise<Blob> {
+    if (!Number.isSafeInteger(messageId) || messageId <= 0) throw new Error('Invalid message ID.');
+    const response = await performApiRequest(`/messages/${messageId}/attachment/`, { method: 'GET' });
+    return response.blob();
 }
 export async function sendRoomMessageService(roomId: number | string, payload: unknown) {
     const data = await sendRoomMessage(roomId, payload);

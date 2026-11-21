@@ -1,83 +1,97 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Linking, View, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
-    ActivityIndicator,
     Button,
     Card,
-    Dialog,
-    Portal,
     Snackbar,
     Text,
 } from 'react-native-paper';
-import { useAuth } from '@/context/AuthContext';
 import {
     activateShiftOfferPayrollService,
-    fetchConfirmedShifts,
-    fetchShiftOffersService,
+    fetchAllConfirmedShifts,
+    fetchDeferredPayrollOffersService,
     type Shift,
     type ShiftUser,
     viewAssignedShiftProfileService,
 } from '@chemisttasker/shared-core';
+import { ContentState } from '@/components/ui';
+import { colors, radius, space } from '@/constants/tokens';
 import OwnerAssignedShiftBoard from './OwnerAssignedShiftBoard';
+import { useAuth } from '@/context/AuthContext';
+import { getMessageDetailRoute } from '@/utils/chatRoutes';
+import { startDirectChat } from '../chat/hooks';
+import { useShiftSurface } from './useShiftSurface';
 import { WorkerProfileDialog } from './WorkerProfileDialog';
+import { filterDeferredPayrollOffers, type DeferredPayrollOffer } from './confirmedPayroll';
+export { filterDeferredPayrollOffers } from './confirmedPayroll';
+export type { DeferredPayrollOffer } from './confirmedPayroll';
 
-type DeferredPayrollOffer = {
-    id: number;
-    paymentPreferenceSnapshot?: string;
-    settlementChannel?: string;
-    engagementKind?: string;
-    payrollActivatedAt?: string | null;
-    engagementTermsSnapshot?: {
-        payrollActivationRequired?: boolean;
-        pharmacyId?: number;
-        pharmacyName?: string;
-        workerName?: string;
-        awardClassification?: string;
-        payBasis?: string;
-    };
-};
+export function filterShiftsByPharmacy(shifts: Shift[], scopedPharmacyId: number | null): Shift[] {
+    if (!Array.isArray(shifts)) return [];
+    if (scopedPharmacyId == null) return shifts;
+    return shifts.filter((shift: Shift) => {
+        const raw =
+            (shift as any).pharmacyDetail?.id ??
+            (shift as any).pharmacy_detail?.id ??
+            (shift as any).pharmacy_id ??
+            (shift as any).pharmacyId ??
+            (shift as any).pharmacy;
+        const identity = typeof raw === 'object' && raw !== null ? raw.id : raw;
+        const id = identity == null || identity === '' ? NaN : Number(identity);
+        return Number.isSafeInteger(id) && id > 0 && id === scopedPharmacyId;
+    });
+}
 
 export default function ConfirmedShiftsView() {
+    const surface = useShiftSurface();
+    return <ScopedConfirmedShifts key={surface.scopeKey} surface={surface} />;
+}
+
+function ScopedConfirmedShifts({ surface }: { surface: ReturnType<typeof useShiftSurface> }) {
+    const scopedPharmacyId = surface.scopedPharmacyId;
+    const router = useRouter();
     const { user } = useAuth();
-    const activePersona = null;
-    const activeAdminPharmacyId = null;
-    const scopedPharmacyId =
-        activePersona === 'admin' && typeof activeAdminPharmacyId === 'number'
-            ? activeAdminPharmacyId
-            : null;
+    const chatGenRef = useRef(0);
+    const pendingChatsRef = useRef<Set<number>>(new Set());
+    const pendingPayrollRef = useRef<Set<number>>(new Set());
 
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [deferredPayrollOffers, setDeferredPayrollOffers] = useState<DeferredPayrollOffer[]>([]);
-    const [activatingPayrollOfferId, setActivatingPayrollOfferId] = useState<number | null>(null);
+    const [payrollLoading, setPayrollLoading] = useState(false);
+    const [payrollError, setPayrollError] = useState<string | null>(null);
+    const [activatingPayrollOfferIds, setActivatingPayrollOfferIds] = useState<Set<number>>(() => new Set());
     const [snackbar, setSnackbar] = useState<string>('');
     const [profile, setProfile] = useState<ShiftUser | null>(null);
     const [profileLoading, setProfileLoading] = useState(false);
     const [profileDialog, setProfileDialog] = useState(false);
 
+    const loadGenRef = useRef(0);
+    const payrollGenRef = useRef(0);
+
     const closeSnackbar = () => setSnackbar('');
 
     const loadShifts = useCallback(async () => {
+        const gen = ++loadGenRef.current;
+        // Same-scope refreshes preserve already rendered bookings if the network fails.
         setLoading(true);
+        setError(null);
         try {
-            const data = await fetchConfirmedShifts();
-            const filtered =
-                scopedPharmacyId != null
-                    ? data.filter((shift: Shift) => {
-                        const targetId =
-                            (shift as any).pharmacyDetail?.id ??
-                            (shift as any).pharmacy_detail?.id ??
-                            (shift as any).pharmacyId ??
-                            (shift as any).pharmacy ??
-                            null;
-                        return Number(targetId ?? NaN) === scopedPharmacyId;
-                    })
-                    : data;
-            setShifts(Array.isArray(filtered) ? filtered : []);
+            const data = await fetchAllConfirmedShifts();
+            if (gen !== loadGenRef.current) return;
+            const filtered = filterShiftsByPharmacy(data, scopedPharmacyId);
+            setShifts((prev) => (filtered.length === 0 && prev.length === 0 ? prev : filtered));
         } catch (err: any) {
-            setSnackbar(err?.response?.data?.detail || 'Failed to load confirmed shifts');
+            if (gen !== loadGenRef.current) return;
+            const msg = err?.response?.data?.detail || err?.message || 'Failed to load confirmed shifts';
+            setError(msg);
+            setSnackbar(msg);
         } finally {
-            setLoading(false);
+            if (gen === loadGenRef.current) {
+                setLoading(false);
+            }
         }
     }, [scopedPharmacyId]);
 
@@ -86,28 +100,23 @@ export default function ConfirmedShiftsView() {
     }, [loadShifts]);
 
     const loadDeferredPayroll = useCallback(async () => {
+        const gen = ++payrollGenRef.current;
+        setPayrollLoading(true);
+        setPayrollError(null);
         try {
-            const [accepted, awaiting] = await Promise.all([
-                fetchShiftOffersService({ status: 'ACCEPTED' }),
-                fetchShiftOffersService({ status: 'ACCEPTED_AWAITING_PAYMENT' }),
-            ]);
-            const rows = [...accepted, ...awaiting] as DeferredPayrollOffer[];
-            const filtered = rows.filter((offer) => {
-                const terms = offer.engagementTermsSnapshot;
-                const pharmacyMatches =
-                    scopedPharmacyId == null || Number(terms?.pharmacyId ?? NaN) === scopedPharmacyId;
-                return (
-                    pharmacyMatches &&
-                    offer.paymentPreferenceSnapshot === 'TFN' &&
-                    offer.engagementKind === 'SHIFT_EMPLOYMENT' &&
-                    offer.settlementChannel === 'TIMESHEET_ONLY' &&
-                    terms?.payrollActivationRequired === true &&
-                    !offer.payrollActivatedAt
-                );
-            });
-            setDeferredPayrollOffers(filtered);
+            const rows = await fetchDeferredPayrollOffersService() as DeferredPayrollOffer[];
+            if (gen !== payrollGenRef.current) return;
+            const filtered = filterDeferredPayrollOffers(rows, scopedPharmacyId);
+            setDeferredPayrollOffers((prev) => (filtered.length === 0 && prev.length === 0 ? prev : filtered));
         } catch (err: any) {
-            setSnackbar(err?.message || 'Failed to load deferred payroll setup');
+            if (gen !== payrollGenRef.current) return;
+            const msg = err?.message || 'Failed to load deferred payroll setup';
+            setPayrollError(msg);
+            setSnackbar(msg);
+        } finally {
+            if (gen === payrollGenRef.current) {
+                setPayrollLoading(false);
+            }
         }
     }, [scopedPharmacyId]);
 
@@ -116,7 +125,9 @@ export default function ConfirmedShiftsView() {
     }, [loadDeferredPayroll]);
 
     const activateDeferredPayroll = async (offer: DeferredPayrollOffer) => {
-        setActivatingPayrollOfferId(offer.id);
+        if (pendingPayrollRef.current.has(offer.id)) return;
+        pendingPayrollRef.current.add(offer.id);
+        setActivatingPayrollOfferIds((prev) => new Set(prev).add(offer.id));
         try {
             await activateShiftOfferPayrollService(offer.id);
             setDeferredPayrollOffers((rows) => rows.filter((row) => row.id !== offer.id));
@@ -124,11 +135,61 @@ export default function ConfirmedShiftsView() {
         } catch (err: any) {
             setSnackbar(err?.message || 'Complete the worker TFN/super details before activating payroll.');
         } finally {
-            setActivatingPayrollOfferId(null);
+            pendingPayrollRef.current.delete(offer.id);
+            setActivatingPayrollOfferIds((prev) => {
+                const next = new Set(prev);
+                next.delete(offer.id);
+                return next;
+            });
+        }
+    };
+
+    const profileGenRef = useRef(0);
+
+    const closeProfileDialog = useCallback(() => {
+        profileGenRef.current++;
+        setProfileDialog(false);
+        setProfile(null);
+        setProfileLoading(false);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            loadGenRef.current++;
+            payrollGenRef.current++;
+            profileGenRef.current++;
+            chatGenRef.current++;
+            pendingChatsRef.current.clear();
+        };
+    }, []);
+
+    const messageAssigned = async (userId: number) => {
+        // Synchronous lock: two presses from the same render initiate one DM only.
+        if (pendingChatsRef.current.has(userId)) return;
+        pendingChatsRef.current.add(userId);
+        const gen = ++chatGenRef.current;
+        const scope = surface.scopeKey;
+        try {
+            const room: any = await startDirectChat({ userId });
+            if (chatGenRef.current !== gen || scope !== surface.scopeKey) return;
+            const roomId = room?.id ?? room?.room_id;
+            if (roomId != null) {
+                router.push({
+                    pathname: getMessageDetailRoute(user?.role, roomId, surface.persona) as any,
+                    params: { id: String(roomId) },
+                });
+            }
+        } catch (err: any) {
+            if (chatGenRef.current === gen && scope === surface.scopeKey) {
+                setSnackbar(err?.message || 'Could not start message');
+            }
+        } finally {
+            pendingChatsRef.current.delete(userId);
         }
     };
 
     const openProfile = async (shiftId: number, slotId: number | null, userId: number) => {
+        const gen = ++profileGenRef.current;
         setProfile(null);
         setProfileDialog(true);
         setProfileLoading(true);
@@ -139,14 +200,29 @@ export default function ConfirmedShiftsView() {
                 slotId: slotId ?? undefined,
                 userId,
             });
+            if (gen !== profileGenRef.current) return;
             setProfile(result);
         } catch (err: any) {
+            if (gen !== profileGenRef.current) return;
             setSnackbar(err?.response?.data?.detail || 'Failed to load assigned profile');
             setProfileDialog(false);
         } finally {
-            setProfileLoading(false);
+            if (gen === profileGenRef.current) {
+                setProfileLoading(false);
+            }
         }
     };
+
+    if (!loading && error && shifts.length === 0) {
+        return (
+            <ContentState
+                kind="error"
+                title="Could not load confirmed shifts"
+                description={error}
+                onAction={() => void loadShifts()}
+            />
+        );
+    }
 
     return (
         <>
@@ -155,7 +231,17 @@ export default function ConfirmedShiftsView() {
                 <Text style={styles.pageSubtitle}>Review booked shifts and assigned chemists</Text>
             </View>
 
-            {deferredPayrollOffers.length > 0 ? (
+            {payrollError ? (
+                <View style={styles.deferredSection}>
+                    <ContentState
+                        kind="error"
+                        title="Could not load deferred payroll setup"
+                        description={payrollError}
+                        actionLabel="Try again"
+                        onAction={() => void loadDeferredPayroll()}
+                    />
+                </View>
+            ) : deferredPayrollOffers.length > 0 ? (
                 <View style={styles.deferredSection}>
                     <Card mode="outlined" style={styles.deferredNotice}>
                         <Card.Content>
@@ -168,6 +254,7 @@ export default function ConfirmedShiftsView() {
                     </Card>
                     {deferredPayrollOffers.map((offer) => {
                         const terms = offer.engagementTermsSnapshot;
+                        const isPending = activatingPayrollOfferIds.has(offer.id);
                         return (
                             <Card key={offer.id} mode="outlined" style={styles.deferredCard}>
                                 <Card.Content style={styles.deferredCardContent}>
@@ -182,9 +269,10 @@ export default function ConfirmedShiftsView() {
                                     </View>
                                     <Button
                                         mode="contained"
-                                        loading={activatingPayrollOfferId === offer.id}
-                                        disabled={activatingPayrollOfferId === offer.id}
+                                        loading={isPending}
+                                        disabled={isPending}
                                         onPress={() => void activateDeferredPayroll(offer)}
+                                        style={styles.actionBtn}
                                     >
                                         Activate payroll
                                     </Button>
@@ -202,9 +290,17 @@ export default function ConfirmedShiftsView() {
                 emptyText="No confirmed shifts available."
                 mode="confirmed"
                 onViewAssigned={openProfile}
+                onMessageAssigned={(id) => void messageAssigned(id)}
             />
 
-            <WorkerProfileDialog visible={profileDialog} loading={profileLoading} profile={profile} onDismiss={() => setProfileDialog(false)} canMessage />
+            <WorkerProfileDialog
+                visible={profileDialog}
+                loading={profileLoading}
+                profile={profile}
+                onDismiss={closeProfileDialog}
+                canMessage
+                persona={surface.persona}
+            />
 
             <Snackbar visible={!!snackbar} onDismiss={closeSnackbar} duration={3000}>
                 {snackbar}
@@ -214,15 +310,15 @@ export default function ConfirmedShiftsView() {
 }
 
 const styles = StyleSheet.create({
-    pageHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 4 },
-    pageTitle: { fontSize: 24, fontWeight: '900', color: '#111827' },
-    pageSubtitle: { color: '#64748B', fontSize: 14, fontWeight: '600' },
-    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+    pageHeader: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: 4, gap: 4 },
+    pageTitle: { fontSize: 24, fontWeight: '900', color: colors.textPrimary },
+    pageSubtitle: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
     bold: { fontWeight: '700' },
-    deferredSection: { paddingHorizontal: 16, paddingTop: 12, gap: 10 },
-    deferredNotice: { backgroundColor: '#FFF7ED' },
-    deferredTitle: { fontWeight: '800', color: '#9A3412', marginBottom: 4 },
-    deferredText: { color: '#64748B', fontSize: 13 },
-    deferredCard: { backgroundColor: '#FFFFFF' },
-    deferredCardContent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    deferredSection: { paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.sm },
+    deferredNotice: { backgroundColor: colors.status.amber.bg, borderRadius: radius.control },
+    deferredTitle: { fontWeight: '800', color: colors.status.amber.fg, marginBottom: 4 },
+    deferredText: { color: colors.textSecondary, fontSize: 13 },
+    deferredCard: { backgroundColor: colors.surfaceBg, borderColor: colors.border, borderRadius: radius.control },
+    deferredCardContent: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+    actionBtn: { minHeight: 44, justifyContent: 'center' },
 });

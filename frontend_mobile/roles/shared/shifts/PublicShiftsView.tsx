@@ -3,8 +3,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Animated, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Card, Chip, Portal, Snackbar, SegmentedButtons, Text, Button } from 'react-native-paper';
+import { Animated, ScrollView, StyleSheet, View } from 'react-native';
+import { Portal, Snackbar, Text } from 'react-native-paper';
 import {
     Shift,
     ShiftCounterOfferPayload,
@@ -18,17 +18,33 @@ import {
     fetchSavedShifts,
     fetchShiftInterests,
     acceptShiftOfferService,
-    activateShiftOfferPayrollService,
     declineShiftOfferService,
     saveShift,
     submitShiftCounterOfferService,
     getOnboardingDetail,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
-import { useWorkspace } from '@/context/WorkspaceContext';
+import { Button as KitButton, ContentState, Pill } from '@/components/ui';
+import { colors, font, radius, space, type } from '@/constants/tokens';
+import { useShiftSurface } from './useShiftSurface';
 import ShiftsBoard from './ShiftsBoard';
+import { BoardTabs } from './ShiftsBoard/components/BoardTabs';
 import type { FilterConfig } from './ShiftsBoard/types';
 import ShiftEngagementTermsDialog from './ShiftsBoard/components/ShiftEngagementTermsDialog';
+import {
+    TermsAcceptanceState,
+    createTermsAcceptanceState,
+    dismissTermsAcceptance,
+    dropCachedOfferPreviews,
+    isTermsChangedError,
+    isTermsDialogVisible,
+    narrowSelectedOffers,
+    selectOffersForTerms,
+    transitionReloadFailure,
+    transitionReloadStart,
+    transitionReloadSuccess,
+    transitionTermsChanged,
+} from './workerShiftDetailLogic';
 import type { ShiftOfferAcceptancePayload } from '@chemisttasker/shared-core';
 
 type PublicShiftsViewProps = {
@@ -60,7 +76,14 @@ const coerceVerified = (value: any) => {
     return false;
 };
 
-export default function PublicShiftsView({
+/** Waits for the workspace policy (never a "switching" spinner) and starts a clean board for each scope. */
+export default function PublicShiftsView(props: PublicShiftsViewProps = {}) {
+    const surface = useShiftSurface();
+    if (!surface.ready) return <ContentState kind="loading" style={styles.state} />;
+    return <PublicShiftsBoard key={surface.scopeKey} {...props} />;
+}
+
+function PublicShiftsBoard({
     activeTabOverride,
     onActiveTabChange,
     hideTabs,
@@ -68,7 +91,6 @@ export default function PublicShiftsView({
 }: PublicShiftsViewProps = {}) {
     const scrollY = useRef(new Animated.Value(0)).current;
     const { user } = useAuth();
-    const { workspace } = useWorkspace();
     const router = useRouter();
     const workerPaymentPath =
         user?.role === 'PHARMACIST'
@@ -77,7 +99,9 @@ export default function PublicShiftsView({
                 ? '/otherstaff/profile-payment'
                 : null;
     const userId = user?.id;
-    const isWorkspaceReady = workspace === 'platform';
+    // Only the latest request writes state: a slow page or filter response never replaces a newer one.
+    const generation = useRef(0);
+    const offersGeneration = useRef(0);
 
     const initialVerified =
         coerceVerified((user as any)?.verified) ||
@@ -87,6 +111,7 @@ export default function PublicShiftsView({
 
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [errorOpen, setErrorOpen] = useState(false);
     const [appliedShiftIds, setAppliedShiftIds] = useState<number[]>([]);
@@ -96,6 +121,7 @@ export default function PublicShiftsView({
     const [page, setPage] = useState(1);
     const pageSize = 10;
     const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
+    const [pageExclusions, setPageExclusions] = useState(0);
     const [savedShiftIds, setSavedShiftIds] = useState<Set<number>>(new Set());
     const [savedMap, setSavedMap] = useState<Map<number, number>>(new Map());
     const [boardTab, setBoardTab] = useState<'browse' | 'saved' | 'interested' | 'rejected' | 'accepted'>(
@@ -104,10 +130,9 @@ export default function PublicShiftsView({
     const [offers, setOffers] = useState<ShiftOffer[]>([]);
     const [payrollActivationOffers, setPayrollActivationOffers] = useState<ShiftOffer[]>([]);
     const [offersLoading, setOffersLoading] = useState(false);
-    const [termsOffers, setTermsOffers] = useState<ShiftOffer[]>([]);
+    const [offersError, setOffersError] = useState(false);
+    const [termsState, setTermsState] = useState<TermsAcceptanceState>(() => createTermsAcceptanceState());
     const [termsConfirming, setTermsConfirming] = useState(false);
-    const [payrollActivatingId, setPayrollActivatingId] = useState<number | null>(null);
-    const [payrollNotice, setPayrollNotice] = useState('');
 
     useEffect(() => {
         if (activeTabOverride) {
@@ -146,8 +171,9 @@ export default function PublicShiftsView({
     const loadShifts = useCallback(
         async (activeFilters: FilterConfig, activePage: number) => {
             if (!userId) return;
+            const request = ++generation.current;
             setLoading(true);
-            setError(null);
+            setLoadError(false);
             try {
                 const apiFilters = {
                     search: activeFilters.search,
@@ -173,6 +199,7 @@ export default function PublicShiftsView({
                     fetchPublicShifts(apiFilters) as Promise<PaginatedResponse<Shift>>,
                     fetchShiftInterests({ userId }),
                 ]);
+                if (request !== generation.current) return;
 
                 const available = (publicShifts.results ?? []).filter((shift: Shift) => {
                     const slots = shift.slots ?? [];
@@ -181,8 +208,9 @@ export default function PublicShiftsView({
                     return assignedSlotCount < slots.length;
                 });
 
-                setShifts(available);
+                setShifts((prev) => (prev.length === 0 && available.length === 0 ? prev : available));
                 setTotalCount(publicShifts.count);
+                setPageExclusions((publicShifts.results ?? []).length - available.length);
 
                 const nextShiftIds = new Set<number>();
                 const nextSlotIds = new Set<number>();
@@ -196,24 +224,30 @@ export default function PublicShiftsView({
                 setAppliedShiftIds(Array.from(nextShiftIds));
                 setAppliedSlotIds(Array.from(nextSlotIds));
             } catch (err) {
+                if (request !== generation.current) return;
                 console.error('Failed to load public shifts', err);
-                showError('Failed to load public shifts.');
+                setLoadError(true);
             } finally {
-                setLoading(false);
+                if (request === generation.current) setLoading(false);
             }
         },
         [userId]
     );
 
     useEffect(() => {
-        if (!userId || !isWorkspaceReady) return;
+        if (!userId) return;
         loadSaved();
-    }, [loadSaved, userId, isWorkspaceReady]);
+    }, [loadSaved, userId]);
 
     useEffect(() => {
+        // Identity changes revoke the previous worker's verification and cached offers immediately.
+        let current = true;
+        setIsVerified(false);
+        setOffers([]);
+        setPayrollActivationOffers([]);
         const fetchVerification = async () => {
             try {
-                if (!user || !isWorkspaceReady) return;
+                if (!user) return;
                 const roleKey =
                     user.role === 'PHARMACIST' ? 'pharmacist' :
                         user.role === 'OTHER_STAFF' ? 'other_staff' :
@@ -226,13 +260,14 @@ export default function PublicShiftsView({
                     onboarding?.verified ??
                     onboarding?.data?.verified ??
                     (roleKey === 'pharmacist' ? onboarding?.ahpra_verified : undefined);
-                setIsVerified(coerceVerified(verifiedFlag));
+                if (current) setIsVerified(coerceVerified(verifiedFlag));
             } catch (err) {
-                console.warn('Failed to fetch onboarding verification', err);
+                if (current) console.warn('Failed to fetch onboarding verification', err);
             }
         };
-        fetchVerification();
-    }, [user, user?.role, isWorkspaceReady]);
+        void fetchVerification();
+        return () => { current = false; };
+    }, [user?.id, user?.role]);
 
     useEffect(() => {
         const handle = setTimeout(() => setDebouncedFilters(filters), 350);
@@ -240,9 +275,9 @@ export default function PublicShiftsView({
     }, [filters]);
 
     useEffect(() => {
-        if (!userId || !isWorkspaceReady) return;
+        if (!userId) return;
         loadShifts(debouncedFilters, page);
-    }, [debouncedFilters, page, loadShifts, userId, isWorkspaceReady]);
+    }, [debouncedFilters, page, loadShifts, userId]);
 
     const guardVerified = () => {
         if (isVerified) return true;
@@ -286,15 +321,15 @@ export default function PublicShiftsView({
         }
     };
 
-    const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload) => {
+    const handleSubmitCounterOffer = async (payload: ShiftCounterOfferPayload, key?: string) => {
         if (!guardVerified()) {
             throw new Error('Verify your profile (email and mobile, plus AHPRA for pharmacists and interns) before applying for public shifts.');
         }
         try {
-            await submitShiftCounterOfferService(payload);
+            return await submitShiftCounterOfferService(payload, key);
         } catch (err) {
             console.error('Failed to submit counter offer', err);
-            throw new Error(errorMessage(err, 'Failed to submit counter offer.'));
+            throw err;
         }
     };
 
@@ -340,12 +375,15 @@ export default function PublicShiftsView({
     };
 
     const loadOffers = useCallback(async () => {
+        const request = ++offersGeneration.current;
         setOffersLoading(true);
+        setOffersError(false);
         try {
             const [pending, accepted] = await Promise.all([
                 fetchShiftOffersService({ status: 'PENDING' }),
                 fetchShiftOffersService({ status: 'ACCEPTED' }),
             ]);
+            if (request !== offersGeneration.current) return;
             setOffers((pending as ShiftOffer[]).filter(
                 (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
             ));
@@ -356,16 +394,17 @@ export default function PublicShiftsView({
                         offer.paymentPreferenceSnapshot === 'TFN'
                         && offer.engagementKind === 'SHIFT_EMPLOYMENT'
                         && !offer.payrollActivatedAt
-                        && offer.settlementChannel !== 'PAYROLL'
-                        && Boolean(preview?.payrollEnabled)
+                        && offer.settlementChannel === 'TIMESHEET_ONLY'
+                        && preview?.payrollActivationRequired === true
                     );
                 })
             );
         } catch (err) {
+            if (request !== offersGeneration.current) return;
             console.error('Failed to load offers', err);
-            showError('Failed to load offers.');
+            setOffersError(true);
         } finally {
-            setOffersLoading(false);
+            if (request === offersGeneration.current) setOffersLoading(false);
         }
     }, []);
 
@@ -430,9 +469,41 @@ export default function PublicShiftsView({
         [offersByShift]
     );
 
+    const reloadTermsOffers = async (selected: ShiftOffer[]) => {
+        setTermsConfirming(true);
+        setTermsState((prev) => transitionReloadStart(prev, selected));
+        try {
+            const fresh = await fetchShiftOffersService({ status: 'PENDING' });
+            const freshPending = (fresh as ShiftOffer[]).filter(
+                (offer) => String(offer.status ?? '').toUpperCase() === 'PENDING'
+            );
+            setOffers(freshPending);
+            setTermsState((prev) => {
+                const next = transitionReloadSuccess(prev, freshPending);
+                if (next.status === 'failed') {
+                    showError('The selected offers are no longer available.');
+                }
+                return next;
+            });
+        } catch (fetchErr) {
+            setTermsState((prev) =>
+                transitionReloadFailure(prev, 'Shift engagement terms have changed. Failed to refresh terms. Please retry.')
+            );
+            showError('Failed to refresh updated terms. Please retry.');
+        } finally {
+            setTermsConfirming(false);
+        }
+    };
+
     const acceptOffers = async (list: ShiftOffer[], payload?: ShiftOfferAcceptancePayload) => {
         if (list.length === 0) return;
         if (!payload) {
+            const selection = selectOffersForTerms(termsState, list);
+            if (selection.needsReload) {
+                setTermsState(selection.state);
+                await reloadTermsOffers(list);
+                return;
+            }
             const blocked = list.some((offer) => Boolean(offer.engagementTermsPreview?.blocked));
             if (blocked) {
                 showError('This offer cannot be confirmed until the required onboarding/payment details are completed.');
@@ -440,16 +511,24 @@ export default function PublicShiftsView({
             }
             const requiresAcceptance = list.some((offer) => Boolean(offer.engagementTermsPreview?.acceptanceRequired));
             if (requiresAcceptance) {
-                setTermsOffers(list);
+                setTermsState(selection.state);
                 return;
             }
         }
         setTermsConfirming(true);
         try {
-            await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, payload)));
-            setTermsOffers([]);
+            await Promise.all(list.map((offer) => acceptShiftOfferService(offer.id, { ...payload, termsVersion: offer.engagementTermsPreview?.termsVersion })));
+            setTermsState(createTermsAcceptanceState());
             await loadOffers();
         } catch (err) {
+            if (isTermsChangedError(err)) {
+                const termsMsg = 'Shift engagement terms have changed. Please review the updated terms and confirm again.';
+                showError(termsMsg);
+                setOffers((prev) => dropCachedOfferPreviews(prev, list.map((o) => o.id)));
+                setTermsState((prev) => transitionTermsChanged(prev, list, termsMsg));
+                await reloadTermsOffers(list);
+                return;
+            }
             showError(errorMessage(err, 'Failed to confirm the shift offer.'));
             throw err;
         } finally {
@@ -502,28 +581,11 @@ export default function PublicShiftsView({
     };
 
     const openPrivatePaymentProfile = () => {
+        setTermsState((prev) => dismissTermsAcceptance(prev));
         if (workerPaymentPath) {
             router.push(workerPaymentPath as any);
         }
     };
-
-    const handleActivatePayroll = async (offer: ShiftOffer) => {
-        setPayrollActivatingId(offer.id);
-        setPayrollNotice('');
-        try {
-            await activateShiftOfferPayrollService(offer.id);
-            setPayrollNotice('ChemistTasker Payroll is now active for this confirmed shift.');
-            await loadOffers();
-        } catch (err) {
-            showError(errorMessage(
-                err,
-                'Payroll could not be activated yet. Complete your private TFN/super profile and try again.'
-            ));
-        } finally {
-            setPayrollActivatingId(null);
-        }
-    };
-
 
     const slotFilterMode =
         boardTab === 'interested' ? 'interested' : boardTab === 'rejected' ? 'rejected' : 'all';
@@ -537,59 +599,109 @@ export default function PublicShiftsView({
     );
 
     if (!userId) return null;
-    if (!isWorkspaceReady) {
-        return (
-            <View style={styles.container}>
-                <ActivityIndicator style={{ marginTop: 24 }} />
-                <Text style={{ textAlign: 'center', marginTop: 8 }}>Switching to Platform mode...</Text>
-            </View>
-        );
-    }
+
+    const payrollContent = payrollActivationOffers.length > 0 ? (
+                                <View style={styles.payrollSection}>
+                                    <Text variant="titleMedium" style={styles.payrollTitle}>
+                                        Payroll setup for confirmed shifts
+                                    </Text>
+                                    <Text variant="bodySmall" style={styles.placeholderText}>
+                                        These TFN shifts are confirmed and stay timesheet-only until your private TFN/super setup is complete. The pharmacy never receives your TFN or super member number.
+                                    </Text>
+                                    {payrollActivationOffers.map((offer) => {
+                                        const preview = offer.engagementTermsPreview;
+                                        const ready =
+                                            preview?.payrollSetupStatus === 'READY'
+                                            && !preview?.awardPayrollReviewRequired;
+                                        const missing = preview?.payrollMissingFields || [];
+                                        const shift = offer.shiftDetail as any;
+                                        const pharmacyName =
+                                            preview?.pharmacyName
+                                            || shift?.pharmacyDetail?.name
+                                            || shift?.pharmacyName
+                                            || 'Confirmed shift';
+                                        return (
+                                            <View key={offer.id} style={styles.payrollCard}>
+                                                <View style={styles.chipRow}>
+                                                    <Pill label="TFN" tone="violet" />
+                                                    <Pill
+                                                        label={ready ? 'Ready for pharmacy activation' : 'Timesheet only · setup required'}
+                                                        tone={ready ? 'green' : 'amber'}
+                                                    />
+                                                </View>
+                                                <Text style={styles.payrollItemTitle}>
+                                                    {pharmacyName}
+                                                </Text>
+                                                <Text style={styles.placeholderText}>
+                                                    {preview?.awardClassification
+                                                        ? `${preview.awardClassification.replaceAll('_', ' ')} · `
+                                                        : ''}
+                                                    {offer.settlementChannel === 'TIMESHEET_ONLY'
+                                                        ? 'Currently timesheet only'
+                                                        : offer.settlementChannel}
+                                                </Text>
+                                                {missing.length > 0 ? (
+                                                    <Text style={styles.warningText}>
+                                                        Private setup needed: {missing.map((field) => field.replaceAll('_', ' ')).join(', ')}
+                                                    </Text>
+                                                ) : null}
+                                                {preview?.awardPayrollReviewRequired ? (
+                                                    <Text style={styles.warningText}>
+                                                        Award/overtime review is required before payroll activation.
+                                                    </Text>
+                                                ) : null}
+                                                <View style={styles.payrollActions}>
+                                                    {!ready && workerPaymentPath ? (
+                                                        <KitButton
+                                                            label="Complete private profile"
+                                                            variant="outlined"
+                                                            onPress={openPrivatePaymentProfile}
+                                                        />
+                                                    ) : null}
+                                                    <Text style={styles.placeholderText}>Your pharmacy manager activates payroll after confirming the requirements.</Text>
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            ) : null;
+
+    const boardHeader = !hideTabs ? <BoardTabs value={boardTab} onChange={handleBoardTabChange} savedCount={savedShiftIds.size} /> : null;
 
     return (
         <View style={styles.container}>
-            {!hideTabs && (
-                <View style={styles.tabsContainer}>
-                    <SegmentedButtons
-                        value={boardTab}
-                        onValueChange={(value) => handleBoardTabChange(value as any)}
-                        buttons={[
-                            { value: 'browse', label: 'Browse' },
-                            { value: 'saved', label: `Saved (${savedShiftIds.size})` },
-                            { value: 'interested', label: 'Interested' },
-                            { value: 'rejected', label: 'Rejected' },
-                            { value: 'accepted', label: 'Offers' },
-                        ]}
-                        theme={{ colors: { secondaryContainer: '#EEF2FF', onSecondaryContainer: '#6366F1' } }}
-                    />
-                </View>
-            )}
             {boardTab === 'accepted' ? (
-                <View style={styles.placeholderCard}>
-                    {offersLoading ? (
-                        <ActivityIndicator style={styles.placeholderLoader} />
-                    ) : (
-                        <View style={styles.offerWorkspace}>
-                            {payrollNotice ? (
-                                <Text style={styles.successText}>{payrollNotice}</Text>
-                            ) : null}
+                offersLoading ? (
+                    <ScrollView>{boardHeader}<ContentState kind="loading" style={styles.state} /></ScrollView>
+                ) : offersError ? (
+                    <ScrollView>{boardHeader}<ContentState
+                        kind="error"
+                        title="Your offers did not load"
+                        description="Check your connection, then try again."
+                        onAction={() => void loadOffers()}
+                        style={styles.state}
+                    /></ScrollView>
+                ) : (
+                        <>
                             {offerShifts.length === 0 ? (
-                                <View>
-                                    <Text variant="titleMedium" style={styles.placeholderTitle}>
-                                        Offers
-                                    </Text>
-                                    <Text variant="bodyMedium" style={styles.placeholderText}>
-                                        No pending offers.
-                                    </Text>
-                                </View>
+                                <ScrollView>{boardHeader}
+                                <ContentState
+                                    kind="empty"
+                                    title="No pending offers"
+                                    description="When a pharmacy offers you a shift, you confirm it here."
+                                    style={styles.state}
+                                />{payrollContent}</ScrollView>
                             ) : (
                                 <ShiftsBoard
+                                    header={boardHeader}
+                                    footer={payrollContent}
                                     title="Offers"
                                     shifts={offerShifts}
                                     loading={offersLoading}
                                     onApplyAll={handleConfirmOfferShift}
                                     onApplySlot={handleConfirmOfferSlot}
                                     onSubmitCounterOffer={handleSubmitCounterOffer}
+                                    counterOfferGuard={guardVerified}
                                     onRejectShift={handleDeclineOfferShift}
                                     onRejectSlot={undefined}
                                     enableSaved={false}
@@ -611,90 +723,28 @@ export default function PublicShiftsView({
                                 />
                             )}
 
-                            {payrollActivationOffers.length > 0 ? (
-                                <View style={styles.payrollSection}>
-                                    <Text variant="titleMedium" style={styles.payrollTitle}>
-                                        Payroll setup for confirmed shifts
-                                    </Text>
-                                    <Text variant="bodySmall" style={styles.placeholderText}>
-                                        These TFN shifts are confirmed and stay timesheet-only until your private TFN/super setup is complete. The pharmacy never receives your TFN or super member number.
-                                    </Text>
-                                    {payrollActivationOffers.map((offer) => {
-                                        const preview = offer.engagementTermsPreview;
-                                        const ready =
-                                            preview?.payrollSetupStatus === 'READY'
-                                            && !preview?.awardPayrollReviewRequired;
-                                        const missing = preview?.payrollMissingFields || [];
-                                        const shift = offer.shiftDetail as any;
-                                        const pharmacyName =
-                                            preview?.pharmacyName
-                                            || shift?.pharmacyDetail?.name
-                                            || shift?.pharmacyName
-                                            || 'Confirmed shift';
-                                        return (
-                                            <Card key={offer.id} mode="outlined" style={styles.payrollCard}>
-                                                <Card.Content style={styles.payrollCardContent}>
-                                                    <View style={styles.chipRow}>
-                                                        <Chip compact>TFN</Chip>
-                                                        <Chip compact>
-                                                            {ready ? 'Ready to activate payroll' : 'Timesheet only · setup required'}
-                                                        </Chip>
-                                                    </View>
-                                                    <Text variant="titleSmall" style={styles.payrollItemTitle}>
-                                                        {pharmacyName}
-                                                    </Text>
-                                                    <Text variant="bodySmall" style={styles.placeholderText}>
-                                                        {preview?.awardClassification
-                                                            ? `${preview.awardClassification.replaceAll('_', ' ')} · `
-                                                            : ''}
-                                                        {offer.settlementChannel === 'TIMESHEET_ONLY'
-                                                            ? 'Currently timesheet only'
-                                                            : offer.settlementChannel}
-                                                    </Text>
-                                                    {missing.length > 0 ? (
-                                                        <Text variant="bodySmall" style={styles.warningText}>
-                                                            Private setup needed: {missing.map((field) => field.replaceAll('_', ' ')).join(', ')}
-                                                        </Text>
-                                                    ) : null}
-                                                    {preview?.awardPayrollReviewRequired ? (
-                                                        <Text variant="bodySmall" style={styles.warningText}>
-                                                            Award/overtime review is required before payroll activation.
-                                                        </Text>
-                                                    ) : null}
-                                                    <View style={styles.payrollActions}>
-                                                        {!ready && workerPaymentPath ? (
-                                                            <Button mode="outlined" compact onPress={openPrivatePaymentProfile}>
-                                                                Complete private profile
-                                                            </Button>
-                                                        ) : null}
-                                                        <Button
-                                                            mode="contained"
-                                                            compact
-                                                            disabled={!ready || payrollActivatingId === offer.id}
-                                                            loading={payrollActivatingId === offer.id}
-                                                            onPress={() => void handleActivatePayroll(offer)}
-                                                        >
-                                                            Activate payroll
-                                                        </Button>
-                                                    </View>
-                                                </Card.Content>
-                                            </Card>
-                                        );
-                                    })}
-                                </View>
-                            ) : null}
-                        </View>
-                    )}
-                </View>
+
+                        </>
+                )
+            ) : loadError ? (
+                <ScrollView>{boardHeader}<ContentState
+                    kind="error"
+                    title="Public shifts did not load"
+                    description="Check your connection, then try again."
+                    onAction={() => void loadShifts(debouncedFilters, page)}
+                    style={styles.state}
+                /></ScrollView>
             ) : (
                 <ShiftsBoard
-                    title="Public Shifts"
+                    header={boardHeader}
+                    title="Public shifts"
                     shifts={shifts}
                     loading={loading}
                     useServerFiltering
                     filters={filters}
                     onFiltersChange={handleFiltersChange}
                     totalCount={totalCount}
+                    pageExclusions={pageExclusions}
                     page={page}
                     pageSize={pageSize}
                     onPageChange={setPage}
@@ -702,6 +752,7 @@ export default function PublicShiftsView({
                     onApplySlot={handleApplySlot}
                     onApplySlots={handleApplySlots}
                     onSubmitCounterOffer={handleSubmitCounterOffer}
+                    counterOfferGuard={guardVerified}
                     savedShiftIds={Array.from(savedShiftIds)}
                     onToggleSave={handleToggleSave}
                     initialAppliedShiftIds={appliedShiftIds}
@@ -716,11 +767,16 @@ export default function PublicShiftsView({
                 />
             )}
             <ShiftEngagementTermsDialog
-                visible={termsOffers.length > 0}
-                offers={termsOffers}
-                loading={termsConfirming}
-                onDismiss={() => setTermsOffers([])}
-                onConfirm={(payload) => acceptOffers(termsOffers, payload)}
+                visible={isTermsDialogVisible(termsState)}
+                offers={termsState.offers}
+                loading={termsConfirming || termsState.status === 'reloading'}
+                status={termsState.status}
+                error={termsState.error}
+                onDismiss={() => {
+                    setTermsState((prev) => dismissTermsAcceptance(prev));
+                }}
+                onConfirm={(payload) => acceptOffers(termsState.offers, payload)}
+                onRetry={() => void reloadTermsOffers(termsState.offers.length > 0 ? termsState.offers : termsState.selectedOfferIds.map((id) => ({ id } as ShiftOffer)))}
                 onOpenPaymentProfile={workerPaymentPath ? openPrivatePaymentProfile : undefined}
             />
             <Portal>
@@ -740,58 +796,45 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    tabsContainer: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-    },
-    placeholderCard: {
-        marginHorizontal: 16,
-        marginTop: 8,
-        padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderStyle: 'dashed',
-        borderColor: '#D1D5DB',
-        backgroundColor: '#FFFFFF',
-        alignItems: 'center',
-    },
-    placeholderTitle: {
-        fontWeight: '700',
-        marginBottom: 6,
-        textAlign: 'center',
+    state: {
+        width: undefined,
+        margin: space.lg,
     },
     placeholderText: {
-        color: '#6B7280',
+        color: colors.textSecondary,
         textAlign: 'center',
-    },
-    awaitingPaymentText: {
-        color: '#B45309',
-        fontWeight: '700',
-        marginBottom: 12,
-        textAlign: 'center',
-    },
-    placeholderLoader: {
-        marginTop: 8,
     },
     offerWorkspace: {
-        width: '100%',
-        gap: 18,
+        flex: 1,
+        gap: space.lg,
     },
     payrollSection: {
-        width: '100%',
         gap: 10,
+        paddingHorizontal: space.lg,
     },
     payrollTitle: {
-        fontWeight: '800',
+        fontFamily: font.outfit.medium,
+        fontSize: type.titleMedium.fontSize,
+        lineHeight: type.titleMedium.lineHeight,
+        color: colors.textPrimary,
     },
     payrollCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surfaceBg,
+        borderRadius: radius.card,
+        borderCurve: 'continuous',
+        borderWidth: 1,
+        borderColor: colors.border,
+        padding: space.lg,
+        gap: space.sm,
     },
     payrollCardContent: {
         gap: 8,
     },
     payrollItemTitle: {
-        fontWeight: '800',
+        fontFamily: font.inter.semiBold,
+        fontSize: type.labelLarge.fontSize,
+        lineHeight: type.labelLarge.lineHeight,
+        color: colors.textPrimary,
     },
     chipRow: {
         flexDirection: 'row',
@@ -805,32 +848,11 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     warningText: {
-        color: '#B45309',
+        color: colors.status.amber.fg,
     },
     successText: {
-        color: '#15803D',
-        fontWeight: '700',
-    },
-    offerList: {
-        width: '100%',
-        marginTop: 12,
-        gap: 12,
-    },
-    offerCard: {
-        borderRadius: 12,
-        backgroundColor: '#FFFFFF',
-    },
-    offerTitle: {
-        fontWeight: '700',
-        marginBottom: 4,
-    },
-    offerMeta: {
-        color: '#6B7280',
-        marginBottom: 4,
-    },
-    offerActions: {
-        flexDirection: 'row',
-        gap: 8,
-        marginTop: 8,
+        marginHorizontal: space.lg,
+        color: colors.status.green.fg,
+        fontFamily: font.inter.semiBold,
     },
 });

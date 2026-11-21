@@ -6,6 +6,7 @@ import { getOnboardingDetail, updateOnboardingForm } from '@chemisttasker/shared
 import { API_BASE_URL } from '@/constants/api';
 import { pickSingleDocument, roleKey, toRNFile } from './shared';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
+import { BrandLoader } from '@/components/ui';
 
 type ApiData = {
   short_bio?: string | null;
@@ -86,6 +87,7 @@ export default function PharmacistBioScreen() {
       } else {
         setError(err?.message || 'Failed to save profile.');
       }
+      return false;
     } finally {
       setSaving(false);
     }
@@ -95,7 +97,7 @@ export default function PharmacistBioScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <View style={styles.loader}>
-          <Text>Loading bio...</Text>
+          <BrandLoader size={44} accessibilityLabel="Loading bio…" />
         </View>
       </SafeAreaView>
     );

@@ -69,15 +69,80 @@ describe('createApiClient', () => {
       });
     });
 
+    const refreshAuthToken = vi.fn(async () => 'new-token');
     const api = createApiClient({
       baseUrl: 'https://example.test/api/v1',
       getAuthToken: () => 'old-token',
-      refreshAuthToken: async () => 'new-token',
+      getSessionGeneration: () => 1,
+      refreshAuthToken,
       fetchImpl: fetchImpl as typeof fetch,
     });
 
     await expect(api.get('/attendance/worker/status/')).resolves.toEqual({ ok: true });
     expect(seenTokens).toEqual(['Bearer old-token', 'Bearer new-token']);
+    expect(refreshAuthToken).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a delayed 401 after the session changes without refreshing or replaying the write', async () => {
+    let generation = 0;
+    let release!: (response: Response) => void;
+    const fetchImpl = vi.fn().mockImplementationOnce(() => new Promise<Response>(resolve => { release = resolve; }))
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const refreshAuthToken = vi.fn(async () => 'token-b');
+    const onAuthFailure = vi.fn();
+    const api = createApiClient({ baseUrl: 'https://example.test/api', getAuthToken: () => 'token-a',
+      getSessionGeneration: () => generation, refreshAuthToken, onAuthFailure, fetchImpl });
+    const pending = api.post('/write/', { owner: 'a' });
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledOnce());
+    generation++;
+    release(new Response('', { status: 401 }));
+    await expect(pending).rejects.toBeDefined();
+    expect(refreshAuthToken).not.toHaveBeenCalled();
+    expect(onAuthFailure).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('shares one refresh across concurrent 401s in the same session', async () => {
+    let release!: (token: string) => void;
+    const refreshAuthToken = vi.fn(() => new Promise<string>(resolve => { release = resolve; }));
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) =>
+      new Response(null, { status: new Headers(init?.headers).get('Authorization') === 'Bearer fresh' ? 204 : 401 }));
+    const api = createApiClient({ baseUrl: 'https://example.test/api', getAuthToken: () => 'old',
+      getSessionGeneration: () => 1, refreshAuthToken, fetchImpl });
+    const calls = [api.post('/one/', {}), api.post('/two/', {})];
+    await vi.waitFor(() => expect(refreshAuthToken).toHaveBeenCalledOnce());
+    release('fresh');
+    await expect(Promise.all(calls)).resolves.toEqual([undefined, undefined]);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    expect(refreshAuthToken).toHaveBeenCalledOnce();
+  });
+
+  it('does not send after the session changes during token lookup', async () => {
+    let generation = 0;
+    let release!: (token: string) => void;
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 204 }));
+    const api = createApiClient({ baseUrl: 'https://example.test/api', getSessionGeneration: () => generation,
+      getAuthToken: () => new Promise<string>(resolve => { release = resolve; }), fetchImpl });
+    const pending = api.post('/write/', {});
+    generation++;
+    release('token-b');
+    await expect(pending).rejects.toBeDefined();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('does not replay after the session changes during refresh', async () => {
+    let generation = 0;
+    let release!: (token: string) => void;
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 401 }));
+    const refreshAuthToken = vi.fn(() => new Promise<string>(resolve => { release = resolve; }));
+    const api = createApiClient({ baseUrl: 'https://example.test/api', getSessionGeneration: () => generation,
+      getAuthToken: () => 'old', refreshAuthToken, fetchImpl });
+    const pending = api.post('/write/', {});
+    await vi.waitFor(() => expect(refreshAuthToken).toHaveBeenCalledOnce());
+    generation++;
+    release('fresh');
+    await expect(pending).rejects.toBeDefined();
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
   it('does not retry forever when the refreshed token is also rejected', async () => {
@@ -205,5 +270,32 @@ describe('createApiClient', () => {
       status: 403,
       message: 'Denied',
     });
+  });
+
+  it('turns DRF default not-found details into plain copy and keeps other details', async () => {
+    const api = (status: number, detail: string) => createApiClient({
+      baseUrl: 'https://example.test/api/v1',
+      fetchImpl: (async () => new Response(JSON.stringify({ detail }), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch,
+    });
+    const friendly = "This item isn't available. It may have been removed or you may not have access.";
+    for (const model of ['Organization', 'Pharmacy', 'MarketplaceListing', 'Shift']) {
+      await expect(api(404, `No ${model} matches the given query.`).get('/x/')).rejects.toMatchObject({ status: 404, message: friendly });
+    }
+    await expect(api(404, 'Shift link expired.').get('/x/')).rejects.toMatchObject({ status: 404, message: 'Shift link expired.' });
+    await expect(api(400, 'No Shift matches the given query.').get('/x/')).rejects.toMatchObject({ message: 'No Shift matches the given query.' });
+  });
+
+  it('maps the marketplace new-listings switch (503 NEW_LISTINGS_DISABLED) to plain copy and drops other 5xx bodies', async () => {
+    const api = (status: number, body: unknown) => createApiClient({
+      baseUrl: 'https://example.test/api/v1',
+      fetchImpl: (async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })) as typeof fetch,
+    });
+    await expect(api(503, { code: 'NEW_LISTINGS_DISABLED', detail: 'New listings are not enabled.' }).post('/marketplace/listings/', {}))
+      .rejects.toMatchObject({ status: 503, message: "New listings aren't open yet", payload: { code: 'NEW_LISTINGS_DISABLED' } });
+    await expect(api(503, { code: 'OTHER', detail: 'internal' }).get('/x/')).rejects.toMatchObject({ status: 503, message: 'Request failed with status 503', payload: null });
+    await expect(api(500, { code: 'NEW_LISTINGS_DISABLED' }).get('/x/')).rejects.toMatchObject({ message: 'Request failed with status 500', payload: null });
   });
 });

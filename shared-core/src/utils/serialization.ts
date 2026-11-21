@@ -1,4 +1,5 @@
 import type { CamelCasedPropertiesDeep } from '../types';
+import { getSessionGeneration } from '../transport/application';
 /** Preserve established adapter query encoding; transport performs URL security checks. */
 export function buildQuery(params?: Record<string, unknown> | null): string {
     if (!params)
@@ -58,9 +59,11 @@ export function asList<T>(data: ApiList<T> | null | undefined): T[] {
 }
 /** Read every page of a DRF list; callers that need the complete collection must not stop at page 1. */
 export async function fetchAllPages<T>(fetchPage: (page: number) => Promise<ApiList<T> | null | undefined>): Promise<T[]> {
+    const generation = getSessionGeneration();
     const rows: T[] = [];
     for (let page = 1; ; page += 1) {
         const data = await fetchPage(page);
+        if (generation !== getSessionGeneration()) throw new Error('Session changed during pagination');
         rows.push(...asList(data));
         if (!extractNext(data))
             return rows;

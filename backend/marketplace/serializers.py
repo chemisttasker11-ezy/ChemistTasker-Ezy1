@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.utils.text import slugify
 
 from .models import ListingAudiencePolicy, ListingDeliveryTerms, MarketplaceCategory, MarketplaceExchange, MarketplaceListing, MarketplaceMessage
 from .policy import ROLE_LABELS, resolved_role
@@ -59,6 +60,11 @@ class PublicListingSerializer(serializers.ModelSerializer):
                 continue
             rows.append({"derivative_url": request.build_absolute_uri(f"/api/v1/marketplace/images/{image.pk}/") if request else f"/api/v1/marketplace/images/{image.pk}/", "alt": image.alt_text})
         return rows
+
+
+def repair_blank_listing_slug(listing):
+    if not listing.slug:
+        listing.slug = slugify(listing.title)[:160] or "listing"
 
 
 class ListingWriteSerializer(serializers.ModelSerializer):
@@ -120,6 +126,7 @@ class ListingWriteSerializer(serializers.ModelSerializer):
         validated_data.pop("expected_version", None)
         for name, value in validated_data.items():
             setattr(instance, name, value)
+        repair_blank_listing_slug(instance)
         instance.version += 1
         instance.full_clean()
         instance.save()

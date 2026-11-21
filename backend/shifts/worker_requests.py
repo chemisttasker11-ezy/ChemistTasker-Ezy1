@@ -10,6 +10,7 @@ from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
 from django.db import transaction
 from django.utils import timezone
 from shifts.emails import build_roster_email_link
+from shifts.posting import validate_posting_window
 from users.task_dispatch import async_task
 from datetime import date
 from shifts.access import _normalized_role_code, _otherstaff_onboarding_role
@@ -258,6 +259,8 @@ class WorkerShiftRequestViewSet(viewsets.ModelViewSet):
                 req = WorkerShiftRequest.objects.select_for_update().get(pk=req.pk)
                 if req.status != "PENDING":
                     return Response({"detail": f"Already {req.status.lower()}."}, status=status.HTTP_400_BAD_REQUEST)
+
+                validate_posting_window(pharmacy, [{'date': req.slot_date}])
 
                 # Request was for an unassigned shift; create open community shift
                 shift_data = {

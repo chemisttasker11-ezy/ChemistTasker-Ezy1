@@ -43,25 +43,25 @@ class MembershipPayloadBehaviourTests(TestCase):
         Membership.objects.create(user=make_user(), pharmacy=self.accepted, role='ASSISTANT', status='ACCEPTED')
         self.client = APIClient()
 
-    def assert_memberships(self, rows, *, session=False, otp=False):
+    def assert_memberships(self, rows, *, otp=False):
         self.assertEqual({row['pharmacy_id'] for row in rows}, {self.accepted.pk, self.owned.pk})
         by_id = {row['pharmacy_id']: row for row in rows}
-        expected = {'pharmacy_id': self.accepted.pk, 'pharmacy_name': self.accepted.name, 'role': 'PHARMACIST'}
+        # Every session payload carries the membership id: mobile leave requests need it.
+        expected = {'id': self.membership.pk, 'pharmacy_id': self.accepted.pk, 'pharmacy_name': self.accepted.name,
+                    'role': 'PHARMACIST'}
         if not otp:
             expected['employment_type'] = 'CASUAL'
-        if session:
-            expected['id'] = self.membership.pk
         self.assertEqual(by_id[self.accepted.pk], expected)
         owned = {'pharmacy_id': self.owned.pk, 'pharmacy_name': self.owned.name, 'role': 'OWNER'}
         if otp:
-            owned['role'] = 'PHARMACIST'
+            owned.update(id=self.overlap.pk, role='PHARMACIST')
         self.assertEqual(by_id[self.owned.pk], owned)
 
     def test_current_user_keeps_membership_id_and_owner_precedence(self):
         self.client.force_authenticate(self.user)
         response = self.client.get('/api/v1/users/me/')
         self.assertEqual(response.status_code, 200, response.data)
-        self.assert_memberships(response.data['memberships'], session=True)
+        self.assert_memberships(response.data['memberships'])
 
     def test_login_and_refresh_keep_distinct_wire_shape(self):
         response = self.client.post('/api/v1/users/login/',

@@ -40,10 +40,23 @@ export interface ShiftPostingDraft {
   slotsModified?: boolean; ratesModified?: boolean;
 }
 
+/** Midnight-crossing shifts are valid; equal clock minutes produce a zero/ambiguous window. */
+export function isValidShiftPostingTimeRange(startTime: string, endTime: string): boolean {
+  const validTime = (value: string) => /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value);
+  return validTime(startTime) && validTime(endTime) && startTime.slice(0, 5) !== endTime.slice(0, 5);
+}
+
 export function validateShiftPostingDraft(draft: Pick<ShiftPostingDraft, 'pharmacyId'|'roleNeeded'|'employmentType'|'slots'|'ftptPayMode'|'minHourly'|'maxHourly'|'minAnnual'|'maxAnnual'|'superPercent'>): string | null {
   if (!draft.pharmacyId || !draft.roleNeeded || !draft.employmentType) return 'Choose a pharmacy, role and type of work.';
   const locum = ['LOCUM', 'CASUAL'].includes(draft.employmentType);
   if (locum && !draft.slots.length) return 'Add at least one date before posting.';
+  if (locum) {
+    for (const slot of draft.slots) {
+      if (!isValidShiftPostingTimeRange(slot.startTime, slot.endTime)) {
+        return 'Select a valid shift start and end time; they cannot be the same.';
+      }
+    }
+  }
   if (!locum && draft.ftptPayMode === 'HOURLY' && (!draft.minHourly || !draft.maxHourly)) return 'Enter minimum and maximum hourly rates.';
   if (!locum && draft.ftptPayMode === 'ANNUAL' && (!draft.minAnnual || !draft.maxAnnual || !draft.superPercent)) return 'Enter minimum and maximum annual pay and super percentage.';
   return null;

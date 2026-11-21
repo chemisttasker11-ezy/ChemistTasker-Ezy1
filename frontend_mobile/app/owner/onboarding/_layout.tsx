@@ -1,15 +1,7 @@
-import { Stack } from 'expo-router';
-import OnboardingProvider from './_context';
+import { Redirect } from 'expo-router';
 
+// The owner first run lives at /setup/owner/onboarding (one multi-step flow, web's save rules);
+// this older path forwards there so there is only one way to submit the owner profile.
 export default function OnboardingLayout() {
-    return (
-        <OnboardingProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="step1" />
-                <Stack.Screen name="step2" />
-                <Stack.Screen name="step3" />
-                <Stack.Screen name="review" />
-            </Stack>
-        </OnboardingProvider>
-    );
+  return <Redirect href="/setup/owner/onboarding" />;
 }

@@ -66,6 +66,9 @@ Security_Audit_Tracking.md
 
 # Management scripts (if you want to keep these local)
 management/
+!backend/talent/management/
+!backend/talent/management/**/
+!backend/talent/management/**/*.py
 !backend/public_hub/management/
 !backend/public_hub/management/**/
 !backend/public_hub/management/**/*.py

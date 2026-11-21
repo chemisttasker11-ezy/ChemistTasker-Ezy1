@@ -1,6 +1,7 @@
 import { AhpraProvider } from './AhpraContext';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert, AppState, Platform } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import {
   getOnboarding,
   hasAdminCapability,
@@ -114,11 +115,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [registeredPush, setRegisteredPush] = useState(false);
   const pushTokenRef = useRef<string | null>(null);
   const pushRegistrationRef = useRef<Promise<void> | null>(null);
+  // Session generation whose cached identity could not be verified (offline start); null once verified.
+  const unverifiedGenerationRef = useRef<number | null>(null);
 
   // Load user from cookie session at app startup
   useEffect(() => {
-    const loadStoredAuth = async () => {
+    const loadStoredAuth = async (reverify = false) => {
       const bootstrapId = getSessionGeneration();
+      if (reverify) {
+        // A sign-in or sign-out since the offline start owns the session; claiming the run stops overlaps.
+        if (unverifiedGenerationRef.current !== bootstrapId) return;
+        unverifiedGenerationRef.current = null;
+      }
       try {
         const baseURL = resolveApiBaseUrl();
         const session = await readStoredSession();
@@ -128,7 +136,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const nextUser = session?.user ? normalizeUser(session.user) : null;
         primeInMemorySession(session);
 
-        if ((nextAccess || nextRefresh) && nextUser) {
+        if (!reverify && (nextAccess || nextRefresh) && nextUser) {
           const [availability, biometricUser] = await Promise.all([
             getBiometricAvailability(),
             getSavedBiometricUser(),
@@ -155,6 +163,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         }
 
+        // Offline or server down (no response, 5xx, or a refresh that failed without being rejected)
+        // keeps the stored session; only a server rejection (401/403, refresh 400/401) signs out.
+        let offline = false;
         if (baseURL) {
           const token = await getValidAccessToken(baseURL);
           const refreshGeneration = getSessionGeneration();
@@ -162,29 +173,52 @@ export function AuthProvider({ children }: AuthProviderProps) {
             // A rejected refresh clears its own session and advances the generation.
             if (!token) {
               const remainingSession = await readStoredSession();
-              if (!remainingSession && getSessionGeneration() === refreshGeneration) setIsLoading(false);
+              if (!remainingSession && getSessionGeneration() === refreshGeneration) {
+                primeInMemorySession(null);
+                setAccess(null);
+                setRefresh(null);
+                setUser(null);
+                setIsLoading(false);
+              }
             }
             return;
           }
           if (token) {
-            const meResponse = await nativeIdentityTransport.currentUser().catch(() => null);
+            const meResponse = await nativeIdentityTransport.currentUser().catch((err) => {
+              const status = err?.response?.status;
+              offline = !status || status >= 500;
+              return null;
+            });
             if (meResponse?.data) {
               const currentUser = normalizeUser(meResponse.data);
               const refreshedSession = await readStoredSession();
               if (getSessionGeneration() !== bootstrapId) return;
-              setAccess(refreshedSession?.access || refreshedSession?.tokens?.access || token);
-              setRefresh(refreshedSession?.refresh || refreshedSession?.tokens?.refresh || nextRefresh);
-              setUser(currentUser);
               const saved = await writeStoredSession({
                 access: refreshedSession?.access || refreshedSession?.tokens?.access || token,
                 refresh: refreshedSession?.refresh || refreshedSession?.tokens?.refresh || nextRefresh,
                 user: currentUser,
               }, bootstrapId);
-              if (!saved) return;
-              setIsLoading(false);
-              return;
+              if (saved) {
+                setAccess(refreshedSession?.access || refreshedSession?.tokens?.access || token);
+                setRefresh(refreshedSession?.refresh || refreshedSession?.tokens?.refresh || nextRefresh);
+                setUser(currentUser);
+                setIsLoading(false);
+                return;
+              }
             }
+          } else {
+            offline = !!nextRefresh;
           }
+        }
+        if (offline && nextUser && getSessionGeneration() === bootstrapId) {
+          // B52: the cached role is unverified; check again on the next foreground or reconnect.
+          unverifiedGenerationRef.current = bootstrapId;
+          if (reverify) return;
+          setAccess(nextAccess);
+          setRefresh(nextRefresh);
+          setUser(nextUser);
+          setIsLoading(false);
+          return;
         }
       } catch {
         // handled below
@@ -193,8 +227,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Secure storage can fail (e.g. Keychain unavailable/locked). Never leave the app on the
       // loading screen: an unreadable or unverified session is treated as signed out (B52);
       // a sign-in that started meanwhile bumped the generation and owns the session.
-      if (getSessionGeneration() !== bootstrapId) return;
-      await clearStoredSession().catch(() => undefined);
+      const finalGeneration = getSessionGeneration();
+      if (finalGeneration !== bootstrapId) {
+        const remainingSession = await readStoredSession();
+        if (!remainingSession && getSessionGeneration() === finalGeneration) {
+          primeInMemorySession(null);
+          setAccess(null);
+          setRefresh(null);
+          setUser(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+      const clearPromise = clearStoredSession().catch(() => undefined);
+      const clearGeneration = getSessionGeneration();
+      await clearPromise;
+      if (getSessionGeneration() !== clearGeneration) return;
       primeInMemorySession(null);
       setAccess(null);
       setRefresh(null);
@@ -202,6 +250,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(false);
     };
     loadStoredAuth();
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void loadStoredAuth(true);
+    });
+    const unsubscribeNetInfo = NetInfo.addEventListener((state) => {
+      if (state.isConnected) void loadStoredAuth(true);
+    });
+    return () => {
+      appStateSubscription.remove();
+      unsubscribeNetInfo();
+    };
   }, []);
 
   useEffect(() => {

@@ -5,6 +5,7 @@ from django.db.models import Q
 from shifts.models import Shift, ShiftSlotAssignment
 from memberships.models import Membership
 from workforce.models import RosterPeriod
+from users.presentation import user_display_name
 
 
 def get_or_create_roster_period(pharmacy, week_start, user=None):
@@ -97,7 +98,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
             "slot_id": a.slot_id,
             "shift_id": a.shift_id,
             "worker_id": a.user_id,
-            "worker_name": a.user.get_full_name() or a.user.username,
+            "worker_name": user_display_name(a.user),
             "worker_role": getattr(a.user, "role", ""),
             "date": str(a.slot_date),
             "start_time": str(a.slot.start_time),
@@ -127,7 +128,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
     ]
 
     workers_map = {
-        m.user_id: {"worker_id": m.user_id, "worker_name": m.user.get_full_name() or m.user.username,
+        m.user_id: {"worker_id": m.user_id, "worker_name": user_display_name(m.user),
                     "role": m.role, "total_shifts": 0, "total_hours": 0.0, "shifts": []}
         for m in Membership.objects.filter(pharmacy=pharmacy, status=Membership.Status.ACCEPTED,
                                             is_active=True, user__is_active=True).exclude(role="CONTACT").select_related("user")
@@ -137,7 +138,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
         if uid not in workers_map:
             workers_map[uid] = {
                 "worker_id": uid,
-                "worker_name": a.user.get_full_name() or a.user.username,
+                "worker_name": user_display_name(a.user),
                 "role": getattr(a.user, "role", ""),
                 "total_shifts": 0,
                 "total_hours": 0.0,
@@ -166,7 +167,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
 
     staff_view = sorted(
         workers_map.values(),
-        key=lambda w: (-w["total_shifts"], -w["total_hours"], w["worker_name"], w["worker_id"]),
+        key=lambda w: (-w["total_shifts"], -w["total_hours"], w["worker_name"] or "", w["worker_id"]),
     )
 
     days_map = {}
@@ -191,7 +192,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
                 "planned_break_minutes": a.slot.planned_break_minutes,
                 "assignment_id": a.id,
                 "worker_id": a.user_id,
-                "worker_name": a.user.get_full_name() or a.user.username,
+                "worker_name": user_display_name(a.user),
                 "start_time": str(a.slot.start_time),
                 "end_time": str(a.slot.end_time),
                 "role": a.shift.role_needed,

@@ -1,5 +1,6 @@
 import { configureApi, configureStorage, createChemistTaskerApi } from '@chemisttasker/shared-core';
 import { getAccessToken, refreshCookieSession } from '../utils/tokenService';
+import { getSessionGeneration } from '../../landing_next/shared/browser-session';
 
 let configured = false;
 
@@ -17,6 +18,7 @@ if (!baseURL) throw new Error('VITE_API_URL is not defined');
 
 export const chemistTaskerApi = createChemistTaskerApi({
   baseUrl: baseURL,
+  getSessionGeneration,
   getAuthToken: async () => getAccessToken(),
   refreshAuthToken: async () => (await refreshCookieSession(true))?.access ?? null,
 });
@@ -30,6 +32,7 @@ export function initSharedCoreApi() {
   });
   configureApi({
     baseURL,
+    getSessionGeneration,
     credentials: 'include',
     getToken: async () => {
       const existing = getAccessToken();

@@ -341,6 +341,11 @@ class FinanceApiTests(TestCase):
         self.assertEqual(receipt.status_code, 201, receipt.data)
         self.assertEqual(self.client.post(path, {'file': upload()}, format='multipart').status_code, 400)
         receipt_id = receipt.data['receipts'][0]['id']
+        download = self.client.get(BASE + f'receipts/{receipt_id}/download/')
+        self.assertEqual(download['Content-Type'], 'application/pdf')
+        self.assertIn('attachment', download['Content-Disposition'])
+        self.assertTrue({'private', 'no-store'} <= {part.strip() for part in download['Cache-Control'].split(',')})
+        self.assertEqual(download['X-Content-Type-Options'], 'nosniff')
         self.client.force_authenticate(self.other)
         self.assertEqual(self.client.get(BASE + f'receipts/{receipt_id}/download/').status_code, 404)
 

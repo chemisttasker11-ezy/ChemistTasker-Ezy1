@@ -12,6 +12,7 @@ type Props = {
   onEdit?: (room: ChatRoom) => void;
   onManageMembers?: (room: ChatRoom) => void;
   canEditDelete?: boolean;
+  canPin?: boolean;
   canManageMembers?: boolean;
 };
 
@@ -29,6 +30,7 @@ export default function ChatListItem({
   onEdit,
   onManageMembers,
   canEditDelete,
+  canPin = true,
   canManageMembers,
 }: Props) {
   const theme = useTheme();
@@ -54,7 +56,7 @@ export default function ChatListItem({
               onDismiss={() => setMenuVisible(false)}
               anchor={<IconButton icon="dots-vertical" size={18} onPress={() => setMenuVisible(true)} />}
             >
-              <Menu.Item leadingIcon={room.is_pinned ? 'pin-off' : 'pin'} onPress={() => { setMenuVisible(false); onTogglePin(room); }} title={room.is_pinned ? 'Unpin' : 'Pin'} />
+              {canPin ? <Menu.Item leadingIcon={room.is_pinned ? 'pin-off' : 'pin'} onPress={() => { setMenuVisible(false); onTogglePin(room); }} title={room.is_pinned ? 'Unpin' : 'Pin'} /> : null}
               {canManageMembers ? <Menu.Item leadingIcon="account-multiple-outline" onPress={() => { setMenuVisible(false); onManageMembers?.(room); }} title="Manage members" /> : null}
               {canEditDelete ? <Menu.Item leadingIcon="pencil" onPress={() => { setMenuVisible(false); onEdit?.(room); }} title="Edit" /> : null}
               {canEditDelete ? <Menu.Item leadingIcon="delete" onPress={() => { setMenuVisible(false); onDelete?.(room); }} title="Delete" /> : null}

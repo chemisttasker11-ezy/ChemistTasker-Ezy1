@@ -459,6 +459,7 @@ export default function InviteStaffPage() {
       const detail =
         err?.response?.data?.detail ||
         (typeof err?.response?.data === 'object' ? JSON.stringify(err.response.data) : null) ||
+        err?.message ||
         'Failed to send invite.';
       setError(detail);
     }
@@ -541,6 +542,7 @@ export default function InviteStaffPage() {
       const message =
         err?.response?.data?.detail ||
         (typeof err?.response?.data === 'object' ? JSON.stringify(err.response.data) : null) ||
+        err?.message ||
         'Failed to update member.';
       setEditError(message);
     } finally {

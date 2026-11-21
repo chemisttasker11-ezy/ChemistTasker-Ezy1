@@ -7,6 +7,7 @@ import GooglePlacesInput from '../../shared/pharmacies/GooglePlacesInput';
 import { useUnsavedChangesGuard } from '../../shared/forms/useUnsavedChangesGuard';
 import { useAuth } from '../../../context/AuthContext';
 import { WorkRightsMenu } from '../../shared/forms/WorkRightsMenu';
+import { BrandLoader } from '@/components/ui';
 
 type ExplorerRole = typeof NEWCOMER_TYPES[number]['value'] | '';
 type ApiData = {
@@ -45,7 +46,7 @@ export default function ExplorerBasicInfoScreen() {
   const [genderMenuVisible, setGenderMenuVisible] = useState(false);
   const [form, setForm] = useState<ApiData>({});
   const [lockedNames, setLockedNames] = useState({ first: false, last: false });
-  const saveRef = useRef<(() => Promise<void>) | null>(null);
+  const saveRef = useRef<(() => Promise<boolean | void>) | null>(null);
   const unsaved = useUnsavedChangesGuard(form, { enabled: !loading, onSave: () => saveRef.current?.(), saving });
   const { refreshUser, user } = useAuth();
 
@@ -137,6 +138,7 @@ export default function ExplorerBasicInfoScreen() {
       } else {
         setError(err?.message || 'Failed to save basic info.');
       }
+      return false;
     } finally {
       setSaving(false);
     }
@@ -149,7 +151,7 @@ export default function ExplorerBasicInfoScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
-        <View style={styles.loader}><Text>Loading basic info...</Text></View>
+        <View style={styles.loader}><BrandLoader size={44} accessibilityLabel="Loading basic info…" /></View>
       </SafeAreaView>
     );
   }

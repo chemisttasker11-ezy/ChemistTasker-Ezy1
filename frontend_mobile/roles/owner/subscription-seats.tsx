@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, Card, HelperText, Surface, Text, TextInput } from 'react-native-paper';
+import { Button, Card, HelperText, Surface, Text, TextInput } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { createSubscriptionCheckout, getCurrentSubscription, updateSubscriptionSeats } from '@chemisttasker/shared-core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 

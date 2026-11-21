@@ -90,6 +90,20 @@ export async function authenticateWithBiometrics(label = 'biometrics'): Promise<
   return result.success;
 }
 
+/** Device-owner authentication allows biometrics or the OS screen lock. It does not
+ * create a second API login or store a low-entropy application PIN. */
+export async function authenticateWithDeviceLock(): Promise<boolean> {
+  const localAuthentication = getLocalAuthentication();
+  if (!localAuthentication?.authenticateAsync) return false;
+  const result = await localAuthentication.authenticateAsync({
+    promptMessage: 'Unlock ChemistTasker',
+    cancelLabel: 'Cancel',
+    fallbackLabel: 'Use device PIN or passcode',
+    disableDeviceFallback: false,
+  });
+  return result.success;
+}
+
 export async function enableBiometricLogin(user: BiometricUser): Promise<void> {
   await AsyncStorage.multiSet([
     [BIOMETRIC_ENABLED_KEY, 'true'],
@@ -108,7 +122,8 @@ export async function getSavedBiometricUser(): Promise<BiometricUser | null> {
       AsyncStorage.getItem(BIOMETRIC_USER_KEY),
     ]);
     if (enabled !== 'true' || !rawUser) return null;
-    return JSON.parse(rawUser) as BiometricUser;
+    const parsed = JSON.parse(rawUser) as BiometricUser;
+    return typeof parsed?.email === 'string' || typeof parsed?.id === 'number' ? parsed : null;
   } catch {
     return null;
   }

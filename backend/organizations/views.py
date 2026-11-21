@@ -1,9 +1,8 @@
 """Organisation API: organisations, pharmacies, chains and pharmacy admins."""
 from organizations.feature_port import pharmacy_features
-import hashlib
-import json
+from access_control.admin_roles import validate_admin_user_for_api
+from infrastructure.request_fingerprint import request_fingerprint
 
-from django.core.files.uploadedfile import UploadedFile
 from rest_framework import permissions, serializers, status, viewsets
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
 from organizations.membership_port import membership_operations
@@ -199,31 +198,11 @@ class PharmacyViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(pharmacy).data, status=status.HTTP_200_OK)
 
     def _request_fingerprint(self):
-        fields, files = {}, {}
-        data = self.request.data
-        if not isinstance(data, dict):
-            raise ValidationError('Expected an object of pharmacy fields.')
-        items = data.lists() if hasattr(data, 'lists') else ((key, [value]) for key, value in data.items())
-        for key, values in items:
-            for value in values:
-                if isinstance(value, UploadedFile):
-                    position = value.tell()
-                    digest = hashlib.sha256()
-                    try:
-                        for chunk in value.chunks():
-                            digest.update(chunk)
-                    finally:
-                        value.seek(position)
-                    files.setdefault(key, []).append({
-                        'name': value.name, 'size': value.size, 'sha256': digest.hexdigest(),
-                    })
-                else:
-                    fields.setdefault(key, []).append(value)
-        canonical = json.dumps({'fields': fields, 'files': files}, sort_keys=True, separators=(',', ':'))
-        return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+        return request_fingerprint(self.request.data, 'Expected an object of pharmacy fields.')
 
     def perform_create(self, serializer):
         user = self.request.user
+        validate_admin_user_for_api(user)
         owner_onboarding = None
         organization = None
 

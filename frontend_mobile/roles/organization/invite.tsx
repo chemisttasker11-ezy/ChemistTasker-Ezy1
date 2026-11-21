@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import {
-  ActivityIndicator,
   Button,
   Card,
   Checkbox,
@@ -15,6 +14,7 @@ import {
   Text,
   TextInput,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   deleteOrganizationMembership,
@@ -28,6 +28,7 @@ import {
   updateOrganizationMembership,
 } from '@chemisttasker/shared-core';
 import { useAuth } from '@/context/AuthContext';
+import { orgCapabilities } from '@/roles/shared/dashboard/ManagerHome';
 import { surfaceTokens } from '@/roles/shared/pharmacies/types';
 
 type RoleDefinition = {
@@ -141,7 +142,7 @@ export default function OrganizationInviteScreen() {
     () => new Set<string>(Array.isArray(orgMembership?.capabilities) ? orgMembership.capabilities : []),
     [orgMembership]
   );
-  const canInvite = inviterCapabilities.has('invite_staff') || String(user?.role || '').toUpperCase() === 'ORGANIZATION';
+  const canInvite = orgCapabilities(user).invite;
 
   const eligibleRoles = useMemo(
     () =>
@@ -295,6 +296,7 @@ export default function OrganizationInviteScreen() {
   };
 
   const handleInvite = async () => {
+    if (!canInvite) return;
     const validation = validateInvite();
     if (validation) {
       setError(validation);
@@ -322,7 +324,8 @@ export default function OrganizationInviteScreen() {
     } catch (err: any) {
       const detail =
         err?.response?.data?.detail ||
-        (typeof err?.response?.data === 'object' ? JSON.stringify(err.response.data) : null);
+        (typeof err?.response?.data === 'object' ? JSON.stringify(err.response.data) : null) ||
+        err?.message;
       setError(detail || 'Failed to send invite.');
     } finally {
       setSubmitting(false);
@@ -390,7 +393,7 @@ export default function OrganizationInviteScreen() {
       setEditForm(null);
       await loadMembers();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to update member.');
+      setError(err?.response?.data?.detail || err?.message || 'Failed to update member.');
     } finally {
       setSavingMember(false);
     }
@@ -498,7 +501,7 @@ export default function OrganizationInviteScreen() {
             {warning ? <HelperText type="info">{warning}</HelperText> : null}
             {error ? <HelperText type="error">{error}</HelperText> : null}
 
-            <Card style={styles.card}>
+            {canInvite ? <Card style={styles.card}>
               <TouchableOpacity style={styles.cardTitleRow} onPress={() => setFormOpen((open) => !open)}>
                 <Text variant="titleMedium" style={styles.cardTitle}>Invite Organization Member</Text>
                 <IconButton icon={formOpen ? 'chevron-up' : 'chevron-down'} size={22} />
@@ -597,7 +600,7 @@ export default function OrganizationInviteScreen() {
                   )}
                 </Card.Content>
               ) : null}
-            </Card>
+            </Card> : null}
 
             <View style={styles.memberListHeader}>
               <Text variant="titleMedium" style={styles.cardTitle}>Organization Members</Text>
@@ -619,7 +622,7 @@ export default function OrganizationInviteScreen() {
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>No organization members found.</Text>
             </View>
-          ) : null
+          ) : undefined
         }
       />
 

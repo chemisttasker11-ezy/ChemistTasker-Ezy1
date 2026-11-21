@@ -6,7 +6,7 @@ import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
 import '@fontsource/outfit/500.css';
 import '@fontsource/outfit/600.css';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { WorkspaceProvider } from './contexts/WorkspaceContext'; // Add this import
@@ -17,8 +17,14 @@ import './index.css';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 import App from './App';
+import ShareQrPage from './pages/ShareQrPage';
+import MobileInstallPrompt from './components/MobileInstallPrompt';
 import PublicRouteBridge from './components/PublicRouteBridge';
-function WebRoot(){return <PublicRouteBridge><App/></PublicRouteBridge>;}
+function WebRoot(){return <PublicRouteBridge><App/><MobileInstallPrompt path={window.location.pathname} /></PublicRouteBridge>;}
+function ExplorerShiftBoardRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={`/dashboard/explorer/shifts/public${search}${hash}`} replace />;
+}
 import RouteLoadingState from './components/ui/RouteLoadingState';
 import RouteErrorState from './components/RouteErrorState';
 // Fetch home graphics alongside the session check, without loading them on app routes.
@@ -153,6 +159,7 @@ const router = createBrowserRouter([
 
       { path: 'shifts/public-board', element: <PublicJobBoardPage /> },
       { path: 'talent/public-board', element: <PublicTalentBoardPage /> },
+      { path: 'share/qr', element: <ShareQrPage /> },
       { path: 'shifts/link', element: <SharedShiftLandingPage /> },
       { path: 'organization/:slug', element: <PublicOrganizationPage /> },
 
@@ -578,8 +585,8 @@ const router = createBrowserRouter([
               { index: true, element: <PublicShiftsPage /> },
               { path: 'public', element: <PublicShiftsPage /> },
               { path: 'community', element: <CommunityShiftsPage /> },
-              { path: 'confirmed', element: <MyConfirmedShiftsPage /> },
-              { path: 'history', element: <MyHistoryShiftsPage /> },
+              { path: 'confirmed', element: <ExplorerShiftBoardRedirect /> },
+              { path: 'history', element: <ExplorerShiftBoardRedirect /> },
               { path: ':id', element: <WorkerShiftDetailPage /> },
             ],
           },

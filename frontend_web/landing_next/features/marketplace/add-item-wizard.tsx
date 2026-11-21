@@ -110,7 +110,40 @@ export default function AddItemWizard() {
   const [lookupMessage, setLookupMessage] = useState('');
   const [created, setCreated] = useState<{ id: string; publication_status?: string }>();
   const [busy, setBusy] = useState(false);
+  // One receipt per draft, including retries after an uncertain create response.
+  const createReceipt = useRef<string>(crypto.randomUUID());
+  const durable = useRef<{ id: string; version: number; audienceCircle: string | null } | null>(null);
+  const uploaded = useRef(new Map<string, number | undefined>());
+  const removingPhoto = useRef(false);
+  const completing = useRef(false);
+  const generation = useRef(0);
+  const account = String(session.user?.id ?? 'anonymous');
+  const accountRef = useRef(account);
+  if (accountRef.current !== account) {
+    // Changing identity invalidates both the in-flight continuation and any
+    // durable listing receipt; a new user must never PATCH the previous user's ID.
+    generation.current++;
+    completing.current = false;
+    durable.current = null;
+    uploaded.current.clear();
+    createReceipt.current = crypto.randomUUID();
+    accountRef.current = account;
+  }
+  const mounted = useRef(true);
 
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      generation.current++;
+      completing.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    generation.current++;
+    completing.current = false;
+    return () => { generation.current++; completing.current = false; };
+  }, [account]);
   useEffect(() => () => {
     for (const url of photoUrls.current) URL.revokeObjectURL(url);
     photoUrls.current.clear();
@@ -150,15 +183,27 @@ export default function AddItemWizard() {
     setPhotos((prev) => [...prev, ...newItems].slice(0, 6));
   }
 
-  function handlePhotoRemove(index: number) {
-    setPhotos((prev) => {
-      const target = prev[index];
-      if (target?.url) {
-        URL.revokeObjectURL(target.url);
-        photoUrls.current.delete(target.url);
+  async function handlePhotoRemove(index: number) {
+    const target = photos[index];
+    if (!target || removingPhoto.current) return;
+    removingPhoto.current = true;
+    setBusy(true);
+    try {
+      const id = uploaded.current.get(target.url);
+      if (uploaded.current.has(target.url)) {
+        if (id == null) throw new Error('This uploaded photo cannot be removed here.');
+        await marketplaceApi.deleteImage(id);
+        uploaded.current.delete(target.url);
       }
-      return prev.filter((_, i) => i !== index);
-    });
+      URL.revokeObjectURL(target.url);
+      photoUrls.current.delete(target.url);
+      setPhotos((prev) => prev.filter((item) => item !== target));
+    } catch (reason) {
+      setError((reason as Error).message || 'Unable to remove photo.');
+    } finally {
+      removingPhoto.current = false;
+      setBusy(false);
+    }
   }
 
   async function lookup() {
@@ -182,11 +227,15 @@ export default function AddItemWizard() {
   }
 
   async function handleComplete(submitForReview: boolean) {
-    if (!context || !category) return;
+    if (!context || !category || completing.current || session.status !== 'authenticated') return;
+    const capturedAccount = account, attempt = ++generation.current;
+    const current = () => mounted.current && accountRef.current === capturedAccount
+      && generation.current === attempt;
+    completing.current = true;
     setBusy(true);
     setError('');
     try {
-      const listing = await marketplaceApi.createListing({
+      const createBody = {
         seller_context: context,
         pharmacy: context === 'PHARMACY' ? pharmacyId : null,
         category: category.id,
@@ -210,49 +259,67 @@ export default function AddItemWizard() {
           postage_organiser: delivery === 'PICKUP' ? '' : postageOrganiser,
           quote_required: quoteRequired,
         },
-      } as Parameters<typeof marketplaceApi.createListing>[0]);
+        client_request_id: createReceipt.current,
+      } as Parameters<typeof marketplaceApi.createListing>[0];
 
-      let listingVersion = listing.version;
-      if (context === 'PHARMACY') {
-        const audience = await marketplaceApi.updateAudience(listing.id, {
-          expected_version: listing.version,
-          current_circle: 'OWNED_CHAIN',
-          maximum_circle: maximumCircle,
-          schedule: [],
+
+      if (!current()) return;
+      let receipt = durable.current;
+      if (receipt) {
+        const revised = await marketplaceApi.updateListing(receipt.id, {
+          ...createBody, expected_version: receipt.version,
         });
-        listingVersion = audience.version;
+        if (!current()) return;
+        receipt = { ...receipt, version: revised.version };
+        durable.current = receipt;
+      } else {
+        const listing = await marketplaceApi.createListing(createBody);
+        if (!current()) return;
+        receipt = { id: String(listing.id), version: listing.version, audienceCircle: null };
+        durable.current = receipt;
       }
 
-      // Upload selected photos
+      if (context === 'PHARMACY' && receipt.audienceCircle !== maximumCircle) {
+        const audience = await marketplaceApi.updateAudience(receipt.id, {
+          expected_version: receipt.version,
+          current_circle: 'OWNED_CHAIN', maximum_circle: maximumCircle, schedule: [],
+        });
+        if (!current()) return;
+        receipt = { ...receipt, version: audience.version, audienceCircle: maximumCircle };
+        durable.current = receipt;
+      }
+
       for (const item of photos) {
+        if (uploaded.current.has(item.url)) continue;
+        if (!current()) return;
         const formData = new FormData();
         formData.append('image', item.file);
-        try {
-          await marketplaceApi.uploadImage(listing.id, formData);
-        } catch {
-          // Continue uploading remaining photos even if one fails
-        }
+        // Never swallow an upload failure or claim publication with missing photos.
+        const image = await marketplaceApi.uploadImage(receipt.id, formData);
+        if (!current()) return;
+        uploaded.current.set(item.url, image?.id);
       }
 
-      // Submit for review / publication if chosen
       let finalStatus = 'DRAFT';
       if (submitForReview) {
-        try {
-          const res = await marketplaceApi.actOnListing(listing.id, 'submit', listingVersion);
-          finalStatus = res.publication_status || 'PENDING_REVIEW';
-        } catch (subErr) {
-          setError(`Listing created as draft, but submit failed: ${(subErr as Error).message}`);
-        }
+        if (!current()) return;
+        const result = await marketplaceApi.actOnListing(receipt.id, 'submit', receipt.version);
+        if (!current()) return;
+        finalStatus = result.publication_status || 'PENDING_REVIEW';
+        durable.current = { ...receipt, version: result.version ?? receipt.version };
       }
-
-      setCreated({ id: listing.id, publication_status: finalStatus });
+      if (!current()) return;
+      setCreated({ id: receipt.id, publication_status: finalStatus });
       for (const url of photoUrls.current) URL.revokeObjectURL(url);
       photoUrls.current.clear();
       setPhotos([]);
     } catch (reason) {
-      setError((reason as Error).message);
+      if (current()) setError((reason as Error).message || 'Listing could not be completed. Retry your draft.');
     } finally {
-      setBusy(false);
+      if (current()) {
+        completing.current = false;
+        setBusy(false);
+      }
     }
   }
 
@@ -329,6 +396,9 @@ export default function AddItemWizard() {
               <button
                 className="button secondary"
                 onClick={() => {
+                  durable.current = null;
+                  uploaded.current.clear();
+                  createReceipt.current = crypto.randomUUID();
                   setCreated(undefined);
                   setContext(undefined);
                   setStep(1);
@@ -609,7 +679,8 @@ export default function AddItemWizard() {
                       <button
                         type="button"
                         className={styles.photoRemove}
-                        onClick={() => handlePhotoRemove(idx)}
+                        disabled={busy}
+                        onClick={() => void handlePhotoRemove(idx)}
                         aria-label="Remove photo"
                       >
                         <X size={12} />

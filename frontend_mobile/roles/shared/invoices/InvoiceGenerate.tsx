@@ -1,3 +1,4 @@
+import { ResponsiveSegmentedButtons as SegmentedButtons } from '@/components/ui/ResponsiveSegmentedButtons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -6,19 +7,18 @@ import {
   View,
 } from 'react-native';
 import {
-  ActivityIndicator,
   Button,
   Card,
   Chip,
   HelperText,
   IconButton,
   Menu,
-  SegmentedButtons,
   Snackbar,
   Switch,
   Text,
   TextInput,
 } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useSegments } from 'expo-router';
 import {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
     Shift,
     ShiftMemberStatus,
@@ -8,6 +8,7 @@ import {
 } from '@chemisttasker/shared-core';
 import { TabDataState } from '../types';
 import { deriveLevelSequence, getCurrentLevelKey, PUBLIC_LEVEL_KEY } from '../utils/shiftHelpers';
+import { getNextGeneration, isLatestGeneration } from '../utils/activeShiftRuntime';
 
 export function useTabData(
     shifts: Shift[],
@@ -15,16 +16,20 @@ export function useTabData(
     getTabKey: (shiftId: number, levelKey: EscalationLevelKey) => string
 ) {
     const [tabData, setTabData] = useState<Record<string, TabDataState>>({});
+    const generationsRef = useRef<Record<string, number>>({});
     const resolveSlotId = (slot: any): number | null => slot?.id ?? slot?.slotId ?? slot?.slot_id ?? null;
 
     const loadTabDataForShift = useCallback(
         async (shift: Shift, levelKey: EscalationLevelKey) => {
             const key = getTabKey(shift.id, levelKey);
-            setTabData(prev => ({ ...prev, [key]: { loading: true } }));
+            const generation = getNextGeneration(generationsRef.current, key);
+            setTabData(prev => ({ ...prev, [key]: { loading: true, error: null } }));
 
             try {
                 if (levelKey === PUBLIC_LEVEL_KEY) {
                     const interests = await fetchShiftInterests({ shiftId: shift.id });
+                    if (!isLatestGeneration(generationsRef.current, key, generation)) return;
+
                     const interestsBySlot: Record<number, any[]> = {};
                     (shift.slots || []).forEach(slot => {
                         const slotId = resolveSlotId(slot);
@@ -36,6 +41,7 @@ export function useTabData(
                         ...prev,
                         [key]: {
                             loading: false,
+                            error: null,
                             interestsAll: interests,
                             interestsBySlot,
                         },
@@ -49,18 +55,16 @@ export function useTabData(
                         if (slotId == null) {
                             return [Number.NaN, [] as ShiftMemberStatus[]] as const;
                         }
-                        try {
-                            const members = await fetchShiftMemberStatus(shift.id, {
-                                slotId,
-                                visibility: levelKey,
-                            });
-                            return [slotId, members] as const;
-                        } catch (error) {
-                            console.error(`Failed to load members for shift ${shift.id} slot ${slotId}`, error);
-                            return [slotId, [] as ShiftMemberStatus[]] as const;
-                        }
+                        // Do not turn a failed member request into a false "no candidates" result.
+                        const members = await fetchShiftMemberStatus(shift.id, {
+                            slotId,
+                            visibility: levelKey,
+                        });
+                        return [slotId, members] as const;
                     })
                 );
+
+                if (!isLatestGeneration(generationsRef.current, key, generation)) return;
 
                 const membersBySlot = membersBySlotEntries.reduce<Record<number, ShiftMemberStatus[]>>((acc, [slotId, members]) => {
                     if (!Number.isFinite(slotId)) {
@@ -76,13 +80,21 @@ export function useTabData(
                     ...prev,
                     [key]: {
                         loading: false,
+                        error: null,
                         membersBySlot,
                         members,
                     },
                 }));
-            } catch (error) {
+            } catch (error: any) {
+                if (!isLatestGeneration(generationsRef.current, key, generation)) return;
                 console.error('Failed to load tab data', error);
-                setTabData(prev => ({ ...prev, [key]: { loading: false } }));
+                setTabData(prev => ({
+                    ...prev,
+                    [key]: {
+                        loading: false,
+                        error: error?.message || 'Failed to load candidates',
+                    },
+                }));
             }
         },
         [getTabKey]
@@ -101,6 +113,12 @@ export function useTabData(
             ]);
             levelsToLoad.forEach(level => loadTabDataForShift(shift, level));
         });
+
+        return () => {
+            Object.keys(generationsRef.current).forEach((k) => {
+                generationsRef.current[k] += 1;
+            });
+        };
     }, [shifts, selectedLevelByShift, loadTabDataForShift]);
 
     return { tabData, setTabData, loadTabDataForShift };

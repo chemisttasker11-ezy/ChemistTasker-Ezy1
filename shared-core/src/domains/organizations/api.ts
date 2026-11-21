@@ -30,20 +30,11 @@ export async function fetchAccessibleOrganizationPharmacies(organizationId: numb
     const id = Number(organizationId);
     if (!Number.isInteger(id) || id <= 0)
         return [];
-    const pharmacies = [];
-    let page = 1;
-    while (true) {
-        const data = await getPharmacies({ page });
-        const rows = asList(data);
-        pharmacies.push(...rows
-            .filter((pharmacy) => Number(pharmacy?.organization) === id)
-            .map((pharmacy) => ({ id: Number(pharmacy.id), name: pharmacy.name }))
-            .filter((pharmacy) => Number.isInteger(pharmacy.id) && pharmacy.id > 0));
-        if (!data?.next)
-            break;
-        page += 1;
-    }
-    return pharmacies;
+    const rows = await fetchAllPages((page) => getPharmacies({ page }));
+    return rows
+        .filter((pharmacy) => Number(pharmacy?.organization) === id)
+        .map((pharmacy) => ({ id: Number(pharmacy.id), name: pharmacy.name }))
+        .filter((pharmacy) => Number.isInteger(pharmacy.id) && pharmacy.id > 0);
 }
 export async function fetchChainsService() {
     const data = await getChains();

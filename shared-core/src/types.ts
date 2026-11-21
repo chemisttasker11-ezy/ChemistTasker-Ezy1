@@ -858,6 +858,14 @@ export interface ShiftApi {
     escalate_to_org_chain?: string | null;
     escalate_to_platform?: string | null;
     slots?: ShiftSlotApi[];
+    /** Authorised worker-specific assigned dates, distinct from recurring slot templates. */
+    assigned_occurrences?: Array<{
+        slot_id: number;
+        date: string;
+        start_time: string;
+        end_time: string;
+        timezone: string;
+    }>;
     slot_assignments?: ShiftAssignmentApi[];
     pending_payment_slot_ids?: number[];
     single_user_only?: boolean;
@@ -971,6 +979,8 @@ export interface ShiftEngagementOccurrenceApi {
 
 export interface ShiftEngagementTermsApi {
     version?: number;
+    /** Hash of the exact server-built terms; must be echoed when accepting. */
+    terms_version?: string;
     blocked?: boolean;
     error?: unknown;
     acceptance_required?: boolean;
@@ -1026,6 +1036,8 @@ export type ShiftEngagementTerms = CamelCasedPropertiesDeep<ShiftEngagementTerms
 export interface ShiftOfferAcceptancePayload {
     engagementTermsAccepted?: boolean;
     independentContractorStatusConfirmed?: boolean;
+    /** The termsVersion from this particular offer's reviewed preview. */
+    termsVersion?: string;
 }
 
 export interface ShiftOfferApi {

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
-import { Modal, Portal, Text, Button, ActivityIndicator, Checkbox, HelperText, TextInput } from 'react-native-paper';
+import { Modal, Portal, Text, Button, Checkbox, HelperText, TextInput } from 'react-native-paper';
+import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { fetchChatParticipants } from '@chemisttasker/shared-core';
 import type { ChatRoom } from './types';
 import { searchParticipants } from './hooks';
 import { deleteRoomService, createOrUpdateGroupRoom } from '@chemisttasker/shared-core';
+import { getSessionGeneration } from '@/utils/authSession';
 
 type Props = {
   room: ChatRoom | null;
@@ -66,7 +68,9 @@ export default function GroupManageModal({ room, visible, onDismiss, onUpdated, 
 
   useEffect(() => {
     let cancelled = false;
+    const sessionGeneration = getSessionGeneration();
     const run = async () => {
+      if (cancelled || sessionGeneration !== getSessionGeneration()) return;
       if (!query || query.length < 2) {
         setResults([]);
         return;

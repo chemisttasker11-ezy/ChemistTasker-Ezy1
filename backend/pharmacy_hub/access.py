@@ -4,6 +4,7 @@ public_hub) uses for pharmacy, group, organization and platform scopes."""
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from users.models import OrganizationMembership
+from access_control.admin_roles import validate_admin_user
 from users.org_roles import OrgCapability, membership_capabilities, membership_visible_pharmacy_ids
 from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from onboarding.models import OtherStaffOnboarding
@@ -411,6 +412,7 @@ class HubScopeResolver:
         raise PermissionDenied("Unable to resolve membership for this scope.")
 
     def _activate_or_create_membership(self, pharmacy):
+        validate_admin_user(self.user)
         membership, _ = Membership.objects.get_or_create(
             user=self.user,
             pharmacy=pharmacy,

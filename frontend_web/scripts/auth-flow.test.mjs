@@ -3,10 +3,50 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import vm from 'node:vm';
-import { bearerBelongsToDifferentUser, safeNext, refreshBrowserSession, logoutSession } from '../landing_next/shared/browser-session.ts';
+import { bearerBelongsToDifferentUser, safeNext, loginHref, refreshBrowserSession, logoutSession } from '../landing_next/shared/browser-session.ts';
 import { canAccessRoute } from '../src/components/routeAccess.ts';
 import { safeHubAttachmentUrl } from '../landing_next/lib/safe-hub-attachment.ts';
 import { resolveDashboardPath } from '../src/utils/dashboardPath.ts';
+import * as browserSession from '../landing_next/shared/browser-session.ts';
+
+test('Next API fences a session change during CSRF lookup', async () => {
+  const ts = createRequire(import.meta.url)('typescript');
+  const source = fs.readFileSync(new URL('../landing_next/lib/chemisttasker-api.ts', import.meta.url), 'utf8');
+  let generation = 1, release, config, sent = 0;
+  const csrf = new Promise(resolve => { release = resolve; });
+  const module = { exports: {} };
+  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
+    module, exports: module.exports, Headers, fetch: async () => { sent++; return new Response(); },
+    require: id => id.includes('shared-core') ? { createChemistTaskerApi: value => { config = value; return {}; } } : {
+      csrfToken: () => csrf, refreshBrowserSession: async () => ({ access: 'token' }), getSessionGeneration: () => generation,
+    },
+  });
+  assert.equal(config.getSessionGeneration(), 1);
+  const request = config.fetchImpl('/post', { method: 'POST' });
+  generation++; release('csrf');
+  await assert.rejects(request);
+  assert.equal(sent, 0);
+});
+
+test('web transports track session generation before logout awaits and on login', async () => {
+  assert.equal(typeof browserSession.getSessionGeneration, 'function');
+  for (const file of ['../src/config/api.ts', '../landing_next/migrated/config/api.ts']) {
+    assert.match(fs.readFileSync(new URL(file, import.meta.url), 'utf8'), /getSessionGeneration\s*[,}]/);
+  }
+  const oldWindow = globalThis.window, oldStorage = globalThis.localStorage, oldFetch = globalThis.fetch;
+  globalThis.window = new EventTarget();
+  globalThis.localStorage = { setItem() {} };
+  globalThis.fetch = async () => { throw Error('offline'); };
+  try {
+    const before = browserSession.getSessionGeneration();
+    const leaving = logoutSession();
+    assert.ok(browserSession.getSessionGeneration() > before);
+    await assert.rejects(leaving);
+    const after = browserSession.getSessionGeneration();
+    browserSession.announceSession('login');
+    assert.ok(browserSession.getSessionGeneration() > after);
+  } finally { globalThis.window = oldWindow; globalThis.localStorage = oldStorage; globalThis.fetch = oldFetch; }
+});
 
 function sessionProviderHarness() {
   const require = createRequire(import.meta.url);
@@ -143,6 +183,12 @@ test('reported phone targets retain at least 44px and desktop shell targets stay
 test('return links preserve permitted destinations and reject external or login loops',()=>{
  for(const path of ['/content','/content/invite/example','/hubs/posts/12?reply=4#comments','/dashboard/pharmacist/overview'])assert.equal(safeNext(path),path);
  for(const path of ['https://example.com','//example.com','/\\example.com','/login?next=/login','javascript:alert(1)','/hubs/../../login','/dashboard/owner/logout?workspace=internal&pharmacy_id=2','/dashboard/admin/1/logout/','/dashboard/pharmacist/%6cogout',null])assert.equal(safeNext(path),null);
+});
+
+test('logout route cannot force generic dashboard return after a different user logs in',()=>{
+ assert.equal(loginHref('/dashboard/owner/logout'),'/login');
+ assert.equal(loginHref('/dashboard/admin/101/logout/?foo=bar'),'/login');
+ assert.equal(loginHref('/dashboard/owner/manage-pharmacies?view=detail'),'/login?next=%2Fdashboard%2Fowner%2Fmanage-pharmacies%3Fview%3Ddetail');
 });
 
 test('cookie authority only reconciles a known cross-user bearer identity',()=>{

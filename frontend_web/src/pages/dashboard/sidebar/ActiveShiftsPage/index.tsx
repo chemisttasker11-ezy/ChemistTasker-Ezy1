@@ -149,6 +149,7 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
         counterOffersByShift,
         counterOffersLoadingByShift,
         loadCounterOffers,
+        loadCounterOffersBatch,
         acceptOffer,
         rejectOffer,
         counterActionLoading,
@@ -217,12 +218,10 @@ const ActiveShiftsPage: React.FC<ActiveShiftsPageProps> = ({ shiftId = null, tit
     const handlePostShift = useCallback(() => navigate(postShiftRoute), [navigate, postShiftRoute]);
 
     React.useEffect(() => {
-        shifts.forEach((shift) => {
-            if (Object.prototype.hasOwnProperty.call(counterOffersByShift, shift.id)) return;
-            if (counterOffersLoadingByShift[shift.id]) return;
-            loadCounterOffers(shift.id);
-        });
-    }, [shifts, counterOffersByShift, counterOffersLoadingByShift, loadCounterOffers]);
+        const missing = shifts.map(shift => shift.id).filter(id =>
+            !Object.prototype.hasOwnProperty.call(counterOffersByShift, id) && !counterOffersLoadingByShift[id]);
+        if (missing.length) void loadCounterOffersBatch(missing);
+    }, [shifts, counterOffersByShift, counterOffersLoadingByShift, loadCounterOffersBatch]);
 
     return (
         <>
