@@ -14,6 +14,32 @@
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Build draft roster week | Manager plans shifts on calendar grid (`frontend_web/src/components/roster/HorizontalCalendarGrid.tsx:30`). | Manager views and edits roster calendar (`frontend_mobile/app/manager/roster/calendar.tsx:1`). | Yes | — |
+| Validate and publish roster | Manager validates roster requirements and publishes week (`frontend_web/src/components/roster/RosterManagerOverview.tsx:45`). | Manager accesses published roster view (`frontend_mobile/app/attendance/published-roster.tsx:1`). | Yes | — |
+| Worker roster view & acknowledgement | Worker reviews schedule on roster grid (`frontend_web/src/components/roster/RosterGridViews.tsx:50`). | Manager tracks worker roster acknowledgements (`frontend_mobile/app/manager/roster/acknowledgements.tsx:1`). | Yes | — |
+| Shift swap request | Shift engagement terms modal displays roster shift metadata (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:15`). | Manager reviews roster approvals including shift swaps (`frontend_mobile/app/manager/roster/approvals.tsx:1`). | Yes | — |
+| Roster audit trail | Manager overview records roster status and revision summaries (`frontend_web/src/components/roster/RosterManagerOverview.tsx:70`). | Mobile manager roster audit screen inspects historical changes (`frontend_mobile/app/manager/roster/audit.tsx:1`). | Yes | — |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-07-Q01 | Web + Expo |
+| GM-07-Q02 | Web + Expo |
+| GM-07-Q03 | Web + Expo |
+| GM-07-Q04 | Web + Expo |
+| GM-07-Q05 | Web + Expo |
+| GM-07-Q06 | Web + Expo |
+| GM-07-Q07 | Web + Expo |
+| GM-07-Q08 | Web + Expo |
+| GM-07-Q09 | Web + Expo |
+| GM-07-Q10 | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Source | Ref | SHA / head |

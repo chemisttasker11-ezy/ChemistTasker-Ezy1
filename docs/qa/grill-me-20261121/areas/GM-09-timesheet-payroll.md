@@ -14,6 +14,34 @@
 **Date of trace:** 2026-11-21 (AEST)
 **Status: ✅ CURRENT FLOW TRACED** — backend + Vite web traced at head; Expo screens located (contents not read at head); a few details still UNKNOWN (see §6). No code was changed, no PR/issue/comment created, no owner notified.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Fortnightly timesheet period generation | Manager opens new fortnightly period and inspects timesheet summaries (`frontend_web/src/features/workforce/TimesheetsPage.tsx:108`). | Manager creates current fortnight period from workforce timesheets screen (`frontend_mobile/app/workforce-timesheets.tsx:500`). | Yes | — |
+| Recalculate timesheets from attendance | Recalculate rebuilds timesheets from attendance sessions and approved leave (`frontend_web/src/features/workforce/TimesheetsPage.tsx:108`). | Recalculate button updates timesheets and prompts to sync offline kiosks (`frontend_mobile/app/workforce-timesheets.tsx:367`). | Yes | — |
+| Worker reviews and submits hours | Worker reviews worked hours and breaks in My Hours page (`frontend_web/src/features/workforce/MyHoursPage.tsx:20`). | Worker inspects daily entries and submits timesheet in mobile app (`frontend_mobile/app/my-hours.tsx:129`). | Yes | — |
+| Manager resolves timesheet checks | Detail drawer reviews blocking checks and records resolutions (`frontend_web/src/features/workforce/TimesheetDetailDrawer.tsx:35`). | Detail screen inspects blocking checks and allows manager decisions (`frontend_mobile/roles/shared/timesheets/TimesheetDetailScreen.tsx:40`). | Yes | — |
+| Timesheet time adjustments | Manager adjusts timesheet segment times with adjustment dialog (`frontend_web/src/features/workforce/TimesheetAdjustTimesDialog.tsx:25`). | Manager adjusts timesheet hours with mobile adjustment bottom sheet (`frontend_mobile/roles/shared/timesheets/TimesheetAdjustTimesSheet.tsx:30`). | Yes | — |
+| Period lock and payroll handoff | Manager locks approved timesheet period to finalize payroll (`frontend_web/src/features/workforce/TimesheetsPage.tsx:108`). | Manager locks period or reopens locked period for corrections (`frontend_mobile/app/workforce-timesheets.tsx:300`). | Yes | — |
+| ChemistTasker payroll toggle | Pharmacy settings toggles ChemistTasker payroll vs external processing (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacySettings.tsx:54`). | Workforce settings toggles ChemistTasker payroll routing (`frontend_mobile/app/workforce-settings.tsx:302`). | Yes | — |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| Q1 | Web + Expo |
+| Q2 | Web + Expo |
+| Q3 | Web + Expo |
+| Q4 | Web + Expo |
+| Q5 | Web + Expo |
+| Q6 | Web + Expo |
+| Q7 | Web + Expo |
+| Q8 | Web + Expo |
+| Q9 | Web + Expo |
+| Q10 | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Base | SHA / ref | Verified |

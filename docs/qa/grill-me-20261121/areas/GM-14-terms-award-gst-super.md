@@ -13,6 +13,34 @@
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED + VALIDATED at PR #249 head. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only. **No prior GM-14 trace file existed anywhere in `~/workspace`** (checked before tracing); this is the first full trace.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| TFN casual terms presentation | Dialog renders Award code MA000012, classification, and superannuation notice (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:35`). | Dialog renders Award details, classification, and superannuation notice (`frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:28`). | Yes | - |
+| ABN contractor terms presentation | Dialog presents contractor terms requiring separate contractor checkbox confirmation (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:75`). | Dialog presents contractor terms requiring contractor confirmation (`frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:65`). | Yes | - |
+| Terms version snapshot & freeze | Sends `termsVersion` with acceptance to prevent stale review drift (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:468`). | Sends `termsVersion` with acceptance to prevent stale review drift (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:356`). | Yes | - |
+| Award floor enforcement | Displays locked rate ensuring rate cannot fall below statutory minima (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:110`). | Displays locked rate ensuring rate cannot fall below statutory minima (`frontend_mobile/roles/shared/shifts/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:95`). | Yes | - |
+| Payment profile readiness | Incomplete payment details trigger navigation to profile settings (`frontend_web/src/pages/attendance/WorkerAttendancePage.tsx:631`). | Incomplete payment details trigger `openPaymentProfile` callback (`frontend_mobile/features/parity/attendance.tsx:337`). | Yes | - |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM14-Q01 | Web + Expo |
+| GM14-Q02 | Web + Expo |
+| GM14-Q03 | Web + Expo |
+| GM14-Q04 | Web + Expo |
+| GM14-Q05 | Web + Expo |
+| GM14-Q06 | Web + Expo |
+| GM14-Q07 | Web + Expo |
+| GM14-Q08 | Web + Expo |
+| GM14-Q09 | Web + Expo |
+| GM14-Q10 | Web + Expo |
+| GM14-Q11 | Web + Expo |
+| GM14-Q12 | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Source | Ref | SHA / head |

@@ -15,6 +15,56 @@
 
 Base blob URL for all file links: `https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/`
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Public job board browsing (logged-out) | Visitors browse public shifts on Vite (`frontend_web/src/pages/PublicJobBoardPage.tsx:74`) and Next (`frontend_web/landing_next/app/(public)/shifts/public-board/page.tsx:1`). | Visitors browse public shifts via AnonymousShiftBoardScreen (`frontend_mobile/app/shifts/public-board.tsx:4`). | Yes | |
+| Public talent board browsing (logged-out) | Visitors browse public talent profiles on Vite (`frontend_web/src/pages/PublicTalentBoardPage.tsx:18`) and Next (`frontend_web/landing_next/app/(public)/talent/public-board/page.tsx:1`). | Visitors inspect public candidate pitches (`frontend_mobile/app/explore/talent-board.tsx:22`). | Yes | |
+| View shared shift link via token | Shared shift details viewed anonymously (`frontend_web/src/pages/SharedShiftLandingPage.tsx:20`). | Anonymous shared shift link opened via deep link (`frontend_mobile/roles/shared/shifts/SharedShiftLandingScreen.tsx:20`). | Yes | |
+| Explorer account registration | New user selects EXPLORER role during self-registration (`frontend_web/src/pages/register.tsx:45`). | User registers with EXPLORER role (`frontend_mobile/app/register.tsx:35`). | Yes | |
+| Explorer onboarding completion | Explorer fills background details in onboarding wizard (`frontend_web/src/pages/onboarding/onboarding_explorer/ExplorerOnboardingV2Layout.tsx:20`). | Explorer submits verification details in profile tabs (`frontend_mobile/roles/explorer/profile-tabs/BasicInfoScreen.tsx:20`). | Yes | |
+| Signed-in Explorer shifts browsing | Signed-in explorer sees public shifts on dashboard (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:72`). | Mobile explorer shifts screen renders only a static placeholder (`frontend_mobile/roles/explorer/shifts.tsx:2`). | No | Verified 21 Nov: refuted. Expo Explorer Shifts re-exports the shared Shift Centre (`frontend_mobile/roles/explorer/shifts.tsx`, `export { default } from '@/roles/shared/shifts/ShiftsScreen'`), not a placeholder; same access policy as web. |
+| Express interest in public shift | Explorer submits interest application (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/index.tsx:140`). | Worker applies to public shift card (`frontend_mobile/roles/shared/shifts/AnonymousShiftBoardScreen.tsx:85`). | Yes | |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-24-Q01 — What can Explorers ("new to pharmacy") do with shifts? | Web + Expo |
+| GM-24-Q02 — Browse access before full verification | Web + Expo |
+| GM-24-Q03 — Verification on outside bookings | Web + Expo |
+| GM-24-Q04 — AHPRA exemption | Web + Expo |
+| GM-24-Q05 — Worker sign-up tracks | Web + Expo |
+| GM-24-Q06 — Who must pass an ID check? | Web + Expo |
+| GM-24-Q07 — What must a pharmacy pass before posting to outside workers? | Web + Expo |
+| GM-24-Q08 — On an anonymous public post, what is hidden? | Web + Expo |
+| GM-24-Q09 — When does an anonymous pharmacy's name reach the worker? | Web + Expo |
+| GM-24-Q10 — When a shift escalates, who is told, and when does escalation stop? | Web + Expo |
+| GM-24-Q11 — Who can see the talent board? | Web + Expo |
+| GM-24-Q12 — When is an anonymous candidate's identity revealed? | Web + Expo |
+| GM-24-Q13 — What stays hidden before identity reveal? | Web + Expo |
+| GM-24-Q14 — Fix before launch? Anonymous talent posts expose full names to any signed-in account. | Web + Expo |
+| GM-24-Q15 — Fix before launch? Hidden, stale and lapsed-credential posts can still be read. | Web + Expo |
+| GM-24-Q16 — Fix before launch? Mobile "add personal profile" drops pharmacist data. | Web + Expo |
+| GM-24-Q17 — Fix before launch? Reachable mobile onboarding screens 404 for non-pharmacists. | Web + Expo |
+| GM-24-Q18 — Fix before launch? Profile progress % doesn't match Verified. | Web + Expo |
+| GM-24-Q19 — Fix before launch? The auto-publish toggle for new shifts has no effect. | Web + Expo |
+| GM-24-Q20 — Fix before launch? The talent board downloads every post and filters in the app. | Web + Expo |
+| GM-24-Q21 — Fix before launch? Web and mobile disagree on Talent Board booking permissions. | Web + Expo |
+| GM-24-Q22 — Fix before launch? Talent post availability is copied once and never syncs with the calendar. | Web + Expo |
+| GM-24-Q23 — Fix before launch? Match emails miss escalated shifts and reach unverified workers. | Web + Expo |
+| GM-24-Q24 — Fix before launch? Availability input has no validation. | Web + Expo |
+| GM-24-Q25 — Is "Request booking" a firm offer or an enquiry? | Web + Expo |
+| GM-24-Q26 — What should the heart on a talent card do? | Web + Expo |
+| GM-24-Q27 — When should a talent post stop showing? | Web + Expo |
+| GM-24-Q28 — How long should verification evidence be kept? | Web + Expo |
+| GM-24-Q29 — What is the rule for hiring a worker directly, off the platform? | Web + Expo |
+| GM-24-Q30 — Who can rate, and when? | Web + Expo |
+| GM-24-Q31 — Accepted terms don't include the cancellation table or terms version. | Web + Expo |
+| GM-24-Q32 — Must every onboarding step work on mobile at launch? | Web + Expo |
+
 ## 1. Traced flow — ACTUAL TODAY
 
 ### 1.1 Who is an Explorer, and how do you become one?

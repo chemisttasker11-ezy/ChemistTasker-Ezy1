@@ -13,6 +13,43 @@
 - **Date traced:** 2026-11-21 (AEST). **Method:** read-only GitHub connector calls only, strictly sequential with ≥8 s between calls. No code changed, no PR/issue/comment created.
 - **Rate-limit note:** no HTTP 429 occurred in this re-run (~70 sequential read calls, all succeeded). The earlier 429s that blocked the first GM-16 attempt have cleared.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Shift fulfilment fee checkout (Stripe) | Shows fee card and launches Stripe checkout session (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:30`). | Shows fee card and launches mobile checkout session (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:228`). | Yes | - |
+| Pay fulfilment fee with Pills | Taps Pay with Pills button to pay via reward balance (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:12`). | Taps Pay with Pills button to pay via reward balance (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:312`). | Yes | - |
+| Subscriber discount on checkout | Server applies $15/$40 rate but UI displays flat `$n × 30` calculation bug (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:35`). | Server applies $15/$40 rate but UI displays same `$n × 30` calculation bug (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:230`). | Yes | - |
+| Owner subscription & extra seats management | Manages subscription plan, card/invoice payment, and extra seats in `OwnerBillingPage` (`frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:85`). | Manages extra seats and subscription in dedicated `subscription-seats` screen (`frontend_mobile/roles/owner/subscription-seats.tsx:82`). | Yes | - |
+| Pills reward wallet & referrals | Displays pill balance, referral code, and history on Pills page (`frontend_web/src/pages/dashboard/sidebar/rewards/PillsPage.tsx:56`). | Displays pill balance and referral history via `trustRewards` (`frontend_mobile/app/rewards/pills.tsx:3`). | Yes | - |
+| Legacy cancellation penalty endpoint | Backend endpoint `/billing/charge-penalty/` has no caller in web UI (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:250`). | Backend endpoint has no caller in mobile UI (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:270`). | Yes | - |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM16-Q01 | Web + Expo |
+| GM16-Q02 | Web + Expo |
+| GM16-Q03 | Web + Expo |
+| GM16-Q04 | Web + Expo |
+| GM16-Q05 | Web + Expo |
+| GM16-Q06 | Web + Expo |
+| GM16-Q07 | Web + Expo |
+| GM16-Q08 | Web + Expo |
+| GM16-Q09 | Web + Expo |
+| GM16-Q10 | Web + Expo |
+| GM16-Q11 | Web + Expo |
+| GM16-Q12 | Web + Expo |
+| GM16-Q13 | Web + Expo |
+| GM16-Q14 | Web + Expo |
+| GM16-Q15 | Web + Expo |
+| GM16-Q16 | Web + Expo |
+| GM16-Q17 | Web + Expo |
+| GM16-Q18 | Web + Expo |
+| GM-16-W01 | Web + Expo |
+| GM-16-W02 | Web + Expo |
+
 ## 0. What was completed in this re-run
 
 The 2026-11-21 partial stopped at two 429s after verifying only `shift_payments.py` and `subscription_events.py`. This re-run completes everything the partial listed as NOT re-validated:

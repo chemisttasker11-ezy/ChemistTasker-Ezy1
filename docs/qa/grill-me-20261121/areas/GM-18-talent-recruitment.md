@@ -17,6 +17,50 @@
 - **Date traced:** 2026-11-21 (AEST). **Method:** read-only GitHub connector calls only, sequential with ≥8 s between calls. No code changed, no PR/issue/comment created, no owner notified.
 - **Rate-limit note:** no HTTP 429 occurred in this re-trace.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Authenticated talent board browsing | Renders talent cards with client-side role and category filters (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:41`; Next has migrated copy `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:75`). | Renders talent cards with identical filters (`frontend_mobile/roles/shared/talent-board/index.tsx:94`). | Yes | - |
+| Public talent board browsing | Public route serves masked cards to logged-out visitors (`frontend_web/src/pages/PublicTalentBoardPage.tsx:18`; Next dynamic import `frontend_web/landing_next/public/runtime.tsx:26`). | Mobile route enforces authenticated session (`frontend_mobile/app/explore/talent-board.tsx:22`). | No | parity question (public discovery is web-first for SEO/marketing, whereas mobile app expects sign-in) |
+| Worker creates / edits talent profile | Worker writes pitch and copies availability via pitch dialog (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:264`). | Worker writes pitch and copies availability via pitch modal (`frontend_mobile/roles/shared/talent-board/index.tsx:210`). | Yes | - |
+| Request booking modal / route | Tapping "Request booking" opens embedded post-shift modal prefilled with worker (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:271`). | Tapping "Request booking" navigates to mobile post-shift screen (`frontend_mobile/roles/shared/talent-board/index.tsx:315`). | Yes | - |
+| Role gating on "Request booking" | Restricted to 9 hiring roles; `PHARMACY_MANAGER` is excluded (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:195`). | Permits any non-worker role; `PHARMACY_MANAGER` is allowed (`frontend_mobile/roles/shared/talent-board/index.tsx:180`). | No | Verified 21 Nov: real drift. Web allows a fixed role list or an admin (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:208-226`); Expo allows any role except Explorer, pharmacist and other staff (`frontend_mobile/roles/shared/talent-board/index.tsx:322-326`). Owner choice: one hiring-role policy (GM-18 Q15, GM-05 Q-17); then align both (BL-24). |
+| Like / react to candidate post | Toggles heart icon to increment/decrement reaction counter (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:420`). | Toggles heart icon on candidate card (`frontend_mobile/roles/shared/talent-board/index.tsx:380`). | Yes | - |
+| Manage availability calendar | Worker configures weekly availability slots on dedicated page (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:129`; Next has no availability page). | Worker configures availability on mobile screen (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:56`). | Yes | - |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-18-Q01 | Web + Expo |
+| GM-18-Q02 | Web + Expo |
+| GM-18-Q03 | Web + Expo |
+| GM-18-Q04 | Web + Expo |
+| GM-18-Q05 | Web + Expo |
+| GM-18-Q06 | Web + Expo |
+| GM-18-Q07 | Web + Expo |
+| GM-18-Q08 | Web + Expo |
+| GM-18-Q09 | Web + Expo |
+| GM-18-Q10 | Web + Expo |
+| GM-18-Q11 | Web + Expo |
+| GM-18-Q12 | Web + Expo |
+| GM-18-Q13 | Web + Expo |
+| GM-18-Q14 | Web + Expo |
+| GM-18-Q15 | Web + Expo |
+| GM-18-Q16 | Web + Expo |
+| GM-18-Q17 | Web + Expo |
+| GM-18-Q18 | Web + Expo |
+| GM-18-Q19 | Web + Expo |
+| GM-18-Q20 | Web + Expo |
+| GM-18-Q21 | Web + Expo |
+| GM-18-Q22 | Web + Expo |
+| GM-18-Q23 | Web + Expo |
+| GM-18-Q24 | Web + Expo |
+| GM-18-Q25 | Web + Expo |
+| GM-18-Q26 | Web + Expo |
+
 ## 0. Reconstruction note — read this first
 
 The original GM-18 worker trace file (26 questions, head `97c4543e…`) is **missing**; only its senior-review record survives (`~/workspace/chemisttasker-grill/senior-review-gm18-talent-recruitment.md`, PASS, 2026-11-21). This file is a **from-scratch re-trace**, not a recovery of that file. Every claim below was re-verified by direct file fetch at the PR #249 head, or is explicitly marked as adopted from another area's senior-reviewed trace at the same head (GM-19 for the matching engine, GM-02 for AHPRA gates, GM-15 for billing/terms) or marked UNKNOWN.

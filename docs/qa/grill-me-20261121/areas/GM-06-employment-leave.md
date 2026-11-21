@@ -12,6 +12,31 @@
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Create employment engagement | Manager configures employment terms and award rates in engagements panel (`frontend_web/src/features/workforce/EmploymentEngagementsPanel.tsx:25`). | Manager creates and views employment engagements (`frontend_mobile/app/workforce/employment-engagements/index.tsx:1`). | Yes | — |
+| Part-time contracted hours recording | Engagement terms dialog records agreed part-time hours (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:15`). | Mobile workforce settings records contracted hours for part-time staff (`frontend_mobile/app/workforce-settings.tsx:274`). | Yes | — |
+| Minimum staffing / coverage rules | Coverage panel displays pharmacy coverage requirements (`frontend_web/src/features/workforce/RosterCoveragePanel.tsx:20`). | Manager roster coverage screen reviews staffing coverage (`frontend_mobile/app/manager/roster/coverage.tsx:1`). | Yes | — |
+| Worker requests leave | Worker submits leave request in My Leave page (`frontend_web/src/features/workforce/MyLeavePage.tsx:6`). | Worker creates leave request with reason and date range (`frontend_mobile/app/my-leave.tsx:15`). | Yes | — |
+| Manager reviews and decides leave | Manager approves or rejects pending leave requests (`frontend_web/src/features/workforce/ManagerLeavePage.tsx:6`). | Manager reviews pending leave requests from workforce screen (`frontend_mobile/app/workforce/leave-requests.tsx:1`). | Yes | — |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-06-Q01 | Web + Expo |
+| GM-06-Q02 | Web + Expo |
+| GM-06-Q03 | Web + Expo |
+| GM-06-Q04 | Web + Expo |
+| GM-06-Q05 | Web + Expo |
+| GM-06-Q06 | Web + Expo |
+| GM-06-Q07 | Web + Expo |
+| GM-06-Q08 | Web + Expo |
+| GM-06-Q09 | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Source | Ref | SHA / head |

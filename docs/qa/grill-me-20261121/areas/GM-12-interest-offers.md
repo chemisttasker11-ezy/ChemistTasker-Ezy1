@@ -14,6 +14,50 @@
 **Revalidation target:** active PR #249, stacked on #248
 **Status of this document:** DOCUMENTATION ONLY. No code was changed, no PR/issue/comment created. No implementation is decided here. Progress label: **CURRENT FLOW TRACED** (backend fully traced at head + shared-core API layer; screen-level Web/Expo parity still UNKNOWN — see §6).
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Express interest in shift slots | Worker submits interest via `expressInterestInPublicShiftService` (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:284`). | Worker submits interest via `expressInterestInShiftService` (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:234`). | Yes | - |
+| View applicants & reveal candidates | Manager reviews applicants in candidates drawer (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:280`). | Manager reviews applicants on candidates screen (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:589`). | Yes | - |
+| Send shift offer with 48h expiry | Manager dispatches offer to candidate (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useCounterOffers.ts:65`). | Manager dispatches offer to candidate (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/hooks/useCounterOffers.ts:65`). | Yes | - |
+| Accept pending offer | Worker reviews terms dialog and accepts offer (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:468`). | Worker reviews terms dialog and accepts offer (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:356`). | Yes | - |
+| Decline pending offer | Worker declines offer via `declineShiftOfferService` (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:529`). | Worker declines offer via `declineWorkerShiftOfferService` (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:393`). | Yes | - |
+| Remind worker with buzz | Manager triggers buzz reminder subject to 1h cooldown (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:24`). | Manager triggers buzz reminder subject to 1h cooldown (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:24`). | Yes | - |
+| Counter-offer workflow | Worker submits proposed terms and manager can accept or reject (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/constants.ts:8`). | Worker submits proposed terms and manager can accept or reject (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/components/Candidates/StatusCard.tsx:126`). | Yes | - |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-12-Q01 | Web + Expo |
+| GM-12-Q02 | Web + Expo |
+| GM-12-Q03 | Web + Expo |
+| GM-12-Q04 | Web + Expo |
+| GM-12-Q05 | Web + Expo |
+| GM-12-Q06 | Web + Expo |
+| GM-12-Q07 | Web + Expo |
+| GM-12-Q08 | Web + Expo |
+| GM-12-Q09 | Web + Expo |
+| GM-12-Q10 | Web + Expo |
+| GM-12-Q11 | Web + Expo |
+| GM-12-Q12 | Web + Expo |
+| GM-12-Q13 | Web + Expo |
+| GM-12-Q14 | Web + Expo |
+| GM-12-Q15 | Web + Expo |
+| GM-12-Q16 | Web + Expo |
+| GM-12-Q17 | Web + Expo |
+| GM-12-Q18 | Web + Expo |
+| GM-12-Q19 | Web + Expo |
+| GM-12-Q20 | Web + Expo |
+| GM-12-Q21 | Web + Expo |
+| GM-12-Q22 | Web + Expo |
+| GM-12-Q23 | Web + Expo |
+| GM-12-Q24 | Web + Expo |
+| GM-12-Q25 | Web + Expo |
+| GM-12-Q26 | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Base | SHA / ref | Verified |

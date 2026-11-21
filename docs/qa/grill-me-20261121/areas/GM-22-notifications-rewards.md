@@ -16,6 +16,52 @@
 **Revalidation target:** active PR #249, stacked on #248
 **Status:** TRACED + RE-VALIDATED. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Shift announcement on posting | Backend announces public shifts to matched audience via email/in-app notification (`backend/shifts/announcements.py:345`). | Push notification and in-app alerts dispatched simultaneously (`backend/shifts/announcements.py:382`). | Yes | |
+| In-app notification center / feed | Top bar bell icon opens notification dropdown list (`frontend_web/src/layouts/TopBarActions.tsx:109`). | Dedicated notifications screen renders grouped alert history (`frontend_mobile/features/notifications/NotificationsScreen.tsx:40`). | Yes | Parity question: Web provides a header dropdown menu, whereas Expo features a full-page notification screen. |
+| Push notification delivery & permissions | Web has no push token registration; relies on email and in-app banners (`frontend_web/src/layouts/TopBarActions.tsx:254`). | Registers Expo push token with native permission prompt (`frontend_mobile/app/_layout.tsx:10`). | Expo only | Intended: Native mobile platforms support APNs/FCM push notifications while web relies on email and in-app dropdowns. |
+| Notification preferences & quiet hours | Web lacks push quiet-hours settings (`frontend_web/src/pages/login.tsx:50`). | User configures quiet-hours window and push delivery toggles (`frontend_mobile/app/settings/mobile.tsx:276`). | Expo only | Verified 21 Nov: intended. Quiet hours govern push, and push exists only on Expo. |
+| Shift reminders (24h / 12h pre-shift) | Celery beat triggers pre-shift reminders sent by email (`backend/shifts/tasks.py:45`). | Mobile receives synchronized push notification reminder (`backend/shifts/tasks.py:65`). | Yes | |
+| Rewards / Pills balance & ledger history | User views Pills balance and ledger in sidebar rewards page (`frontend_web/src/pages/dashboard/sidebar/rewards/PillsPage.tsx:45`). | User reviews Pills balance, history, and redemption in native screen (`frontend_mobile/roles/shared/pills/PillsScreen.tsx:61`). | Yes | |
+| Pay shift fees with Pills | Owner selects Pills payment option in active shifts table (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:204`). | Owner selects 'Pay with Pills' on payable shift cards (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/ActiveShiftCards.tsx:648`). | Yes | |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM22-01 · PO-Q08 — When a shift escalates, who is told, and when does escalation stop? | Web + Expo |
+| GM22-02 · BK-Q06 — When an offer is declined or expires, what happens to the shift? | Web + Expo |
+| GM22-03 · AG-Q09 — Who is told when a shift is cancelled, covered or replaced? | Web + Expo |
+| GM22-04 · AG-Q10 — Which channels carry those notices? | Web + Expo |
+| GM22-05 · AG-Q11 — Which shifts get pre-shift reminders, and when? | Web + Expo |
+| GM22-06 · AG-Q12 — If a shift changes inside 12 hours of start, what happens to reminders? | Web + Expo |
+| GM22-07 · CX-Q06 — Inside the window, who is alerted and how fast? | Web + Expo |
+| GM22-08 · AV-Q08 — Should urgent-shift alerts need a separate opt-in? | Web + Expo |
+| GM22-09 · AV-Q09 — Should workers set a max distance and minimum rate for alerts? | Web + Expo |
+| GM22-10 · LA-Q17 — Fix before launch? Match emails miss escalated shifts and reach unverified workers. | Web + Expo |
+| GM22-11 · PO-Q10 — How late may a scheduled escalation fire? | Web + Expo |
+| GM22-12 · LA-Q08 — Fix before launch? Scheduled escalation only runs when someone loads a shift list. | Web + Expo |
+| GM22-13 · PO-Q09 — Should escalation pause while an offer waits for an answer? | Web + Expo |
+| GM22-14 · PO-Q12 — When does an anonymous pharmacy's name reach the worker? | Web + Expo |
+| GM22-15 · AG-Q03 — Should both sides get a PDF copy of the agreement? | Web + Expo |
+| GM22-16 · LA-P02 — Fix before launch? AHPRA cancellations bypass the cancellation policy and notices. | Web + Expo |
+| GM22-17 · NEW — Is there an in-app notification centre, and what does it do? | Web + Expo |
+| GM22-18 · NEW — How do Expo push notifications work, and what happens when permission is denied? | Expo only |
+| GM22-19 · NEW — Who sends the emails, and what happens when one fails? | Web + Expo |
+| GM22-20 · NEW — What notification preferences can a worker (and a pharmacy) set — including quiet hours? | Web + Expo |
+| GM22-21 · NEW — Master event catalogue: which event notifies whom, on which channel? | Web + Expo |
+| GM22-22 · NEW — What Pills / rewards notifications exist (earn, spend, expiry, low balance)? | Web + Expo |
+| GM22-23 · NEW — Which payment / invoice / refund events notify whom? | Web + Expo |
+| GM22-24 · NEW — Is either side told when a rating is left, or when a reliability badge / incident is applied? | Web + Expo |
+| GM22-25 · NEW — Are verification / AHPRA status changes notified (granted, lapsed, suspended, revoked)? | Web + Expo |
+| GM22-26 · NEW — How are duplicate, failed and stale notifications handled — and is there an audit log? | Web + Expo |
+| GM22-27 · NEW — Can a notification leak one tenant's information to another? | Web + Expo |
+| GM22-28 · NEW — Do chat / hub messages notify, and where does GM-22 end and GM-20 begin? | Web + Expo |
+
 ## 0. Verification header — read first
 
 | Item | Value / result |

@@ -15,6 +15,36 @@
 - **Example format source:** PR [#184](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/184), `docs/qa/launch-grill/AUDIT.md` + `questions.json` on `refs/pull/184/head` — 142 questions, 30 carried decisions
 - **Status of this document:** DOCUMENTATION ONLY. No code was changed, no PR/issue/comment created. No implementation is decided here. Progress label: **CURRENT FLOW TRACED** (backend + shared-core + Vite web + Expo wizard traced at head; Next parity and a few details still UNKNOWN — see §6).
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Start posting wizard | Multi-step wizard opens in Vite (`frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx:16`; Next has no wizard route, only a navigation helper at `frontend_web/landing_next/migrated/pages/dashboard/sidebar/TalentBoard/index.tsx:307`). | Multi-step posting screen opens in Expo (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:79`, mounted at `frontend_mobile/roles/owner/post-shift.tsx:1`). | Yes | - |
+| Submit shift with required fields | Validates draft and submits payload via `buildShiftPostingPayload` (`frontend_web/shared/postShift/PostShiftForm.tsx:493`). | Validates draft and submits payload via `buildShiftPostingPayload` (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:1372`). | Yes | - |
+| Submit with missing or invalid fields | Shared validation intercepts invalid draft returning inline field errors (`frontend_web/shared/postShift/PostShiftForm.tsx:499`). | Shared validation intercepts invalid draft returning inline field errors (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:532`). | Yes | - |
+| Hourly rate and loading preview | Renders rate inputs and preview calculations in pay step (`frontend_web/shared/postShift/PostShiftPayStep.tsx:64`). | Renders mobile pay rate step sending identical rate configuration (`frontend_mobile/roles/shared/shifts/PostShiftPayRateStep.tsx:92`). | Yes | - |
+| Edit published shift | Re-enters wizard loading existing shift data under `editingShiftId` (`frontend_web/shared/postShift/PostShiftForm.tsx:210`). | Reuses mobile wizard passing `editingShiftId` to update payload (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:1340`). | Yes | - |
+| Withdraw / delete unfilled shift | Deletes unfilled shift via `deleteShift` action without candidate notifications (`frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:595`). | Deletes unfilled shift via `deleteShift` without candidate notifications (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:265`). | Yes | - |
+| Save draft / leave wizard | In-memory draft state only; closing the page discards unsubmitted data (`frontend_web/shared/postShift/PostShiftForm.tsx:135`). | In-memory draft state only; navigating away discards form progress (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:241`). | Yes | - |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-10-Q01 | Web + Expo |
+| GM-10-Q02 | Web + Expo |
+| GM-10-Q03 | Web + Expo |
+| GM-10-Q04 | Web + Expo |
+| GM-10-Q05 | Web + Expo |
+| GM-10-Q06 | Web + Expo |
+| GM-10-Q07 | Web + Expo |
+| GM-10-Q08 | Web + Expo |
+| GM-10-Q09 | Web + Expo |
+| GM-10-Q10 | Web + Expo |
+| GM-10-Q11 | Web + Expo |
+| GM-10-Q12 | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Base | SHA / ref | Verified |

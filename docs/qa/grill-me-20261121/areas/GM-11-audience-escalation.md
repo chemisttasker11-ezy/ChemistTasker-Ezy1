@@ -14,6 +14,36 @@
 **Revalidation target:** active PR #249, stacked on #248
 **Status of this document:** DOCUMENTATION ONLY. No code was changed, no PR/issue/comment created. No implementation is decided here. Progress label: **CURRENT FLOW TRACED** (backend + Vite web + Expo wizard traced at head; Next parity and a few details still UNKNOWN — see §6).
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Select audience tier in posting wizard | Offers 5 audience tiers and custom escalation timing (`frontend_web/shared/postShift/PostShiftVisibilityStep.tsx:61`). | Offers identical 5 audience tiers and escalation intervals (`frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx:63`). | Yes | - |
+| Unfilled shift escalation check | Any shift list load triggers backend auto-escalation evaluation (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:75`). | Shift list load triggers identical backend auto-escalation check (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:125`). | Yes | - |
+| Disclosing widened shift to new tier | Widened shift becomes visible to new audience on feed query (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:370`). | Widened shift becomes discoverable on mobile shift query (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:145`). | Yes | - |
+| Posting-time notification toggles | Wizard exposes notification switches for email and in-app alerts (`frontend_web/shared/postShift/PostShiftVisibilityStep.tsx:142`). | Wizard exposes notification switches for email and in-app alerts (`frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx:185`). | Yes | - |
+| Worker interest halts escalation | Submitting interest halts further automatic audience widening (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:284`). | Submitting interest halts further automatic audience widening (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:234`). | Yes | - |
+| Anonymous public posting toggle | Toggle anonymises pharmacy details for public platform tier (`frontend_web/shared/postShift/PostShiftVisibilityStep.tsx:180`). | Toggle hides pharmacy name on public platform tier (`frontend_mobile/roles/shared/shifts/PostShiftVisibilityStep.tsx:210`). | Yes | - |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-11-Q01 | Web + Expo |
+| GM-11-Q02 | Web + Expo |
+| GM-11-Q03 | Web + Expo |
+| GM-11-Q04 | Web + Expo |
+| GM-11-Q05 | Web + Expo |
+| GM-11-Q06 | Web + Expo |
+| GM-11-Q07 | Web + Expo |
+| GM-11-Q08 | Web + Expo |
+| GM-11-Q09 | Web + Expo |
+| GM-11-Q10 | Web + Expo |
+| GM-11-Q11 | Web + Expo |
+| GM-11-Q12 | Web + Expo |
+| GM-11-Q13 | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Base | SHA / ref | Verified |

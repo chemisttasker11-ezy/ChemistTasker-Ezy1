@@ -14,6 +14,44 @@
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED + VALIDATED. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Sign up (create account) | Visitor submits registration form with role selection and reCAPTCHA (`frontend_web/src/pages/register.tsx:96`). | Visitor submits registration with role picker and captcha verification (`frontend_mobile/app/register.tsx:91`). | Yes | — |
+| Verify email OTP | User inputs 6-digit email code sent upon registration (`frontend_web/src/pages/OTPVerify.tsx:35`). | User enters 6-digit OTP with auto-advancing text inputs (`frontend_mobile/app/verify-otp.tsx:36`). | Yes | — |
+| Log in (email & password) | User enters credentials with "Keep me signed in" checkbox (`frontend_web/src/pages/login.tsx:30`). | User enters credentials without "Keep me signed in" checkbox (`frontend_mobile/app/login.tsx:22`). | No | Parity question: web exposes "Keep me signed in" checkbox altering refresh token lifetime (`frontend_web/src/pages/login.tsx:189`), while mobile omits it. |
+| Biometric fast login | Web client does not implement biometric or WebAuthn passkey authentication (`frontend_web/src/pages/login.tsx:30`). | Mobile client prompts for biometric enrolment and allows Face ID/fingerprint sign-in (`frontend_mobile/app/login.tsx:162`). | Expo only | Intended: mobile-only native device hardware capability. |
+| Mobile OTP verification | Unverified worker is gated to mobile OTP verification screen (`frontend_web/src/pages/MobileOTPVerify.tsx:67`). | Mobile app gates unverified workers to mobile-verify screen before accessing tabs (`frontend_mobile/app/mobile-verify.tsx:19`). | Yes | — |
+| Password reset request | Visitor submits email to request password reset link (`frontend_web/src/pages/PasswordResetRequestPage.tsx:8`). | Visitor inputs email on forgot-password screen to trigger reset code (`frontend_mobile/app/forgot-password.tsx:7`). | Yes | — |
+| Session token refresh | Browser refreshes access token via HttpOnly cookies and session storage sync (`frontend_web/src/contexts/AuthContext.tsx:456`). | Native app exchanges stored refresh token via bearer payload (`frontend_mobile/context/AuthContext.tsx:475`). | No | Parity question: web relies on HttpOnly cookie transport while mobile persists tokens in SecureStore. |
+| Log out | User logs out, clearing browser storage and session cookies (`frontend_web/src/contexts/AuthContext.tsx:453`). | User logs out, clearing SecureStore and resetting root navigation (`frontend_mobile/context/AuthContext.tsx:518`). | Yes | — |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM01-Q01 | Web + Expo |
+| GM01-Q02 | Web + Expo |
+| GM01-Q03 | Web + Expo |
+| GM01-Q04 | Web + Expo |
+| GM01-Q05 | Web + Expo |
+| GM01-Q06 | Web + Expo |
+| GM01-Q07 | Web only |
+| GM01-Q08 | Web + Expo |
+| GM01-Q09 | Web only |
+| GM01-Q10 | Expo only |
+| GM01-Q11 | Expo only |
+| GM01-Q12 | Expo only |
+| GM01-Q13 | Web + Expo |
+| GM01-Q14 | Web + Expo |
+| GM01-Q15 | Web + Expo |
+| GM01-Q16 | Web + Expo |
+| GM01-Q17 | Web + Expo |
+| GM01-Q18 | Web + Expo |
+| GM01-Q19 | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Source | Ref | SHA / head |

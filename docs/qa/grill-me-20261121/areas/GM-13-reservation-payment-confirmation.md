@@ -18,6 +18,36 @@
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED + VALIDATED at PR #249 head. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only. This file overwrites the 2026-11-21 partial, which was BLOCKED by a GitHub 429 before any current-code check.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Worker accepts offer and creates reservation | Offer transitions to `ACCEPTED_AWAITING_PAYMENT` holding the slot (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:468`). | Offer transitions to `ACCEPTED_AWAITING_PAYMENT` holding the slot (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:356`). | Yes | - |
+| Owner opens Stripe checkout | Calls `chargeShiftFulfillment` and redirects to Stripe Checkout (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:30`; Next lacks payment UI at `frontend_web/landing_next/migrated/pages/dashboard/sidebar/ShiftsBoard/index.tsx:1`). | Calls `chargeShiftFulfillment` and opens Stripe Checkout URL via `Linking.openURL` (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:228`). | Yes | - |
+| Stripe checkout completes via webhook | Webhook finalises booking and web UI refreshes on reload (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:64`). | Webhook finalises booking and mobile UI updates on reload (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:236`). | Yes | - |
+| Owner pays booking with Pills | Owner invokes `payShiftWithPills` to finalise shift without Stripe (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:12`). | Owner invokes `payShiftWithPills` to finalise shift without Stripe (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:312`). | Yes | - |
+| Concurrent checkout conflict | Displays conflict dialog offering to resume or expire session (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:51`). | Displays native alert offering to resume, expire, or cancel (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:246`). | Yes | - |
+| Lazy offer expiry | Offer list query triggers backend bulk-expiry of stale offers (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:374`). | Offer query triggers backend bulk-expiry of stale offers (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:154`). | Yes | - |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM13-Q01 | Web + Expo |
+| GM13-Q02 | Web + Expo |
+| GM13-Q03 | Web + Expo |
+| GM13-Q04 | Web + Expo |
+| GM13-Q05 | Web + Expo |
+| GM13-Q06 | Web + Expo |
+| GM13-Q07 | Web + Expo |
+| GM13-Q08 | Web + Expo |
+| GM13-Q09 | Web + Expo |
+| GM13-Q10 | Web + Expo |
+| GM13-Q11 | Web + Expo |
+| GM13-Q12 | Web + Expo |
+| GM13-Q13 | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Source | Ref | SHA / head |

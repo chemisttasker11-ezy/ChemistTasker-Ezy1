@@ -12,6 +12,34 @@
 - **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together per question, side by side, including parity gaps.
 - **Status:** TRACED + RE-VALIDATED AT HEAD. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Organization dashboard overview | Org admin views multi-site overview with key performance metrics (`frontend_web/src/pages/dashboard/organization/OrganizationOverviewPage.tsx:15`). | Org admin accesses mobile organization dashboard (`frontend_mobile/app/organization/dashboard.tsx:1`). | Yes | — |
+| Pharmacy hierarchy & site list | Org dashboard lists pharmacies associated with the organization (`frontend_web/src/pages/dashboard/organization/OrganizationOverviewPage.tsx:53`). | Organization navigation exposes pharmacies tab and detail routes (`frontend_mobile/app/organization/_layout.tsx:222`). | Yes | — |
+| Invite staff to organization | Org admin invites staff members across multiple sites (`frontend_web/src/pages/dashboard/organization/InviteStaffPage.tsx:12`). | Org admin accesses invite staff screen (`frontend_mobile/app/organization/invite.tsx:1`). | Yes | — |
+| Post shift with organization scope | Shift creation allows scoping visibility to chain or organisation tiers (`frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:1120`). | Mobile post-shift wizard supports organisation visibility scoping (`frontend_mobile/app/admin/[pharmacyId]/post-shift.tsx:1`). | Yes | — |
+| Aggregated organization invoicing | Org admin manages organization-level invoices (`frontend_web/src/pages/OrganizationPricingPage.tsx:85`). | Org admin reviews aggregated invoices on mobile (`frontend_mobile/app/organization/invoice.tsx:5`). | Yes | — |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-04-Q01 | Web + Expo |
+| GM-04-Q02 | Web + Expo |
+| GM-04-Q03 | Web + Expo |
+| GM-04-Q04 | Web + Expo |
+| GM-04-Q05 | Web + Expo |
+| GM-04-Q06 | Web + Expo |
+| GM-04-Q07 | Web + Expo |
+| GM-04-Q08 | Web + Expo |
+| GM-04-Q09 | Web + Expo |
+| GM-04-Q10 | Web + Expo |
+| GM-04-Q11 | Web + Expo |
+| GM-04-Q12 | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Source | Ref | SHA / head |

@@ -15,6 +15,63 @@ Repo: `chemisttasker11-ezy/ChemistTasker-Ezy1`
 Trace date: 2026-11-21 (AEST). Read-only. No code changed, no PR/issue/comment created.
 Re-run of the blocked 2026-11-21 trace (same day, after the GitHub rate limit cleared).
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Sign up / login / email OTP | Vite handles registration (`frontend_web/src/pages/register.tsx:28`) and Next handles landing login (`frontend_web/landing_next/app/(public)/login/page.tsx:1`). | Mobile provides native email/password and OTP login screens (`frontend_mobile/app/login.tsx:20`). | Yes | |
+| Worker onboarding & credential verification | Pharmacist submits AHPRA and ID in multi-step wizard (`frontend_web/src/pages/onboarding/onboarding_pharmacist/PharmacistOnboardingV2Layout.tsx:20`). | Pharmacist completes credentials via profile basic info redirect (`frontend_mobile/app/pharmacist/onboarding.tsx:5`). | Yes | |
+| Owner / pharmacy onboarding & setup gate | Owner registers pharmacy details with setup checklist (`frontend_web/src/pages/onboarding/OwnerOnboarding.tsx:30`). | Owner completes pharmacy setup in native step wizard (`frontend_mobile/app/owner/onboarding/step1.tsx:1`). | Yes | |
+| Shift posting flow (single / multi-slot) | Owner creates shift via multi-step wizard (`frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx:10`). | Owner creates shift with duplicate draft recovery and escalation settings (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:40`). | Yes | |
+| Public shift discovery (logged out) | Next renders landing board (`frontend_web/landing_next/app/(public)/shifts/public-board/page.tsx:1`) and Vite renders discovery page (`frontend_web/src/pages/PublicJobBoardPage.tsx:74`). | Native anonymous shift board renders public shift cards (`frontend_mobile/app/shifts/public-board.tsx:4`). | Yes | |
+| Shift offer negotiation and acceptance | Worker reviews offer terms and confirms booking reservation (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:120`). | Worker reviews offer and accepts with reservation prompt (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:150`). | Yes | |
+| Talent board discovery & booking request | Authenticated users search talent cards and request bookings (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:62`). | Mobile users browse candidate cards and submit booking proposals (`frontend_mobile/roles/shared/talent-board/index.tsx:106`). | Yes | |
+| Goods & Ethical marketplace | Managed on Next web (`frontend_web/landing_next/app/(public)/marketplace/page.tsx:1`); missing from Vite (`frontend_web/src/main.tsx:1`). | Supported natively in mobile marketplace screens (`frontend_mobile/features/parity/marketplace.tsx:31`). | Yes | Parity question: Marketplace operates on Next web and Expo, completely omitted from Vite web. |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM25-C01 — Must every onboarding step work on mobile at launch? | Web + Expo |
+| GM25-C02 — Browse access before full verification | Web + Expo |
+| GM25-C03 — Verification on outside bookings | Web + Expo |
+| GM25-C04 — What can Explorers (new to pharmacy) do with shifts? | Web + Expo |
+| GM25-C05 — Payment readiness across clients | Web + Expo |
+| GM25-C06 — What must a pharmacy pass before posting to outside workers? | Web + Expo |
+| GM25-C07 — Should pharmacies save a payment method during onboarding? | Web + Expo |
+| GM25-C08 — Fix before launch? Mobile "add personal profile" drops pharmacist data. | Web + Expo |
+| GM25-C09 — Fix before launch? Reachable mobile onboarding screens 404 for non-pharmacists. | Web + Expo |
+| GM25-C10 — Fix before launch? Profile progress % doesn't match Verified. | Web + Expo |
+| GM25-C11 — Fix before launch? The auto-publish toggle for new shifts has no effect. | Web + Expo |
+| GM25-C12 — Fix before launch? Anonymous talent posts expose full names. | Web + Expo |
+| GM25-C13 — Fix before launch? The talent board downloads every post and filters in the app. | Web + Expo |
+| GM25-C14 — Fix before launch? Web and mobile disagree on Talent Board booking permissions. | Web + Expo |
+| GM25-C15 — Fix before launch? Talent post availability is copied once and never syncs. | Web + Expo |
+| GM25-C16 — Is "Request booking" a firm offer or an enquiry? | Web + Expo |
+| GM25-C17 — What should the heart on a talent card do? | Web + Expo |
+| GM25-C18 — Should reservations show a live payment countdown? | Web + Expo |
+| GM25-C19 — Which shifts get pre-shift reminders, and when? | Web + Expo |
+| GM25-C20 — Escalation: who is told, and how late may a scheduled escalation fire? | Web + Expo |
+| GM25-Q01 — What is the launch cut across Vite web, Next web, and Expo? | Web + Expo |
+| GM25-Q02 — Vite vs Next: which routes live where, and is the migration finished? | Web only |
+| GM25-Q03 — Duplicated public boards: one implementation or tolerated twin? | Web + Expo |
+| GM25-Q04 — Shared-core scope: which flows must go through shared-core? | Web + Expo |
+| GM25-Q05 — Dead, half-built, and "coming soon" screens: delete, hide, or finish? | Web + Expo |
+| GM25-Q06 — Navigation and routing parity: one nav model, or one per client? | Web + Expo |
+| GM25-Q07 — Auth and session parity: same rules on all three surfaces? | Web + Expo |
+| GM25-Q08 — Logged-out public surfaces: what must a visitor be able to see? | Web + Expo |
+| GM25-Q09 — Offline and poor-network behaviour on Expo: what is the standard? | Expo only |
+| GM25-Q10 — How does Expo take payment? | Expo only |
+| GM25-Q11 — Notification parity: email vs push — same events, same controls? | Web + Expo |
+| GM25-Q12 — Kiosk: web-only, or does Expo do kiosk too? | Web + Expo |
+| GM25-Q13 — Accessibility and text scaling: is 1.6× text a launch gate? | Web + Expo |
+| GM25-Q14 — Error, retry, and crash UX: one standard across clients? | Web + Expo |
+| GM25-Q15 — "Coming soon" policy: what may ship labelled coming-soon? | Web + Expo |
+| GM25-Q16 — Web ↔ app install handoff: where does web send phone users? | Web + Expo |
+| GM25-Q17 — Launch sign-off evidence: what proves each surface ready? | Web + Expo |
+| GM25-Q18 — Twin-drift prevention after launch: who owns parity? | Web + Expo |
+
 ## 0. Verification status — read this first
 
 **HEAD VERIFIED (my own call, this re-run).** PR #249 head is still

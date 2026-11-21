@@ -14,6 +14,72 @@
 - **Rate limits:** none encountered. All GitHub calls succeeded; no question is marked NOT RE-VALIDATED for rate-limit reasons. Two items are marked PARTIAL where a sub-claim was not re-opened line-by-line at this head (see §8).
 - **Date traced:** 2026-11-21 (AEST). Code citations are file/function at SHA `97c4543e`.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Owner cancels confirmed booking | No endpoint or button exists in UI to cancel confirmed bookings (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:220`). | No endpoint or button exists in mobile UI to cancel confirmed bookings (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:265`). | Yes | - |
+| Worker cancels confirmed booking | No cancellation button exists; cover requests blocked on booked shifts (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:142`). | No cancellation button exists; cover requests blocked on booked shifts (`frontend_mobile/app/my-roster.tsx:50`). | Yes | - |
+| Worker declines pending offer | Worker declines offer via `declineShiftOfferService` (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:529`). | Worker declines offer via `declineWorkerShiftOfferService` (`frontend_mobile/roles/pharmacist/shifts/[id].tsx:393`). | Yes | - |
+| Internal roster shift cover request | Worker requests cover for rostered internal shift (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:142`). | Worker requests cover for rostered internal shift (`frontend_mobile/app/my-roster.tsx:50`). | Yes | - |
+| Completed shift rating submission | Allows 1-5 star rating and feedback on completed shifts (`frontend_web/src/pages/dashboard/sidebar/HistoryShiftsPage.tsx:180`). | Opens dialog for 1-5 star rating on completed shifts (`frontend_mobile/roles/shared/shifts/HistoryShiftsView.tsx:193`). | Yes | - |
+| Historical ratings profile review | Displays rating summary and individual comments (`frontend_web/src/pages/dashboard/shiftCenter/WorkerBookedShifts.tsx:158`). | Displays rating summary and paginated reviews (`frontend_mobile/roles/shared/shifts/WorkerBookedShifts.tsx:182`). | Yes | - |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM15-01 | Web + Expo |
+| GM15-02 | Web + Expo |
+| GM15-03 | Web + Expo |
+| GM15-04 | Web + Expo |
+| GM15-05 | Web + Expo |
+| GM15-06 | Web + Expo |
+| GM15-07 | Web + Expo |
+| GM15-08 | Web + Expo |
+| GM15-09 | Web + Expo |
+| GM15-10 | Web + Expo |
+| GM15-11 | Web + Expo |
+| GM15-12 | Web + Expo |
+| GM15-13 | Web + Expo |
+| GM15-14 | Web + Expo |
+| GM15-15 | Web + Expo |
+| GM15-16 | Web + Expo |
+| GM15-17 | Web + Expo |
+| GM15-18 | Web + Expo |
+| GM15-19 | Web + Expo |
+| GM15-20 | Web + Expo |
+| GM15-21 | Web + Expo |
+| GM15-22 | Web + Expo |
+| GM15-23 | Web + Expo |
+| GM15-24 | Web + Expo |
+| GM15-25 | Web + Expo |
+| GM15-26 | Web + Expo |
+| GM15-27 | Web + Expo |
+| GM15-28 | Web + Expo |
+| GM15-29 | Web + Expo |
+| GM15-30 | Web + Expo |
+| GM15-31 | Web + Expo |
+| GM15-32 | Web + Expo |
+| GM15-33 | Web + Expo |
+| GM15-34 | Web + Expo |
+| GM15-35 | Web + Expo |
+| GM15-36 | Web + Expo |
+| GM15-37 | Web + Expo |
+| GM15-38 | Web + Expo |
+| GM15-39 | Web + Expo |
+| GM15-40 | Web + Expo |
+| GM15-41 | Web + Expo |
+| GM15-42 | Web + Expo |
+| GM15-43 | Web + Expo |
+| GM15-44 | Web + Expo |
+| GM15-45 | Web + Expo |
+| GM15-46 | Web + Expo |
+| GM15-47 | Web + Expo |
+| GM15-48 | Web + Expo |
+| GM15-49 | Web + Expo |
+
 ## 0. Headline finding (plain English)
 
 **A confirmed outside booking still cannot be cancelled by anyone — owner, worker or admin — through any screen or API.** There is no cancelled state, no cancel button, no cancel endpoint. The only way a confirmed booking ends early today is:

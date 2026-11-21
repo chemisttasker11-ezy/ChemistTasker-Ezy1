@@ -12,6 +12,34 @@
 
 > This file **overwrites** the earlier BLOCKED-429 stub of the same name. That stub verified only Issue #250, PR #184 `get`, and PR #249 `get`; no `questions.json`, no code. Everything below is traced from scratch at the head in this session.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Clock in via mobile QR scanner | Web browser app does not implement camera scanner for physical kiosk QR (`frontend_web/src/App.tsx:50`). | Mobile app opens camera scanner to read kiosk QR token (`frontend_mobile/app/attendance/clock.tsx:3`). | Expo only | Intended: camera QR scanning of the physical on-site kiosk is mobile-native. |
+| Rotating kiosk QR display | Dedicated tablet kiosk web app renders rotating dynamic QR code (`frontend_web/src/pages/attendance/KioskPage.tsx:112`). | Mobile app provides pairing status and link screen for kiosk hardware (`frontend_mobile/app/attendance/kiosk-status.tsx:3`). | No | Parity question: the kiosk display terminal is web-only (`KioskPage.tsx`), while mobile manages pairing and diagnostics. |
+| PIN clock in/out | Kiosk terminal provides numeric keypad for PIN attendance (`frontend_web/src/pages/attendance/KioskPage.tsx:185`). | Worker configures attendance PIN in dedicated mobile settings screen (`frontend_mobile/app/attendance-pin.tsx:5`). | No | Intended: terminal handles physical PIN entry while mobile allows worker PIN configuration. |
+| Breaks recording | Kiosk terminal logs break start and break return events (`frontend_web/src/pages/attendance/KioskBreakDialog.tsx:15`). | Mobile parity screen tracks break events during shift attendance (`frontend_mobile/features/parity/attendance.tsx:36`). | Yes | — |
+| Manager provisional attendance review | Manager audits unrostered and suspicious clock-ins (`frontend_web/src/pages/attendance/KioskEvidenceReview.tsx:25`). | Manager reviews attendance exceptions on mobile (`frontend_mobile/app/attendance/exceptions/[id].tsx:3`). | Yes | — |
+| Attendance corrections | Attendance tracking logs manual time adjustments (`frontend_web/src/pages/attendance/KioskActivationView.tsx:20`). | Manager submits manual attendance correction request (`frontend_mobile/app/attendance/corrections/new.tsx:3`). | Yes | — |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-08-Q01 | Web + Expo |
+| GM-08-Q02 | Web + Expo |
+| GM-08-Q03 | Web + Expo |
+| GM-08-Q04 | Web + Expo |
+| GM-08-Q05 | Web + Expo |
+| GM-08-Q06 | Web + Expo |
+| GM-08-Q07 | Web + Expo |
+| GM-08-Q08 | Web + Expo |
+| GM-08-Q09 | Web + Expo |
+| GM-08-Q10 | Web + Expo |
+| GM-08-Q11 | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Source | Ref | SHA / head |

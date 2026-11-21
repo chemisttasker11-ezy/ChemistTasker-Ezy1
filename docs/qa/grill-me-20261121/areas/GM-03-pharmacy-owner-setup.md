@@ -25,6 +25,35 @@
 
 ---
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Owner registration | New user selects OWNER role during registration (`frontend_web/src/pages/register.tsx:26`). | New user selects OWNER role in mobile registration (`frontend_mobile/app/register.tsx:37`). | Yes | — |
+| Setup gate enforcement | Incomplete owner is redirected to owner setup during login (`frontend_web/src/pages/login.tsx:83`). | Layout redirect guards force incomplete owners into setup wizard (`frontend_mobile/app/_layout.tsx:453`). | Yes | — |
+| Step 1: Owner personal profile | Owner submits single-page personal profile form (`frontend_web/src/pages/onboarding/OwnerOnboarding.tsx:837`). | Owner completes step-by-step onboarding wizard with unsaved changes guard (`frontend_mobile/roles/owner/setup-onboarding.tsx:95`). | No | Verified 21 Nov: intended layout difference (single page on web, wizard on Expo); not a defect. |
+| Step 2: Create primary pharmacy | Owner fills pharmacy details and creates pharmacy record (`frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx:2010`). | Owner enters pharmacy location and operating details in setup wizard (`frontend_mobile/roles/owner/setup-pharmacy.tsx:35`). | Yes | — |
+| Dashboard unlock | Completing profile and pharmacy unlocks the owner overview container (`frontend_web/src/pages/dashboard/sidebar/owner/OwnerOverviewContainer.tsx:29`). | Completing setup redirects owner to mobile dashboard (`frontend_mobile/roles/owner/dashboard.tsx:50`). | Yes | — |
+| Pharmacy management & settings | Owner manages pharmacy operating hours and details in settings (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacySettings.tsx:20`). | Owner edits pharmacy details using the shared mobile form (`frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx:251`). | Yes | — |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-03-Q01 | Web + Expo |
+| GM-03-Q02 | Web + Expo |
+| GM-03-Q03 | Web + Expo |
+| GM-03-Q04 | Web + Expo |
+| GM-03-Q05 | Web + Expo |
+| GM-03-Q06 | Web + Expo |
+| GM-03-Q07 | Web + Expo |
+| GM-03-Q08 | Web + Expo |
+| GM-03-Q09 | Web + Expo |
+| GM-03-Q10 | Web + Expo |
+| GM-03-Q11 | Web + Expo |
+| GM-03-Q12 | Web + Expo |
+
 ## §1 — Current-flow matrix
 
 Legend: **Vite** = Vite web app; **Next** = Next web (landing_next) — UNKNOWN, see header; **Expo** = mobile app. "—" = no step / not present. All backend paths are Django (`backend/`).

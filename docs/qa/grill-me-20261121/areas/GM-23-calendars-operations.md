@@ -12,6 +12,54 @@
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED + RE-VALIDATED (re-run 2026-11-21). Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Worker personal roster view | Worker reviews assigned shifts in personal roster view (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:125`). | Worker views upcoming shifts on My Roster screen (`frontend_mobile/app/my-roster.tsx:194`). | Yes | |
+| Manager team roster / coverage view | Manager plans and reviews pharmacy shifts in owner roster view (`frontend_web/src/pages/dashboard/sidebar/RosterOwnerPage.tsx:60`). | Manager inspects coverage and assignments in manager roster (`frontend_mobile/app/manager/roster/calendar.tsx:3`). | Yes | |
+| Pharmacy calendar view (month / week / day) | Pharmacy staff view calendar events and shifts (`frontend_web/src/pages/dashboard/sidebar/PharmacyCalendarPage.tsx:40`). | Shared calendar component displays monthly/weekly schedule (`frontend_mobile/roles/shared/calendar/index.tsx:35`). | Yes | |
+| Leave request submission and approval | Worker submits leave and manager reviews approvals (`frontend_web/src/features/workforce/MyLeavePage.tsx:10`). | Worker submits leave and manager approves requests (`frontend_mobile/app/workforce/leave-requests.tsx:185`). | Yes | |
+| Shift cover / replacement request | Worker requests cover on rostered shift; surfaces to manager (`backend/workforce/leave_service.py:40`). | Worker requests cover directly from assigned shift card (`frontend_mobile/app/workforce/leave-requests.tsx:185`). | Yes | |
+| Automated birthday & anniversary events | System generates recurring events displayed on pharmacy calendar (`backend/team_calendar/tasks.py:20`). | Birthday events display alongside shift entries on mobile calendar (`frontend_mobile/roles/shared/calendar/index.tsx:80`). | Yes | |
+| Add shift to personal external calendar | Web lacks one-click external calendar intent generator (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:120`). | Worker taps 'Add to calendar' to open Google/device calendar editor (`frontend_mobile/app/next-shifts.tsx:133`). | Expo only | Intended: Mobile leverages native device calendar integrations (`nextShiftModel.ts`). |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-23-01 — Talent-post availability is copied once and never syncs with the calendar | Web + Expo |
+| GM-23-02 — How should workers set availability? | Web + Expo |
+| GM-23-03 — How far can a repeating availability run? | Web + Expo |
+| GM-23-04 — When does availability "match" a shift? | Web + Expo |
+| GM-23-05 — Who can see a worker's availability? | Web + Expo |
+| GM-23-06 — Should confirmed bookings block that time automatically? | Web + Expo |
+| GM-23-07 — When should a talent post stop showing? | Web + Expo |
+| GM-23-08 — Should availability show when it was last confirmed? | Web + Expo |
+| GM-23-09 — Should urgent-shift alerts need a separate opt-in? | Web + Expo |
+| GM-23-10 — Should workers set a max distance and minimum rate for alerts? | Web + Expo |
+| GM-23-11 — Which shifts get pre-shift reminders, and when? | Web + Expo |
+| GM-23-12 — If a shift changes inside 12 hours of start, what happens to reminders? | Web + Expo |
+| GM-23-13 — For multi-date posts, how is "same worker for every date" set? | Web + Expo |
+| GM-23-14 — How far ahead can recurring shifts run? | Web + Expo |
+| GM-23-15 — How should owners repeat a past shift? | Web + Expo |
+| GM-23-16 — Match emails miss escalated shifts and reach unverified workers | Web + Expo |
+| GM-23-17 — Availability input has no validation | Web + Expo |
+| GM-23-18 — Team calendar views: day / week / month — what does each role see? | Web + Expo |
+| GM-23-19 — Operations tasks / rules engine: what rules run, when, and who acts on them? | Web + Expo |
+| GM-23-20 — Leave on the calendar: how do leave / roster / cover requests appear? | Web + Expo |
+| GM-23-21 — Shift display on the calendar: what state does each entry show? | Web + Expo |
+| GM-23-22 — Operations dashboard: what does it show, to whom, and how fresh is it? | Web + Expo |
+| GM-23-23 — Clock / timezone: whose time is a shift time? | Web + Expo |
+| GM-23-24 — Calendar permissions: who can create / edit / delete calendar entries? | Web + Expo |
+| GM-23-25 — Which external calendar exports or sync should workers get? | Web + Expo |
+| GM-23-26 — Calendar notifications: which calendar events notify, on which channel? | Web + Expo |
+| GM-23-27 — Roster publishing: what does publishing a roster do to calendars? | Web + Expo |
+| GM-23-28 — "Needs cover" on the calendar: who sees it, and how is it filled? | Web + Expo |
+| GM-23-29 — Calendar history / audit: can the owner see who changed what, when? | Web + Expo |
+| GM-23-W01: Planner: simplified version vs original | Web + Expo |
+
 ## Bases (exact SHAs verified 2026-11-21)
 
 | Source | Ref | SHA / head |

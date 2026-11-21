@@ -18,6 +18,48 @@ PR body "working head `26cae2d6`" is stale — the live head SHA above was read 
 So every "(with PR #183)" note in #184 is now baseline code, not a proposal.
 **Phase:** documentation and decisions only. No code changes, no PRs/issues/comments.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Sign up role selection | Visitor selects from OWNER, PHARMACIST, OTHER_STAFF, or EXPLORER roles (`frontend_web/src/pages/register.tsx:26`). | Visitor selects from identical four role tracks (`frontend_mobile/app/register.tsx:37`). | Yes | — |
+| Mobile OTP verification gate | Worker verifies Australian mobile or skips if overseas Explorer (`frontend_web/src/pages/MobileOTPVerify.tsx:43`). | Worker enters 6-digit SMS OTP or confirms overseas waiver (`frontend_mobile/app/mobile-verify.tsx:105`). | Yes | — |
+| Enter AHPRA registration number | Staff onboarding collects AHPRA number for interns and pharmacists (`frontend_web/src/pages/onboarding/onboarding_staff/RegulatoryV2.tsx:100`). | Other-staff regulatory tab collects and validates AHPRA registration number (`frontend_mobile/roles/otherstaff/profile-tabs/RegulatoryScreen.tsx:111`). | Yes | — |
+| Pharmacist onboarding profile | Pharmacist enters profile bio, qualifications, and work history (`frontend_web/src/pages/onboarding/onboarding_pharmacist/BasicInfoV2.tsx:84`). | Pharmacist enters personal and professional details in mobile onboarding (`frontend_mobile/roles/pharmacist/onboarding.tsx:64`). | Yes | — |
+| Explorer basic info & Gov ID | Newcomer Explorer fills profile and submits government ID (`frontend_web/src/pages/onboarding/ExplorerOnboarding.tsx:98`). | Explorer completes identity verification on mobile profile screen (`frontend_mobile/app/explorer/profile-identity.tsx:1`). | Yes | — |
+| Payment & banking setup | Worker enters bank account details and tax classification (`frontend_web/src/pages/onboarding/onboarding_pharmacist/PaymentV2.tsx:15`). | Worker enters bank and superannuation details in financial form (`frontend_mobile/roles/shared/invoices/InvoiceGenerate.tsx:134`). | Yes | — |
+| Shift application verification check | Public shift board blocks unverified workers from applying (`frontend_web/src/pages/dashboard/sidebar/PublicShiftsPage.tsx:277`). | Worker home logic evaluates missing verification steps before allowing applications (`frontend_mobile/roles/shared/dashboard/workerHomeLogic.ts:169`). | Yes | — |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| ON-Q01 | Web + Expo |
+| ON-Q02 | Web + Expo |
+| ON-Q03 | Web + Expo |
+| ON-P01 | Web + Expo |
+| ON-Q04 | Web + Expo |
+| ON-Q05 | Web + Expo |
+| ON-Q06 | Web + Expo |
+| ON-P03 | Web + Expo |
+| ON-Q07 | Web + Expo |
+| ON-P02 | Web + Expo |
+| ON-Q08 | Web + Expo |
+| ON-R01 | Web + Expo |
+| ON-Q09 | Web + Expo |
+| ON-Q10 | Web + Expo |
+| ON-Q11 | Web + Expo |
+| ON-Q12 | Web + Expo |
+| ON-Q13 | Web + Expo |
+| ON-Q14 | Web + Expo |
+| ON-Q15 | Expo only |
+| GM02-Q20 | Web + Expo |
+| GM02-Q21 | Web + Expo |
+| GM02-Q22 | Web + Expo |
+| GM02-Q23 | Web + Expo |
+| GM02-Q24 | Web + Expo |
+
 ## How to read this document
 
 - **ACTUAL TODAY** = what the code at the head SHA above does, with file/function citations.

@@ -22,6 +22,75 @@ Other/describe, recommendation; Web and Expo traced together, side by side)
 **Status: TRACED — re-run complete for the genuinely new GM-26 ground (Q36–Q46) and the
 adopted-verdict overlaps; 15 old questions remain NOT RE-VALIDATED (listed in §0).**
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Platform admin access | Accessible only via backend `/admin` Django interface (`backend/core/urls.py:25`). Vite has no platform admin console (`frontend_web/src/main.tsx:87`). | Mobile app has no platform admin console; `/admin` is pharmacy manager (`frontend_mobile/app/admin/index.tsx:25`). | Yes | Intended: Platform administration is restricted to secure Django admin. |
+| Talent board anonymous candidate unmasking | Authenticated talent board exposes author names and IDs for anonymous posts (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:210`). | Authenticated mobile talent board displays same author identity pre-consent (`frontend_mobile/roles/shared/talent-board/index.tsx:340`). | Yes | Verified 21 Nov: confirmed, same as BL-08. |
+| Anonymous pharmacy public shift posting | Redacts pharmacy name and street address on public card (`frontend_web/src/pages/PublicJobBoardPage.tsx:110`). | Redacts pharmacy contact info on public shift card (`frontend_mobile/roles/shared/shifts/AnonymousShiftBoardScreen.tsx:85`). | Yes | |
+| User account deletion & data anonymization | User triggers deletion in account settings with soft-delete anonymization (`frontend_web/src/components/AccountDeletionSection.tsx:49`). | User triggers account deletion in mobile profile settings (`frontend_mobile/roles/pharmacist/profile.tsx:206`). | Yes | |
+| AHPRA suspension booking revocation | Backend revokes bookings; web displays cancellation banner (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:215`). | Backend revokes bookings; mobile displays shift status change (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:230`). | Yes | |
+| Kiosk pairing code security in notifications | Pairing code generated and displayed on kiosk page (`frontend_web/src/pages/attendance/KioskPage.tsx:385`). | Mobile receives pairing code in push notification payload (`frontend_mobile/features/notifications/NotificationsScreen.tsx:90`). | Yes | Verified 21 Nov: confirmed. The code is put in the notification title/body and payload (`backend/attendance/credentials.py:347-356`), and `notify_users` also attempts push, so it can show on a lock screen. Backlog BL-25. |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM26-Q01 — Who can see the talent board, and are anonymous candidates really anonymous? | Web + Expo |
+| GM26-Q02 — When is an anonymous candidate's identity revealed? | Web + Expo |
+| GM26-Q03 — What stays hidden before identity reveal? | Web + Expo |
+| GM26-Q04 — Fix before launch? Anonymous talent posts expose full names to any signed-in account. | Web + Expo |
+| GM26-Q05 — Fix before launch? Hidden, stale and lapsed-credential posts can still be read. | Web + Expo |
+| GM26-Q06 — How long should verification evidence be kept? | Web + Expo |
+| GM26-Q07 — Who must pass an ID check? | Web + Expo |
+| GM26-Q08 — Browse access before full verification | Web + Expo |
+| GM26-Q09 — Verification on outside bookings | Web + Expo |
+| GM26-Q10 — How should AHPRA be re-checked after sign-up? | Web + Expo |
+| GM26-Q11 — Which AHPRA lookup should run at launch? | Web + Expo |
+| GM26-Q12 — If current registration cannot be confirmed, what happens to future bookings? | Web + Expo |
+| GM26-Q13 — When the register shows Suspended or Cancelled, what happens? | Web + Expo |
+| GM26-Q14 — Professional indemnity insurance: who must hold it, and who checks? | Web + Expo |
+| GM26-Q15 — On an anonymous public post, what is hidden? | Web + Expo |
+| GM26-Q16 — When does an anonymous pharmacy's name reach the worker? | Web + Expo |
+| GM26-Q17 — Who can see a worker's availability? | Web + Expo |
+| GM26-Q18 — Should urgent-shift alerts need a separate opt-in? | Web + Expo |
+| GM26-Q19 — Can a pharmacy block a worker? | Web + Expo |
+| GM26-Q20 — What is the rule for hiring a worker directly, off the platform? | Web + Expo |
+| GM26-Q21 — Who approves refunds and credits? | Web + Expo |
+| GM26-Q22 — Who reviews disputes and appeals? | Web + Expo |
+| GM26-Q23 — How long to appeal, and how fast must support answer? | Web + Expo |
+| GM26-Q24 — Who can see each part of a dispute? | Web + Expo |
+| GM26-Q25 — What process applies before permanent suspension? | Web + Expo |
+| GM26-Q26 — Which events count as an incident? / How far back does the ladder count? | Web + Expo |
+| GM26-Q27 — Who can rate, and when? | Web + Expo |
+| GM26-Q28 — Do cancelled, expired and no-show shifts stay in both sides' history? | Web + Expo |
+| GM26-Q29 — Fix before launch? Web and mobile disagree on Talent Board booking permissions. | Web + Expo |
+| GM26-Q30 — Fix before launch? The talent board downloads every post and filters in the app. | Web + Expo |
+| GM26-Q31 — May cancellation charges launch before Australian legal review? | Web + Expo |
+| GM26-Q32 — Fix before launch? Accepted terms don't include the cancellation table or terms version. | Web + Expo |
+| GM26-Q33 — Fix before launch? Booking fees lack explicit GST and tax-invoice treatment. | Web + Expo |
+| GM26-Q34 — Fix before launch? Subscribers are charged full price, and Stripe price IDs are hard-coded. | Web + Expo |
+| GM26-Q35 — Fix before launch? Booking never refreshes AHPRA registration from the public register. | Web + Expo |
+| GM26-Q36 — What is the launch cut for GM-26 — which release blockers must close before the first real user? | Web + Expo |
+| GM26-Q37 — Who is a platform admin, how do they get the power, and what can they do that nobody else can? | Web + Expo |
+| GM26-Q38 — What is the audit trail for admin actions, and who can read it? | Web + Expo |
+| GM26-Q39 — What personal data is shown to whom — the full data-sharing map? | Web + Expo |
+| GM26-Q40 — Account deletion: what is deleted, what is kept (and why), and how long does it take? | Web + Expo |
+| GM26-Q41 — Privacy policy / terms: are they APP-compliant, versioned, and shown on Expo as well as web? | Web + Expo |
+| GM26-Q42 — Secrets, DEBUG and ALLOWED_HOSTS: what is the production configuration, and who can see it? | Web + Expo |
+| GM26-Q43 — Has anyone pentested this, and what is the vulnerability-handling process? | Web + Expo |
+| GM26-Q44 — Kiosk codes and worker PIN OTPs in notifications | Web + Expo |
+| GM26-Q45 — Region Admin cross-tenant shift actions; native pairing-code downgrade; pricing-preview leakage | Web + Expo |
+| GM26-Q46 — Staging, migration rehearsal and rollback: what is the deploy path to production? | Web + Expo |
+| GM26-Q47 — Fix before launch? Mobile 'add personal profile' drops pharmacist data / sends other staff to not-found. | Web + Expo |
+| GM26-Q48 — Must every onboarding step work on mobile at launch? | Web + Expo |
+| GM-26-W01: Production reCAPTCHA keys: owner action, not a choice | Web only |
+| GM-26-W02: Dependabot pull requests | Web + Expo |
+| GM-26-W03: Keep the node-forge 1.4.1 RSA patch? | Web + Expo |
+| GM-26-W04: When does the minimatch 3.1.5 exception end? | Web + Expo |
+
 ## §0 — Verification status (read this first)
 
 ### Head

@@ -4,6 +4,30 @@
 
 Cross-references, not repeated here: biometrics sign-in is GM01-Q11; mobile onboarding parity is MOBILE-PARITY-01; offline kiosk/attendance is GM-08; push channels are GM22-04; subscription on the phone is GM-16-W02.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Post-shift draft recovery and idempotency | Web lacks offline draft recovery and auto-retry on reload (`frontend_web/src/pages/dashboard/sidebar/PostShiftPage.tsx:10`). | Interrupted shift creation restores payload and replays submission key (`frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:686`). | Expo only | Intended: Mobile app provides offline form preservation and idempotent crash recovery. |
+| Offline access to confirmed upcoming shifts | Active shifts view requires live network connection (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:55`). | Confirmed shifts cached in AsyncStorage display when offline (`frontend_mobile/app/next-shifts.tsx:83`). | Expo only | Intended: Mobile provides persistent offline shift access for workers in low-connectivity dispensaries. |
+| External calendar and map intent launch | Shift cards do not provide direct external map/calendar intent buttons (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx:120`). | One-tap button opens Google Calendar editor or Google Maps directions (`frontend_mobile/app/next-shifts.tsx:133`). | Expo only | Intended: Mobile leverages native device URL schemes for navigation and scheduling. |
+| App lock / biometric return protection | Web has no client-side inactivity lock or biometric gate (`frontend_web/src/App.tsx:20`). | Configurable app lock protects screen after 60s background delay (`frontend_mobile/components/security/AppLockGate.tsx:172`). | Expo only | Intended: Mobile app provides device PIN/biometric privacy protection for shared dispensary devices. |
+| Multi-role workspace switching and session restore | Role switching handled via layout dropdown and URL routes (`frontend_web/src/layouts/WorkspaceSwitcher.tsx:15`). | Workspace switch component restores active persona from local storage (`frontend_mobile/components/shell/WorkspaceSwitch.tsx:304`). | Yes | Parity question: Expo persists and restores persona state locally, while web relies on session cookies and route prefixes. |
+| Worker QR contact invitation and scanning | Profile generates public profile URL without camera scanner (`frontend_web/src/pages/PublicTalentBoardPage.tsx:40`). | Owner scans worker QR to generate 14-day invitation link (`frontend_mobile/features/share/InviteFromWorkerQr.tsx:43`). | Expo only | Intended: Mobile app uses camera hardware to scan worker contact QRs. |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM27-Q01 — Should unfinished shift posts also appear on the dashboard? | Expo only |
+| GM27-Q02 — How long may the phone keep Sara's confirmed shifts for offline use? | Expo only |
+| GM27-Q03 — Should app lock stay off by default? | Expo only |
+| GM27-Q04 — Which workspace opens when someone has more than one role? | Web + Expo |
+| GM27-Q05 — Should an invitation from a worker's QR be single-use? | Expo only |
+| GM27-Q06 — Can Sara use calendar and map links from a cached shift? | Expo only |
+| GM27-Q07 — Should public QR contacts sync and when should private invitation codes clear? | Expo only |
+
 ## Current-flow matrix
 
 | Flow | Trigger, actor | Phone today | Web | Stored where | Recovery / denial |

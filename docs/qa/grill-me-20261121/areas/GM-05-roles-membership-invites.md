@@ -15,6 +15,41 @@
 **Status of this document:** DOCUMENTATION AND DECISIONS ONLY. No code changes. No implementation is decided. The implementation backlog at the end is explicitly **not approved to build** until the owner answers the questions it hangs from.
 **Read-only method:** GitHub connector `call-read-tool` only. No code modified, no PRs/issues/comments created.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Direct email staff invite | Manager opens invite modal to send direct email invitation to staff (`frontend_web/src/pages/dashboard/sidebar/owner/InviteStaffModal.tsx:25`). | Manager sends invitation via staff management screen (`frontend_mobile/app/admin/pharmacies/[id]/staff.tsx:1`). | Yes | — |
+| Shareable invite links | Manager generates shareable join link with role presets (`frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:339`). | Mobile app surfaces admin invitations screen to generate join links (`frontend_mobile/app/admin-invitations.tsx:1`). | Yes | — |
+| Promote staff to pharmacy manager | Owner promotes member to pharmacy admin/manager in staff list (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx:165`). | Manager assigns permissions on staff member profile (`frontend_mobile/app/manager/roster/staff.tsx:1`). | Yes | — |
+| Remove member from pharmacy | Owner deletes pharmacy admin or staff membership (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx:42`). | Manager removes staff member from roster directory (`frontend_mobile/app/admin/pharmacies/[id]/staff.tsx:1`). | Yes | — |
+| Locum & staff directory | Owner manages active pharmacy staff and locum memberships (`frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:144`). | Manager views pharmacy staff roster directory (`frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:502`). | Yes | — |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| Q-01 | Web + Expo |
+| Q-02 | Web + Expo |
+| Q-03 | Web + Expo |
+| Q-04 | Web + Expo |
+| Q-05 | Web + Expo |
+| Q-06 | Web + Expo |
+| Q-07 | Web + Expo |
+| Q-08 | Web + Expo |
+| Q-09 | Web + Expo |
+| Q-10 | Web + Expo |
+| Q-11 | Web + Expo |
+| Q-12 | Web + Expo |
+| Q-13 | Web + Expo |
+| Q-14 | Web + Expo |
+| Q-15 | Web + Expo |
+| Q-16 | Expo only |
+| Q-17 | Web + Expo |
+| Q-18 | Web + Expo |
+| Q-19 | Web + Expo |
+
 ## ⚠️ Verification limits (read this first)
 
 1. **GitHub returned HTTP 429 (too many requests) part-way through fetching files at the #249 head.** Per the rate-limit rule this stopped further GitHub reads in this pass. The following were **NOT inspected at the #249 head** and are marked **NOT INSPECTED** wherever they matter — nothing about them is asserted as current fact:

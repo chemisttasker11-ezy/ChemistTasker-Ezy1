@@ -15,6 +15,45 @@
   3. **Public Hub** (`backend/public_hub` + Next `landing_next`) — public articles (blog/news, editorial workflow) and public community-post reads, comments, reactions, reports. Anonymous reads allowed; writes need an OTP-verified member.
 - **No code changed. No PR/issue/comment created.** Documentation and decisions only.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Open chat list / conversations | Web fetches accessible conversations and groups (`frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:85`). Next web has no chat interface and links to dashboard (`frontend_web/landing_next/features/home/home-router.tsx:17`). | Mobile loads conversations and shift contacts via custom hook (`frontend_mobile/roles/shared/chat/ChatPage.tsx:38`). | Yes | Parity question: Next web links to Vite dashboard rather than rendering its own chat client. |
+| Open pharmacy team chat | Team chat opens automatically for pharmacy members via group creation helper (`frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:210`). | Team chat created or fetched by pharmacy ID with staff check (`frontend_mobile/roles/shared/chat/ChatPage.tsx:156`). | Yes | |
+| Start direct message | User initiates DM with another member by user ID (`frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:340`). | User initiates direct chat with modal or contact selection (`frontend_mobile/roles/shared/chat/ChatPage.tsx:172`). | Yes | |
+| Create custom group chat | Owner/admin creates custom group chat with selected members (`frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:415`). | Creator names group and selects members in GroupManageModal (`frontend_mobile/roles/shared/chat/GroupManageModal.tsx:45`). | Yes | |
+| Send text message (REST/WS) | Message sent via REST/WebSocket with real-time thread update (`frontend_web/src/pages/dashboard/sidebar/chat/ChatPage.tsx:550`). | Message sent via REST/WebSocket with optimistic chat update (`frontend_mobile/roles/shared/chat/ChatPage.tsx:198`). | Yes | |
+| React to message (emoji) | User toggles emoji reaction (👍, ❤️, 🔥, 💩) on message bubble (`frontend_web/src/pages/dashboard/sidebar/chat/MessageBubble.tsx:80`). | User toggles emoji reaction from native popover menu (`frontend_mobile/roles/shared/chat/ChatListItem.tsx:45`). | Yes | |
+| Edit or delete own message | Sender edits or soft-deletes message within edit window (`frontend_web/src/pages/dashboard/sidebar/chat/MessageBubble.tsx:120`). | Sender modifies or deletes own message via context menu (`frontend_mobile/roles/shared/chat/ChatPage.tsx:53`). | Yes | |
+| Browse and participate in Community Hubs | Users view feeds, post updates, comment, and vote on polls (`frontend_web/src/pages/dashboard/sidebar/hub/HubFeed.tsx:45`). | Native Hub screens support post creation, poll voting, and comments (`frontend_mobile/roles/shared/hub/api.ts:18`). | Yes | |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM20-Q01 — Who can start a direct chat with whom? | Web + Expo |
+| GM20-Q02 — When can a worker and a pharmacy chat — before or only after a booking? | Web + Expo |
+| GM20-Q03 — Should a chat thread be linked to a shift? | Web + Expo |
+| GM20-Q04 — Who belongs in a pharmacy's community chat, and can a pharmacy opt out? | Web + Expo |
+| GM20-Q05 — Who can create a custom group chat? | Web + Expo |
+| GM20-Q06 — How are abusive, spam, or wrong messages handled in chat? | Web + Expo |
+| GM20-Q07 — How long is chat history kept? | Web + Expo |
+| GM20-Q08 — What identity does chat show? | Web + Expo |
+| GM20-Q09 — What files can be sent in chat (and in hub posts)? | Web + Expo |
+| GM20-Q10 — How are people notified of messages, and can they mute a room? | Web + Expo |
+| GM20-Q11 — Read receipts, typing, presence: what do people see? | Web + Expo |
+| GM20-Q12 — Who can edit, delete, or pin — and can an admin remove someone else's message? | Web + Expo |
+| GM20-Q13 — Should chat reactions include 💩? | Web + Expo |
+| GM20-Q14 — What happens to chat when a membership is revoked or an AHPRA registration is suspended? | Web + Expo |
+| GM20-Q15 — Unread counts: fix the ?unread=1 filter or remove it? | Web + Expo |
+| GM20-Q16 — Who can post in the hubs — and is OTP verification enough, or must posters be Verified workers? | Web + Expo |
+| GM20-Q17 — Is the public hub (articles + community posts) on at launch, and who moderates it? | Web + Expo |
+| GM20-Q18 — Hub posts: edit windows, pinning, tagging, polls — keep today's rules? | Web + Expo |
+| GM20-Q19 — Web/Expo parity: which gaps are launch-blocking? | Web + Expo |
+| GM-20-W01: Messages sent through a since-revoked membership can't be edited or deleted | Web + Expo |
+
 ## 0. Re-validation of the old #184 questions (the only GM-20-relevant ones)
 
 PR #184 has **142 questions** in 8 areas (onboarding, posting, booking, agreement, cancel, talent, availability, launch). **None of them is a chat/hub question.** Its `AUDIT.md` says explicitly, under "Not checked": *"chat, invoice/payroll internals …"* — chat was never grilled. Only three questions touch chat/hubs tangentially:

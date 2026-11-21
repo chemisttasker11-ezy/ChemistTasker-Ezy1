@@ -13,6 +13,42 @@
 **No GitHub rate limit was hit.** All file evidence below was fetched at `refs/pull/249/head` unless stated. Caveat: `search_code` indexes the default branch (main, `8ccf8f77`); it was used only to *locate* files, and every cited behaviour was then read from the file at the #249 head.
 **No code changed, no PR/issue/comment created.** Documentation and decisions only.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Fulfillment fee checkout redirect | Dispatches `chargeShiftFulfillment` and redirects to Stripe Checkout (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:30`). | Dispatches `chargeShiftFulfillment` opening Stripe session on mobile (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:228`). | Yes | - |
+| Free mode finalisation | PRE_LIVE / FREE_TRIAL finalises booking with zero charge (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:40`). | Free billing mode finalises booking with zero charge (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:235`). | Yes | - |
+| Worker invoices list | Renders list of worker invoices with status and date filters (`frontend_web/src/pages/dashboard/sidebar/Invoices/InvoiceManagePage.tsx:8`). | Renders invoice list grouped by status (`frontend_mobile/roles/shared/invoices/InvoiceList.tsx:51`). | Yes | - |
+| Worker invoice details & generation | Inspects invoice line items and triggers PDF generation (`frontend_web/src/pages/dashboard/sidebar/InvoiceDetailPage.tsx (re-exported by sidebar/Invoices/InvoiceDetailPage.tsx:1)`). | Displays invoice details and allows line item edits (`frontend_mobile/roles/shared/invoices/InvoiceDetail.tsx:19`). | Yes | - |
+| Subscription payment by invoice | Allows selecting invoice billing for subscriptions (`frontend_web/src/pages/dashboard/sidebar/owner/OwnerBillingPage.tsx:85`). | Allows selecting invoice billing for subscriptions (`frontend_mobile/roles/owner/subscription-seats.tsx:82`). | Yes | - |
+| Checkout reconciliation & conflict queue | Displays conflict dialog when previous checkout state is unresolved (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts:55`). | Displays alert when checkout attempt is in conflict (`frontend_mobile/roles/shared/shifts/ActiveShiftsPage/index.tsx:246`). | Yes | - |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM17-Q01 | Web + Expo |
+| GM17-Q02 | Web + Expo |
+| GM17-Q03 | Web + Expo |
+| GM17-Q04 | Web + Expo |
+| GM17-Q05 | Web + Expo |
+| GM17-Q06 | Web + Expo |
+| GM17-Q07 | Web + Expo |
+| GM17-Q08 | Web + Expo |
+| GM17-Q09 | Web + Expo |
+| GM17-Q10 | Web + Expo |
+| GM17-Q11 | Web + Expo |
+| GM17-Q12 | Web + Expo |
+| GM17-Q13 | Web + Expo |
+| GM17-Q14 | Web + Expo |
+| GM17-Q15 | Web + Expo |
+| GM17-Q16 | Web + Expo |
+| GM17-Q17 | Web + Expo |
+| GM17-Q18 | Web + Expo |
+| GM-17-W01 | Web + Expo |
+
 ## 0. The one fact that frames everything: there are TWO money systems
 
 | | A — Platform fees (Stripe) | B — Worker wages (worker-issued invoices) |

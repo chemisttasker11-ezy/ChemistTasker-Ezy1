@@ -15,6 +15,38 @@
 - **Date traced:** 2026-11-21 (AEST). **Method:** read-only GitHub connector calls only, strictly sequential with ≥8 s between calls. No code changed, no PR/issue/comment created.
 - **Rate-limit note:** no HTTP 429 occurred in this re-run (~70 sequential read calls, all succeeded). The 429 that stopped the first GM-19 attempt — on `backend/shifts/announcements.py` — has cleared, and that file is now fully verified.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Save dated availability slot | Worker saves dated slot via sidebar form (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:371`). Next web lacks availability surface (`frontend_web/landing_next/package.json:1`). | Worker saves dated slot with start/end time and travel radius (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:505`). | Yes | Parity question: Next web lacks an availability page; Vite web and Expo have matching forms. |
+| Save recurring pattern | Worker configures recurring weekdays with optional end date (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:365`). | Worker configures recurring weekdays with optional end date (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:512`). | Yes | |
+| Edit / delete availability slot | Worker updates or removes slot with immediate preview update (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:288`). | Worker updates or deletes slot via optimistic mutation (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:442`). | Yes | |
+| Matching shift notification toggle | Worker toggles match alert with default 30 km radius (`frontend_web/src/pages/dashboard/sidebar/SetAvailabilityPage.tsx:371`). | Worker toggles match alert with map preview and 5–1000 km radius slider (`frontend_mobile/roles/shared/availability/SetAvailabilityScreen.tsx:493`). | No | Parity question: Expo provides map preview and customizable radius (5–1000 km) absent on web. |
+| Shift match alerts on posting | Backend alerts workers with any-overlap availability at shift posting (`backend/shifts/announcements.py:345`). | Push and in-app alerts dispatched from matching engine without client filtering (`backend/shifts/announcements.py:382`). | Yes | |
+| Dashboard availability recommendations | Overlap matching endpoint feeds recommended shifts (`backend/shifts/announcements.py:465`). | Mobile dashboard fetches matching shifts from recommendations API (`frontend_mobile/roles/shared/availability/availabilityModel.ts:75`). | Yes | |
+| Roster placement availability warning | Roster displays non-blocking warning when shift is outside full containment (`backend/workforce/roster/validation.py:45`). | Manager roster surfaces non-blocking conflict warning from validation API (`backend/workforce/roster/validation.py:52`). | Yes | |
+| Talent board availability snapshot | Worker publishes talent post with copied availability snapshot that never auto-syncs (`frontend_web/src/pages/dashboard/sidebar/TalentBoard/index.tsx:62`). | Post displays snapshot decoupled from live calendar rows (`frontend_mobile/roles/shared/talent-board/index.tsx:106`). | Yes | |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM-19-Q01 (ex AV-Q01) — How should workers set availability? | Web + Expo |
+| GM-19-Q02 (ex AV-Q02) — How far can a repeating availability run? | Web + Expo |
+| GM-19-Q03 (ex AV-Q03) — When does availability "match" a shift? | Web + Expo |
+| GM-19-Q04 (ex AV-Q04) — Who can see a worker's availability? | Web + Expo |
+| GM-19-Q05 (ex AV-Q05) — Should confirmed bookings block that time automatically? | Web + Expo |
+| GM-19-Q06 (ex AV-Q06) — When should a talent post stop showing? | Web + Expo |
+| GM-19-Q07 (ex AV-Q07) — Should availability show when it was last confirmed? | Web + Expo |
+| GM-19-Q08 (ex AV-Q08) — Should urgent-shift alerts need a separate opt-in? | Web + Expo |
+| GM-19-Q09 (ex AV-Q09) — Should workers set a max distance and minimum rate for alerts? | Web + Expo |
+| GM-19-Q10 (NEW) — Should availability validation be added, and what must it reject? | Web + Expo |
+| GM-19-Q11 (NEW) — Should a roster availability warning block placement, or stay a warning? | Web + Expo |
+| GM-19-Q12 (NEW) — Should the talent-post availability snapshot sync with the calendar? | Web + Expo |
+| GM-19-Q13 (NEW) — Next web: does an availability surface exist, and must it match Vite/Expo? | Web only |
+
 ## 0. What was completed in this re-run
 
 The 2026-11-21 partial stopped at a 429 on `announcements.py` after verifying 5 files. This re-run completes everything the partial listed as NOT re-validated:

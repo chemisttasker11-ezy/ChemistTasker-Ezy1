@@ -11,6 +11,44 @@
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED + RE-VALIDATED. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
 
+## Web and Expo today, side by side (pr257 `21add924`)
+
+Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges to main). Read-only code check by agy, 21 Nov 2026; every cited file:line was checked to exist at that commit. "Parity question" = a choice for the owner, asked in this area's rounds. "Possible defect (to verify)" = drift that looks unintended; it is confirmed in code before it goes to the engineering backlog, never asked as a question. The Platforms table says which platforms each question applies to.
+
+| Flow | Web (Vite + Next) | Expo | Same? | If different |
+|---|---|---|---|---|
+| Seller creates listing for ordinary goods | Next web provides goods listing creation wizard (`frontend_web/landing_next/app/(public)/marketplace/new/page.tsx:1`). Vite web has no marketplace routes (`frontend_web/src/main.tsx:1`). | Mobile provides listing creation flow with category and mode selection (`frontend_mobile/features/parity/marketplace.tsx:31`). | Yes | Verified 21 Nov: parity question, not a defect. The goods marketplace lives on the Next public site and Expo, not on Vite; which web app hosts it is GM-24-Q24 (canonical public site). |
+| Listing submission and review gate | Listing transitions to pending review for moderator approval in Django admin (`backend/marketplace/models.py:45`). | Mobile surfaces pending review state and prevents unapproved listings from public view (`frontend_mobile/features/parity/marketplace.tsx:55`). | Yes | |
+| Buyer browses public marketplace catalogue | Next web renders public marketplace catalogue with category and mode filters (`frontend_web/landing_next/app/(public)/marketplace/page.tsx:1`). Vite has no catalogue (`frontend_web/src/main.tsx:1`). | Mobile catalogue renders approved listings with category search (`frontend_mobile/features/parity/marketplace.tsx:80`). | Yes | Parity question: Public catalogue lives on Next web and Expo, with no presence on Vite web. |
+| Buyer opens enquiry / exchange | Buyer initiates enquiry on item detail page in Next web (`frontend_web/landing_next/app/(public)/marketplace/items/[id]/[slug]/marketplace-item.tsx:25`). | Buyer opens enquiry via mobile item detail modal (`frontend_mobile/features/parity/marketplace.tsx:120`). | Yes | |
+| Accept exchange terms and reserve listing | Buyer/seller agree on terms; backend locks listing idempotently (`backend/marketplace/models.py:120`). | Exchange details reflect accepted state and reserved badge (`frontend_mobile/features/parity/marketplace.tsx:145`). | Yes | |
+| Ethical marketplace stock preparation and inventory | Next web ethical workspace manages stock lots and private transfers (`frontend_web/landing_next/app/(ethical)/marketplace/ethical/page.tsx:1`). Vite has no ethical workspace (`frontend_web/src/main.tsx:1`). | Mobile ethical marketplace handles lot preparation and owner authorisation (`frontend_mobile/features/parity/ethicalMarketplace.tsx:108`). | Yes | Parity question: Ethical pharmacy marketplace operates exclusively on Next web and Expo. |
+
+### Platforms per question
+| Question id | Platforms |
+|---|---|
+| GM21-Q01 — Do we launch the goods marketplace at all, and for whom? | Web + Expo |
+| GM21-Q02 — What may be traded, and what is banned? | Web + Expo |
+| GM21-Q03 — Who can sell personally, and who can sell for a pharmacy? | Web + Expo |
+| GM21-Q04 — Who can buy, and how far does a listing travel? | Web + Expo |
+| GM21-Q05 — What identity check must a trader pass before listing or buying? | Web + Expo |
+| GM21-Q06 — Which marketplace terms must a user accept, and when? | Web + Expo |
+| GM21-Q07 — How does listing review work, and how fast? | Web + Expo |
+| GM21-Q08 — Sell, swap, free: what are the price rules? | Web + Expo |
+| GM21-Q09 — Audience circles and escalation: who sees it first, and when does it widen? | Web + Expo |
+| GM21-Q10 — Enquiry or firm offer: what is an exchange, and when is a listing held? | Web + Expo |
+| GM21-Q11 — How is money handled — in-platform, or off-platform? | Web + Expo |
+| GM21-Q12 — Delivery and pickup: who pays, who organises, what happens on dispute? | Web + Expo |
+| GM21-Q13 — How are disputes, returns, and damaged/missing goods handled? | Web + Expo |
+| GM21-Q14 — Ratings and reviews for marketplace transactions | Web + Expo |
+| GM21-Q15 — Ethical marketplace: launch together or defer? | Web + Expo |
+| GM21-Q16 — Ethical marketplace: who can access S4/S8 inventory? | Web + Expo |
+| GM21-Q17 — Ethical marketplace: batch tracking and expiry compliance | Web + Expo |
+| GM21-Q18 — Ethical marketplace: wholesaler vs direct transfer documentation | Web + Expo |
+| GM21-Q19 — Marketplace notifications: which events notify whom, on which channel? | Web + Expo |
+| GM21-Q20 — Marketplace admin: who moderates listings, manages categories, and views audit logs? | Web + Expo |
+| GM-21-W01: Which marketplace switches are on at launch? | Web + Expo |
+
 ## 0. Verification header — read first
 
 | Item | Value / result |
