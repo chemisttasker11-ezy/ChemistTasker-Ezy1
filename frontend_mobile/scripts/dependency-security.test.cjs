@@ -484,7 +484,7 @@ test('qs comma serialization handles hostile toString data and retains Places qu
 
 test('upgraded security dependencies preserve supported APIs and reject invalid OIDs', () => {
   const forge = require('node-forge');
-  assert.equal(require('node-forge/package.json').version, '1.4.1');
+  assert.equal(require('node-forge/package.json').version, '1.4.3');
   assert.throws(() => forge.asn1.oidToDer('0.42.840.113549.1.1.1'), /invalid oid|out of range/i);
   const { globSync, globStream } = require('glob');
   assert.equal(typeof globSync, 'function');

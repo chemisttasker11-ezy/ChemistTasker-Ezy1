@@ -28,8 +28,8 @@ function verifyInstalled() {
   assert.equal(mobileRequire('follow-redirects/package.json').version, '1.16.2');
   assert.equal(lock.packages['node_modules/follow-redirects'].version, '1.16.2');
   // Security-only transitive upgrades, scoped to Expo's build-time tooling.
-  assert.equal(mobileRequire('node-forge/package.json').version, '1.4.1');
-  assert.equal(lock.packages['node_modules/node-forge'].version, '1.4.1');
+  assert.equal(mobileRequire('node-forge/package.json').version, '1.4.3');
+  assert.equal(lock.packages['node_modules/node-forge'].version, '1.4.3');
   assert.equal(lock.packages['node_modules/glob'].version, '14.0.2');
   assert.equal(lock.packages['node_modules/path-scurry'].version, '3.0.0');
   // @expo/cli 55 matches with picomatch; a returning minimatch copy must be re-pinned to 11.0.1.

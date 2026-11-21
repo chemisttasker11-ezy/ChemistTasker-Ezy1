@@ -3,11 +3,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const ts = require('../node_modules/typescript');
+// typescript loads lazily in load(): web tests reuse the hook scheduler without mobile node_modules installed
 const root = path.resolve(__dirname, '..');
 const jsx = (type, props, key) => ({ type, props: props || {}, key });
 
 function load(relative, modules) {
+  const ts = require('../node_modules/typescript');
   const filename = path.join(root, relative);
   const src = fs.readFileSync(filename, 'utf8');
   const transpiled = ts.transpileModule(src, { fileName: filename,

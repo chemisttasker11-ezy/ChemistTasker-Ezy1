@@ -48,7 +48,7 @@ test('generating a new invite link hides the QR of the previous link', async () 
   assert.equal(find(tree,n=>n.type==='ShareQr').props.value,'tokenAAAA', manager);
   await find(tree,n=>n.type==='Button' && n.props.mode==='contained' && n.props.loading!==undefined && typeof n.props.onPress==='function' && n.props.onPress.length===0 && /Generate/.test(String(n.props.children))).props.onPress();
   tree=render();
-  assert.ok(state.includes('https://www.chemisttasker.com/membership/apply/tokenBBBB') || state.some(x=>typeof x==='string' && x.endsWith('/membership/apply/tokenBBBB')), manager+' new link');
+  assert.ok(state.some(x=>typeof x==='string' && x.endsWith('/membership/apply/tokenBBBB')), manager+' new link');
   const qr=find(tree,n=>n.type==='ShareQr');
   assert.ok(!qr || qr.props.value==='tokenBBBB', manager+' stale QR still shows the previous token');
  }
