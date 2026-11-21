@@ -1,5 +1,8 @@
 # GM-07 — Internal roster / cover / swap — Full Grill Documentation
 
+> **Independent senior audit correction, 21 November 2026:** The owner already approved R04C: the replacement target accepts, passes role/conflict checks, and a manager approves the transfer. The current manager-only transfer is therefore an **IMPLEMENTATION GAP**, not an OPEN yes/no decision and not a supersession. Likewise R04A's per-pharmacy cover-publication control and R06's same-Shift/Slot needs-cover rule are binding directions with missing implementation. The original GM-07-Q04/Q06/Q07 text below is retained as a historical trace of the implementation mismatch; only ask the owner for genuinely missing detail or an explicit change of approved policy. See [owner ledger](../OWNER_DECISION_LEDGER.md).
+
+
 **Area:** GM-07 Internal roster/cover/swap (Issue #250, area 7 of 26)
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
