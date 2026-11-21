@@ -1,5 +1,14 @@
 # GM-18 — Talent / Recruitment — Grill Me trace (RECONSTRUCTED 2026-11-21)
 
+> **Corrections against current code (21 Nov 2026 review).** 14 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 10 hold, 4 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q04 / Q16 | Full download and client filtering; “backend has no filter parameters” | WRONG — overbroad | General board filtering still follows a full feed download. The API does support own-post selection and a bounded public reference-code lookup, but not server-side distance or rate search. | `pr257:frontend_mobile/roles/shared/talent-board/hooks/useTalentFeed.ts:45`; `pr257:backend/talent/views/explorer.py:70`; `pr257:backend/talent/views/explorer.py:77` |
+| Q19 | “serializer has no validate() at all” | STALE; still true on main | PR257 validates time order, weekday values, recurring days and recurrence end dates. Past-date and duplicate-row rejection are not added by that validator. | `main:backend/talent/serializers/availability.py:7`; `pr257:backend/talent/serializers/availability.py:17` |
+| Q20 | Legacy penalty creates a “live Stripe checkout” | WRONG if read as unconditional | The route remains callable, but checkout creation depends on environment, provider mode and release flags. Its calculation remains defective as described in B02. | `pr257:backend/billing/shift_payments.py:223`; `pr257:backend/billing/release_guards.py:38`; `pr257:backend/billing/release_guards.py:48` |
+| Q26 | Accepted terms have a fingerprint | MAIN-ONLY — holds on PR257 only | PR257 previews and enforces the fingerprint; main does neither. Neither version supplies the cancellation matrix or pharmacy-side legal-policy acceptance in this snapshot. | `main:backend/shifts/serialization/offers.py:243`; `pr257:backend/shifts/serialization/offers.py:244`; `pr257:backend/shifts/offers.py:387` |
+
 - **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 - **Issue:** #250 (Grill Me, 26 areas) — **PR #184** (Oct 2026) is the format example
 - **Trace baseline:** PR #249 head **`97c4543e051b43fe30ec7e2e61ad3d69957a918e`** — VERIFIED live via `pull_request_read` (open draft, base `feat/mobile-merge-sdk`). PR body text naming a "working head `26cae2d6`" is the short SHA of the last listed implementation commit, not the branch head. All tracing below is at the API head.
@@ -441,13 +450,9 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 FIXED · ❓ NOT RE-VALIDATED.
 - **Other / defer:** validate + dedupe only; leave past dates to the client. Defer: not recommended — this is correctness work, not a new policy.
 - **Gap type:** **code gap**, with one owner sub-decision (past dates).
 
-### GM-18-Q20 (ex LA-Q06 / SH-02) — The legacy 10%/20% penalty route is still live: disable it?
-- **ACTUAL TODAY (verified):** live and callable. `POST billing/charge-penalty/<int:shift_id>/` is routed (`billing/urls.py:15`) and implemented (`shift_payments.py::charge_penalty`): 20% of expected wage if ≤24h to start, 10% if ≤72h, creating a live Stripe checkout. The Oct register says to suspend it. No screen was found calling it. The agreed P09 7-band fee table is **not** implemented — this legacy route is the only charge that exists.
-- **RECOMMENDED (carried from #184, rec A):** before launch — disable the callable route. Do not introduce replacement cancellation charges until Australian counsel reviews classification, proportionality, disclosure and unfair-contract-term risk (GM-15 LA-R02 / SH-16). Rationale: a live charge outside the agreed table, with no legal review, is the single most dangerous thing on the board — one owner cancelling a filled shift can be charged 20% under a rule nobody agreed to. Severity: **P0 (money + legal)**. Benefit: no surprise charges; the fee conversation happens deliberately, with advice. Risk: disabling the route is a one-line change plus a test; the risk is forgetting it, not doing it. Legal: since November 2023, proposing, using or relying on unfair standard-form terms can attract major penalties; clear wording alone does not cure unfairness.
-- **ALTERNATIVE A — Keep current logic:** leave the route live. Scenario: an owner cancels a filled shift 12 hours out and is charged 20% of the wage under a rule that appears nowhere in the terms they accepted (Q26). Trade-off: zero build, live legal and reputational risk.
-- **ALTERNATIVE B — Soon after launch:** within the first month. Scenario: as A, for a month. Trade-off: ships sooner; the charge can be levied in the meantime.
-- **ALTERNATIVE C — Not needed:** accept the risk or keep the route deliberately as the cancellation charge. Scenario: the legacy 10%/20% becomes the policy by default. Trade-off: only honest if the terms are rewritten to disclose it and counsel reviews it — which is the recommended path anyway, just slower.
-- **Gap type:** **code gap with a timing decision** — disabling needs no owner choice on the principle. Recommended: before the first real booking. (GM-15 senior review independently confirms: "legacy `charge-penalty/` live and proven buggy".)
+### GM-18-Q20 (ex LA-Q06 / SH-02) — Legacy cancellation charging
+- **Actual today:** The route uses the old 10%/20% calculation. Its live flag defaults off (`pr257:backend/billing/shift_payments.py:211`, `pr257:backend/core/settings.py:679`).
+- **Status:** Engineering: see BL-04. Preserve the route and client export behind the current flag. Ask launch scope at GM15-01.
 
 ### GM-18-Q21 (ex LA-Q07 / SH-03) — Subscriber discount and hard-coded Stripe price IDs?
 - **ACTUAL TODAY (verified, split):** the **discount half is FIXED** — `is_subscriber` now selects the subscriber price IDs (`shift_payments.py:110-132`): locum $15 vs $30, PT-FT $40 vs $80; tests exist (`test_pr201_b01.py`). The **price-ID half is still open** — the four IDs are hard-coded in `shift_payments.py:116-130` and in `checkout_prices.py` (ID → cents map), with no env selection, so test and live cannot differ. The fee is per offer, whatever the hours or days.
@@ -525,7 +530,7 @@ Plain English: today, anyone who signs in can see everyone. A locum posts "open 
 - **CG-5 — Talent-post availability snapshot never syncs, AV-01 (Q17).** One-time copy at compose on both clients; no link in `models.py`.
 - **CG-6 — Match emails miss escalated shifts and reach unverified workers, AV-04 (Q18).** Posting-time only, PLATFORM-only, no re-announce, no Verified filter. (GM-19 verified.)
 - **CG-7 — Booked time and approved leave do not suppress match alerts (GM-19 Q05; Q25 context).** No assignment/leave check in `announce_availability_matches`. (GM-19 verified.)
-- **CG-8 — Legacy `charge-penalty/` route live (Q20, SH-02).** Routed + implemented, 20%/10% live Stripe checkouts. Disable before launch.
+- **CG-8 — Legacy cancellation charging (Q20, SH-02).** Engineering: see BL-04 for the correction behind the existing flag.
 - **CG-9 — Hard-coded Stripe price IDs (Q21, SH-03 second half).** Discount fixed; IDs still hard-coded in `shift_payments.py` and `checkout_prices.py` — test/live cannot differ.
 - **CG-10 — Offer expiry not capped at shift start; refresh does not extend it (Q22, SH-07).** Flat 48h, lazy expiry.
 - **CG-11 — Accepted terms lack cancellation table / version / pharmacy acceptance (Q26, SH-09).** Fingerprint exists; the disclosure fields do not. (GM-15 verified.)
@@ -550,7 +555,7 @@ Plain English: today, anyone who signs in can see everyone. A locum posts "open 
 - DG-8 — Availability snapshot model: sync / live-read / stamp (Q17); who sees availability, opt-in scope (Q24); minimum-rate alert filter + rate source (Q25, rate half only).
 - DG-9 — Post inactivity window + nudge (Q23); urgent-alert consent is KEEP (GM-19 Q08 — no decision needed).
 - DG-10 — Cancellation disclosure + legal review + launch gate (Q26) ★ P0 — owned jointly with GM-15/GM-17.
-- DG-11 — Legacy penalty route timing (Q20) ★ P0 — recommended: disable before first real booking; price-ID config timing (Q21); offer-expiry cap (Q22 — code gap once decided, D02 shape already exists).
+- DG-11 — Price-ID config timing (Q21) and offer-expiry cap (Q22). Cancellation charging follows BL-04 and GM15-01.
 
 ## 6. Documentation matrix & implementation backlog
 
@@ -577,7 +582,7 @@ Plain English: today, anyone who signs in can see everyone. A locum posts "open 
 | GM-18-Q17 (LA-Q16) | ✅ STILL VALID | Pitch-save copy (web `:670`, mobile `:574`); `models.py` (no link) |
 | GM-18-Q18 (LA-Q17) | ✅ VERIFIED (GM-19) | `announcements.py` (adopted) |
 | GM-18-Q19 (LA-Q18) | ✅ VERIFIED (GM-19) | `serializers/availability.py` (adopted) |
-| GM-18-Q20 (LA-Q06) | ✅ STILL VALID | `billing/urls.py:15`, `shift_payments.py:214-218` |
+| GM-18-Q20 (LA-Q06) | Engineering: see BL-04 | `pr257:backend/billing/shift_payments.py:211`, `pr257:backend/core/settings.py:679` |
 | GM-18-Q21 (LA-Q07) | 🔄 PARTIAL (discount fixed) | `shift_payments.py:110-132`, `checkout_prices.py` |
 | GM-18-Q22 (LA-Q09) | ✅ STILL VALID | `assignment.py:22, :69, :259` |
 | GM-18-Q23 (AV-Q06) | ✅ STILL VALID | `models.py::is_talent_board_visible` |
@@ -596,7 +601,7 @@ Plain English: today, anyone who signs in can see everyone. A locum posts "open 
 2. Q11/Q12: desktop AHPRA source + staging trial + fresh check before registered-role bookings; scheduled re-scan (GM-02).
 3. Q13/Q14: hide on lapse/revocation (trigger: nightly job vs revocation event) + re-show on re-verification.
 4. Q15: one hiring-role policy in shared-core + backend enforcement on dedicated-shift creation; fix mobile override; resolve `postShiftRoute` default for worker wrappers.
-5. Q20: disable `charge-penalty/` route (one-line + test) before first real booking; Q21: price IDs to env/config per Stripe mode.
+5. Q20: correct cancellation charging behind the existing flag (BL-04). Q21: move price IDs to config per Stripe mode.
 6. Q22: cap offer expiry at shift start + show the countdown on both apps.
 7. Q07 (C): enquiry/chat-first step for public-board contacts (GM-20 chat surface); firm offer retained for favourites/members.
 8. Q08: "Invite to favourites" (membership invite) + wire saved-contacts API to a UI (bookmark stopgap); Q09: private block list.

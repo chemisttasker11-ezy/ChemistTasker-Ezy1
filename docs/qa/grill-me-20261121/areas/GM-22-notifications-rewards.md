@@ -1,5 +1,15 @@
 # GM-22 — Notifications / Rewards — Full Grill Documentation
 
+> **Corrections against current code (21 Nov 2026 review).** 13 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 8 hold, 5 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| GM22-04 / 18 / 20 | Same push preferences and quiet hours on both backend refs | MAIN-ONLY — PR257 only | PR257 adds per-type push preferences and user quiet hours. Main’s notification service does not implement that preference policy. | `main:backend/notifications/services.py:102`; `pr257:backend/notifications/services.py:119`; `pr257:backend/notifications/models.py:65` |
+| GM22-04 / 23 | Reconciliation/refund-required notices are “in-app only” | WRONG | These notices use `notify_users`, which also attempts WebSocket and eligible Expo push delivery. They have no dedicated email in these call sites. | `pr257:backend/billing/payment_events.py:65`; `pr257:backend/billing/paid_fulfillment.py:48`; `pr257:backend/notifications/services.py:159`; `main:backend/notifications/services.py:102` |
+| GM22-14 / 27 | Pharmacy name “never” reaches worker before acceptance | WRONG | The offered worker can receive the pharmacy name and ABN through the pre-acceptance engagement preview. Separate update and not-selected notices also disclose the name to applicants. | `main:backend/shifts/engagement.py:640`; `main:backend/shifts/serialization/offers.py:235`; `pr257:backend/shifts/serialization/offers.py:243` |
+| GM22-18 / 20 | Quiet-hours pushes are “held” | WRONG | Quiet hours suppress the push attempt; no later-delivery queue is created. ALERT pushes bypass quiet hours unless explicitly opted out. | `pr257:backend/notifications/services.py:132`; `pr257:backend/notifications/services.py:143`; `pr257:backend/notifications/services.py:159` |
+| GM22-24 / 25 | Future assignments can be rated; expiry never enforced | WRONG / overbroad | Rating eligibility requires a past assignment date. AHPRA handling checks stored state and can queue expiry-driven desktop rechecks, although it does not synchronously query the register before booking. | `pr257:backend/ratings/views.py:82`; `pr257:backend/onboarding/verification/state.py:162`; `pr257:backend/onboarding/verification/state.py:211` |
+
 **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 **Issue:** #250 — Grill Me, one consolidated backend + Web + Expo sign-off before launch
 **Method source:** PR #184 (`docs/qa/launch-grill/questions.json`, `AUDIT.md`, `LAUNCH_GRILL.html`), head `c786a4b8182ebf9b505d47cd81980eb3b9851ce3`

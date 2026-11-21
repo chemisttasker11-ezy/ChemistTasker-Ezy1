@@ -1,5 +1,16 @@
 # GM-25 — Web / Next / Expo parity & UX — Grill Me trace
 
+> **Corrections against current code (21 Nov 2026 review).** 12 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 6 hold, 6 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q01, first question; Q17 | No native build, screenshots or authenticated acceptance has happened | UNVERIFIABLE by code reading | These source files establish an implemented app and API configuration, not its execution history. Replace historical PR249 gate statements with separately dated evidence for the candidate under review. | `pr257:frontend_mobile/app/_layout.tsx:314`; `pr257:frontend_mobile/config/api.ts:1` |
+| C01 / C08 | Pharmacist add-profile still reaches legacy unsupported form | STALE | The PR257 onboarding route redirects to `/pharmacist/profile-basic-info`. The legacy component’s continued presence does not prove that this route still submits its unsupported fields. | `pr257:frontend_mobile/app/pharmacist/onboarding.tsx:5` |
+| C04 / C09 / Q05 | Explorer shifts is a reachable placeholder | WRONG — already false at traced head | Explorer shifts exports the shared Shift Centre. Do not list it as a blank “Shifts” placeholder. | `pr257:frontend_mobile/roles/explorer/shifts.tsx:2` |
+| C09 / Q05 / Q15 | Owner hub placeholder remains the reachable owner experience | WRONG | The owner hub route exports the shared HubScreen. A legacy placeholder file exists, but it is not the implementation selected by this route. | `pr257:frontend_mobile/app/owner/hub.tsx:1` |
+| Q05 / Q15 | Pharmacist learning remains “Coming Soon” | STALE | PR257 implements learning-resource fetching, search, pagination and error states. It should be assessed as a functioning content surface, not a placeholder. | `pr257:frontend_mobile/roles/pharmacist/learning.tsx:101`; `pr257:frontend_mobile/roles/pharmacist/learning.tsx:180` |
+| Q13 / Q17 | Accessibility/device/release readiness inferred from old ledger | UNVERIFIABLE | Source includes large-text accommodations, but this does not prove visual acceptance or store readiness. Keep those as separately evidenced runtime checks for PR257. | `pr257:frontend_mobile/app/register.tsx:640`; `pr257:frontend_mobile/app/welcome.tsx:246` |
+
 Repo: `chemisttasker11-ezy/ChemistTasker-Ezy1`
 Trace date: 2026-11-21 (AEST). Read-only. No code changed, no PR/issue/comment created.
 Re-run of the blocked 2026-11-21 trace (same day, after the GitHub rate limit cleared).
@@ -572,7 +583,7 @@ Verdict key: **V** = re-validated at #249 head in this re-run ·
   retry, stale data).
 - **DG-9 (GM25-Q13):** 1.6× text / accessibility gate — both clients?
 - **DG-10 (GM25-Q17):** What evidence signs off each surface for launch.
-- **DG-11 (carried):** ON-Q02/Q03 verification-enforcement scope;
+- **DG-11 (carried):** ON-Q02 is referenced at GM01-Q04. ON-Q03 is answered at VERIFY-GATE-01. Open topics continue with
   ON-Q05 explorer shift access; ON-Q11 pharmacy posting gate; ON-Q13 saved
   payment method; TB-Q01/Q02 talent visibility/reveal; TB-Q07 firm offer
   vs enquiry; TB-Q08 heart/favourites; AV-Q02/Q03/Q04/Q06 availability
@@ -608,32 +619,13 @@ basics, rest links to web. Other / defer. Recommended: A — managers who
 upgrade on mobile lose data or hit a dead end. **Status: CHANGED (partial),
 OPEN.**
 
-**GM25-C02 — ON-Q02. What can a worker do before they are Verified?**
-**Verdict: CHANGED — A01 (adopted GM-01).** The Oct 2026 "current"
-("anyone signed in can browse shift boards") was incomplete when written:
-`ProtectedRoute` forces PHARMACIST / OTHER_STAFF / EXPLORER without mobile
-verification to `/mobile-verify` on every dashboard route, and both login
-screens route there first — the code already implements option B ("Browse
-after email and mobile") for the dashboard, while anonymous public boards
-stay open to anyone. The gate already existed at the #184 head. Options:
-KEEP — browse everything after email login; only public applications need
-Verified; A — Browse everything, gate applying (apply button asks them to
-finish checks); B — Browse after email and mobile; C — Nothing until
-Verified. Other / defer. Recommended (GM-01, re-asked): KEEP the current
-strict rule (option B). **Status: CHANGED, OPEN — re-ask as the corrected
-question.**
+**GM25-C02 — ON-Q02. Browse access before full verification**
 
-**GM25-C03 — ON-Q03. Where must role-appropriate verification be enforced?**
-**Verdict: STILL VALID — A18 (adopted GM-18).** Public apply/accept/
-counter-offer check Verified + latest AHPRA
-(`backend/onboarding/verification/state.py::require_public_ahpra`, acts
-only `if is_public_shift(shift) and not member-access`); members, other
-audiences, internal rostering skip it. Parity angle: the gate is backend,
-so it binds all three clients equally — but only if all three clients call
-the same endpoints (shared-core scope, GM25-Q04). Options: KEEP — public
-checked; members/internal exempt; B — Every outside booking (chain, org,
-talent-board non-members too); C — B plus internal rostering. Other /
-defer. Recommended (Oct 2026): B. **Status: STILL VALID (adopted), OPEN.**
+**Status:** Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation. The dashboard requires email and mobile verification. Anonymous browsing stays open on public boards.
+
+**GM25-C03 — ON-Q03. Verification on outside bookings**
+
+**Status:** Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01. Engineering: see BL-01 for the backend guard shared by the three clients.
 
 **GM25-C04 — ON-Q05. What can Explorers (new to pharmacy) do with shifts?**
 **Verdict: STILL VALID — M (mobile half) + O (web half).** Mobile:
@@ -648,16 +640,9 @@ Board only); B — Unpaid shadowing posts only; C — Paid shifts after
 upgrading role (upgrade card exists). Other / defer. Recommended (Oct
 2026): C. **Status: STILL VALID (mobile half confirmed), OPEN.**
 
-**GM25-C05 — ON-Q04 / LA-Q05. When must a worker's pay details be ready,
-and must both apps show it early?** Context (Oct 2026, NOT RE-VALIDATED):
-ABN/TFN readiness checked only at offer acceptance; workers learn what is
-missing only in the accept dialog, on both apps (ON-11). New partial
-evidence (V, not a verdict): Expo `ActiveShiftsPage` now maps
-`awaitingPayment` state onto shift cards. Options: KEEP — checked at
-accept only; A — Before applying; B — Before accepting, shown early on
-apply and offer screens; C — Before first payout only. Other / defer.
-Recommended (Oct 2026): B. Fix timing: LA-Q05 rec A = before launch.
-**Status: NOT RE-VALIDATED.**
+**GM25-C05 — ON-Q04 / LA-Q05. Payment readiness across clients**
+
+**Status:** Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04. Engineering: see BL-03 for the acceptance gate and early notice on web and Expo. LA-Q05's remaining launch timing choice is covered by LAUNCH-01.
 
 **GM25-C06 — ON-Q11. What must a pharmacy pass before posting to outside
 workers?** Context (Oct 2026, NOT RE-VALIDATED): posting checks neither
@@ -1139,10 +1124,10 @@ Medium (prevents the next GM-25). **Status: TRACED, OPEN.**
 | Q | Source (ref) | Status |
 |---|---|---|
 | GM25-C01 (ON-Q15) | #184 `questions.json` ON-Q15; `AUDIT.md` ON-04 @ `c786a4b8`; re-traced @ `97c4543e` (`ChooseAccountTypeCard.tsx`, `roles/pharmacist/onboarding.tsx`, `app/otherstaff/` listing) | CHANGED (partial) — OPEN |
-| GM25-C02 (ON-Q02) | #184 ON-Q02; `AUDIT.md` ON-01 @ `c786a4b8`; adopted GM-01 | CHANGED — OPEN (re-ask) |
-| GM25-C03 (ON-Q03) | #184 ON-Q03; adopted GM-18 (`verification/state.py`) | STILL VALID (adopted) — OPEN |
+| GM25-C02 (ON-Q02) | #184 ON-Q02; adopted GM-01 | Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation |
+| GM25-C03 (ON-Q03) | #184 ON-Q03; `verification/state.py` | Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01 |
 | GM25-C04 (ON-Q05) | #184 ON-Q05; `AUDIT.md` ON-09 @ `c786a4b8`; PARITY_MATRIX L17 @ `97c4543e` | STILL VALID (mobile half confirmed) — OPEN |
-| GM25-C05 (ON-Q04/LA-Q05) | #184 ON-Q04, LA-Q05; `AUDIT.md` ON-11 @ `c786a4b8` | NOT RE-VALIDATED — OPEN |
+| GM25-C05 (ON-Q04/LA-Q05) | #184 ON-Q04, LA-Q05 | Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04. Engineering: see BL-03. Launch timing: see LAUNCH-01. |
 | GM25-C06 (ON-Q11) | #184 ON-Q11; `AUDIT.md` ON-06 @ `c786a4b8` | NOT RE-VALIDATED — OPEN |
 | GM25-C07 (ON-Q13) | #184 ON-Q13; `AUDIT.md` ON-08 @ `c786a4b8` | NOT RE-VALIDATED — OPEN |
 | GM25-C08 (LA-Q02) | #184 LA-Q02; `AUDIT.md` ON-04 @ `c786a4b8`; re-traced @ `97c4543e` (repo-wide field searches) | STILL VALID (pharmacist) / CHANGED (other-staff) — OPEN |

@@ -1,5 +1,12 @@
 # GM-21 — Ordinary / Ethical Marketplace — Full Grill Documentation
 
+> **Corrections against current code (21 Nov 2026 review).** 11 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 9 hold, 2 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q01, first question | “all write flags off”; read-only catalogue at defaults | WRONG | Defaults disable new goods listings, contact and commitments, but the master goods-write flag and ethical access applications default on. Describe individual flags rather than calling every write disabled. | `main:backend/core/settings.py:241`; `pr257:backend/core/settings.py:235`; `pr257:backend/core/settings.py:241`; `pr257:backend/core/settings.py:251` |
+| Q03 / Q05 | Trading always requires verified identity and adulthood | WRONG — age claim overbroad | Identity verification is checked. Age is checked when a date of birth exists; the explicit missing-DOB age-assurance fallback applies only to Explorer and Junior roles. | `pr257:backend/marketplace/policy.py:57`; `pr257:backend/marketplace/policy.py:78`; `pr257:backend/marketplace/policy.py:84` |
+
 **Area:** GM-21 Ordinary/ethical marketplace (Issue #250, area 21 of 26)
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED + RE-VALIDATED. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
@@ -624,3 +631,22 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 - Trace order followed the senior review: docs first (`IMPLEMENTATION.md`, `FINALISATION_HANDOVER_2026-09-17.md`), then views/services/serializers/listing_policy/tasks/urls, the whole ethical app, tests (existence + scope, not re-run), celery, Stripe wiring (searched, none found), Next + Expo screens, Vite check.
 - GitHub calls: 146, all strictly sequential, 9 s apart, one at a time. No real 429. One false-positive stop (settings constant `EMAIL_TASK_RATE_LIMIT` matched by the detector inside a successfully downloaded file) — detector fixed, file usable, no finding rests on it.
 - Do not raise a PR and do not change code during Grill Me — documentation and decisions only (Issue #250 scope freeze).
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-21-W01: Which marketplace switches are on at launch? (W-04, D166)
+**Scenario:** Ali wants to list spare stock at launch. Nadia wants to contact him. Tom wants to apply for ethical marketplace access.
+**What happens today:** Goods browsing and the master write switch default on. Separate switches default off for new goods listings, contact, commitments, escalation and catalogue lookup. Ethical access applications default on. Ethical private browsing, inventory, transfers, escalation and S8 default off (`pr257:backend/core/settings.py:235`, `:251`).
+**Recommendation first: A.** Launch goods browsing and keep ethical access applications open. Wait to enable trading until the relevant launch gates pass.
+- **A (recommended):** Ali and Nadia can browse goods only. Tom can apply for ethical access. Private ethical browsing and trading stay off.
+- **B:** Ali can list goods and Nadia can contact him. Goods commitments, escalation and catalogue lookup stay off. Ethical access stays as in A.
+- **C:** Ali and Nadia also get goods commitments, escalation and catalogue lookup. Enable ethical private browsing, inventory, transfers, escalation and S8 after their release gates pass.
+- **DEFER:** Decide within LAUNCH-01.
+
+**Engineering: see BL-07.** The listing editor should explain when new listings are closed.
+**Status:** OPEN (ask together with LAUNCH-01)

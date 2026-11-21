@@ -5,23 +5,23 @@
 **Method:** 26 areas traced area by area (backend → Vite → Next → Expo, file/function/test/commit per claim), old #184 questions re-validated against current code before being asked, senior-reviewed (worker areas by the coordinator, re-run areas by the coordinator with independent spot-checks at head). Documentation/decisions only — no code changed.
 **Bases:** main `8ccf8f7` (last commit 3 Nov 2026), PR #249 head `97c4543e`.
 
-## 1. Per-area status table — all 26 areas
+## 1. Per-area trace and question index
 
 | Area | Status | Qs | First question (ask this first) | Deliverable file |
 |---|---|---|---|---|
 | GM-01 Sessions/auth | Traced + senior-reviewed (corrections applied) | 19 | GM01-Q04 — must a worker verify mobile before browsing anything? | [`areas/GM-01-sessions-auth.md`](areas/GM-01-sessions-auth.md) |
-| GM-02 Worker onboarding/credentials | Traced + senior-reviewed (pass with corrections) | 24 (22 OPEN, 1 SETTLED ON-Q10, 1 UNVERIFIED ON-Q15) | ON-P03 — which AHPRA lookup runs at launch? | [`areas/GM-02-worker-onboarding-credentials.md`](areas/GM-02-worker-onboarding-credentials.md) |
+| GM-02 Worker onboarding/credentials | Traced + senior-reviewed (pass with corrections) | 24 (16 OPEN in the area, 6 ANSWERED / REFERENCE, ON-Q10 settled, ON-Q15 unverified) | ON-P03 — which AHPRA lookup runs at launch? | [`areas/GM-02-worker-onboarding-credentials.md`](areas/GM-02-worker-onboarding-credentials.md) |
 | GM-03 Pharmacy/owner setup | Traced + senior-reviewed (pass with corrections) | 12 | GM-03-Q01 — what must a pharmacy pass before posting to outside workers? | [`areas/GM-03-pharmacy-owner-setup.md`](areas/GM-03-pharmacy-owner-setup.md) |
 | GM-04 Organisations/chains/regions | Traced (re-run) + senior-reviewed PASS | 12 | GM-04-Q01 — how do organisations join? | [`areas/GM-04-organisations-chains-regions.md`](areas/GM-04-organisations-chains-regions.md) |
-| GM-05 Roles/membership/invites | Traced + senior-reviewed (pass with corrections) | 19 (16 OPEN, 2 NOT VERIFIED Q-16/Q-17, 1 code invariant Q-19) | Q-01 — should favourite locums be exempt from the AHPRA check on public shifts? | [`areas/GM-05-roles-membership-invites.md`](areas/GM-05-roles-membership-invites.md) |
+| GM-05 Roles/membership/invites | Traced + senior-reviewed (pass with corrections) | 19 original entries | GM-05-W01 — is Mia active before setting a password? | [`areas/GM-05-roles-membership-invites.md`](areas/GM-05-roles-membership-invites.md) |
 | GM-06 Employment/leave | Traced (re-run) + senior-reviewed PASS | 9 | GM-06-Q06 — when leave is approved, what happens to the rostered shift? | [`areas/GM-06-employment-leave.md`](areas/GM-06-employment-leave.md) |
-| GM-07 Internal roster/cover/swap | Traced (re-run) + senior-reviewed PASS | 10 | GM-07-Q04 — must the swap/cover target accept before the manager approves? | [`areas/GM-07-internal-roster-cover-swap.md`](areas/GM-07-internal-roster-cover-swap.md) |
+| GM-07 Internal roster/cover/swap | Traced (re-run) + senior-reviewed PASS | 10 original entries | GM-07-W01 — does the posting window apply to roster planning? | [`areas/GM-07-internal-roster-cover-swap.md`](areas/GM-07-internal-roster-cover-swap.md) |
 | GM-08 Attendance/kiosk | Traced (re-run) + senior-reviewed PASS | 11 | GM-08-Q01 — who may clock in; may a verified locum with no booking walk in and work? | [`areas/GM-08-attendance-kiosk.md`](areas/GM-08-attendance-kiosk.md) |
 | GM-09 Timesheet/payroll | Traced (re-run) + senior-reviewed PASS | 10 | Q1 — who pays whom, and when? | [`areas/GM-09-timesheet-payroll.md`](areas/GM-09-timesheet-payroll.md) |
 | GM-10 Shift posting/rates | Traced (re-run) + senior-reviewed PASS | 12 | GM-10-Q03 — fixed vs negotiable rate | [`areas/GM-10-shift-posting-rates.md`](areas/GM-10-shift-posting-rates.md) |
 | GM-11 Audience/escalation | Traced (re-run) + senior-reviewed PASS | 13 | GM-11-Q01 — who is told on escalation, and when does it stop? | [`areas/GM-11-audience-escalation.md`](areas/GM-11-audience-escalation.md) |
-| GM-12 Interest/offers | Traced (re-run) + senior-reviewed PASS | 26 | GM-12-Q01 — where must Verified + current AHPRA be enforced? | [`areas/GM-12-interest-offers.md`](areas/GM-12-interest-offers.md) |
-| GM-13 Reservation/payment confirmation | Traced (re-run) + senior-reviewed PASS WITH NOTE | 13 | GM13-Q01 — D02 pay-by window does not exist; build D02 as decided | [`areas/GM-13-reservation-payment-confirmation.md`](areas/GM-13-reservation-payment-confirmation.md) |
+| GM-12 Interest/offers | Traced (re-run) + senior-reviewed PASS | 26 original entries | GM-12-Q06 — who can instant book? | [`areas/GM-12-interest-offers.md`](areas/GM-12-interest-offers.md) |
+| GM-13 Reservation/payment confirmation | Traced (re-run) + senior-reviewed PASS WITH NOTE | 13 original entries | GM-13-W01 — can operator recovery of a paid orphan checkout book the work? | [`areas/GM-13-reservation-payment-confirmation.md`](areas/GM-13-reservation-payment-confirmation.md) |
 | GM-14 Terms/Award/GST/super | Traced (re-run) + senior-reviewed PASS | 12 | GM14-Q03 — does the pharmacy accept the same agreement? | [`areas/GM-14-terms-award-gst-super.md`](areas/GM-14-terms-award-gst-super.md) |
 | GM-15 Cancellation/disputes/ratings | Traced + senior-reviewed PASS | 49 | GM15-01 — what cancellation can launch, given fees are not yet enforceable? | [`areas/GM-15-cancellation-disputes-ratings.md`](areas/GM-15-cancellation-disputes-ratings.md) |
 | GM-16 Subscriptions/Pills/fees | Traced (re-run) + senior-reviewed PASS | 18 | GM16-Q01-FIRST — confirm launch price table exactly as coded | [`areas/GM-16-subscriptions-pills-fees.md`](areas/GM-16-subscriptions-pills-fees.md) |
@@ -33,10 +33,11 @@
 | GM-22 Notifications/rewards | Traced (re-run) + senior-reviewed PASS | 28 (Q07, Q15 NOT RE-VALIDATED; Q03 partial) | GM22-04 — which channels carry those notices? | [`areas/GM-22-notifications-rewards.md`](areas/GM-22-notifications-rewards.md) |
 | GM-23 Calendars/operations | Traced (re-run) + senior-reviewed PASS | 29 | GM-23-01 — is the worker availability calendar the single live source of truth? (alt first: GM-23-23 timezone) | [`areas/GM-23-calendars-operations.md`](areas/GM-23-calendars-operations.md) |
 | GM-24 Explorer/public | Traced + senior-reviewed PASS | 32 | GM-24-Q01 — what can Explorers ("new to pharmacy") do with shifts? | [`areas/GM-24-explorer-public.md`](areas/GM-24-explorer-public.md) |
-| GM-25 Web/Next/Expo parity/UX | Traced (re-run) + senior-reviewed PASS | 38 (C05, C06, C07, C10, C17, C18 NOT RE-VALIDATED) | GM25-Q01 — launch cut (merged into LAUNCH-01, §2.1) | [`areas/GM-25-web-next-expo-parity-ux.md`](areas/GM-25-web-next-expo-parity-ux.md) |
+| GM-25 Web/Next/Expo parity/UX | Traced (re-run) + senior-reviewed PASS | 38 original entries (C06, C07, C10, C17, C18 still need re-validation) | GM25-Q01 — launch cut (merged into LAUNCH-01, §2.1) | [`areas/GM-25-web-next-expo-parity-ux.md`](areas/GM-25-web-next-expo-parity-ux.md) |
 | GM-26 Admin/privacy/security/release | Traced (re-run) + senior-reviewed PASS WITH NOTE | 48 (Q07, Q12–Q20, Q22–Q26, Q33 NOT RE-VALIDATED; Q43 pentest UNKNOWN) | GM26-Q36 — launch cut (merged into LAUNCH-01, §2.1) | [`areas/GM-26-admin-privacy-security-release.md`](areas/GM-26-admin-privacy-security-release.md) |
+| GM-27 Mobile-only flows (added 21 Nov) | Traced on pr257-int `21add924` by the 21 Nov review | 7 open | GM27-Q01 — should unfinished posts appear on the dashboard? | [`areas/GM-27-mobile-only-flows.md`](areas/GM-27-mobile-only-flows.md) |
 
-**Totals:** 540 area-question entries as written; 524 after 16 enumerated merges (§3), **not yet globally de-duplicated**. Many are OPEN; other entries are UNVERIFIED, adopted reference-only or source-invariant checks. Existing 30 owner-carried decisions remain binding; no NEW owner answers were recorded in this PR.
+The Qs column indexes the original area entries plus GM-27. See [OWNER_GRILL.md](OWNER_GRILL.md) §2 for the current open-question counts.
 
 † GM-18: only the 39-line [senior-review summary](areas/GM-18-talent-recruitment-SENIOR-REVIEW-ONLY.md) was recovered. The original full area trace and 26 full question-and-alternative records are **missing** from this PR. This area is PARTIALLY VERIFIED, not COMPLETE; recover the trace or reconstruct it at the fixed code head before the owner interview.
 
@@ -62,7 +63,7 @@
 **Current behaviour:** PR #200 (draft, 24 Oct) audit says PRODUCTION NO-GO; Issue #250 open; CI red on main; staging deploys queued since October (PR #167, no self-hosted runner); marketplace is a read-only public catalogue at defaults with no payment path; Expo pays via `Linking.openURL` to Stripe Checkout with the return-to-app leg unverified; 480-file mobile rewrite (PR #248) unmerged.
 **Recommendation (single):** A — no launch until the NO-GO is cleared; then Vite web + Next public first, Expo after Senior Package Testing, marketplace deferred from the launch cut.
 **Options:** A (recommended) — no launch until NO-GO cleared, then Vite + Next public first, marketplace deferred, Expo after package testing. B — browse-only early access (no bookings, no payments). C — bookings live with manual/off-platform charges. D — full launch with recorded risk acceptance.
-**Why one question:** GM-21's "defer marketplace", GM-25's "Vite + Next first, Expo after", and GM-26's "no launch until NO-GO cleared" are components of one decision, not three. Asking them separately could produce three answers that cannot all be true.
+**Ask together:** GM-21-W01 covers marketplace switches, GM-16-W01 the trial and GM-16-W02 billing surfaces. The live-fulfilment launch gate includes the stuck-checkout fix (GM13-Q13, BL-09) and payment readiness (LA-Q05, BL-03).
 
 ### 2.2 OFFER-01 — firm offer vs enquiry (merges GM-18-Q07 + GM-24-Q14 / TB-Q07)
 
@@ -73,6 +74,8 @@
 **Options:** A — keep firm offer everywhere (GM-18's original). B — enquiry/chat first everywhere, then offer (GM-24's original). C (recommended) — enquiry first on public contacts, firm offer for favourites/members. D — offer only after an availability check passes.
 
 ### 2.3 AHPRA-FAV-01 — favourite locums and the AHPRA check (merges GM-05 Q-01 + GM-02 ON-P01)
+
+**ANSWERED (21 Nov review):** the owner answered ON-P01 = **A** (employees skip, favourites checked) in the launch grill on 23 Oct 2026. Not asked again; the code gap is ENGINEERING_BACKLOG BL-02.
 
 **Question:** Should favourite locums be exempt from the AHPRA check on public shifts?
 **Owner:** GM-05 (Q-01 framing) — record the answer in GM-02 (ON-P01); do not ask twice.
@@ -101,6 +104,8 @@
 **Recommendation:** A — yes, when it sends/approves, logged with time + version.
 
 ### 2.7 VERIFY-GATE-01 — where Verified + current AHPRA are enforced (merges GM-11-Q11 + GM-12-Q01)
+
+**ANSWERED (21 Nov review):** the owner answered ON-Q03 = **B** (checked on every outside booking) on 23 Oct 2026. Not asked again; the code gap is ENGINEERING_BACKLOG BL-01.
 
 **Question:** Where must Verified + current AHPRA be enforced — at posting, at interest, at offer, or at acceptance?
 **Owner:** GM-12 (Q01 framing, proven end-to-end) — GM-11 Q11 records the same answer.
@@ -148,7 +153,7 @@
 
 ## 3. De-duplication accounting
 
-540 area-question entries as written → **524 entries after the 16 explicitly documented merges**. This is verified arithmetic, **not proof that 524 independent owner decisions remain**: cross-area adopted and repeated questions (notably GM-19/GM-23, GM-02/GM-24 and GM-18/GM-26) still require canonical-ID mapping. Distinguish OPEN, APPROVED, IMPLEMENTATION GAP, UNVERIFIED and duplicate/reference-only entries before counting owner decisions.
+The table records 16 merges from the original queue. See [OWNER_GRILL.md](OWNER_GRILL.md) §2 for the current open counts and §1 for carried answers.
 
 | Merge | Questions merged | Removed |
 |---|---|---|
@@ -174,6 +179,8 @@ Applied to `~/workspace/proactivity/chemisttasker-grill-gm01.md` and verified at
 (d) The byte-identical claim is qualified as spot-checked for one file, not a full audit.
 
 ## 5. Consolidated ask order (one question at a time in conversation)
+
+> **Superseded for the owner interview by [OWNER_GRILL.md](OWNER_GRILL.md) section 2 (area order).** Items 2 (VERIFY-GATE-01) and 7 (AHPRA-FAV-01) are answered; item 10 is an implementation checkpoint.
 
 Ask the merged questions once, in this dependency order. Each area's remaining questions follow its own first question; the full question text lives in the area file.
 
@@ -212,5 +219,5 @@ Ask the merged questions once, in this dependency order. Each area's remaining q
 - **GM-21/GM-22 caveat:** `search_code` results reflect the default branch (`main`), not the PR head — flagged wherever a finding rests on search alone.
 - **GM-18 file path:** worker trace file not recovered in this pass — locate before the PR (§1, †).
 - **GM-01 file:** the GM-01 senior-review corrections (§4) are recorded here; verify they are present in the file itself before the PR.
-- **Legacy HTML page:** the Grill Me HTML artifact (`grill-me`) still carries the 142 stale #184 questions with the "Stale — re-trace needed" stamp; it is NOT the consolidated queue in this file. The PR should carry this consolidated queue (524 unique questions), not the stale 142.
+- **Legacy HTML page:** the Grill Me HTML artifact (`grill-me`) still contains the 142 stale #184 questions. Use [OWNER_GRILL.md](OWNER_GRILL.md) for the current interview order.
 - **No new owner answers recorded in this PR.** Historic APPROVED decisions remain binding: see `OWNER_DECISION_LEDGER.md`. PR #267 exists and is still draft. No app code, merges or deployments are authorised by these documents.

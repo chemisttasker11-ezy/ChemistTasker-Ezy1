@@ -1,5 +1,14 @@
 # GM-10 — Shift posting / rates — Grill Me trace (read-only, documentation only)
 
+> **Corrections against current code (21 Nov 2026 review).** 10 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 6 hold, 4 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q01, retry case | “no server guard” against duplicate posting | STALE for keyed retries | pr257 supports per-user idempotency receipts for keyed create requests. Independently submitted requests with different keys are still separate postings. | `pr257:backend/shifts/base.py:123`; `:177`; `pr257:shared-core/src/domains/shifts/api.ts:217` |
+| Q05 | no past-date guard or recurrence horizon cap | STALE for backend posting | pr257 accepts posting dates from pharmacy-local today through the end of the fourth following calendar month, including recurring end dates. main lacks this backend guard. | main entry: `main:backend/shifts/posting.py:78`; candidate guard: `pr257:backend/shifts/posting.py:66`; create: `:100`; edit: `:228` |
+| Q06 / Q11 | “Interested/accepted workers are NOT re-notified” | WRONG | Shift edits notify active interest holders, counter-offer holders and workers with pending or accepted offers. Notification does not mean existing accepted terms are re-confirmed. | `main:backend/shifts/posting.py:215`; `pr257:backend/shifts/posting.py:257`; recipients: `pr257:backend/shifts/emails.py:406` |
+| Q09 | “draft … in-memory … only” | STALE for submitted-request recovery | There is still no server posting-draft state. Expo now persists submitted intents and recovery edits, so an uncertain submitted post is not merely disposable in-memory form state. | `pr257:frontend_mobile/roles/shared/shifts/PostShiftScreen.tsx:685`; `:1328`; `:1393`; `:1426` |
+
 - **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 - **Issue:** [#250 — Grill Me, one consolidated backend, web & Expo business-logic sign-off before launch](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/issues/250)
 - **Revalidation base:** active PR [#249](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/249) (stacked on [#248](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/pull/248))

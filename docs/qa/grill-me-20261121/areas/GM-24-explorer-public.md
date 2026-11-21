@@ -1,5 +1,12 @@
 # GM-24 — Explorer / Public — Traced Flow & Validated Question Queue
 
+> **Corrections against current code (21 Nov 2026 review).** 10 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 8 hold, 2 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q07 | “Pharmacy.verified is only read by the ethical marketplace” | WRONG | Goods marketplace eligibility also requires verified pharmacy ownership. Ordinary shift posting still does not add that goods-marketplace verification gate. | `pr257:backend/marketplace/policy.py:93`; `pr257:backend/marketplace/policy.py:99` |
+| Q08 / Q09 | Anonymous pharmacy name stays hidden through offer/acceptance | WRONG | Board pharmacy details are redacted, but an offered worker can receive the real name through engagement terms before accepting. Document this separately from the board-card presentation. | `pr257:backend/organizations/serializers.py:54`; `pr257:backend/shifts/engagement.py:640`; `pr257:backend/shifts/serialization/offers.py:235` |
+
 - **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 - **Re-validated against:** PR #249 head **`97c4543e051b43fe30ec7e2e61ad3d69957a918e`** (verified current via `pull_request_read` on PR #249; matches the Issue #250 snapshot — no newer head). PR #249 is stacked on #248 (`feat/mobile-merge-sdk`, head `25939534a1c5543454a8e770571e4dff46380d96`). Draft, not merged, not deployed.
 - **Method:** Issue #250 + PR #184 format. Every old #184 question relevant to GM-24 was re-checked against the current code at the head above. No GitHub rate-limit (429) was hit; all evidence below is current-head evidence, not October 2026 evidence.
@@ -120,7 +127,7 @@ Trigger → Actor → Backend/API → Vite → Next → Expo → Persisted state
 | Old ID | Question (short) | Verdict | What changed / stayed |
 |---|---|---|---|
 | ON-Q01 | Which sign-up tracks at launch? | STILL VALID | 3 worker tracks unchanged; note `ORG_STAFF` + `PHARMACY_MANAGER` roles added since — they are not self-registration tracks. |
-| ON-Q02 | What can a worker do before Verified? | CHANGED | Browsing still open to all signed-in users; the Verified gate at apply is now real and includes an Explorer branch. |
+| ON-Q02 | What can a worker do before Verified? | Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation | Signed-in worker dashboards require mobile verification. Anonymous public browsing stays open. |
 | ON-Q03 | Where must verification be enforced? | CHANGED | Public apply/accept/claim now gated (`require_public_ahpra`); dedicated-offer *creation* and chain/org/community interest still skip it. |
 | ON-P01 | Who is exempt from AHPRA gates on public shifts? | STILL VALID | Member-access bypass (`is_public_shift_member_access`) still skips the gate for accepted staff/favourites on named public shifts. |
 | ON-Q05 | What can Explorers do with shifts? | CHANGED | Interest now possible on verified EXPLORER-role shifts; accept still impossible; Expo dead screen fixed; upgrade path built. Decision still open — now sharper. |
@@ -167,40 +174,21 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 - **ALTERNATIVE D — No shifts at all for Explorers:** hide the Shifts nav and the boards for Explorers; boards become a post-upgrade feature. Scenario: a newcomer signs up, sees only profile + Talent Hub + Learning. Trade-off: cleanest, but throws away the discovery funnel and the Explorer dashboard's "Find your next shift" section.
 - **Other (describe) / Defer:** ___
 
-### GM-24-Q02 — What can a worker do before they are Verified?
-- **Old ID:** ON-Q02. **Status:** CHANGED, still open.
-- **ACTUAL TODAY:** Anyone signed in can browse both boards. Verified (email + mobile, + AHPRA for pharmacists/interns, + ID for overseas Explorers) is checked only when applying/accepting/counter-offering on public shifts (`require_public_ahpra`; Explorer branch needs verified Explorer onboarding). Unverified workers still receive availability-match emails for shifts they cannot apply to. Anonymous visitors can browse everything public but cannot act at all.
-- **RECOMMENDED: Keep browsing open; keep the apply-time gate; stop emailing unverified workers about shifts they cannot take (see Q19).** Browsing is the funnel; the gate is at the right point. Severity: medium.
-- **ALTERNATIVE A — Keep current logic (browse everything, gate applying; unverified match emails continue).**
-- **ALTERNATIVE B — Browse after email + mobile only:** anonymous browsing ends; every board view needs at least a half-verified account. Scenario: a pharmacist hears about a shift, must verify mobile before even seeing rates — funnel narrows sharply.
-- **ALTERNATIVE C — Nothing until Verified:** strictest; kills the anonymous SEO boards entirely.
-- **Other / Defer:** ___
+### GM-24-Q02 — Browse access before full verification
+- **Status:** Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation.
+- **Actual today:** The worker dashboard requires email and mobile verification. Anonymous visitors can still read public boards. See GM-24-Q19 for match emails.
 
-### GM-24-Q03 — Where must role-appropriate verification be enforced?
-- **Old ID:** ON-Q03. **Status:** CHANGED, still open.
-- **ACTUAL TODAY:** Public apply, accept, and community-shift claim check Verified + latest AHPRA (`require_public_ahpra`, with the member-access bypass). Dedicated-offer *creation* does not check the candidate; chain/org/community *interest* does not check either (the gate runs only when `visibility == PLATFORM`). AHPRA re-check is queued at apply/accept when expiry passed; no scheduled scan was verified here.
-- **RECOMMENDED: B — every outside booking (offer accept, claim, dedicated offer) checks Verified + current AHPRA at creation/acceptance, not just public apply.** Rationale: the direct-offer path is the easiest way around the gate today (an unverified "pharmacist" can be booked by direct offer and only fails at accept — or, for chain-tier interest, never checked). Severity: high (trust/legal). Benefit: one rule everywhere. Risk: more 403s for legitimate members — mitigated by the existing member bypass for accepted staff/favourites.
-- **ALTERNATIVE A — Keep current logic (public-only gate).**
-- **ALTERNATIVE B — (recommended, above).**
-- **ALTERNATIVE C — B plus internal rostering:** also gate rostering a worker into pharmacist/intern roles. Scenario: a manager rosters an intern whose registration lapsed; the shift is internal so no gate fires today.
-- **Other / Defer:** ___
+### GM-24-Q03 — Verification on outside bookings
+- **Status:** Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01. Engineering: see BL-01.
+- **Actual today:** The shared guard skips non-public shifts (`pr257:backend/onboarding/verification/state.py:174`).
 
-### GM-24-Q04 — Who is exempt from AHPRA gates on public shifts?
-- **Old ID:** ON-P01. **Status:** STILL VALID.
-- **ACTUAL TODAY:** Anyone with an accepted membership at the posting pharmacy (staff or favourite) reaching its named (non-anonymous) public shift skips the AHPRA/Verified gate (`is_public_shift_member_access`); invitations never need AHPRA (no check at invite time was found).
-- **RECOMMENDED: Keep the member bypass for employees; check favourites.** A favourite locum is still an outside worker — their registration should be current. Severity: medium.
-- **ALTERNATIVE A — Keep current logic (members + favourites exempt).**
-- **ALTERNATIVE B — Employees exempt; favourites checked.**
-- **ALTERNATIVE C — Nobody exempt.**
-- **Other / Defer:** ___
+### GM-24-Q04 — AHPRA exemption
+- **Status:** Answered: A, employees are exempt and favourites are checked, launch grill, 23 Oct 2026 - see AHPRA-FAV-01. Engineering: see BL-02.
+- **Actual today:** A favourite with an eligible membership can skip the check on a named public shift at that pharmacy (`pr257:backend/shifts/interest.py:21`).
 
-### GM-24-Q05 — Which sign-up tracks should workers get at launch?
-- **Old ID:** ON-Q01. **Status:** STILL VALID.
-- **ACTUAL TODAY:** Three worker tracks (Pharmacist; Other Staff — intern/technician/assistant/student on one form; Explorer). `ORG_STAFF` and `PHARMACY_MANAGER` also exist but are not self-registration tracks (manager is created by organisation email onboarding).
-- **RECOMMENDED: Keep current logic.** Severity: low.
-- **ALTERNATIVE A — Keep current logic.**
-- **ALTERNATIVE B — One track per role (six separate forms).** Trade-off: clearer for students vs technicians, but six forms to maintain on web + Expo + Next.
-- **Other / Defer:** ___
+### GM-24-Q05 — Worker sign-up tracks
+- **Status:** Answered: KEEP the existing sign-up tracks, launch grill, 23 Oct 2026 - see ON-Q01.
+- **Actual today:** Pharmacist, Other Staff and Explorer are worker sign-up tracks. Owner is separate. Organisation staff and pharmacy managers join through other routes.
 
 ### GM-24-Q06 — Who must pass an ID check?
 - **Old ID:** ON-Q08. **Status:** STILL VALID.
@@ -231,7 +219,7 @@ Plain English first. Each question: ACTUAL TODAY (traced at `97c4543e`), RECOMME
 
 ### GM-24-Q09 — When does an anonymous pharmacy's name reach the worker?
 - **Old ID:** PO-Q12. **Status:** STILL VALID.
-- **ACTUAL TODAY:** Not defined anywhere traced. The name stays hidden through interest, offer, and acceptance (accept email still says "Shift in {suburb}"). Nothing in the terms snapshot or agreement preview names a reveal point.
+- **ACTUAL TODAY:** The anonymous listing hides the name. The terms preview exposes the pharmacy name and ABN before acceptance, and several notices use the real name. Which step should reveal it is open. Engineering: see BL-13 (`pr257:backend/shifts/serialization/offers.py:244`).
 - **RECOMMENDED: A — Reveal in the agreement preview (before the worker accepts).** The worker needs to know who they are contracting with before they are bound; the pharmacy keeps anonymity while browsing. Severity: high (contract/clarity).
 - **ALTERNATIVE A — (recommended, above).**
 - **ALTERNATIVE B — After reservation (payment pending).**
@@ -590,3 +578,23 @@ Do not treat any item below as decided. Order is suggested, not approved.
 - ON-Q07 / ON-P02 (AHPRA suspension handling), TB-05 (heart vs favourites), TB-09 (block list), AV-01/AV-06 (availability sync/hiring) — not re-validated in this area; they belong to GM-01/GM-18/GM-19/GM-25 as noted in §3.
 - Live behaviour: nothing was run (no builds, tests, browser runs, or live site checks). The staging site's reachability was not re-checked here.
 - The Vite `main.tsx` route table was not individually enumerated; public routes are evidenced by the sitemap, `PublicRouteBridge`, and `LandingPage.PAGE_ROUTES`.
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-24-W01: What happens to explorer accounts that already hold admin rows in production? (W-10, D96)
+**Scenario:** before the D96 guard existed, Zoe (an Explorer) was made a pharmacy manager at Tom's.
+**What happens today:** on the Expo branch the guard refuses any new admin grant to an Explorer (`pr257:backend/access_control/admin_roles.py`; not yet on deployed main), but rows created before it stay. The dev database has 0 such rows. The production count is unknown until the read-only query `explorer-admin-counts.sql` (mobile-mirror work folder) runs on production.
+**Recommendation first: A.** Count first. If any are found, end those admin rows and tell the pharmacy owner; Zoe keeps her ordinary Explorer access.
+- **A (recommended):** run the count; end any explorer admin rows and notify the owner.
+- **B:** run the count; each owner decides case by case.
+- **DEFER:** only if the count is 0.
+
+**Status:** OPEN (needs the production count; the rule itself is answered by D96)
+
+### Answered, not re-asked: role conversion to Explorer (owner, 13 Nov, D93)
+"Explorer will not get invoices and owner or pharmacist will not change to explorer." Any question about a pharmacist or owner becoming an Explorer, or about Explorer invoices, is answered: it doesn't happen. The Explorer-to-Pharmacist upgrade (section 1.4) stays in scope.

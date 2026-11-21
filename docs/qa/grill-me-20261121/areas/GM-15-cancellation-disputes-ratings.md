@@ -1,5 +1,13 @@
 # GM-15 — Cancellation / disputes / ratings — traced flow + validated question queue
 
+> **Corrections against current code (21 Nov 2026 review).** 10 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 7 hold, 3 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| GM15-46 | “test mode runs unimpeded” | WRONG — qualification required | Test collection requires an explicitly allowed non-production environment. Live collection additionally requires the corresponding release flag. | `main:backend/billing/release_guards.py:28`; `pr257:backend/billing/release_guards.py:38` |
+| GM15-40 / GM15-41 | Reservation expires or retries until its “original payment deadline” | WRONG | The offer deadline and checkout-session recovery are separate mechanisms. There is no implemented reservation pay-by deadline or reservation-expiry transition matching D02/D03. | `pr257:backend/shifts/models.py:692`; `pr257:backend/shifts/offers.py:355`; `pr257:backend/billing/urls.py:11` |
+| GM15-47 | Fingerprint exists, but cancellation/legal-policy acceptance is missing | MAIN-ONLY — fingerprint holds on PR257 only | PR257 protects the reviewed engagement terms with a fingerprint; main does not. Neither engagement snapshot contains the cancellation matrix or pharmacy-side policy acceptance. | `main:backend/shifts/offers.py:385`; `pr257:backend/shifts/offers.py:387`; `pr257:backend/shifts/engagement.py:636` |
+
 - **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 - **Traced against:** active PR #249 (`fix/pr248-expo-production-waves-20261104`), **head verified 97c4543e051b43fe30ec7e2e61ad3d69957a918e** — identical to the SHA in Issue #250, so no refresh drift. PR #249 is still DRAFT, stacked on #248, not merged, not deployed.
 - **Method:** Issue #250 + PR #184 (`docs/qa/launch-grill/AUDIT.md`, `questions.json` on `refs/pull/184/head`) as the example format. Every old GM-15-relevant question was re-validated against files read at the PR #249 head via the GitHub connector (read-only; no code, PRs, issues or comments created).
@@ -446,11 +454,9 @@ Severity: **Launch-blocker** = cannot launch real bookings without it; **High** 
 - **B — Soon after launch. C — Not needed.**
 - **Other / defer.**
 
-### GM15-46 — LA-Q06 / SH-02 · The old 10%/20% penalty route is still live [CHANGED — WORSE + GATED]
-- **Actual today:** `POST /billing/charge-penalty/<id>/` still routed (`billing/urls.py`), still exported from shared-core (`chargeShiftPenalty`), no UI calls it. **New evidence:** repo characterisation tests prove it charges the wrong amount across timezones, charges all assignments despite a slot selector, and opens duplicate Stripe sessions with no idempotency key (`test_cancellation_policy_evidence.py`; `RELEASE_DECISIONS_20261102.md` #8). **New gating:** live mode requires `BILLING_LIVE_SHIFT_PENALTY_ENABLED` (`release_guards.py`); test mode runs unimpeded.
-- **Recommended (Launch-blocker): A — Before launch: disable the callable route** (remove it or gate it off unconditionally) and do not introduce replacement charges until Australian counsel reviews classification, proportionality, disclosure and unfair-contract-term risk (see GM15-49).
-- **B — Soon after launch. C — Not needed.**
-- **Other / defer.**
+### GM15-46 — Legacy cancellation charging (LA-Q06 / SH-02)
+- **Actual today:** The route and client export exist. The live penalty flag defaults off. Checkout still uses the old bands and all assignments in an allowed environment.
+- **Status:** Engineering: see BL-04. Keep the route and export behind the existing live flag and fix the charge. Ask about launch scope at GM15-01.
 
 ### GM15-47 — LA-Q10 / SH-09 · Accepted terms don't include the cancellation table or terms version [CHANGED — PARTIAL]
 - **Actual today:** Better than Oct, still incomplete. A stable terms fingerprint now exists (`engagement.py: shift_engagement_terms_version`, SHA-256) and acceptance echoes it (PR #249 D2 work). But the snapshot (`build_shift_engagement_terms`, `version: 1`) still contains **no cancellation band table, no platform terms version, no pharmacy-side acceptance** — only worker `accepted_at` / `accepted_by_user_id`. The register's legal note stands: P09 fees need clear disclosure *before* acceptance before they can ever be charged.
@@ -485,7 +491,7 @@ Severity: **Launch-blocker** = cannot launch real bookings without it; **High** 
 - **C — Hold launch until fees are enforceable.** No cancellation ships until the fee table is legally reviewed and built. *Trade-off:* delays launch indefinitely for a money feature; a non-money cancel could have shipped meanwhile.
 - **Other (describe) / Defer.**
 
-**What happens after the answer:** if A or B, the implementation backlog (§7) items B1–B4 are unblocked; if C, GM-15 stays launch-blocking and the legacy penalty route must still be disabled (Q46, a code gap, not a decision).
+**What happens after the answer:** The chosen launch scope controls when cancellation capabilities turn on. Engineering: see BL-04 for the charge and B2–B4 for the cancellation workflow.
 
 ---
 
@@ -506,7 +512,7 @@ Severity: **Launch-blocker** = cannot launch real bookings without it; **High** 
 | C10 | Subscriber fulfillment pricing fixed, but Stripe price IDs still hard-coded | `shift_payments.py` (SH-03 partial fix) | Low |
 
 ### Decision gaps — owner must choose first (the queue in §4)
-Q01 (launch scope) → Q02–Q04 (fee recipient/bands/boundaries) → Q05–Q07 (approval window/emergency/unanswered) → Q08–Q10 (mutual/emergency waivers) → Q11–Q13 (no-show definition/confirmation) → Q15–Q18 (reopen/replacement) → Q19–Q22 (booking fee + worker pay) → Q23–Q25 (disputes/appeals/visibility) → Q26–Q31 (incident ladder) → Q32–Q34 (completion/hours/early finish) → Q35–Q37 (ratings/history) → Q46–Q49 (launch gates: disable legacy route, terms disclosure, legal review). Plus carried-decision conflicts:
+Q01 (launch scope) → Q02–Q04 (fee recipient/bands/boundaries) → Q05–Q07 (approval window/emergency/unanswered) → Q08–Q10 (mutual/emergency waivers) → Q11–Q13 (no-show definition/confirmation) → Q15–Q18 (reopen/replacement) → Q19–Q22 (booking fee + worker pay) → Q23–Q25 (disputes/appeals/visibility) → Q26–Q31 (incident ladder) → Q32–Q34 (completion/hours/early finish) → Q35–Q37 (ratings/history) → Q47–Q49 (remaining launch gates). Q46 follows BL-04. Plus carried-decision conflicts:
 
 | # | Carried decision vs code | Conflict |
 |---|---|---|
@@ -522,7 +528,7 @@ Q01 (launch scope) → Q02–Q04 (fee recipient/bands/boundaries) → Q05–Q07 
 
 | # | Item | Unblocked by | Notes / acceptance |
 |---|---|---|---|
-| B1 | Disable/remove `charge-penalty/` route (or gate off unconditionally) | Q46 (code gap C1 — can proceed on owner confirmation, not a policy choice) | No authenticated caller can open a cancellation checkout; shared-core export removed or stubbed; regression test |
+| B1 | Superseded by BL-04 in the central engineering backlog | Existing live penalty flag | Preserve the route and shared-core export. Correct the charge before enabling live collection. |
 | B2 | Cancelled state + cancel endpoints (owner cancel; worker cancel-request; admin/support cancel) with reason + audit | Q01, Q05, Q38–Q39 | Per-date / selected / whole-posting (D05); role + tenant checks (403); concurrent cancel vs payment; idempotent retry |
 | B3 | Reopen-after-cancel (same shift, favourites first) + no-show slot release | Q15, Q16, Q11 | Reuses roster-release escalation pattern (`worker_actions.py`); no duplicate shift (R06) |
 | B4 | Cancel notices (recipients + channels) incl. emergency escalation timer | Q05–Q06, Q38–Q39 | In-app + push; email for money/cancel; support alert after 30 min |
@@ -566,3 +572,15 @@ Base: `https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e05
 - Ratings: `backend/ratings/views.py`, `backend/ratings/models.py`, `backend/ratings/admin.py`, `backend/talent/views/explorer.py:63-82`
 - Timesheets/history: `backend/workforce/timesheet_transitions.py`, `backend/shifts/lifecycle.py:131-175`, `backend/shifts/my_shifts.py`
 - Decisions/docs: `docs/qa/RELEASE_DECISIONS_20261102.md`, `docs/qa/BOUNDED_CANCELLATION_NOTIFICATION_20261030.md`, `docs/qa/launch-grill/AUDIT.md` + `questions.json` (PR #184 head `c786a4b8`), Issue #250, PR #249 head `97c4543e`
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-15-W01: Cancellation charging code vs the carried fee rules (W-14, register item 8): defect, not a question
+**Answered already (carried):** P07 (fees only for outside confirmed bookings), P08 (notice bands), P09 (a percentage of the frozen agreed wages for the cancelled dates only), FEES (0 / 0 / 10 / 15 / 20 / 25 / 30 %), F01 (fee, refund and pay kept separate), NOPEN (no money penalties for workers, ever).
+**Code today:** `billing/shift_payments.py` `charge_penalty` uses the ambient timezone, charges every assignment on the shift, ignores the selected dates, has no persisted obligation or idempotency key, and uses the old 10% / 20% scheme (register item 8; GM15-46). Live charging is closed by default (`BILLING_LIVE_SHIFT_PENALTY_ENABLED=False`, `pr257:backend/core/settings.py:679`).
+**Disposition:** engineering backlog BL-04 (rebuild to the carried rules). The only owner question left here is GM15-49 / LA-R02: may cancellation charges launch before an Australian legal review?

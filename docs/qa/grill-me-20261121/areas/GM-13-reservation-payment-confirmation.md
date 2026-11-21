@@ -1,5 +1,16 @@
 # GM-13 — Reservation / payment confirmation — Full Grill Documentation
 
+> **Corrections against current code (21 Nov 2026 review).** 14 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 8 hold, 6 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q01 | “no deadline field” at all | WRONG if it includes provider expiry | Checkout stores `provider_expires_at`. This is provider metadata, not the missing D02 business deadline. | `main:backend/billing/models.py:166`; `pr257:backend/billing/checkout_reservations.py:147` |
+| Q01 / Q04 / Q08 | reservation ends when Stripe’s session lapses | WRONG | Stripe session expiry alone does not clear the application’s reservation or accepted-awaiting-payment offer. Remove the promise that the worker or occurrence is automatically freed after 24 hours. | webhook handling: `main:backend/billing/webhooks.py:25`; persistent release: `pr257:backend/billing/checkout_reservations.py:197`; offer hold: `pr257:backend/shifts/assignment.py:246` |
+| Q11 | “TFN/ABN + super … accept blocked until complete” | WRONG | ABN completeness blocks acceptance. TFN/super incompleteness can defer payroll while the worker accepts; this question must match GM-02 and GM-12. | ABN gate: `main:backend/shifts/engagement.py:272`; TFN deferral: `pr257:backend/shifts/engagement.py:660`; `:703` |
+| Q12 / CG legacy penalty | “legacy … charge … still live” | UNVERIFIABLE as production collection; code is gated | The legacy owner-charge route exists, but live collection is disabled by default and guarded. Describe its dormant calculation defects and require deployment verification before calling it a live production charge. | permission: `pr257:backend/billing/views.py:181`; charge guard: `main:backend/billing/shift_payments.py:223`; release flag: `pr257:backend/billing/release_guards.py:28`; default: `pr257:backend/core/settings.py:679` |
+| W01 | “refund the rest” after orphan recovery | WRONG if described as automatic refund (already fixed in the W question text) | Recovery can preserve available work and flag unavailable paid work for refund/manual follow-up. The inspected path does not itself execute that refund. | `pr257:backend/billing/checkout_reservations.py:180`; `pr257:backend/billing/paid_fulfillment.py:36`; `:52` |
+| W02 | paid work released “as soon as assignment rows are gone” | WRONG about timing and slotless condition (already fixed in the W question text) | Released paid work is detected lazily during checkout preparation or fulfilment guarding. A slotless accepted offer continues to hold its work even without assignment rows. | `main:backend/billing/checkout_reservations.py:49`; `pr257:backend/billing/checkout_reservations.py:60`; callers: `:74`, `:245` |
+
 > **Independent senior audit correction, 21 November 2026:** D02 and D03 are **ALREADY APPROVED** owner rules, not fresh questions. D02: >48 h before shift start gives 24 h to pay; 12–48 h gives 6 h; 2–12 h gives 2 h; <=2 h gives 30 min; deadline never extends past start. D03: on unpaid expiry, release to the SAME audience and notify manager and worker with no automatic escalation or penalty. `checkout_reservations.py` stores a Stripe provider expiry but not the D02 business deadline. Treat GM13-Q01/Q02 as **IMPLEMENTATION GAP and validation checkpoint**, not a prompt to choose Stripe 24h as an alternative to a settled policy. Preserve the original trace as historical source evidence. See [owner ledger](../OWNER_DECISION_LEDGER.md).
 
 
@@ -81,10 +92,10 @@ Method: every question in `questions.json` (130 questions + 30 carried decisions
 | Old ID | Old question | Verdict | Evidence (current code) |
 |---|---|---|---|
 | D01 | Acceptance creates a time-limited reservation; only verified payment confirms it | **CHANGED — half true** | Acceptance does create a reservation (`ACCEPTED_AWAITING_PAYMENT` + `FulfillmentCheckout`/`FulfillmentReservation`, `offers.py:accept`, `checkout_reservations.py:prepare_checkout`) and only verified payment (webhook `bind_paid_checkout`, or Pills) confirms it. But the reservation is **not time-limited by any D02 deadline** — see D02. The "time-limited" half is not implemented |
-| D02 | Pay-by window: >48h 24h; 12–48h 6h; 2–12h 2h; <2h 30 min; never past shift start | **NOT IMPLEMENTED — must be re-asked** | No pay-by deadline exists anywhere in the traced code. No `pay_by`/`deadline`/D02 constant, no per-offer deadline field, no expiry job (`CELERY_BEAT_SCHEDULE` has none). The only time bounds on a reservation are Stripe's 24 h Checkout session (`checkout_reservations.py:219`, "no `expires_at` is set") and the manual expire/resume endpoints. A shift <2 h away does **not** get a 30-minute window today — it gets up to 24 h. Carried forward as GM13-Q01 (first question) |
-| D03 | Unpaid reservation expires → release to same audience, notify both sides, no penalty | **NOT IMPLEMENTED as a flow** | There is no expiry event to trigger it: no deadline (D02), no job (F08), no release-to-audience step, no expiry notification. What exists is manual provider-confirmed expiry (`expire_checkout`) and the 48 h operator path (`expire_unreconciled_checkout`). When a checkout is expired, reservations deactivate — but nothing re-offers the shift or notifies the worker/manager. Carried forward as GM13-Q02 |
+| D02 | Pay-by window: >48h 24h; 12–48h 6h; 2–12h 2h; <2h 30 min; never past shift start | Answered: use these pay-by bands, carried D02 - see GM13-Q01 | Stripe expiry is recorded. The app has no D02 deadline or scheduled release. Engineering: see BL-06. |
+| D03 | Unpaid reservation expiry | Answered: reopen to the same audience, notify both sides, no penalty or automatic escalation, carried D03 - see GM13-Q02 | Manual provider-confirmed expiry and the 48-hour operator path can deactivate the hold. The app has no scheduled D03 offer transition or notices. Engineering: see BL-06. |
 | F01 | Pharmacy cancels: booking fee, refund/credit, worker pay stay separate | **STILL VALID (adopted GM-15/GM-17)** | No code contradicts it; no cancellation-charge engine exists to merge them. Boundary: GM-15/GM-17 own the money decisions |
-| F04 | Payment arrives after expiry: no rebooking; pharmacy chooses credit or refund after approved review | **PARTLY TRUE — mechanism changed** | No rebooking is correct (F06). But there is no credit/refund choice in the app: no refund/credit endpoint exists (GM-17 adopted), and the "approved review" is the `reconciliation_required` flag + owner notice, with no approver workflow. Carried forward as GM13-Q09 |
+| F04 | Payment arrives after expiry | Answered: no rebooking; pharmacy chooses credit or refund after approved review, carried F04 - see REFUND-01 | The app flags reconciliation and notifies managers. GM17-Q03 owns who approves and how quickly. GM-13-W01 asks about a possible orphan-recovery exception. |
 | P07/P09/FEES | Owner fees by time before shift; % of frozen wages, cancelled dates only | **NOT GM-13 — boundary GM-15/GM-17** | P09 is a preview-only calculator (GM-15 adopted: calculator gone / not connected); the only charging code is the legacy 10%/20% penalty (GM-16). GM-13 must not re-decide it |
 | BK-Q05 | How long does an offer stay open? | **STILL VALID** | Flat 48 h, not capped at shift start (`assignment.py:22,105,273,285`); expiry applied lazily on list/accept (`offers.py:184,355`). Carried forward as GM13-Q05 |
 | BK-Q06 | Offer declined/expired — what happens to the shift? | **STILL VALID** | Decline notifies the owner, shift stays open (accept flow + notifications in `offers.py`); expiry is silent, no next-applicant offer (no code path found; `expire_competing_offers` only runs on finalisation). Carried forward as GM13-Q06 |
@@ -93,7 +104,7 @@ Method: every question in `questions.json` (130 questions + 30 carried decisions
 | BK-Q14 | Can a worker drop a reservation before payment without an incident? | **STILL VALID** | No withdraw action exists in the traced code: no worker endpoint ends an `ACCEPTED_AWAITING_PAYMENT` offer; it ends only on payment, explicit owner expiry of the checkout, AHPRA decline (F07), or Stripe session expiry. Carried forward as GM13-Q04 |
 | BK-R01 / SH-13 | What happens after booking payment fails? | **CHANGED — and SH-13 is undefined** | `SH-13` has **no definition** in `AUDIT.md` (only the `gap: SH-13` field on BK-R01 in `questions.json`). The retry behaviour today: a failed/cancelled Stripe attempt leaves the `FulfillmentCheckout` PREPARED/OPEN/UNKNOWN; the owner can resume the same attempt or expire it and start a replacement (F05); a Stripe provider error returns 400/503 and changes nothing. There is no "original deadline" to retry until, because D02 does not exist — the effective bound is the Stripe session's 24 h. Carried forward as GM13-Q08 |
 | ON-Q13 (ON-08) | Should pharmacies save a payment method during setup? | **STILL VALID** | Every booking opens a new Stripe Checkout; no card is stored anywhere in the traced code (no saved-card endpoint; `charge_shift_fulfillment` creates a fresh Session per booking; a Stripe `customer` is reused only when a subscription exists). The Oct rationale cites a 30-minute D02 window that does not exist — the urgency argument is weaker than stated, but the no-saved-card fact stands. Carried forward as GM13-Q10 |
-| ON-Q04 (ON-11) | When must worker pay details (ABN/TFN, bank, super) be ready? | **STILL VALID (gate half verified; exposure half not re-validated)** | Checked at accept: `_external_payment_profile` blocks acceptance until the worker's TFN or ABN profile is complete (`engagement.py:265`); `worker_payment_profile_status` reports READY / TFN_SETUP_INCOMPLETE / ABN_SETUP_INCOMPLETE. Whether managers see it early on apply/offer screens was not re-traced here (GM-14 owns the detail). Carried forward as GM13-Q11 (GM-14 owns the wording) |
+| ON-Q04 (ON-11) | When must pay details be ready? | Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04 | ABN can block acceptance; TFN/super defers payroll. Engineering: see BL-03. |
 | AG-Q01 (SH-09) | What must the worker see before accepting? | **NOT GM-13 — route to GM-14** | Terms disclosure; GM-14 verified the terms dict lacks breaks/duties/site/cancellation table/platform terms version |
 | AG-Q02 (SH-09) | Does the pharmacy accept the same agreement? | **NOT GM-13 — route to GM-14** | Worker-only acceptance verified in GM-14 |
 | CX-Q03/Q19–Q22/Q31 | Cancellation money (unpaid-reservation fee, paid-booking refund, worker cancel, approver, cancellation pay, freeze precedence) | **NOT GM-13 — boundary GM-15/GM-17 (adopted)** | No cancel endpoint for confirmed outside bookings exists in the traced code (only the AHPRA path, F07); no refund/credit engine. GM-13 must not contradict GM-15-Q01 (what cancellation can launch) or GM-17-Q01 (refund vs credit) |
@@ -113,30 +124,17 @@ Method: every question in `questions.json` (130 questions + 30 carried decisions
 
 Per-question format: plain-English explanation first, then ACTUAL TODAY with **Web** and **Expo** side by side, RECOMMENDED, ALTERNATIVE A (keep), ALTERNATIVE B/C, Other/defer. Decision status: **OPEN** for all — no owner answer recorded.
 
-### GM13-Q01 — The pay-by window does not exist. Should D02 be built as decided, or is Stripe's 24 hours the rule? (carried D02 — FIRST QUESTION, see Part D)
+### GM13-Q01 — Pay-by window (D02)
 
-**Plain English:** the owner already decided (D02) that a pharmacy gets 24 hours, 6 hours, 2 hours or 30 minutes to pay depending on how soon the shift starts — 30 minutes for a shift under 2 hours away. The code never built it. Today a reservation has no deadline at all: the only clock is Stripe's own 24-hour Checkout session, and nothing ever expires the reservation on a schedule. The owner needs to choose whether to build D02, keep the Stripe-only rule, or pick a simpler window.
+**Decision status:** Answered: payment is due in 24 h, 6 h, 2 h or 30 min depending on the shift start, carried D02 - see BL-06.
 
-**ACTUAL TODAY — Web and Expo (same backend):** no `pay_by`, no deadline field on `FulfillmentCheckout`/`FulfillmentReservation`, no D02 bands, no expiry job (`CELERY_BEAT_SCHEDULE` has no reservation job). A reservation ends only when the owner pays, explicitly expires the checkout, the worker's offer is declined (AHPRA), or the Stripe session lapses after 24 h. **Parity:** none — the absence is backend-wide; neither client shows a deadline because none exists.
-**Normal case:** worker accepts; owner pays within the hour; webhook confirms. **Edge case:** shift starts in 90 minutes; owner opens checkout, gets distracted; the worker is held for up to 24 h while the shift start passes. **Retry/concurrency:** two owners/managers paying the same shift — second gets 409 + conflict dialog. **Denied role:** only `user_can_pay_shift_charge_for_pharmacy` may pay (403 otherwise). **Payment/notification:** no expiry notification exists, so D03's "notify both sides" cannot fire.
-**RECOMMENDED:** Build D02 as already decided (24h/6h/2h/30min, capped at shift start) + a scheduled expiry job + D03 release-and-notify. Severity: high — D01/D03 and ON-Q13/BK-R01 all assume it exists; without it an unpaid reservation can strand a worker past the shift start. Benefit: the carried decisions become true; urgent shifts stop being held hostage. Risk: needs a beat task, a deadline field, countdown UI, and the expiry-notify path — the largest build in this area.
-**ALTERNATIVE A — Keep current logic:** no D02; Stripe's 24 h session + manual expire/resume is the rule. Scenario: a shift 90 minutes away is held up to 24 h by an unpaid reservation; the owner must remember to expire it. Trade-off: zero build; D01/D03 stay partly fictional and urgent shifts stay fragile.
-**ALTERNATIVE B — One fixed window:** every reservation gets 24 h (or 6 h), capped at shift start, with a job. Scenario: simpler to explain than four bands; a shift 90 minutes away still gets 90 minutes, not 30. Trade-off: less code than D02, weaker for urgent shifts.
-**ALTERNATIVE C — Deadline only, no job:** store a D02 deadline and enforce it lazily (on list/accept/pay, like offer expiry today). Scenario: a stale reservation only dies when someone looks at the shift. Trade-off: cheapest; a worker can still be held past start until someone looks.
-**Other (describe) / Defer:** deferring keeps the current Stripe-only rule by default.
-**Sources:** `backend/billing/checkout_reservations.py`, `backend/core/settings.py:271` (`CELERY_BEAT_SCHEDULE`), `backend/shifts/offers.py:accept`, `backend/shifts/assignment.py:22`.
-**Decision status:** OPEN — **ask first (Part D)**.
+**Actual today:** Provider expiry metadata is stored. Stripe session expiry alone does not release the app hold or expire the offer. An authorised manual checkout expiry can deactivate the hold after the provider confirms the expiry (`pr257:backend/billing/checkout_reservations.py:147`, `:197`, `:216`). Engineering: see BL-06.
 
-### GM13-Q02 — When a reservation expires unpaid, what exactly happens? (carried D03)
+### GM13-Q02 — Unpaid expiry (D03)
 
-**Plain English:** D03 says an unpaid reservation is released to the same audience and both sides are told, with no penalty and no auto-escalation. Nothing in the code does any of that, because nothing expires a reservation. The owner needs to confirm D03 still stands and what "release" means now that reservations are persisted occurrence holds.
-**ACTUAL TODAY — Web and Expo (same):** no expiry event, no release, no notification. Expiring a checkout manually only deactivates its `FulfillmentReservation` rows; the shift is not re-offered and nobody is told.
-**RECOMMENDED:** KEEP D03 as decided (release to the same audience, notify worker + manager, no penalty, no auto-escalation) — and implement it as part of GM13-Q01. Severity: medium (it only matters once Q01 creates an expiry).
-**ALTERNATIVE A — Keep current logic:** manual expiry only, no release, no notice. Trade-off: the shift sits open but the worker who was waiting is never told they are free, and the manager is never told to re-offer.
-**ALTERNATIVE B — Auto-offer the next applicant on expiry:** fastest refill; risks picking someone the pharmacy did not want (needs GM-12's applicant ordering).
-**Other / Defer.**
-**Sources:** `backend/billing/checkout_reservations.py:expire_checkout`, `backend/shifts/offers.py`.
-**Decision status:** OPEN.
+**Decision status:** Answered: release to the same audience, notify the worker and manager, charge no penalty and do not auto-escalate, carried D03 - see BL-06.
+
+**Actual today:** Manual checkout expiry releases the active checkout hold. It does not run the D03 offer transition or notify the worker and manager (`pr257:backend/billing/checkout_reservations.py:197`, `:216`). Engineering: see BL-06.
 
 ### GM13-Q03 — Should reservations show a live payment countdown? (carried BK-Q13)
 
@@ -205,15 +203,13 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Sources:** `backend/billing/checkout_reservations.py` (`prepare_checkout`, `open_checkout`, `expire_checkout`), `frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/hooks/useShiftPaymentActions.ts`, `docs/qa/launch-grill/AUDIT.md` (no SH-13).
 **Decision status:** OPEN.
 
-### GM13-Q09 — Payment arrives after expiry: credit, refund, or nothing — and who decides? (carried F04; GM-17 boundary)
+### GM13-Q09 — Payment arrives after expiry (F04)
 
-**Plain English:** the money is recorded and flagged for reconciliation, the owner is told the payment needs a refund or manual follow-up, and no rebooking happens. But there is no credit/refund choice in the app and no approver workflow — that is GM-17's question, and GM-13 must not answer it alone.
-**ACTUAL TODAY — Web and Expo (same):** `reconciliation_required=True` + reason + owner notification; no in-app refund/credit action (GM-17 adopted).
-**RECOMMENDED:** Do not decide here. Adopt GM-17-Q01's answer when the owner gives it (refund over 72 h / credit inside 72 h is GM-17's recommendation), and build the GM-13 half as: reconciliation queue entry + notify owner + finance/support action. Severity: high for launch (money taken with no way back in-app).
-**ALTERNATIVE A — Keep current logic:** flag + notify, manual handling outside the app.
-**Other / Defer:** defer the build, not the decision — launch with live payments and no refund path is the risk GM-17-Q01 gates.
-**Sources:** `backend/billing/payment_events.py:handle_payment_checkout`, `backend/billing/paid_fulfillment.py:finalize_paid_selection`; GM-17 senior review.
-**Decision status:** OPEN — **owned by GM-17-Q01; GM-13 adopts it**.
+**Decision status:** Answered: no rebooking after expiry; the pharmacy chooses a credit or refund after approved review, carried F04 - see REFUND-01.
+
+**Actual today:** If paid work cannot be booked, the payment is flagged and the managers are notified. No in-app credit or refund is issued (`pr257:backend/billing/paid_fulfillment.py:36`).
+
+**Open detail:** Who approves and how quickly? Ask once at GM17-Q03. GM-13-W01 asks whether operator recovery is an exception to F04.
 
 ### GM13-Q10 — Should pharmacies save a payment method during setup? (carried ON-Q13 / ON-08)
 
@@ -226,55 +222,36 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Sources:** `backend/billing/shift_payments.py` (GM-16 verified), `backend/billing/views.py:charge_shift_fulfillment`, `backend/billing/checkout_reservations.py`.
 **Decision status:** OPEN.
 
-### GM13-Q11 — When must worker pay details be ready — and who sees the gap early? (carried ON-Q04 / ON-11; GM-14 owns the wording)
+### GM13-Q11 — Payment readiness before acceptance (ON-Q04)
 
-**Plain English:** the worker's TFN/ABN + super details are checked only when they accept an offer — the accept is blocked until the profile is complete. Whether the pharmacy sees the gap earlier (on apply/offer screens) was not re-traced in GM-13; GM-14 owns that half.
-**ACTUAL TODAY — Web and Expo (same backend):** `_external_payment_profile` blocks accept with field-level errors; `worker_payment_profile_status` reports the readiness state.
-**RECOMMENDED:** B (from #184) — before accepting, shown early (apply + offer screens). GM-14 to confirm the exposure half before this is decided.
-**ALTERNATIVE A — Keep current logic:** at accept only. **ALTERNATIVE B — Before applying. ALTERNATIVE C — Before first payout only.**
-**Other / Defer.**
-**Sources:** `backend/shifts/engagement.py:199,265` (GM-14 verified); GM-14.
-**Decision status:** OPEN — **do not decide until GM-14 confirms the exposure half**.
+**Decision status:** Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04. Engineering: see BL-03.
 
-### GM13-Q12 — The old 10%/20% penalty route is still live. Remove it? (carried LA-Q06 / SH-02; GM-16 owns the charge)
+**Actual today:** Missing or unverified ABN blocks external acceptance. Incomplete TFN/super permits assignment with payroll deferred (`pr257:backend/shifts/engagement.py:265`, `:716`).
 
-**Plain English:** the legacy cancellation-penalty charge (20% ≤24 h, 10% 24–72 h of total wages, ad-hoc Stripe checkout, no payee recorded) still exists in code, is still routed, and is still exported to the clients — even though the carried decisions say no money penalties for workers ever, and the P09 table that would replace it is not built.
-**ACTUAL TODAY — Web and Expo (same):** function present (`shift_payments.py::charge_penalty`, GM-16 verified), route present (`billing/urls.py` line 16, GM-17 adopted), shared-core export present (`chargeShiftPenalty`). No UI was found calling it in the traced screens.
-**RECOMMENDED:** Remove or suspend before launch (GM-16-Q03 agrees). Severity: high — a callable legacy charge with no disclosed recipient and no agreement text naming it.
-**ALTERNATIVE A — Keep current logic:** leave function + route live. **ALTERNATIVE B — Remove the route, keep the function dead. ALTERNATIVE C — Replace with the P09 table after legal review (GM-16-Q11/Q14).**
-**Other / Defer.**
-**Sources:** `backend/billing/shift_payments.py` (GM-16), `backend/billing/urls.py` (GM-17 adopted), `shared-core/src/domains/billing/api.ts`.
-**Decision status:** OPEN — **owned by GM-16-Q03; GM-13 adopts it**.
+### GM13-Q12 — Legacy cancellation charge (LA-Q06 / SH-02)
 
-### GM13-Q13 — AHPRA cancellation strands the payment reservation. Fix the release? (carried LA-P01)
+**Status:** Engineering: see BL-04. Preserve the route and client export behind the existing live-charge flag. Launch scope is owned by GM15-01 and LAUNCH-01.
 
-**Plain English:** when AHPRA cancels a worker's future bookings, the offer is declined — but the persisted checkout reservation and any opened Stripe session are left behind, so the occurrence stays reserved and nobody else can pay for it until someone manually expires the checkout.
-**ACTUAL TODAY — Web and Expo (same backend):** `cancel_upcoming_assignments` declines `ACCEPTED_AWAITING_PAYMENT` offers and deletes assignments, but never touches `FulfillmentCheckout`/`FulfillmentReservation` or Stripe sessions (F07).
-**RECOMMENDED:** A — before launch: the AHPRA-cancel path must also expire the checkout (provider-confirmed) and release the occurrence hold, and the Stripe session must be expired. Severity: high (a stuck paid-or-payable reservation blocks refills and can take money for a cancelled booking).
-**ALTERNATIVE A — Keep current logic:** decline only; manual expiry by support.
-**Other / Defer.**
-**Sources:** `backend/shifts/cancellation.py:cancel_upcoming_assignments`, `backend/billing/checkout_reservations.py:expire_checkout`, `backend/billing/checkout_reservations.py:guard_fulfillment`.
-**Decision status:** OPEN.
+### GM13-Q13 — Launch scope for bookings that can strand a checkout (LA-P01)
 
-## Part D — SINGLE first decision question to ask the owner
+**Scenario:** Tom has opened Stripe Checkout for Sara. Her AHPRA status changes before he pays. Tom needs to book Ben instead.
+**What happens today:** The cancellation declines Sara's offer and leaves the unpaid Stripe session and its hold active. Those can block the replacement (`pr257:backend/shifts/cancellation.py:74`).
+**Recommendation first: A.** Include live fulfilment only after the checkout release works here.
+- **A (recommended):** Tom can use live fulfilment at launch if the fix lands and is verified.
+- **B:** Tom can launch with live fulfilment switched off. Card payments follow after the fix is verified.
 
-**GM13-Q01 — The pay-by window does not exist. Should D02 be built as decided, or is Stripe's 24 hours the rule?**
+**Status:** OPEN (launch scope, decide once at LAUNCH-01). Engineering: see BL-09.
 
-Plain English: you already decided (D02) that a pharmacy gets 24 hours, 6 hours, 2 hours or 30 minutes to pay depending on how soon the shift starts. The code never built it — today a reservation has no deadline at all, and nothing ever expires it on a schedule. The only clock is Stripe's own 24-hour Checkout session.
+## Part D — First owner question
 
-- **Option A — RECOMMENDED — Build D02 as decided:** 24h / 6h / 2h / 30min by lead time, capped at shift start, plus a scheduled expiry job and D03 release-and-notify. *Scenario:* a shift 90 minutes away gives the pharmacy 30 minutes; if unpaid, the worker is freed and told, the manager is told, and the shift reopens. *Benefit:* D01/D03 become true; urgent shifts stop being held past start. *Risk:* the largest build in this area (deadline field, beat task, countdown UI, expiry notices).
-- **Option B — Keep current logic:** no D02; Stripe's 24 h session + manual expire/resume is the rule. *Scenario:* a shift 90 minutes away can be held up to 24 h by an unpaid reservation. *Trade-off:* zero build; D01/D03 stay partly fictional.
-- **Option C — One fixed window:** every reservation gets 24 h (or 6 h), capped at shift start, with a job. *Scenario:* simpler than four bands; a 90-minute shift still gets 90 minutes, not 30. *Trade-off:* less code than A, weaker for urgent shifts.
-- **Option Other (describe) / Defer:** deferring keeps option B by default.
-
-*Ask this first because every other GM-13 question assumes a deadline exists: the countdown (Q03), the expiry release (Q02), the retry rule (Q08), the saved-card urgency (Q10), and the offer-expiry scaling (Q05) all hang off it.*
+Start at **GM-13-W01** (paid orphan checkout recovery). D02 and D03 are implementation work in BL-06.
 
 ## Part E — Code gaps vs decision gaps
 
 ### Code gaps (no owner decision needed — just build/fix; timing is the only question)
-1. **CG-1 — D02 not implemented** (no deadline field, no bands, no expiry job). Build after Q01 = A/B/C.
-2. **CG-2 — No expiry job at all** (`CELERY_BEAT_SCHEDULE` has no reservation/offer/escalation job). The Oct "expiry every 60 s" claim is false at this head.
-3. **CG-3 — LA-P01: AHPRA-cancel path strands the checkout reservation + Stripe session** (F07). Fix before launch (Q13).
+1. **CG-1 — D02/D03 business transition missing.** Engineering: see BL-06.
+2. **CG-2 — No scheduled reservation expiry.** Provider expiry metadata and manual checkout release exist. Engineering: see BL-06.
+3. **CG-3 — LA-P01: AHPRA cancellation strands the checkout and hold** (F07). Engineering: see BL-09.
 4. **CG-4 — Owner pay card shows `$n × 30 AUD` always** (`ActiveShiftCard.tsx`, Expo `ActiveShiftCards.tsx`): PT/FT $80 and the subscriber $15/$40 are not reflected in the displayed total. The server charges the right price (GM-16 verified) — the display is wrong.
 5. **CG-5 — No missed-webhook recovery**: no polling/reconciliation job; a paid checkout whose webhook never arrives stays unfinalised until manual reconciliation. (Webhook dedupe + Stripe retries + reconciliation flags exist; the gap is the absence of a sweeper.)
 6. **CG-6 — `auto_escalate_due_shifts` has no schedule**: the function exists (`escalation.py:81`) but no beat entry calls it and no caller was found in the traced files — escalation (and therefore match-email timing) depends on something invoking it. GM-11/GM-19 boundary.
@@ -282,7 +259,7 @@ Plain English: you already decided (D02) that a pharmacy gets 24 hours, 6 hours,
 8. **CG-8 — SH-13 is undefined**: `AUDIT.md` contains no SH-13 definition; only BK-R01's `gap` field cites it. Define it or drop the citation.
 
 ### Decision gaps (owner must choose first — do not build until answered)
-- DG-1 — Pay-by window: build D02 / keep Stripe-24h / fixed window (Q01) ★ first. DG-2 — Expiry release + notices (Q02). DG-3 — Countdown display (Q03, after Q01). DG-4 — Worker drop-reservation (Q04). DG-5 — Offer-expiry scaling (Q05, with Q01). DG-6 — Decline/expiry fallback (Q06). DG-7 — Payment-failure retry rule + SH-13 definition (Q08). DG-8 — Saved card / auto-charge (Q10). DG-9 — Payment-after-expiry remedy (Q09 — owned by GM-17-Q01). DG-10 — Legacy penalty removal (Q12 — owned by GM-16-Q03). DG-11 — AHPRA-cancel release (Q13). DG-12 — Worker payment-readiness exposure (Q11 — owned by GM-14).
+Open here: countdown display (Q03), worker drop-reservation (Q04), offer-expiry scaling (Q05), decline/expiry fallback (Q06), competing-offer handling (Q07), payment retry wording (Q08), saved card (Q10), orphan recovery (W01) and paid release (W02). Refund approval is in GM17-Q03. Live-payment launch scope is in LAUNCH-01.
 
 ## Part F — Documentation matrix (per-question source links, head `97c4543e`)
 
@@ -296,13 +273,13 @@ Plain English: you already decided (D02) that a pharmacy gets 24 hours, 6 hours,
 | GM13-Q06 (BK-Q06) | STILL VALID | `offers.py:184,677` |
 | GM13-Q07 (BK-Q07) | STILL VALID | `offers.py:accept`, `finalize.py:expire_competing_offers` |
 | GM13-Q08 (BK-R01/SH-13) | CHANGED; SH-13 undefined | `checkout_reservations.py`, `useShiftPaymentActions.ts`, `AUDIT.md` |
-| GM13-Q09 (F04) | PARTLY TRUE; owned by GM-17-Q01 | `payment_events.py`, `paid_fulfillment.py` |
+| GM13-Q09 (F04) | Answered: no rebooking after expiry; the pharmacy chooses a credit or refund after approved review, carried F04 - see REFUND-01. Approval workflow: GM17-Q03 | `paid_fulfillment.py:36` |
 | GM13-Q10 (ON-Q13) | STILL VALID | `shift_payments.py` (GM-16), `views.py:charge_shift_fulfillment` |
-| GM13-Q11 (ON-Q04) | STILL VALID (gate); exposure → GM-14 | `engagement.py:199,265` |
-| GM13-Q12 (LA-Q06) | STILL VALID; owned by GM-16-Q03 | `shift_payments.py`, `urls.py` (GM-17 adopted), `sc-billing-api` |
-| GM13-Q13 (LA-P01) | STILL VALID (worse) | `cancellation.py:cancel_upcoming_assignments`, `checkout_reservations.py:guard_fulfillment` |
+| GM13-Q11 (ON-Q04) | Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04 | `engagement.py:265`, `:716` |
+| GM13-Q12 (LA-Q06) | Engineering: see BL-04 | `shift_payments.py:181`, `urls.py:15` |
+| GM13-Q13 (LA-P01) | Engineering: see BL-09. Launch scope: LAUNCH-01 | `cancellation.py:74`, `checkout_reservations.py:266` |
 
-Decision status per question: **all 13 questions are OWNER DECISION: NOT ASKED / NOT DECIDED.** No decision, no implementation, no PR.
+The open owner choices are listed above. The carried rules and engineering items are recorded in the status rows.
 
 ### Implementation backlog — FROZEN until the owner answers (nothing here is decided)
 1. Q01: D02 deadline field + bands + scheduled expiry job + countdown data (web + Expo + Next parity decision).
@@ -323,3 +300,30 @@ Decision status per question: **all 13 questions are OWNER DECISION: NOT ASKED /
 - U-2: who calls `announce_posted_shift` / `announce_availability_matches` (posting flow, GM-10) and who calls `auto_escalate_due_shifts` (no schedule found).
 - U-3: whether the live Next site serves the migrated ShiftsBoard copy, and where Next owners pay today (if anywhere).
 - U-4: the extra 12 questions behind Issue #250's "142" (vs 130 counted in `questions.json`).
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-13-W01: Should operator recovery of a paid orphan checkout ever book the work? (W-14, register item 4)
+**Scenario:** An operator releases the hold on Tom's checkout. A delayed Stripe session appears and cannot be expired. Tom pays it. It covers two separate offers for Sara, and Ben now holds one date on her second offer.
+**What happens today:** Recovery can finalise an offer only if the original attempt holds every date on it. Sara can get the first offer. Ben's date blocks the whole second offer, even if its other dates are free. The payment is flagged for reconciliation and the managers are notified. Recovery issues no refund (`pr257:backend/billing/checkout_reservations.py:251`, `pr257:backend/billing/fulfillment.py:67`, `pr257:backend/billing/paid_fulfillment.py:36`).
+**Recommendation first: A.** Make operator-recovered orphan checkouts a narrow exception to F04. Accept only an offer the original checkout can still fulfil in full.
+- **A (recommended):** Sara gets the first offer and Ben keeps his date. Tom gets a reconciliation notice for the unbookable offer. He can choose credit or refund after approved review.
+- **B:** Apply F04 even to recovered orphan checkouts. Sara gets neither offer from this payment. Tom chooses credit or refund after approved review and can start a new booking.
+- **DEFER**
+
+**Status:** OPEN; must be decided before real card payments.
+
+### GM-13-W02: Should only a recorded cancellation release paid work? (W-14, register item 5)
+**Scenario:** A privileged repair removes Sara's paid assignment rows without recording a cancellation. Tom tries to book Ben for one of those dates.
+**What happens today:** Ordinary shift deletion and pharmacy or organisation cascades guard paid bookings (`pr257:backend/shifts/deletion.py:8`, `:30`). If an exceptional path removes the rows, the next checkout or fulfilment check can release the work. A slotless offer keeps its hold while accepted. Removing rows alone creates no cancellation record or outcome (release register item 5).
+**Recommendation first: A.** Release paid work only after a recorded cancellation. Apply the carried fee and notice rules and keep an audit trail.
+- **A (recommended):** Tom can rebook once the cancellation is recorded. A privileged repair also needs that record before it releases the dates.
+- **KEEP:** Tom can rebook once the app sees the assignment rows are gone. A slotless offer still holds while accepted.
+- **DEFER**
+
+**Status:** OPEN; must be decided before real card payments.

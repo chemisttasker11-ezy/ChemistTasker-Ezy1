@@ -1,5 +1,13 @@
 # GM-23 Calendars / Operations — Full Grill Documentation
 
+> **Corrections against current code (21 Nov 2026 review).** 9 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 6 hold, 3 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| GM-23-03 / 17 | Open-ended availability allowed; API has no validation | STALE; main remains permissive | PR257 validates schedule semantics and requires recurrence end dates for new or changed schedules. Preserve the documented exception for metadata-only edits to legacy open-ended rows. | `main:backend/talent/serializers/availability.py:7`; `pr257:backend/talent/serializers/availability.py:17`; `pr257:frontend_mobile/roles/shared/availability/availabilityModel.ts:111` |
+| GM-23-11 / 26 | Shift reminders are “email only”, with no push/in-app copy | WRONG | The reminder email wrapper also creates an in-app TASK notice for a matching platform user. That notice can produce push, subject to PR257 preferences and quiet hours. | `pr257:backend/shifts/tasks.py:71`; `pr257:backend/users/tasks.py:70`; `pr257:backend/users/tasks.py:101`; `pr257:backend/notifications/services.py:159` |
+| GM-23-14 | Four-month horizon is “UI only” | STALE; main lacks the newer guard | PR257 enforces a pharmacy-local posting window on the server for ordinary posting, changed slot dates and the legacy open-shift creation path. The upper bound is the last day of the month four months ahead. | `pr257:backend/shifts/posting.py:66`; `pr257:backend/shifts/posting.py:100`; `pr257:backend/shifts/posting.py:228`; `pr257:backend/workforce/roster/views.py:441` |
+
 **Area:** GM-23 Calendars/operations (Issue #250, area 23 of 26)
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED + RE-VALIDATED (re-run 2026-11-21). Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
@@ -419,14 +427,14 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Sources:** `backend/team_calendar/views.py` (`CalendarScopeMixin`, `CalendarEventViewSet`, `WorkNoteViewSet`), `test_api.py` (30 tests incl. tenant isolation B06/B07).
 **Decision status:** OPEN.
 
-### GM-23-25 — NEW. External calendar: export / sync to Google / Outlook / Apple, or ICS download? (verified this trace — NOT BUILT)
+### GM-23-25 — Which external calendar exports or sync should workers get?
 
-**Plain English:** can a worker add a confirmed shift to their phone calendar with one tap?
-**ACTUAL TODAY — Vite, Next, Expo:** **nothing exists.** No ICS export, no Google/Outlook/Apple sync, no export route, no shared-core contract, no UI affordance was found in any traced file (team-calendar urls expose only `calendar-events/`, `work-notes/`, `calendar-feed/`; the calendar contract is events + work notes only). A worker who wants a shift in their phone calendar must retype it.
-**RECOMMENDED:** ICS download for confirmed bookings only (no pay/rate in the file, no reservation state), per-worker, revocable link or one-off file — decide after privacy review.
-**ALTERNATIVE A:** No export at launch. **ALTERNATIVE B:** Full two-way sync. **Other / Defer.**
-**Edge:** exported event goes stale after a late change (GM-23-12) — no update pushed. Privacy: exported file must not contain other workers' details (the Vite roster page shows team names — an export built from that view would leak them).
-**Sources:** `backend/team_calendar/urls.py`, `shared-core/src/contracts/calendar.ts`, `shared-core/src/domains/calendar/api.ts` (no export surface anywhere traced).
+**Plain English:** Can Sara save a confirmed shift to the calendar she uses?
+**ACTUAL TODAY — Expo (PR257):** My next shifts opens a Google Calendar event editor and, when there is an address, Google Maps directions. The traced team-calendar routes and contract have no ICS download or Outlook/Apple sync. Cached Expo export is a separate choice in GM27-Q06.
+**RECOMMENDED:** Keep the Expo calendar and map links for confirmed bookings. Add a one-off ICS export for workers who use another calendar, with no pay or team details.
+**ALTERNATIVE A:** Keep just the existing Expo links at launch. **ALTERNATIVE B:** Add two-way calendar sync. **Other / Defer.**
+**Edge:** An event saved to another calendar can go stale after a late shift change (GM-23-12).
+**Sources:** `pr257:frontend_mobile/app/next-shifts.tsx:133`, `pr257:frontend_mobile/features/nextShift/nextShiftModel.ts:90`, `backend/team_calendar/urls.py`, `shared-core/src/contracts/calendar.ts`.
 **Decision status:** OPEN.
 
 ### GM-23-26 — NEW. Calendar notifications: which calendar events notify, on which channel, and can the worker turn them off? (verified this trace)
@@ -592,3 +600,13 @@ GM-23-01 (source of truth — FIRST) · GM-23-02 (blackout exceptions) · GM-23-
 17. Whether the live Expo app serves `SharedCalendarScreen` behind any additional gate beyond the route files (no runtime check performed).
 
 *End of GM-23 documentation. No code was changed. No branch or PR was created — the parent agent will assemble and raise the PR after all areas are done and reviewed.*
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-23-W01: Planner: simplified version (PR #181) vs original (PR #192) (W-17): deferred by the owner
+**Deferred:** the owner will mix the two versions later. Keep both, touch neither until the owner asks. Not asked in this grill.

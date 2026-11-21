@@ -1,5 +1,14 @@
 # GM-05 Roles / Membership / Invites — Traced Flow, Validated Question Queue, Decision Status
 
+> **Corrections against current code (21 Nov 2026 review).** 12 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 8 hold, 4 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q05 | “manager … has no undo” for a pending invitation | WRONG | Direct invitations have no expiry field, but an authorised manager can delete the pending membership through the ordinary membership endpoint. | GUARDED removal: `main:backend/memberships/views.py:112`; `pr257:backend/memberships/views.py:113`; permission: `pr257:backend/memberships/access.py:45` |
+| Q08 | invite links have “no default expiry” | WRONG | The creation endpoint defaults links to 14 days and checks invitation authority. Deletion deactivates a link while preserving its applications. | `main:backend/memberships/views.py:194`; `pr257:backend/memberships/views.py:195`; `:209` |
+| Q11 / Q16 | one-time manager conversion is unverified or broken | WRONG as a current premise | Conversion is enforced once under a user lock and updates the selected CONTACT membership plus its admin staff role. Current mobile destinations use the basic-profile screens. | `pr257:backend/memberships/account_management.py:10`; `:44`; `pr257:frontend_mobile/components/ChooseAccountTypeCard.tsx:14` |
+| W02 | “Explorers can never hold an admin role” | MAIN-ONLY, reversed: candidate enforcement (already fixed in the W question text) | pr257 blocks new Explorer admin grants and access expansion while allowing maintenance or revocation of historical assignments. Do not describe this candidate protection as deployed main behaviour. | `pr257:backend/access_control/admin_roles.py:6`; `pr257:backend/organizations/models.py:443`; `pr257:backend/users/models.py:128`; main lacks this shared guard |
+
 **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 **Area:** GM-05 Roles/membership/invites (Issue #250, method of PR #184 / Issue #250)
 **Snapshot verified:** PR #249 head **`97c4543e051b43fe30ec7e2e61ad3d69957a918e`** — confirmed live via `pull_request_read` get on 2026-11-21; unchanged from the #250 snapshot. PR #249 is DRAFT, stacked on #248 (head `25939534a1c5543454a8e770571e4dff46380d96`), not merged, not deployed.
@@ -26,7 +35,7 @@ ChemistTasker has **two different "role" systems that must not be confused**:
 **The three biggest things that changed since the October 2026 #184 questions:**
 - There is now a **Pharmacy Manager account role**, created only when an organisation invites a pharmacy by email. That person manages the pharmacy, and may **once** switch to a personal Pharmacist or Pharmacy-team account — never to Owner.
 - A **multi-use invite link + application** flow now exists alongside direct email invites: an admin generates a link, candidates fill in a short form, the owner approves or rejects.
-- **Direct email invites to people with no account auto-activate them immediately** — they become an accepted, active member before they ever log in, verify email, or prove who they are. They are sent a password-set (magic) link. This is the single most safety-relevant new behaviour and is proposed as the first question.
+- **New-account direct invites activate the membership before the invitee sets a password.** Ask once at GM-05-W01.
 
 **The biggest thing that has NOT changed:** on a pharmacy's public shifts, **employed staff and favourite locums skip the Verified/AHPRA check entirely** — including a favourite whose AHPRA registration is suspended, who keeps booking that pharmacy's shifts. That was already flagged in #184 (ON-P01) and is still the live code.
 
@@ -107,7 +116,7 @@ Legend: **✔ R** = revalidated at #249 head (file/function cited). **~ #184** =
 | ON-Q01 | Which sign-up tracks at launch? | **REVALIDATED — changed** | Still 3 worker tracks + Owner, but the role list grew: ORG_STAFF and PHARMACY_MANAGER now exist (`users/models.py` ✔ R). Self-registration is still exactly the same 4 roles. New sub-question: how are the 2 non-self-registrable roles created? (Q-GM05-08) |
 | ON-Q02 | What can a worker do before Verified? | **REVALIDATED — changed** | Browsing vs applying split still stands; enforcement now runs through `require_public_ahpra()` + `lock_public_ahpra()` inside the booking transaction (`state.py:171-195` ✔ R), which did not exist in this form in Oct. Member exemption confirmed (F24). Front-end browse behaviour **not revalidated**. |
 | ON-Q03 | Where must verification be enforced? | **REVALIDATED — changed, partially** | Public apply confirmed gated (F23). Offer-accept / counter-offer / dedicated-offer gating **NOT revalidated** (`offers.py`, `assignment.py` ✘ NI). The #184 claim "PR #183 gates public accept/counter-offer" could not be confirmed at #249 head. |
-| ON-P01 | Who is exempt from AHPRA gates on public shifts? | **REVALIDATED — still valid** | `is_public_shift_member_access()` (F24) + `ahpra_frozen()` / member-suspension note (F25) match #184 exactly, including: favourites exempt, suspended members never paused, anonymous posts excluded. **This is the first question (Section 4).** |
+| ON-P01 | AHPRA exemption | Answered: A, employees are exempt and favourites are checked, launch grill, 23 Oct 2026 - see AHPRA-FAV-01 | The public gate currently exempts eligible staff and favourites; engineering follows BL-02. |
 | ON-Q05 | What can Explorers do with shifts? | **REVALIDATED — changed, partially** | Backend: explorer still needs verified `ExplorerOnboarding` to apply (F26 ✔ R). Mobile placeholder: main-branch search shows `app/explorer/shifts.tsx` now re-exports `@/roles/explorer/shifts` — the "blank placeholder" may be fixed, **not verified at #249 head**. Whether explorers can accept (engagement lookup) **not revalidated**. |
 | ON-Q08 | Who must pass an ID check? | **REVALIDATED — still valid** | `policy.py` ✔ R: gov ID only required for overseas explorers (mobile substitute); ID otherwise a badge; owner can extend via `VERIFICATION_EXTRA_REQUIREMENTS` (setting ✘ NI). |
 | ON-Q14 | How do organisations join? | **REVALIDATED — still valid** | `OrganizationViewSet.create` still superuser-only (`organizations/views.py:59-65` ✔ R). No org signup role. Web create page routing **not revalidated**. |
@@ -134,25 +143,13 @@ Legend: **✔ R** = revalidated at #249 head (file/function cited). **~ #184** =
 Format per question: **ACTUAL TODAY** (with source links) → **RECOMMENDED** (keep/change, rationale, severity, benefits, risks, legal/financial impact) → **ALTERNATIVE A** (keep existing policy where possible, scenario + trade-offs) → **ALTERNATIVE B/C** (realistic alternatives with concrete worker/pharmacy/platform scenarios + consequences) → **Other / defer**. Each option is read against: normal case, edge case, retry/concurrency, denied role / wrong tenant, payment/notification side effects, web/Expo difference. Plain English first.
 **Decision status** is shown per question: `OPEN` (owner has not decided) · `CARRIED — confirm only` (already decided; ask only to confirm it still stands) · `NOT VERIFIED` (do not ask until re-checked).
 
-### Q-01 — [ON-P01] ★ FIRST QUESTION — see Section 4
-**Should favourite locums be exempt from the AHPRA check on a pharmacy's public shifts, like employed staff?**
-- **Status:** OPEN — REVALIDATED still valid.
-- **Sources:** `backend/shifts/interest.py` `is_public_shift_member_access()`; `backend/onboarding/verification/state.py` `ahpra_frozen()`, `announce_member_suspension()`; `backend/memberships/models.py` `FAVORITE_STAFF_EMPLOYMENT_TYPES`.
-- **ACTUAL TODAY:** If you are an accepted, active member of the pharmacy — employed staff (full-time/part-time/casual) **or** a favourite locum / Shift Hero — you can apply for that pharmacy's public, named shifts with **no** Verified and **no** AHPRA check at all. If the AHPRA register later shows you suspended, and you are a member, you are **never paused**: the pharmacy gets a note, you keep your internal access, and you keep booking that pharmacy's public shifts. Only non-members get paused account-wide. Anonymous public posts are the one exception: members get no shortcut there and must pass the check.
-- **RECOMMENDED — A (employees exempt; favourites checked). Severity: HIGH / safety-critical.** A favourite is an outside contractor the platform books, not an employee the pharmacy supervises day to day. Letting a suspended favourite keep booking is the exact harm the AHPRA gate exists to prevent, and the pharmacy may never see the register themselves. Benefits: the platform's core trust signal stays true; pharmacies are protected from booking a suspended pharmacist unknowingly. Risks: favourites face one more check on public shifts (they already face it everywhere else); a small delay while a re-check runs. Legal: a pharmacist working while suspended is unlawful; the platform knowingly routing such bookings is a serious exposure. Financial: none directly; indirectly avoids cancelled bookings and disputes.
-- **ALTERNATIVE A — Keep current logic (favourites exempt).** Scenario: a trusted favourite of 3 years picks up a Saturday at her regular pharmacy; the register suspended her on Friday for an admin lapse and the pharmacy, which knows her, books her anyway. Trade-off: zero friction for trusted relationships; but the platform cannot tell the difference between "trusted regular" and "suspended stranger who was favourited once", and the exemption is invisible to the worker and the pharmacy.
-- **ALTERNATIVE B — Nobody exempt.** Scenario: a full-time employed pharmacist applies for her own pharmacy's public shift and is blocked because her AHPRA re-check is queued. Trade-off: simplest rule, easiest to explain, but it punishes the case the exemption was built for (employers check their own staff) and adds re-check load on every internal application.
-- **ALTERNATIVE C — Favourites checked, but a suspended *member* gets a grace + manager override.** Scenario: as in A, but the pharmacy owner can explicitly re-approve a suspended favourite for internal shifts only, with the approval logged. Trade-off: keeps trust while respecting that the pharmacy may know more than the register snapshot; adds an override path that must be audited and cannot be used for public shifts at other pharmacies.
-- **Other (describe) / Defer.** Edge cases: concurrent — a suspension lands *while* a favourite's application is in flight (the booking-transaction lock in `lock_public_ahpra()` is designed for this; members bypass it entirely today). Denied role: a non-member favourite of a *different* pharmacy gets no exemption there. Payment/notification: cancelling a suspended member's future public bookings today notifies the pharmacy; under A, the same flow would extend to favourites. Web/Expo: identical — the gate is backend-only, so both apps change together.
+### Q-01 — ON-P01: AHPRA exemption for favourites
+- **Status:** Answered: A, employees are exempt and favourites are checked, launch grill, 23 Oct 2026 - see AHPRA-FAV-01.
+- **Actual today:** Eligible favourites and employees skip the check on named public shifts at that pharmacy. Engineering: see BL-02.
 
-### Q-02 — [ON-Q03] Where must role-appropriate verification be enforced?
-- **Status:** OPEN — REVALIDATED changed, partially (public apply confirmed; offer paths not verified).
-- **Sources:** `backend/shifts/interest.py` `express_interest()`, `require_public_ahpra()`; `backend/onboarding/verification/state.py` `require_public_ahpra()`, `lock_public_ahpra()`; `backend/shifts/offers.py`, `backend/shifts/assignment.py` — **NOT INSPECTED**.
-- **ACTUAL TODAY:** Public-shift *applications* check Verified + latest AHPRA (unless the applicant is a member — see Q-01). Whether *accepting an offer*, *counter-offering*, or taking a *dedicated* ("Request booking") offer checks anything is **not verified at #249 head**; in Oct 2026 none of those paths checked, and the #184 claim that PR #183 added those gates could not be confirmed in this pass.
-- **RECOMMENDED — B (every outside booking). Severity: HIGH.** Gate every external acceptance the same way as a public application: offer accept, counter-offer accept, dedicated offer, claim. Rationale: the gap is a straight bypass — the same unverified worker blocked from applying can be booked by direct offer. Benefits: one rule, no bypass. Risks: extra re-checks at accept time; a manager's chosen worker blocked at the last minute (mitigate by showing readiness early — see Q-12). Legal: same as Q-01. Financial: a blocked acceptance delays filling; no money moves until payment confirmation (D01), so no refund path is triggered.
-- **ALTERNATIVE A — Keep current logic (public applications only).** Scenario: a manager finds an unverified pharmacist on the talent board and books him directly; the pharmacy discovers at the shift that his AHPRA lapsed. Trade-off: fastest booking; the hole stays open exactly where managers choose people by hand.
-- **ALTERNATIVE B — B plus internal rostering (C in #184).** Scenario: an employed pharmacist whose registration lapsed is rostered for a pharmacist shift by her own pharmacy. Trade-off: the platform second-guesses the employer on its own staff; strongest safety, highest friction, and it contradicts the carried R01 idea that the roster is the employer's own business.
-- **Other / defer.** Edge: retry — a re-check queued at apply time (`queue_public_recheck`) may still be pending at accept; define whether accept waits or fails. Concurrency: `lock_public_ahpra()` already locks the profile row inside the booking transaction for the public path — extend the same lock to offers. Web/Expo: backend gate, so both apps inherit it; both must surface the refusal message.
+### Q-02 — ON-Q03: Verification on outside bookings
+- **Status:** Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01.
+- **Actual today:** The shared guard skips non-public shifts. Engineering: see BL-01.
 
 ### Q-03 — [ON-Q05] What can Explorers (new to pharmacy) do with shifts?
 - **Status:** OPEN — REVALIDATED changed, partially (backend confirmed; mobile screen not verified).
@@ -165,7 +162,7 @@ Format per question: **ACTUAL TODAY** (with source links) → **RECOMMENDED** (k
 - **Other / defer.** Edge: an Explorer mid-upgrade (account type changed, onboarding incomplete) — what do they see? Unknown; define. Web/Expo difference: web shows boards today; mobile may or may not — verify before launch (see NOT VERIFIED note).
 
 ### Q-04 — [NEW] When a pharmacy invites someone with no account, should they become an active member immediately?
-- **Status:** OPEN — REVALIDATED (new behaviour since #184).
+- **Status:** Merged into GM-05-W01. Ask there once.
 - **Sources:** `backend/memberships/invites.py` `create_membership_invite()` (the `if user_created or activate_immediately` branch); `backend/memberships/models.py` `Membership.Status`.
 - **ACTUAL TODAY:** Yes — today a brand-new person is created with a random password and their membership is **ACCEPTED and active at once**, before they have logged in, verified email or mobile, or proved anything about themselves. They get a password-set magic link by email. Separately, an existing user who is invited stays **PENDING** until they accept — unless the inviter passes `activate_immediately=true`, which also skips consent.
 - **RECOMMENDED — Change: pending until the person accepts (and verifies email). Severity: HIGH.** A membership is a trust relationship: it unlocks the AHPRA exemption (Q-01), staff-tier shift visibility, and internal access. Granting it to an unverified email address — including a mistyped address, which would hand a stranger membership of a real pharmacy — is the wrong default. Benefits: no stranger-members; the invite flow matches what the worker sees (accept/reject). Risks: one extra click before a new starter can be rostered; managers must chase acceptance. Legal: reduces impersonation / wrongful-access exposure. Financial: none.
@@ -220,14 +217,9 @@ Format per question: **ACTUAL TODAY** (with source links) → **RECOMMENDED** (k
 - **ALTERNATIVE B — Removal is blocked while future confirmed bookings exist (manager must cancel/reassign first).** Scenario: as above, but removal refuses until the Saturday shift is dealt with. Trade-off: safest, but a manager in a hurry cannot remove someone quickly.
 - **Other / defer.** Edge: the member is mid-shift when removed (attendance/kiosk — GM-08). Concurrency: removal racing an acceptance — the acceptance should fail if the membership is gone (verify in `offers.py` ✘ NI). Notification: removed member told? ✘ NI.
 
-### Q-10 — [ON-Q01] Which sign-up tracks should workers get at launch? (revalidated)
-- **Status:** OPEN — REVALIDATED changed.
-- **Sources:** `backend/users/models.py` `User.ROLE_CHOICES`, `SELF_REGISTRATION_ROLES`; #184 `questions.json` ON-Q01.
-- **ACTUAL TODAY:** Three worker tracks (Pharmacist; Other Staff covering intern/technician/assistant/student with role-specific fields; Explorer) plus Owner — on web and mobile per #184 (not revalidated at #249 head). Two further roles exist in code but are **not** self-registrable: ORG_STAFF and PHARMACY_MANAGER (see Q-06, Q-11).
-- **RECOMMENDED — KEEP.** The three tracks with role-specific fields already do what a per-role split would do. The new question is only about the two invite-only roles' creation paths (Q-06, Q-11), not the tracks themselves.
-- **ALTERNATIVE A — Keep current logic.** (Same as recommended; this is the KEEP option.)
-- **ALTERNATIVE B — One track per role (separate screens for intern, technician, assistant, student).** Scenario: a student is confused by intern fields on a shared form. Trade-off: clearer per role, but 4× the screens to maintain for no verified confusion.
-- **Other / defer.** Web/Expo: per #184 the tracks match on both; re-verify at #249 head before launch (frontend ✘ NI).
+### Q-10 — ON-Q01: Worker sign-up tracks
+- **Status:** Answered: KEEP the existing sign-up tracks, launch grill, 23 Oct 2026 - see ON-Q01.
+- **Actual today:** Pharmacist, Other Staff and Explorer are the worker tracks. Owner has a separate sign-up track. The organisation and pharmacy-manager roles are created through other flows.
 
 ### Q-11 — [NEW] The Pharmacy Manager one-time switch: what exactly happens, and is once really once?
 - **Status:** OPEN — REVALIDATED (model comment only; endpoint not inspected).
@@ -238,14 +230,9 @@ Format per question: **ACTUAL TODAY** (with source links) → **RECOMMENDED** (k
 - **ALTERNATIVE B — No switch: a manager who wants to work shifts creates a second account.** Trade-off: simplest to reason about; two logins, two identities for one person, and the membership/AHPRA logic must cope with that.
 - **Other / defer.** Edge: a PHARMACY_MANAGER who is also the pharmacy's *owner-side* contact — switching must never confer ownership. Denied role: switching to OWNER or ORG_STAFF or EXPLORER must be refused. Web/Expo: the #184 mobile breakage (ON-04) must be re-verified at #249 head before this is asked as a launch question.
 
-### Q-12 — [ON-Q02 + ON-11] What can a worker do before Verified, and when do they learn about payment blockers?
-- **Status:** OPEN — REVALIDATED changed, partially.
-- **Sources:** `backend/shifts/interest.py` `express_interest()`; `backend/onboarding/verification/policy.py` `requirements()`, `missing_requirements()`; `backend/memberships/serializers.py` `_application_payment_profile_status()`; #184 ON-Q02, ON-11.
-- **ACTUAL TODAY:** Anyone signed in can browse boards (per #184; not revalidated). Public *applying* needs Verified + AHPRA (unless a member). Payment readiness (ABN verified / entity confirmed) is still only surfaced at acceptance time for the worker; it is now also computed on membership *applications* for managers (`serializers.py:334-353` ✔ R), but an early worker-facing checklist was not verified in either app.
-- **RECOMMENDED — A (browse everything, gate applying — plus show the verification + payment checklist on the worker's own profile before they apply). Severity: MEDIUM.** Browsing is harmless; late surprises are not. Benefits: workers fix ABN/AHPRA issues before an urgent shift, not during acceptance. Risks: small UI build on both apps. Legal/financial: ABN/TFN readiness affects whether the worker can be paid (engagement terms); surfacing it early prevents accepted-then-unpayable bookings.
-- **ALTERNATIVE A — Keep current logic (browse, gate apply, learn payment blockers at acceptance).** Scenario: a pharmacist accepts an urgent offer, then learns his ABN entity is unconfirmed and the booking stalls. Trade-off: zero build; the stall happens at the worst moment.
-- **ALTERNATIVE B — Nothing until Verified (C in #184).** Scenario: a new user cannot even browse. Trade-off: cleanest trust story; kills the browsing that brings people in.
-- **Other / defer.** Edge: progress % vs Verified mismatch (audit ON-10, not revalidated) — drive any checklist from `verification_summary().missing`, not from profile completeness. Web/Expo: both apps must show the same checklist from the same backend summary.
+### Q-12 — ON-Q02 / ON-11: Browse access and payment readiness
+- **Status:** Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation.
+- **Payment-readiness status:** Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04. Engineering: see BL-03.
 
 ### Q-13 — [ON-Q14] How do organisations (multi-site groups) join? (revalidated)
 - **Status:** OPEN — REVALIDATED still valid.
@@ -311,20 +298,7 @@ Format per question: **ACTUAL TODAY** (with source links) → **RECOMMENDED** (k
 
 ## 4. The SINGLE first decision question
 
-**Ask this first, before any other GM-05 question:**
-
-> **Q-01 — Should favourite locums be exempt from the AHPRA check on a pharmacy's public shifts, like employed staff?**
->
-> **What happens today:** If a worker is an accepted, active member of your pharmacy — either employed staff *or* a favourite locum / Shift Hero — they can apply for your pharmacy's public shifts with **no** Verified check and **no** AHPRA check. And if the AHPRA register later shows them suspended, a member is never paused: your pharmacy gets a note, but they keep booking your public shifts. Only non-members get paused. (Anonymous public posts are the exception — members get no shortcut there.)
->
-> **Options:**
-> - **A — Employees exempt; favourites checked (RECOMMENDED).** Your own staff keep the shortcut; a favourite locum must pass the AHPRA check like any other outside worker. A suspended favourite can no longer book your public shifts.
-> - **KEEP — Keep current logic.** Favourites stay exempt, including suspended ones.
-> - **B — Nobody exempt.** Everyone passes the AHPRA check on public shifts, including your own employed staff.
-> - **C — Favourites checked, but you can explicitly re-approve a suspended favourite for your own pharmacy's internal shifts only** (logged, internal shifts only, never other pharmacies' public shifts).
-> - **Other (describe) / Defer.**
->
-> **Why first:** It is safety-critical (a suspended pharmacist working is unlawful), it is already the oldest open GM-05 question (ON-P01, Oct 2026, still live code), and it decides the scope of Q-02 (where verification is enforced), Q-04 (who counts as a trusted member), and Q-14 (what a favourite *means*). Everything else in GM-05 can wait a day; this one changes who can be booked.
+**First owner question:** GM-05-W01, whether Mia is active before she sets her password. Safety work from the recorded ON-Q03 and ON-P01 answers is tracked in BL-01 and BL-02.
 
 ---
 
@@ -416,25 +390,47 @@ Base for all links: `https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/b
 
 | Question | Status | Owner decision |
 |---|---|---|
-| Q-01 ON-P01 favourites AHPRA exemption | **OPEN — ask first** | — |
-| Q-02 ON-Q03 verification enforcement scope | OPEN | — |
+| Q-01 ON-P01 favourites AHPRA exemption | Answered: A, employees are exempt and favourites are checked, launch grill, 23 Oct 2026 - see AHPRA-FAV-01 | Engineering: see BL-02 |
+| Q-02 ON-Q03 verification enforcement scope | Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01 | Engineering: see BL-01 |
 | Q-03 ON-Q05 Explorers | OPEN | — |
-| Q-04 NEW new-account invite auto-activation | OPEN | — |
+| Q-04 NEW new-account invite auto-activation | Merged into GM-05-W01 | Ask once at GM-05-W01 |
 | Q-05 NEW invite expiry / revoke | OPEN | — |
 | Q-06 NEW ORG_STAFF creation / REGION_ADMIN scope | OPEN | — |
 | Q-07 NEW MANAGER = OWNER powers | OPEN | — |
 | Q-08 NEW invite-link rules | OPEN | — |
 | Q-09 NEW removal consequences | OPEN | — |
-| Q-10 ON-Q01 sign-up tracks | OPEN (recommend KEEP) | — |
+| Q-10 ON-Q01 sign-up tracks | Answered: KEEP the existing sign-up tracks, launch grill, 23 Oct 2026 - see ON-Q01 | — |
 | Q-11 NEW Pharmacy Manager switch | OPEN | — |
-| Q-12 ON-Q02 + ON-11 browse/gate + payment checklist | OPEN | — |
+| Q-12 ON-Q02 + ON-11 browse/gate + payment checklist | Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation | Pay details answered by ON-Q04; engineering follows BL-03 |
 | Q-13 ON-Q14 org joining | OPEN (recommend KEEP) | — |
 | Q-14 TB-Q08 talent-board heart | OPEN | — |
 | Q-15 ON-Q08 ID check | OPEN | — |
 | Q-16 ON-Q15/LA-Q02/LA-Q03 mobile onboarding parity | **NOT VERIFIED — do not ask yet** | — |
 | Q-17 LA-Q15 talent-board booking permissions parity | **NOT VERIFIED — do not ask yet** | — |
 | Q-18 NEW 3-pharmacy cap | OPEN | — |
+| GM-05-W01 Active membership before password setup | OPEN | Canonical question for Q-04 |
 | Q-19 owner membership immutable | **CODE INVARIANT — confirm only (not a #184 carried decision)** | Invariant in code; ownership-transfer path belongs to GM-03/GM-04 |
 | Carried R01, R04A/B/C, D01–D05, E01, P02–P12, F01/F04 | **CARRIED — not re-asked** | As recorded in #184 `questions.json` "carried" list |
 
-*End of GM-05 trace. Next step: the short re-verification read pass (backlog B-17) to close the 429-blocked files, then ask Q-01.*
+*End of GM-05 trace. The remaining re-verification work is in B-17. For the first owner question, see GM-05-W01.*
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-05-W01: Is a brand-new invitee an active team member before they set a password? (W-03, D156)
+**Scenario:** Tom invites Mia by email. Mia has no ChemistTasker account yet and hasn't opened the email.
+**What happens today:** Mia's new account gets an active, accepted membership and a set-password link. Tom can roster her before she signs in. With an ordinary direct invite, an existing account stays pending until it accepts. An approved invite-link application can activate an existing account immediately too (`pr257:backend/memberships/invites.py:149`, `pr257:backend/memberships/applications.py:122`).
+**Recommendation first: A.** Mia shows as "Invited" until she sets her password. Tom can still pre-roster her, but she gets no chat messages or shift offers until she joins.
+- **A (recommended):** active only after she sets a password; Tom can roster her as "Invited".
+- **KEEP:** active at once, as today.
+- **B:** active at once, but hidden from chat until she signs in.
+- **DEFER**
+
+**Status:** OPEN
+
+### GM-05-W02: Explorers can never hold an admin role: answered (D96)
+**Answered:** owner, 13 Nov (D96): "block explorer be an admin". Built as one shared guard, `pr257:backend/access_control/admin_roles.py`, on every grant path (D107, D114). It blocks new grants and widening of access; ending or maintaining a historical assignment is still allowed. **On the Expo branch only:** deployed main (`8ccf8f77`) doesn't have the guard yet; it ships with the PR #257 release. Not re-asked. The production clean-up question is GM-24-W01.

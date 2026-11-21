@@ -37,7 +37,7 @@
 | Question ID | Existing approved rule / conflicts | Current actual and verified SHA | Recommended + alternatives | Owner answer verbatim, source and date | Effective surface/roles | Tests and state | Release gate |
 |---|---|---|---|---|---|---|---|
 | LAUNCH-01 | PR #200 PRODUCTION NO-GO (audit; not a substitute for owner policy) | PR #249 `97c4543e` + later PR #257 `ad01356e` not fully reconciled | A: no live transactions until gates clear; B: browse-only early access; C: limited opt-in after specific gates; D: full after proven acceptance | **UNANSWERED** | All web and Expo | EVIDENCE_OPEN | P0 |
-| VERIFY-GATE-01 | existing AHPRA policy applies where required | At #249 head member/public gate differs; backend interest path inspected | Require current credential at irreversible external booking, cache policy explicit | **UNANSWERED** | External bookings / verified roles | OPEN_POLICY | P0 |
+| VERIFY-GATE-01 | existing AHPRA policy applies where required | At #249 head member/public gate differs; backend interest path inspected | Require current credential at irreversible external booking, cache policy explicit | **ANSWERED** by ON-Q03 = B, launch grill 23 Oct 2026: check on every outside booking | External bookings / verified roles | APPROVED + IMPLEMENTATION_GAP (BL-01) | P0 |
 | REFUND-01 | D01-D03 payment reservations; cancellation remuneration separate | No complete refund workflow demonstrated | Qualified legal/finance decision on refunds vs credits and timing | **UNANSWERED** | Billing, cancelled booking | OPEN_POLICY | P0 |
 | OFFER-01 | Owner decision not established | Dedicated firm offer exists; public exposure/PII risk | Enquiry first on public; trusted dedicated offer can be firm, with consent | **UNANSWERED** | Talent, booking | OPEN_POLICY | P1 |
 
@@ -48,3 +48,17 @@
 - `PAYBY-01` and `CARRIED-01` in consolidated queue must be implementation checkpoints, not policy re-asks (corrected).
 - `GM-07-Q04` original section still presents a yes/no policy although R04C is approved. Treat that question as a **source mismatch and remediation**, unless the owner explicitly initiates a change request.
 - `GM-18` remains missing its primary 26-question trace, and `GM-25` needs a latest-head comparison before the owner interview.
+
+## Launch grill answers carried in (added 21 Nov 2026 review)
+
+Source: launch grill artifact database, collection `answers`, written 23 Oct 2026. PR #267 had listed these as open.
+
+| ID | Answer | Status |
+|---|---|---|
+| ON-Q01 sign-up tracks | KEEP | APPROVED |
+| ON-Q02 before Verified | KEEP, given against a wrong "today" text | Re-confirm once as GM01-Q04 |
+| ON-Q03 where verification is enforced | B: every outside booking is checked | APPROVED + IMPLEMENTATION_GAP (BL-01) |
+| ON-P01 AHPRA exemption | A: employees skip, favourites are checked | APPROVED + IMPLEMENTATION_GAP (BL-02); closes AHPRA-FAV-01 |
+| ON-Q04 pay details | B: told early, finished before accepting | APPROVED + IMPLEMENTATION_GAP (BL-03) |
+
+Also binding (owner, 13 Nov): D93 (no role change to Explorer; Explorers get no invoices) and D96 (an Explorer can never hold an admin role; built). Carried from the job memory: R1, E1, grill #9, D2, D3, E17/E18.

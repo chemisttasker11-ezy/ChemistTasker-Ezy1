@@ -1,5 +1,12 @@
 # GM-17 Invoices / refunds — Grill Me trace (read-only)
 
+> **Corrections against current code (21 Nov 2026 review).** 9 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 7 hold, 2 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q03 / Q15 | Reconciliation has “no queue, screen … or record” | WRONG — too broad | Django admin provides fulfillment-checkout reconciliation and records an audit reason when manually expiring an attempt. This is not a customer-facing refund-approval workflow or a defined operational SLA. | `main:backend/billing/admin.py:89`; `pr257:backend/billing/admin.py:100`; `pr257:backend/billing/admin.py:110` |
+| Finance flow matrix | Web and Expo share unrestricted authenticated finance access | MAIN-ONLY | PR257 denies Explorer accounts across both modern finance and legacy invoice routes, including downloads and worksheets. Main lacks this role restriction; ordinary authorised workers and pharmacy managers retain their existing scoped access. | `main:backend/worker_finance/views.py:153`; `pr257:backend/worker_finance/permissions.py:4`; `pr257:backend/invoicing/views.py:70`; `pr257:backend/worker_finance/views.py:626` |
+
 **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 **Area:** GM-17 Invoices/refunds (Issue #250 scope; method per PR #184 / Issue #250)
 **Evidence head (verified this session):** PR #249 head **`97c4543e051b43fe30ec7e2e61ad3d69957a918e`** — confirmed unchanged via `pull_request_read get` on #249 (still the head, updated 2026-11-05). PR #249 is stacked on #248 (`25939534a1c5543454a8e770571e4dff46380d96`).
@@ -113,7 +120,7 @@ Worker invoices: full immutable revision history + PDFs per revision, delivery a
 | Audit SH-03 fulfilment fee bugs | **CHANGED — partially fixed** | Subscriber price now applied; price IDs still hard-coded (`checkout_prices.py`); fee still per-offer regardless of days. |
 | Audit SH-04 billing live, no trial | **CHANGED** | See PO-Q15: trial machinery exists, configured to 0 days; live-collection flags now the real gate. |
 | Release D8 cancellation charging | **STILL VALID** | `RELEASE_DECISIONS_20261102.md` #8: inherited behaviour, no persisted obligation/idempotency; "Before enabling: real cancellation payments". |
-| Release D1 companion/super invoices need approval? | **CARRIED, still open** | "No approval guard. R1 is intentional: an owner may record payment made through other channels." Note: worker-invoice *review* approval (APPROVED_FOR_PAYMENT) now exists in finance — D1's "no approval guard" refers to payment recording, which is still unguarded (`record_payment` / mark-paid need no approval). |
+| Release D1 companion/super payment approval | Answered: the owner may record a payment made through other channels without prior approval, R1 and release register item 1 - see GM-17-W01 | Invoice review approval is a separate step. Payment recording still has no approval prerequisite (`pr257:backend/worker_finance/views.py:505`). |
 
 ---
 
@@ -267,7 +274,7 @@ Q01 refund/credit matrix · Q02 worker-cancel remedy · Q03 refund approver/SLA 
 | B-09 | Q08 | Per-day fee pricing (if chosen) — price by filled date, not offer | 10-day block = 10 fees; partial fill = filled dates only |
 | B-10 | Q09–Q10 | Pre-posting full-cost breakdown + worker rate/super/GST/total display | Fee visible before checkout on web + Expo |
 | B-11 | Q16 | Completed state + 48h auto-approval (if chosen); invoice prefill gated on completion | Cannot invoice unworked shift; auto-approval fires once |
-| B-12 | CG-01/02/09/11 | Hard-coded price IDs → config; remove/suspend legacy penalty route; fix live-date comment; drop dead `hours` param | Test vs live prices differ; penalty route gone or guarded |
+| B-12 | CG-01/02/09/11 | Move hard-coded price IDs to config and fix the live-date comment and unused hours parameter. Engineering: see BL-04 for cancellation charging. | Preserve the charge route and export behind the existing flag. |
 | B-13 | CG-10 | Retire legacy invoice screens after parity check (web + mobile) | One invoice UI per platform; no orphaned routes |
 | B-14 | Q14 | Subscription dunning/lapse (reminders, 30-day lapse) | Unpaid invoice-method sub lapses; no silent subscriber pricing |
 
@@ -295,3 +302,13 @@ Q01 refund/credit matrix · Q02 worker-cancel remedy · Q03 refund approver/SLA 
 - **No live run:** no staging, Stripe test-mode, email or device check was performed; webhook/replay/refund behaviour is from code + the cited QA docs, not a live exercise.
 - **Pills (GM-16):** no invoice interaction with Pills was found in the inspected billing/finance code; Pills stay in GM-16's scope.
 - **Decision status:** all 18 questions are **NOT VERIFIED → CURRENT FLOW TRACED** (per Issue #250 labels). None is OWNER DECIDED. No owner answers were found in the repo for these questions in this trace.
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-17-W01: Must companion or super invoices be approved before payment? (W-14, register item 1): answered
+**Answered:** R1 (carried owner decision): an owner may record an invoice payment without approval, because pharmacies often pay through other channels. Register item 1 is closed by R1; not re-asked. If the platform ever takes invoice payments itself (not today), ask again then.

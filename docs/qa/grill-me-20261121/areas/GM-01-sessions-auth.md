@@ -1,5 +1,15 @@
 # GM-01 — Sessions / Auth — Full Grill Documentation
 
+> **Corrections against current code (21 Nov 2026 review).** 13 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 8 hold, 5 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q07 | “original `exp` … never extends” | WRONG | Preservation of the original refresh expiry applies specifically to remembered sessions. Do not describe every refresh-token rotation as having a fixed original expiry. | `main:backend/users/serializers.py:539`; `pr257:backend/users/serializers.py:542` |
+| Q09, Vite | “login never reads `?next=`” | STALE | Deployed main routes by role. pr257 honours a safe `next` destination after verification and owner-setup checks. | `main:frontend_web/src/pages/login.tsx:90`; `pr257:frontend_web/src/pages/login.tsx:81`; `pr257:frontend_web/src/pages/login.tsx:95` |
+| Q09, Expo | “no return-to concept” | WRONG | Expo preserves selected internal destinations through sign-in. Its allow-list covers membership applications, admin invitations and Explore routes, rather than arbitrary protected pages. | `pr257:frontend_mobile/app/login.tsx:84`; `pr257:frontend_mobile/app/_layout.tsx:518`; `pr257:frontend_mobile/utils/authReturnRoute.ts:14` |
+| Q13 | “reset link … valid until you change your password again” | WRONG | Reset links are checked with Django’s expiring password-reset token generator. Remove the claim that they have no expiry. | `main:backend/users/api_passwords.py:58`; `pr257:backend/users/api_passwords.py:58` |
+| Q19 | “cannot be on in production via the default” | UNVERIFIABLE for production | Code restricts OTP display using the flag and `APP_ENV`, whose fallback is `local`. Confirm deployed environment values before claiming production cannot display codes. | `main:backend/core/settings.py:656`; `pr257:backend/core/settings.py:660` |
+
 **Area:** GM-01 Sessions/auth (Issue #250, area 1 of 26)
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED + VALIDATED. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
@@ -149,15 +159,11 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM01-Q02 — Which sign-up tracks should workers get at launch? (carried ON-Q01, corrected)
 
-**Plain English:** today anyone can create an account as a pharmacist, other staff (intern, technician, assistant, student), Explorer, or owner — on the web and on the phone. The detailed questions for each role (like AHPRA number for interns, year of study for students) are not asked on the signup screen; they come later in onboarding. Should that stay?
+**Plain English:** people can sign up as a pharmacist, other staff (intern, technician, assistant or student), Explorer, or owner on web and phone. Role-specific questions come later in onboarding.
 
 **ACTUAL TODAY — Web:** `frontend_web/src/pages/register.tsx` — four role choices, reCAPTCHA, terms required; role-specific fields NOT on this screen. **ACTUAL TODAY — Expo:** `frontend_mobile/app/register.tsx` — same four roles, same reCAPTCHA (`EXPO_PUBLIC_RECAPTCHA_SITE_KEY`), Explorer asks `newcomer_type` + date of birth (min age 15). **Backend:** role must be in `SELF_REGISTRATION_ROLES` (`backend/users/models.py`); duplicate email rejected; no auto-login — email OTP first (F02).
-**RECOMMENDED:** KEEP — three worker tracks + Explorer + Owner, role details in onboarding. Matches Locumate / Locate a Locum (vary documents by role, not the whole flow).
-**ALTERNATIVE A — Keep current logic:** same as recommended (this question's KEEP *is* the recommendation; no change).
-**ALTERNATIVE B — One track per role:** separate signup screens for intern, technician, assistant, student. Trade-off: clearer at signup, much more to build and maintain on two clients.
-**Other (describe) / Defer.**
 **Sources:** `backend/users/models.py` (`SELF_REGISTRATION_ROLES`), `backend/users/serializers.py` (`UserRegistrationSerializer`), `frontend_web/src/pages/register.tsx`, `frontend_mobile/app/register.tsx`, `frontend_web/src/pages/onboarding/onboarding_staff/RegulatoryV2.tsx`.
-**Decision status:** OPEN (carried from ON-Q01; old `current` corrected — role fields live in onboarding, not signup).
+**Decision status:** Answered: KEEP the existing sign-up tracks, launch grill, 23 Oct 2026 - see ON-Q01.
 
 ### GM01-Q03 — Should an unverified email block sign-in entirely, or let the worker in to finish verifying?
 
@@ -173,6 +179,8 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Decision status:** OPEN.
 
 ### GM01-Q04 — Must a worker verify their mobile before they can browse anything? (carried ON-Q02, re-asked — FIRST QUESTION, see Part D)
+
+**Previous answer:** KEEP (launch grill, 23 Oct 2026). Re-confirm here once using the corrected dashboard baseline.
 
 **Plain English:** today, after email + password, a pharmacist, assistant, technician or Explorer must also verify an Australian mobile number (or, for overseas Explorers, a photo ID) before they can see *any* dashboard page — the app bounces them to the mobile-check screen. The old grill said workers could "browse everything after email login". That is not what the code does. The owner needs to confirm the strict rule or relax it.
 
@@ -468,3 +476,13 @@ GM01-Q01 (session lifetimes), Q03 (unverified-email block), Q04 (mobile gate —
 - Old sources: PR #184 `docs/qa/launch-grill/questions.json` (142 Qs), `docs/qa/launch-grill/AUDIT.md` (35 gaps), `docs/qa/shift-lifecycle/OWNER_DECISION_REGISTER.md`; PR #204 `docs/qa/project-grill/AREA_MAP.md`, `QUESTION_INVENTORY.md`, `DECISION_LEDGER.md` (30 carried), `BASELINE_AND_GAPS.md`, `INTERVIEW_PLAYBOOK.md`, `PROGRESS.md`, `README.md`; Issue #250.
 
 *End of GM-01 documentation. No code was changed. No branch or PR was created — the parent agent will assemble and raise the PR after all areas are done and reviewed.*
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM01-Q04: earlier owner answer (added 2026-11-21)
+The owner answered the old ON-Q02 on 23 Oct 2026 with **KEEP**. The "today" text shown then said signed-in workers browse every board, but the code already sent PHARMACIST / OTHER_STAFF / EXPLORER to the mobile check first (Part B above). Because that answer was given against a wrong description, GM01-Q04 is asked once more, with this note shown first. If the owner confirms KEEP of the real behaviour (browse after email + mobile), close it with no code change.

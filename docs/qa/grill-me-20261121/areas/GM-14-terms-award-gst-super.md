@@ -1,5 +1,14 @@
 # GM-14 — Terms / Award / GST / Super — Full Grill Documentation
 
+> **Corrections against current code (21 Nov 2026 review).** 9 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 5 hold, 4 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q02; F01/F02 | Terms contain “no … site details” | WRONG — overbroad | Terms include the pharmacy ID, name and ABN. They omit the cancellation matrix and a platform legal-terms version. | `main:backend/shifts/engagement.py:639`; `pr257:backend/shifts/engagement.py:639` |
+| Q05; F01/F06 | Missing TFN/super details “blocks acceptance” | WRONG | Missing TFN/super details defer payroll rather than block acceptance. Missing or unverified ABN details do block the ABN pathway. | `main:backend/shifts/engagement.py:265`; `main:backend/shifts/engagement.py:660`; `pr257:backend/shifts/engagement.py:265`; `pr257:backend/shifts/engagement.py:660` |
+| F05 | Stale terms return `409 TERMS_CHANGED` | PR257 only for external offers | PR257 compares the reviewed external-offer terms fingerprint. Main requires the external-offer acceptance flags. Cover already compares the reviewed version on main. | `main:backend/shifts/offers.py:385`; `pr257:backend/shifts/offers.py:387`; `main:backend/attendance/cover_terms.py:169` |
+| Q11; F07 | “The only GST fact … is the gst_registered boolean” | WRONG — scope confusion | The platform booking-fee checkout has no explicit tax treatment in its request. Worker finance separately calculates and displays GST; do not describe GST as absent across the product. | `pr257:backend/worker_finance/serializers.py:124`; `pr257:backend/worker_finance/services.py:324`; `pr257:backend/worker_finance/templates/worker_finance/invoice.html:25` |
+
 **Area:** GM-14 Terms/Award/GST/super (Issue #250, area 14 of 26)
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED + VALIDATED at PR #249 head. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only. **No prior GM-14 trace file existed anywhere in `~/workspace`** (checked before tracing); this is the first full trace.
@@ -17,7 +26,7 @@
 **Files verified at the PR #249 head in this trace:**
 `backend/shifts/engagement.py` (33,914 B — terms build/freeze/snapshot, TFN/ABN paths, super), `backend/workforce/award_rates.py` (17,372 B — MA000012 schedule resolution), `backend/shifts/offers.py` (accept flow: terms version check, freeze, payment-profile gate), `backend/shifts/finalize.py` (rate locked from accepted terms), `backend/billing/checkout_prices.py` + `stripe_support.py` (fee prices — GST search), `backend/core/settings.py` (billing flags), `backend/shifts/cancellation_policy.py` — **not** fetched (P09 preview calculator; GM-15 senior review adopted: preview-only, not connected), `frontend_mobile/roles/shared/shifts/ShiftTermsSummary.tsx` (Expo pre-apply money terms), `docs/qa/launch-grill/questions.json` + `AUDIT.md` at `refs/pull/184/head`.
 **Adopted, not re-fetched:** GM-02 senior-reviewed super-notice verdict (`engagement.py:734` verbatim — re-confirmed in this trace by direct read); GM-06 senior-reviewed Award engagement findings (`EmploymentEngagement`, `award_rate_snapshot`, junior birthday rule, `award_code MA000012`); GM-15/GM-17 senior-reviewed findings (P09 calculator, no refund/credit engine, GST/tax-invoice gap); GM-01 senior-reviewed mobile-OTP finding (unrelated).
-**Not verified / still UNKNOWN:** which component renders the full frozen terms to the worker in the Vite accept dialog (the accept endpoint is verified; the dialog's terms rendering was not line-read); who sets `abn_verified` / `abn_entity_confirmed` on a worker's onboarding (which service/check); whether any screen shows the worker their payment-readiness state before accept (the backend status exists; the exposure half is the open half of ON-Q04); the GST treatment of worker invoices (GM-17 territory — adopted, not re-traced).
+**Still to trace:** the Vite dialog that renders frozen terms, the service that sets the worker's ABN verification fields, and where the early payment-readiness checklist appears on web and Expo (BL-03). Worker-invoice GST belongs to GM-17.
 
 ## Part A — Current-flow matrix
 
@@ -138,15 +147,11 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Sources:** `backend/shifts/engagement.py:629-640` (preference match), `:747` (contractor confirmation).
 **Decision status:** OPEN.
 
-### GM14-Q05 — When must worker pay details be ready — and who sees the gap early? (carried ON-Q04 / ON-11)
+### GM14-Q05 — Payment readiness before offer acceptance (ON-Q04)
 
-**Plain English:** pay details are checked only at accept, and the accept is blocked until they are complete. The old grill said they should be shown early (on apply + offer screens) so nobody discovers the gap at the last minute — but whether any screen shows them early was not re-traced, so that half cannot be decided yet.
-**ACTUAL TODAY — Web and Expo (same backend):** gate verified (F06). Exposure half: UNKNOWN.
-**RECOMMENDED:** B — before accepting, shown early (apply + offer screens) — **after** the exposure half is re-traced. Severity: medium. Benefit: workers fix their profile before the accept, not during it.
-**ALTERNATIVE A — Keep current logic:** at accept only. **ALTERNATIVE B — Before applying. ALTERNATIVE C — Before first payout only.**
-**Other / Defer.**
-**Sources:** `backend/shifts/engagement.py:199,265`.
-**Decision status:** OPEN — **blocked on re-tracing the exposure half**.
+**Decision status:** Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04. Engineering: see BL-03.
+
+**Actual today:** Missing or unverified ABN blocks external acceptance. Missing TFN/super allows assignment and defers payroll. Early checklist coverage across clients still needs a trace (`pr257:backend/shifts/engagement.py:265`, `:716`).
 
 ### GM14-Q06 — Should both sides get a PDF copy of the agreement? (carried AG-Q03)
 
@@ -277,3 +282,21 @@ Decision status per question: **all 12 questions are OWNER DECISION: NOT ASKED /
 - U-4: AG-Q05–Q08 re-trace (shift-edit endpoints not read): do rate/role/payment/travel stay editable after acceptance?
 - U-5: GST treatment of worker invoices (GM-17 territory — adopted, not re-traced here).
 - U-6: whether a posting-time Award check exists (GM-10 territory — PO-R01 posting half).
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-14-W01: Re-grill: the cover-terms dialog went stale (409 TERMS_CHANGED) (W-13, register item 3)
+**Scenario:** Ali is asked to cover Mia's Thursday shift and opens the cover terms. Tom changes the terms. Ali taps "Accept" on the old ones.
+**What happens today (merged in PR #242, live on main and pr257):** the server refuses with `TERMS_CHANGED` and writes nothing (`main:backend/attendance/cover_terms.py:214`, `pr257:backend/attendance/cover_terms.py:214`). Web and phone throw away the stale preview, reload the current terms and make Ali agree to both agreements again. If the reload fails he gets a retry, never the stale acceptance. **Separate gap:** for outside shift offers, deployed main checks the acceptance flags but doesn't compare the terms version; pr257 does (`pr257:backend/shifts/offers.py:386`). That is backlog BL-21, not part of this question.
+**Already answered:** D2, terms are accepted only as shown (carried decision). This re-grill asks only about the reload experience.
+**Recommendation first: KEEP.** Ali only ever agrees to terms he has seen.
+- **KEEP (recommended):** reload and ask again.
+- **A:** reload and highlight what changed (the rate) before she agrees again (small UX addition).
+- **DEFER**
+
+**Status:** OPEN (re-grill requested by the owner)

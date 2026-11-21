@@ -1,5 +1,12 @@
 # GM-04 — Organisations / chains / regions — Grill Me trace (read-only, documentation only)
 
+> **Corrections against current code (21 Nov 2026 review).** 9 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 7 hold, 2 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q03 | “`abn_verified` is read at acceptance-time … a fake site is caught” | WRONG for pharmacy ABN verification | The acceptance gate validates the worker’s payment profile, not the pharmacy’s verified ABN status. The pharmacy ABN is copied into terms without that verification gate. | `main:backend/shifts/engagement.py:265`; `pr257:backend/shifts/engagement.py:629`; `:641` |
+| Q07 / Q10 | org-tier membership and regional scope undefined | WRONG as an absence claim | Org-tier browsing uses accepted active employed memberships at pharmacies in the same organisation. Admin authority uses organisation matching and explicit scope; a free-text region is not a geographic security boundary. | `pr257:backend/shifts/browse.py:112`; `pr257:backend/users/org_roles.py:265` |
+
 - **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 - **Issue:** [#250 — Grill Me](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/issues/250) (open), area GM-04 of 26
 - **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together per question, side by side, including parity gaps.
@@ -202,19 +209,11 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Sources:** `backend/shifts/posting.py` (full read at head), `backend/organizations/models.py` (`Pharmacy.verified`, `abn_*`), `backend/shifts/engagement.py` / `candidates.py` (default-branch search hits for `abn_verified`).
 **Decision status:** OPEN.
 
-### GM-04-Q04 — Where must Verified / current AHPRA be enforced for chain and organisation tiers? [ex-#184 ON-Q03 + LA-P03] — STILL VALID, safety-critical
+### GM-04-Q04 — Verification for chain and organisation bookings (ON-Q03 / LA-P03)
 
-**Plain English:** today the identity and registration check only happens when a worker applies for a *public* shift. If the same worker is booked through a chain shift, an organisation shift, or a direct offer, nobody checks. A pharmacist whose AHPRA registration lapsed can still be booked that way.
+**Decision status:** Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01. Engineering: see BL-01.
 
-**ACTUAL TODAY — Web and Expo (same backend):** `shifts/interest.py` (read at head): `require_public_ahpra` runs only when `shift.visibility == PUBLIC_LEVEL` and the worker is not a "member". Member is now defined in code (`is_public_shift_member_access`): active + accepted staff/favourite membership at that pharmacy + can perform the role + post not anonymous. Chain/org/favourite-tier interest never checks Verified or AHPRA. (Offer accept / counter-offer / dedicated offer gates were not re-read at head — GM-12 owns them; #184 says PR #183 gated public apply/accept/counter-offer.)
-**RECOMMENDED: B — every outside booking (extend the same gate to non-members on other audiences).** Rationale: an unverified or unregistered "pharmacist" can otherwise be booked through a direct offer or a chain-tier shift — the chain label is not a registration check. Severity: **critical / launch-gating**. Benefits: one rule everywhere; the AHPRA register stays the trust signal. Risks: a genuine chain locum with a lapsed check is blocked mid-booking — needs a clear "re-verify" path.
-**ALTERNATIVE A — Keep current logic (KEEP):** only public apply/accept/counter-offer gated; chain/org/favourite members exempt. Scenario: a Chempro pharmacist whose AHPRA lapsed last month is booked for a chain shift; the pharmacy discovers it on the day. Trade-off: frictionless for trusted groups, real compliance hole.
-**ALTERNATIVE B — (recommended above)** Every outside booking, members included unless the owner explicitly defines "member" narrowly (ON-P01 — now partly defined in code, see Q07).
-**ALTERNATIVE C — B plus internal rostering:** also gate rostering a worker into a pharmacist/intern role. Scenario: an employed pharmacist's registration lapses; the roster blocks them from pharmacist shifts until renewed. Trade-off: safest, but touches employment (GM-06) and needs a re-check cadence.
-**Other / defer:** Defer C; decide B now.
-**Normal case:** verified pharmacist with current AHPRA accepts a chain shift. **Edge case:** AHPRA expires *between* acceptance and shift start — no scheduled re-check found (ON-02, Oct 2026; not re-traced). **Retry/concurrency:** AHPRA lookup fails at accept time — fail closed (block) or fail open (allow and flag)? UNKNOWN — owner must choose. **Denied role / wrong tenant:** an unverified worker applies to a chain shift — blocked with reason (if B); today allowed. **Payment/notification:** a blocked acceptance means no reservation, no Stripe checkout, no fee. **Web/Expo:** gate is backend-side; both clients must surface the same denial message.
-**Sources:** `backend/shifts/interest.py` (`express_interest`, `is_public_shift_member_access`, `require_public_ahpra`), `backend/organizations/models.py` (no AHPRA fields on Pharmacy — the check is on the worker's onboarding, GM-02).
-**Decision status:** OPEN.
+**Actual today:** The shared guard skips non-public shifts, including chain and organisation shifts (`pr257:backend/onboarding/verification/state.py:174`). ON-P01 defines the employee exemption. See GM-04-Q07 for the separate organisation-tier membership question.
 
 ### GM-04-Q05 — What can an organisation admin do? (hierarchy, pharmacies, members, shifts) [NEW, refined]
 
@@ -343,7 +342,7 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### GM-04-Q01 — How do organisations (multi-site groups) join?
 
-**Ask this first because:** every other GM-04 question assumes someone can create an org and someone administers it. If the owner picks self-serve, Q02 (definitions), Q05 (org-admin powers) and Q07 (membership) all gain approval/pending-state work; if sales-led is kept, they stay simple. Q04 (AHPRA gate) is more safety-critical, but it is a *verification* rule that applies however orgs join — it is second, not first. New in this pass: the `PharmacyClaim` model may already be the intended join path for pharmacies — the owner should say whether claims are the mechanism, so the wiring question (CG-08) gets answered in the same conversation.
+**Ask this first because:** the setup path affects Q02 (definitions), Q05 (org-admin powers) and Q07 (membership). Tom can also decide whether pharmacy claims are the join mechanism (CG-08). Verification scope is answered in Q04 and tracked in the central BL-01.
 
 **Question (plain English):** A pharmacy group like Chempro wants to join ChemistTasker with all its sites. How should that happen?
 
@@ -381,9 +380,9 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### Decision gaps (owner must choose first — do not build until answered)
 
-GM-04-Q01 (how orgs join) · Q02 (chain vs org vs region definitions) · Q03 (pharmacy verification before posting) · Q04 (Verified/AHPRA on chain/org tiers) · Q05 (org-admin powers) · Q06 (org-level rates/policies) · Q07 (who counts as org member) · Q08 (org admins in cancellation notices?) · Q09 (source freeze/precedence — NOT RE-VALIDATED, read `assignment_freeze.py` first) · Q10 (regions: exist or not) · Q11 (chain/org incidents on the platform ladder? — NOT RE-VALIDATED, GM-15 owns) · Q12 (talent-board access for orgs).
+GM-04-Q01 (how orgs join) · Q02 (chain vs org vs region definitions) · Q03 (pharmacy verification before posting) · Q05 (org-admin powers) · Q06 (org-level rates/policies) · Q07 (who counts as org member) · Q08 (org admins in cancellation notices?) · Q09 (source freeze/precedence — NOT RE-VALIDATED, read `assignment_freeze.py` first) · Q10 (regions: exist or not) · Q11 (chain/org incidents on the platform ladder? — NOT RE-VALIDATED, GM-15 owns) · Q12 (talent-board access for orgs).
 
-**Order to ask (after revalidation):** Q01 → Q02 → Q04 → Q07 → Q09 → Q03 → Q05 → Q08 → Q06 → Q12 → Q11 → Q10. (Q01 first per Part D; Q04 is the safety-critical one and should be second in substance even though Q01 is asked first.)
+**Order to ask (after revalidation):** Q01 → Q02 → Q07 → Q09 → Q03 → Q05 → Q08 → Q06 → Q12 → Q11 → Q10.
 
 ---
 
@@ -396,7 +395,7 @@ GM-04-Q01 (how orgs join) · Q02 (chain vs org vs region definitions) · Q03 (ph
 | BL-01 Org onboarding path as decided (delete dead page, or build self-serve + approval queue; wire or drop `PharmacyClaim`) | Q01 | `backend/organizations/views.py`, `backend/organizations/claims.py`, `frontend_web/src/pages/OrganizationCreate.tsx` | Positive/negative role tests: superuser-only vs self-serve; duplicate org; pending org invisible |
 | BL-02 Encode chain/org/region definitions in model + UI copy (Vite, Next, Expo identically) | Q02 | `backend/organizations/models.py`, posting wizards (web + Expo) | One pharmacy, one org; many chains; group-change history; wrong-tenant denial |
 | BL-03 Pharmacy verification gate at posting, per tier | Q03 | `backend/shifts/posting.py` (`post_shift`), both posting wizards | Unverified pharmacy blocked from public (and chain/org if decided); clear denial message on web + Expo |
-| BL-04 Extend Verified/AHPRA gate to chain/org acceptances as decided; AHPRA re-check cadence | Q04 | `backend/shifts/interest.py`, `backend/shifts/offers.py`, `backend/shifts/assignment.py` | Unverified/lapsed worker blocked at apply/accept/counter-offer; fail-closed on lookup failure if decided |
+| BL-04 Extend verification to outside bookings across tiers | ON-Q03, answered | Engineering: see the central BL-01 | Preserve public coverage and apply the outside-booking scope to chain/org routes |
 | BL-05 Org-admin permission set + hierarchy | Q05 | `backend/users/org_roles.py`, `backend/organizations/views.py`, `backend/workforce/permissions.py` | Org admin sees own org only; cannot act on other orgs; union with owner role correct |
 | BL-06 Org defaults (rates/policies) if decided, with override + audit | Q06 | New org-default model + `backend/organizations/models.py` (`Pharmacy.rate_*`), offer/engagement terms | Default copied to new pharmacy; change never alters frozen terms |
 | BL-07 Membership definition in visibility query + revocation handling | Q07 | Visibility queryset (`backend/shifts/escalation.py` / `base.py` / `browse.py`), `backend/shifts/interest.py` | Ex-employee loses org visibility; pending offer re-checked at acceptance |

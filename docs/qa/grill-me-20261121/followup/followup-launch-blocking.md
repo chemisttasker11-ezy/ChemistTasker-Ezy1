@@ -372,7 +372,7 @@
 | GM-15 | GM15-43 | TB-Q09 · Can a pharmacy block a worker? [STILL VALID] | Whether a pharmacy can block a worker is a safety control. |
 | GM-15 | GM15-44 | LA-P01 · AHPRA cancellation leaves a shift stuck as waiting for payment [CHANGED — PARTIAL] | AHPRA cancellation leaving a shift stuck waiting for payment strands money and the shift. |
 | GM-15 | GM15-45 | LA-P02 · AHPRA cancellations bypass the cancellation policy and notices [STILL VALID] | AHPRA cancellations bypassing policy and notices leave workers and pharmacies uninformed. |
-| GM-15 | GM15-46 | LA-Q06 / SH-02 · The old 10%/20% penalty route is still live [CHANGED — WORSE + GATED] | The live 10%/20% penalty route must be removed before launch. |
+| GM-15 | GM15-46 | Legacy cancellation charging | Engineering: see BL-04. Preserve the charge behind its existing live flag. Ask launch scope at GM15-01. |
 | GM-15 | GM15-47 | LA-Q10 / SH-09 · Accepted terms don't include the cancellation table or terms version [CHANGED — PARTIAL] | Accepted terms must include the cancellation table and terms version or charges are undisclosed. |
 | GM-15 | GM15-48 | LA-P03 (context, GM-15 adjacent) · Chain and organisation shifts skip the AHPRA gate [STILL VALID — noted, owned by GM-02/GM-04] | Chain/org shifts skipping the AHPRA gate is a safety hole. |
 | GM-15 | GM15-49 | LA-R02 · May cancellation charges launch before Australian legal review? [STILL VALID] | Cancellation charges need Australian legal review before they can launch (LA-R02). |
@@ -387,7 +387,7 @@
 | GM-15 | C9 | No idempotency / persisted obligation for cancellation charges | Money must not move, or be mis-stated, without the agreed rule. |
 | GM-15 | C10 | Subscriber fulfillment pricing fixed, but Stripe price IDs still hard-coded | Subscriber pricing fixed but Stripe price IDs still hard-coded; test/live prices cannot differ. |
 | GM-16 | GM16-Q02 | Fix before launch? Subscribers charged full price; Stripe price IDs hard-coded. | Subscribers charged full price and hard-coded Stripe price IDs mean wrong money is charged. |
-| GM-16 | GM16-Q03 | Fix before launch? The old 10%/20% penalty route is still live. | The live 10%/20% penalty route must be removed before launch. |
+| GM-16 | GM16-Q03 | Legacy cancellation charging | Engineering: see BL-04. Preserve the charge behind its existing live flag. |
 | GM-16 | GM16-Q04 | When should booking fees start? | When booking fees start decides whether the first bookings are charged. |
 | GM-16 | GM16-Q05 | Should pharmacies save a payment method during setup? | Saving a payment method at setup decides whether D02 deadlines are payable. |
 | GM-16 | GM16-Q06 | Should the pharmacy see the full cost before posting? | The pay card shows $n x 30 regardless of type/subscriber; the displayed price is wrong. |

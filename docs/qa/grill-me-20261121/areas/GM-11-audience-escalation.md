@@ -1,5 +1,13 @@
 # GM-11 — Audience / Escalation — Grill Me trace (READ-ONLY, docs only)
 
+> **Corrections against current code (21 Nov 2026 review).** 10 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 7 hold, 3 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q01 / Q02 / Q10 | stops “for good once anyone has shown interest” | WRONG | Automatic escalation pauses while interest rows exist. If all interest is deleted, a later query can escalate again; decline or offer expiry alone does not delete those rows. | current-row predicate: `main:backend/shifts/escalation.py:91`; deletable interests: `pr257:backend/shifts/offers.py:48`; requester scope: `:57` |
+| Q08, carried premise | worker never sees pharmacy name before accepting | WRONG | There is no uniform pre-acceptance anonymity guarantee: profile-reveal and shift-update notifications include the pharmacy’s real name. Record this disclosure defect instead of repeating the historical guarantee. | GAP reveal notice: `main:backend/shifts/candidates.py:120`; `pr257:backend/shifts/candidates.py:132`; GAP edit notice: `pr257:backend/shifts/emails.py:434` |
+| CG-11-08 | recipients beyond 50 “silently” omitted | WRONG about silence | Posting notices are capped at 50 recipients and truncation is logged. There is no user-facing explanation in this helper. | `main:backend/shifts/announcements.py:424`; `pr257:backend/shifts/announcements.py:425` |
+
 **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 **Issue:** #250 — Grill Me, one consolidated backend + Web + Expo sign-off before launch
 **Method source:** PR #184 (`docs/qa/launch-grill/questions.json`, `AUDIT.md`, `LAUNCH_GRILL.html`), head `c786a4b8182ebf9b505d47cd81980eb3b9851ce3`
@@ -158,15 +166,17 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 - **ALTERNATIVE A — Within 1 minute:** Same job, more often. *Scenario:* an urgent shift posted at 07:00 escalates at 07:01 instead of 07:05 — negligible worker benefit, higher job frequency. Trade-off: tightest, most load.
 - **ALTERNATIVE B — Within 15 minutes:** Cheapest. *Scenario:* a shift due to widen at 09:00 widens at 09:15; a chain worker who checked at 09:05 sees nothing and does not come back. Trade-off: cheapest, visibly laggy for urgent shifts.
 - **Other / defer:** e.g. 2 minutes; or keep lazy escalation for non-urgent shifts and schedule only urgent ones.
-- **Note:** this is a **code gap, not a decision gap**, once the bound is chosen: build a Celery beat job, remove the per-request scan from `get_queryset`, add idempotency so a job firing twice does not double-advance a tier. **Retry/concurrency:** a job that crashes mid-scan must not skip tiers or double-notify.
+- **Engineering: see BL-24.** Q03 owns the timing bound.
 
-### GM-11-Q04 — Fix before launch? Scheduled escalation only runs when someone loads a shift list. 🔴 (code gap)
-- **Old ID:** LA-Q08 (gap SH-05). **Status: STILL VALID.** Same facts as Q03; kept as a separate launch-gate question because it asks "fix before launch?" rather than "how late?".
-- **ACTUAL TODAY:** As Q03.
-- **RECOMMENDED:** A — Fix before launch. (LA-Q08 rec A.)
-- **ALTERNATIVE A — Keep current logic (launch with lazy escalation):** *Scenario:* launch weekend, few workers browsing at 2am; overnight escalations never fire, Monday morning shifts go unfilled. Trade-off: no build, launch-gating reliability risk.
-- **ALTERNATIVE B — Fix after launch, with a manual workaround:** Owner manually widens audience / re-posts. Trade-off: human toil, inconsistent.
-- **Other / defer:** Deferring is Alternative A in practice.
+### GM-11-Q04 — Should automatic widening be in the first launch? (LA-Q08)
+
+**Scenario:** Tom's shift is due to widen at 2 am. Sara checks at 7 am.
+**What happens today:** The shift widens when a shift-list or detail request runs the due check. Until someone loads it, the shift can stay at its earlier tier (`pr257:backend/shifts/escalation.py:91`).
+**Recommendation first: A.** Launch automatic widening with the scheduled check and the timing chosen in GM-11-Q03.
+- **A (recommended):** After the scheduler ships, Sara can find the shift in the wider audience within the agreed time even if nobody opens the board overnight.
+- **B:** Tom widens the audience by hand at launch. Scheduled widening comes later.
+
+**Status:** OPEN (launch scope). Engineering: see BL-24.
 
 ### GM-11-Q05 — Fix before launch? Match emails miss escalated shifts and reach unverified workers. 🟠 (code gap)
 - **Old ID:** LA-Q17 (gap AV-04). **Status: STILL VALID.**
@@ -227,15 +237,10 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 - **Other / defer:** e.g. auto-resume only if shift start is &gt;12h away; manual if nearer.
 - **Edge cases:** multiple offers, one declines while another is pending; decline after partial acceptance on a multi-date block; expired offer discovered lazily (SH-07) — does expiry even get noticed in time to resume? **Concurrency:** two declines at once must resume escalation once, not twice.
 
-### GM-11-Q11 — Who sees a shift, and can apply, at each tier — and what is gated? 🟡
-- **Old ID:** overlaps ON-Q02 / ON-Q03 / ON-P01 (verification gates by audience). **Status: CHANGED.**
-- **ACTUAL TODAY:** Anyone signed in can browse shift boards (per `browse.py` querysets). Verified (+ current AHPRA) is checked only on public-shift interest; staff and favourites skip it; chain/org/talent bookings skip it — the gate in `onboarding/verification/state.py:require_public_ahpra` is a **no-op for non-public shifts** (proven in GM-12-Q01). A suspended favourite keeps booking its own pharmacy's shifts (ON-P01 — adverse-transition behaviour in `state.py:apply_state_transition` cancels upcoming assignments on adverse status, but the interest-time gate never runs for non-public shifts, so the check is not the thing stopping them).
-- **RECOMMENDED (Oct 2026, ON-Q03):** B — Every outside booking. Also check non-members on chain, organisation and talent-board bookings. (ON-P01 rec A: employees exempt; favourites checked — a favourite locum is an outside contractor.)
-- **ALTERNATIVE A — Keep current logic:** Public apply/accept/counter-offer checked; members and internal shifts exempt. *Scenario:* a suspended locum in the chain accepts a chain shift unchecked. Trade-off: no build, safety gap — now proven, not hypothetical.
-- **ALTERNATIVE B — Every outside booking (recommended above).**
-- **ALTERNATIVE C — B plus internal rostering:** Also check registered roles before assignment. Trade-off: safest, most friction for employed staff whose employer already checks them.
-- **Other / defer:** e.g. check at booking, not at apply, for chain/org tiers.
-- **Edge cases:** worker is staff at pharmacy A (exempt there) but favourite at pharmacy B (checked or not? — today: not checked at B's chain/org shifts either); worker's AHPRA lapses between apply and accept; Explorer browsing (ON-Q05). **Web/Expo difference:** gate must be enforced backend-side (it is, for public shifts) — a client that forgets the check must still be blocked. **Decide jointly with GM-12-Q01** — do not answer here in isolation.
+### GM-11-Q11 — Verification at each audience tier (ON-Q03 / ON-P01)
+- **Status:** Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01.
+- **Exemption status:** Answered: A, employees are exempt and favourites are checked, launch grill, 23 Oct 2026 - see AHPRA-FAV-01.
+- **Actual today:** Several booking actions call the shared verification guard, which skips non-public shifts. Eligible favourites can also skip it on named public shifts at their pharmacy. Engineering: see BL-01 and BL-02. Browse access is referenced at GM01-Q04.
 
 ### GM-11-Q12 — Do notification flags control escalation notices per tier, and is there an organisation-wide broadcast? 🟡
 - **Old ID:** part of carried E01B. **Status: STILL VALID — downstream of Q01.**
@@ -247,14 +252,9 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 - **Other / defer:** e.g. digest (one email per day per worker) instead of per-escalation emails.
 - **Edge cases:** worker belongs to several tiers at once (staff at one store, favourite at another) — one notice or several? NOT inspected. Worker opted out of email but not push.
 
-### GM-11-Q13 — NEW: A favourite loses visibility when the shift escalates past LOCUM_CASUAL — keep it or fix it? 🟠
-- **Old ID:** NEW (found in this trace). **Status: VALIDATED (gap in current code).**
-- **ACTUAL TODAY:** `browse.py:eligible_q` — OWNER_CHAIN and ORG_CHAIN branches require PHARMACY_STAFF employment types only. A pure favourite of the posting pharmacy loses community-list visibility once the shift escalates past LOCUM_CASUAL; they regain it only at PLATFORM. This partly violates carried decision E01A ("earlier audiences keep access; wider posting adds viewers").
-- **RECOMMENDED:** Fix it — carry favourites forward through OWNER_CHAIN and ORG_CHAIN in the community queryset (a favourite of the posting pharmacy stays able to see and claim/apply to that shift at every tier until PLATFORM, where everyone sees it anyway). Rationale: E01A is a carried owner decision; the current queryset silently breaks it for exactly the workers the pharmacy already trusts. Severity: MEDIUM-HIGH (a favourite who watched a shift at LOCUM_CASUAL loses it the moment it widens — the opposite of what the owner was told E01A means).
-- **ALTERNATIVE A — Keep current logic:** Favourites see the shift only at LOCUM_CASUAL and PLATFORM. *Scenario:* a favourite locum sees a shift on Tuesday, it escalates Wednesday, the shift vanishes from their board, they assume it was filled. Trade-off: zero build; confusing, and contradicts E01A as written.
-- **ALTERNATIVE B — Fix (recommended):** carry favourites forward. *Scenario:* same favourite keeps seeing the shift through the chain/org tiers and can still apply. Trade-off: small queryset change; chain/org staff and favourites then see the same shift — no new privacy issue, the shift was already visible to the favourite at a narrower tier.
-- **ALTERNATIVE C — Deliberately narrow E01A:** amend the carried decision to "staff keep access; favourites do not" and tell owners. *Scenario:* same as A, but documented and deliberate rather than accidental. Trade-off: honest, but weakens the favourites relationship the product is built on.
-- **Other / defer:** e.g. favourites keep visibility but cannot claim at chain/org tiers (view-only). **Edge cases:** favourite of pharmacy A, staff at pharmacy B in the same chain — already covered by staff membership. **Web/Expo difference:** none — the queryset is shared backend; both clients inherit the fix (or the gap).
+### GM-11-Q13 — Favourites keep visibility when a shift widens (E01A)
+- **Status:** Answered: earlier audiences keep access when the shift widens, carried E01A - see BL-06.
+- **Actual today:** OWNER_CHAIN and ORG_CHAIN drop pure favourites from the community list until PLATFORM (`pr257:backend/shifts/browse.py:107`). Engineering: see BL-06.
 
 ---
 
@@ -262,7 +262,7 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 
 ### GM-11-Q01 — When a shift escalates, who is told, and when does escalation stop?
 
-**Ask this first because:** it is the launch-gating SH-06 defect, it blocks Q02, Q05, Q10 and Q12 (all of them assume an answer to "notify on escalation?" and "what stops it?"), and it decides whether shifts strand silently — the failure the pharmacy will feel first on launch weekend. Q03/Q04 (the scheduled job) is build work that can start in parallel, but its *behaviour* (what the job does when it fires) depends on Q01. Q13 (favourites visibility) can be fixed independently of Q01, but do not present it as decided until the owner confirms whether E01A means what it says.
+**Ask this first:** It sets who gets notices and when widening stops. GM-11-Q03 sets the timing bound, GM-11-Q04 sets launch scope and BL-24 tracks the scheduler. Favourites keep access under E01A (BL-06).
 
 **Plain-English version for the owner:** "Today, when a shift widens to more workers, nobody is told — workers only find it if they happen to browse. And once any worker has shown interest, even if they say no, the shift never widens again, so it can sit empty. Should we tell each new group when a shift reaches them, and keep widening until the shift is actually booked?"
 
@@ -326,27 +326,27 @@ Severity: 🔴 launch-gating · 🟠 high · 🟡 medium. Severity is re-assesse
 |---|---|---|
 | GM-11-Q01 | PO-Q08 / SH-06 | STILL VALID — open, ask first |
 | GM-11-Q02 | PO-Q09 | STILL VALID — open, blocked by Q01 |
-| GM-11-Q03 | PO-Q10 / SH-05 | STILL VALID — open (bound), code gap after |
-| GM-11-Q04 | LA-Q08 / SH-05 | STILL VALID — open, launch-gate |
+| GM-11-Q03 | PO-Q10 / SH-05 | OPEN (timing bound); engineering follows BL-24 |
+| GM-11-Q04 | LA-Q08 / SH-05 | OPEN (launch scope); engineering follows BL-24 |
 | GM-11-Q05 | LA-Q17 / AV-04 | STILL VALID — open, code gap after Q01 |
 | GM-11-Q06 | E01 slice | CHANGED — open |
 | GM-11-Q07 | PO-Q11 | PARTLY — open; re-verify serializer field list before deciding |
 | GM-11-Q08 | PO-Q12 | PARTLY — open; re-verify reminder email + terms dialog before deciding |
 | GM-11-Q09 | PO-Q13 | STILL VALID — open |
 | GM-11-Q10 | BK-Q06 slice | STILL VALID — open, blocked by Q01/Q02 |
-| GM-11-Q11 | ON-Q03 / ON-P01 | CHANGED — open; decide jointly with GM-12-Q01 |
+| GM-11-Q11 | ON-Q03 / ON-P01 | Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01. Employee exemption from AHPRA-FAV-01. |
 | GM-11-Q12 | E01B follow-up | STILL VALID — open, downstream of Q01 |
-| GM-11-Q13 | NEW | VALIDATED (gap) — open |
+| GM-11-Q13 | E01A | Answered: earlier audiences keep access when the shift widens, carried E01A - see BL-06 |
 | E01 / E01A / E01B / E03 / D03 | carried | Settled Oct 2026 — E01A partly violated (Q13); D03 implementation not found |
 
 ### 6c. Implementation backlog — ONLY after owner answers (nothing here is decided now)
-1. **After Q01-A + Q03-A:** build scheduled escalation job (≤5 min), idempotent tier advance, per-tier notify respecting flags, stop-when-reserved, resume after decline/expiry. Tests: normal escalation, decline-then-resume, expiry-then-resume, double-fire idempotency, wrong-tenant/denied-role list access, Expo + Vite list visibility at each tier.
+1. **Engineering: see BL-24.** Use GM-11-Q01 for escalation behaviour, GM-11-Q03 for the timing bound and GM-11-Q04 for launch scope.
 2. **After Q01:** fix AV-04 match emails (escalation-to-PLATFORM trigger + Verified filter).
 3. **After Q08:** reveal pharmacy name in agreement preview (or chosen point); keep redaction on cards/emails otherwise.
 4. **After Q09:** auto-urgent rule (24h/48h) and any urgency→escalation shortening.
-5. **After Q11 / GM-12-Q01:** extend Verified/AHPRA gates to chain/org/talent bookings as decided; favourite exemption as decided.
+5. **Engineering: see BL-01 and BL-02.** Implement the carried verification and employee-exemption rules.
 6. **After Q06/Q12:** starting-tier / skip logging; per-tier flag handling for escalation notices; no org broadcast unless Q12-C chosen.
-7. **After Q13:** carry favourites forward through OWNER_CHAIN/ORG_CHAIN queryset (or amend E01A deliberately).
+7. **Engineering: see BL-06.** Keep favourites visible as audiences widen under E01A.
 8. **Cross-client verification (after implementation):** Web (Vite + Next) verified, Expo verified, launch signed off — per Issue #250 progress labels. No step is "done" from a green typecheck alone.
 
 ### 6d. What is still UNKNOWN (do not present as decided)

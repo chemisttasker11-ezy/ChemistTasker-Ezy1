@@ -1,5 +1,13 @@
 # GM-06 — Employment / leave — Full Grill Documentation
 
+> **Corrections against current code (21 Nov 2026 review).** 7 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 4 hold, 3 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q01 | “No rule requires an engagement to exist” | WRONG as a blanket claim | Staff rostering can omit an engagement when ChemistTasker payroll is disabled. With payroll enabled, the shared staff-terms helper requires complete TFN payroll details and a dated engagement covering the work date. | `main:backend/shifts/engagement.py:99`; `pr257:backend/shifts/engagement.py:103`; `:112`; payroll-off path: `pr257:backend/shifts/engagement.py:80` |
+| Q07 | “nothing … warns at roster publish” about approved leave | WRONG | Approved leave is a blocking roster-validation error and prevents publication and validated slot edits. Some older direct assignment writers need separate treatment; the guard is not replacement-only. | GUARDED leave check: `main:backend/workforce/roster/validation.py:61`; validation caller: `pr257:backend/workforce/roster/periods.py:234`; publish refusal: `pr257:backend/workforce/roster/publication.py:59`; slot edit: `pr257:backend/workforce/roster/slot_edit.py:52` |
+| Q09 | coverage requirements have no identified consumer | WRONG as an absence premise | The roster workspace calculates coverage and shortfalls across each required window. These are displayed calculations, not publication-blocking errors in the inspected validation path. | `main:backend/workforce/roster/revisions.py:64`; `pr257:backend/workforce/roster/revisions.py:91`; `:144` |
+
 **Area:** GM-06 Employment/leave (Issue #250, area 6 of 26)
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.

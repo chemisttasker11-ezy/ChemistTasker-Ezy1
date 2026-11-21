@@ -1,5 +1,13 @@
 # GM-19 — Availability / Matching — Grill Me trace (COMPLETE — re-run 2026-11-21)
 
+> **Corrections against current code (21 Nov 2026 review).** 9 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 6 hold, 3 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q01 / Q02 | Recurrence end date is optional on backend and Expo | STALE; main remains permissive | PR257 requires an end date for new or changed recurring schedules, and Expo requires it too. Metadata-only edits preserve supported legacy open-ended rows. | `main:backend/talent/serializers/availability.py:7`; `pr257:backend/talent/serializers/availability.py:41`; `pr257:frontend_mobile/roles/shared/availability/availabilityModel.ts:111` |
+| Q08 | “no quiet-hours” | MAIN-ONLY | PR257 has user-level push quiet hours, although no separate urgent-shift consent exists. Quiet hours suppress eligible pushes; they do not defer email or create a later push queue. | `main:backend/notifications/services.py:102`; `pr257:backend/notifications/services.py:119`; `pr257:backend/notifications/models.py:65` |
+| Q10 / CG-1 | No semantic API validation | STALE; still true on main | Remove the blanket no-validation claim for PR257. Describe the remaining unsupported constraints separately, including past dates and duplicates. | `main:backend/talent/serializers/availability.py:7`; `pr257:backend/talent/serializers/availability.py:17` |
+
 - **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 - **Issue:** #250 (Grill Me, 26 areas) — **PR #184** (Oct 2026) is the format example
 - **Re-validation target:** active PR #249 (stacked on #248)

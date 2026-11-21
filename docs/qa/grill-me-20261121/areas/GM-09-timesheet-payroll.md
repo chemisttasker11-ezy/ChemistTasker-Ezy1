@@ -1,5 +1,13 @@
 # GM-09 Timesheet / Payroll — Grill Trace (READ-ONLY)
 
+> **Corrections against current code (21 Nov 2026 review).** 8 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 5 hold, 3 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q1 / Q6 | “No export exists” | WRONG | Expo exports approved or locked timesheet hours to CSV and opens native sharing. This is a client-generated hours export, not wage execution or a server payroll-export endpoint. | `main:frontend_mobile/features/parity/workforce.tsx:192`; `:221`; `pr257:frontend_mobile/features/parity/workforce.tsx:208`; `:235` |
+| Q3 | “worker submits their own first” before manager approval | WRONG as a mandatory sequence | Workers can submit only their own timesheets, but manager approval does not require a prior SUBMITTED state. It requires a current revision, no rebuild requirement and no open blockers. | worker-only submission: `main:backend/workforce/timesheet_transitions.py:43`; approval checks: `pr257:backend/workforce/timesheet_transitions.py:58` |
+| Q10 / CG-09-09 | open sessions inflate time “instead of blocking” | WRONG | An open session can show estimated minutes, but it also creates an unwaivable missing-clock-out blocker. Do not describe those estimated minutes as silently approvable. | GUARDED: `main:backend/workforce/timesheet_data.py:252`; display estimate: `pr257:backend/workforce/timesheet_data.py:272`; unwaivable source check: `pr257:backend/workforce/timesheet_transitions.py:112` |
+
 **Repo:** chemisttasker11-ezy/ChemistTasker-Ezy1
 **Issue:** #250 — "Grill Me — one consolidated backend, web & Expo business-logic sign-off before launch"
 **Method:** PR #184 format (each question: ACTUAL TODAY / RECOMMENDED / ALTERNATIVE A "Keep current logic" / ALTERNATIVE B/C / Other-defer)
@@ -297,3 +305,20 @@ Progress label (per Issue #250): **CURRENT FLOW TRACED**. It advances to OWNER D
 - **Did not:** change any code; create any PR/issue/comment/branch; notify the owner; read the Expo/Next timesheet screens at head; read `workforce/tasks.py` or the commit `d15304b0`; decide any question.
 
 *No code changes were made in this trace. No PR/issue/comment/branch created. No owner was notified.*
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-09-W01: Re-grill: overnight deferred payroll activation into a locked period (W-13, register item 7)
+**Scenario:** Omar works Friday 22:00 to Saturday 06:00 with TFN/super details deferred. Tom locks the period that covers Saturday. Omar finishes his details, then Tom asks the app to activate payroll for the shift.
+**What happens today:** An authorised manager starts activation. The server checks both work dates. A locked finishing date refuses activation and rolls back the offer and assignment writes (`pr257:backend/shifts/offers.py:566`, `:582`, `pr257:backend/shifts/payroll.py`). Separate cover and later assignment writes are outside this check (release register item 7).
+**Recommendation first: KEEP.** The locked period stays intact. Tom handles the correction.
+- **KEEP (recommended):** Tom sees the refusal and decides how to correct payroll.
+- **A:** Tom can activate payroll and put Omar's hours in the next open period automatically.
+- **DEFER**
+
+**Status:** OPEN (re-grill requested by the owner)

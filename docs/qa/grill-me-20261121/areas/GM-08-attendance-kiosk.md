@@ -1,5 +1,11 @@
 # GM-08 — Attendance / kiosk — Full Grill Documentation
 
+> **Corrections against current code (21 Nov 2026 review).** 9 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 8 hold, 1 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q06 | PIN format is unknown / only non-empty checked | WRONG as a missing-validation premise | Both inspected setup paths require four to six numeric digits. Remove the proposed investigation of whether any PIN format rule exists. | GUARDED setup: `main:backend/attendance/credentials.py:961`; self-service: `pr257:backend/attendance/credentials.py:1025` |
+
 **Area:** GM-08 Attendance/kiosk (Issue #250, area 8 of 26)
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only.
@@ -411,3 +417,22 @@ GM-08-Q01 (who can clock in — FIRST) · Q02 (provisional approval deadline) ·
 - Adopted without re-trace: GM-01 sessions (device token, not user JWT); GM-06 employment/leave (this session); GM-07 roster/cover/swap (this session); GM-04 chain/org definitions; GM-18 LA-Q12; GM-25 structural trace.
 
 *End of GM-08 documentation. No code was changed. No branch or PR was created. This file replaces the earlier BLOCKED-429 stub of the same name.*
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-08-W01: Re-grill: kiosk PIN setup and worker QR confirmations tied to the session the worker saw (W-13, register item 2)
+**Scenario (worker QR):** Ali scans the kiosk QR on his phone. It asks him to confirm clock-out. He clocks out elsewhere using his own signed-in session, then taps the old confirmation.
+**Scenario (PIN setup):** Mia verifies her code and sets a kiosk PIN. The kiosk asks her to confirm clock-in after a recent clock-out. Her attendance session changes before she confirms.
+**What happens today:** On both paths, the server checks the action and session shown to the worker. It refuses a stale tap with 409 and writes no clock event. For stale PIN setup, the PIN write rolls back and the verification code stays usable. On the phone, Ali sees a reload and is told to start the action again (`pr257:backend/attendance/worker_api.py:164`, `pr257:backend/attendance/kiosk_api.py:708`, `pr257:frontend_mobile/features/parity/attendance.tsx:386`).
+**Recommendation first: KEEP.** Both Ali and Mia act on fresh attendance information after a stale tap.
+- **KEEP (recommended):** Ali starts clock-out again from the refreshed screen. Mia restarts PIN setup and confirms against the current session.
+- **A:** When the intended clock state is already in place, Ali sees “Already clocked out” and Mia can finish setting her PIN without a second clock-in. A different session or action still needs fresh confirmation.
+- **DEFER**
+
+**Note:** The rollout order (ship the mobile build first, then the backend) is a GM-26 release item.
+**Status:** OPEN (owner asked for a re-grill; the ACTIVE.md note "proposed until #242 merges" is out of date: #242 merged on 3 Nov)

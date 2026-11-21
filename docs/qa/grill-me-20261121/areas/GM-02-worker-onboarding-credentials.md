@@ -1,5 +1,13 @@
 # GM-02 — Worker onboarding / credentials (Grill Me)
 
+> **Corrections against current code (21 Nov 2026 review).** 14 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 11 hold, 3 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| ON-Q03 / GM02-Q20 / CG-04 | “counter-offer submission … no gate at all” | WRONG | Public counter-offer submission already invokes verification before serializer creation. The actual gap is that this guard deliberately does nothing for non-public shifts. | GUARDED main endpoint: `main:backend/shifts/base.py:325`; GUARDED pr257 endpoint/replay: `pr257:backend/shifts/base.py:400`, `:426`; shared rule: `pr257:backend/onboarding/verification/state.py:171` |
+| ON-Q03 / GM02-Q21 | “manager-issued offers … NOT gated” | WRONG as a blanket claim | Ordinary manager offer creation and counter-offer acceptance call the public guard. Dedicated creation has a different path, and non-public bookings remain outside that guard. | GUARDED: `main:backend/shifts/base.py:273`; `pr257:backend/shifts/base.py:348`; counter acceptance: `pr257:backend/shifts/base.py:462`; dedicated creation: `pr257:backend/shifts/posting.py:159` |
+| ON-Q15, mobile uncertainty | Explorer Shifts may be a placeholder | WRONG as a current premise | Explorer Shifts uses the shared Shift Centre. Current account-type choices route to the pharmacist or Other Staff basic-profile screen; the old missing-screen description must not be presented as current. | `pr257:frontend_mobile/roles/explorer/shifts.tsx:1`; `pr257:frontend_mobile/components/ChooseAccountTypeCard.tsx:14` |
+
 **Area:** GM-02 Worker onboarding/credentials · **Issue:** #250 · **Method:** PR #184 format
 **Code head verified:** PR #249 `97c4543e051b43fe30ec7e2e61ad3d69957a918e`
 (PR #249 open draft, stacked on #248 `feat/mobile-merge-sdk`, base `c98cf2ef`;
@@ -123,158 +131,31 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
 
 ### ON-S1 · Worker tracks and gates
 
-#### ON-Q01 — Which sign-up tracks should workers get at launch?
-- **Validation: STILL VALID.** **Decision status: OPEN.**
-- **Context:** Three tracks on web and mobile: pharmacist, other staff (intern, technician,
-  assistant, student) and Explorer. Other staff share one form.
-- **ACTUAL TODAY:** Web and mobile both offer the same four signup roles
-  (`backend/users/models.py:40-54`; `frontend_web/src/pages/register.tsx:26`;
-  `frontend_mobile/app/register.tsx:37-39`). The other-staff form already changes by
-  role: AHPRA number for interns, classification levels for technicians/assistants,
-  year of study for students (`backend/onboarding/services/progress.py`,
-  `classification_ok`; `backend/onboarding/verification/policy.py:badges()` —
-  QUALIFICATION / DISPENSING / ENROLMENT badges). Tab-level screens were NOT re-inspected
-  (frontend reads rate-limited); the role-specific *fields* are confirmed in backend code.
-- **Options:** **KEEP — Keep current logic:** three tracks; the other-staff form shows each
-  role's own fields. | **B — One track per role:** separate screens for intern, technician,
-  assistant and student.
-- **RECOMMENDED: KEEP. Severity: Low.** Today already does what B proposed at the field
-  level. Separate screens would quadruple the maintenance for no new check.
-  Competitors (Locumate, Locate a Locum) also vary documents by role, not the whole flow.
-- **Normal case:** a technician signs up, sees classification levels, never sees AHPRA.
-  **Edge case:** an Explorer upgrades — senior-review correction: `CHOOSABLE_ACCOUNT_TYPES` (`users/models.py:54`) is documented in code as the PHARMACY_MANAGER one-time switch list; whether Explorer upgrade reuses it was not traced. Upgrade screens NOT INSPECTED.
-  **Web/Expo difference:** none found in the register screens; onboarding tab screens
-  NOT INSPECTED on Expo.
-- **Sources:** [users/models.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/users/models.py#L40-L54),
-  [register.tsx (web)](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/frontend_web/src/pages/register.tsx#L26),
-  [progress.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/onboarding/services/progress.py),
-  [policy.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/onboarding/verification/policy.py).
+#### ON-Q01 — Worker sign-up tracks
 
-#### ON-Q02 — What can a worker do before they are Verified?
-- **Validation: STILL VALID.** **Decision status: OPEN.**
-- **Context:** Anyone signed in can browse shift boards. Verified (and the latest AHPRA
-  result) are checked only on public shift actions (ON-01).
-- **ACTUAL TODAY:** Signed-in workers browse every board; only *public* applying needs
-  Verified (flow F5). Staff and favourites skip it. Suspended non-members are paused
-  account-wide (`verification/state.py:ahpra_frozen()` + `apply_state_transition()` —
-  Verified revoked, chat sockets closed); suspended *members* keep internal access and
-  only lose other pharmacies' public shifts (`member_suspension_note()`). (The "login
-  needs an email code" note in #184 is GM-01 territory and was not re-verified here.)
-- **Options:** **KEEP — Keep current logic:** browse everything after login; only public
-  applications need Verified. | **A — Browse everything, gate applying:** see all open
-  shifts; the apply button asks them to finish checks. | **B — Browse after email and
-  mobile:** blocks bots/fake sign-ups; new workers can still look around. |
-  **C — Nothing until Verified:** strictest; many workers leave before finishing.
-- **RECOMMENDED: A. Severity: Medium.** Browsing creates little safety risk. Gate every
-  apply, offer acceptance and booking request with role-appropriate checks, while showing
-  an actionable verification checklist. KEEP and A differ only in whether the apply
-  button explains *what* is missing — A is KEEP plus the checklist.
-- **Normal case:** new pharmacist browses, sees the checklist, verifies, applies.
-  **Edge case:** suspended member still browses and works internally — intended.
-  **Retry/concurrency:** a suspension landing between browse and apply is caught by the
-  row lock in `lock_public_ahpra()` (F8). **Payment/notification:** none at browse time.
-  **Web/Expo difference:** NOT INSPECTED on either client (boards/apply screens not re-read).
-- **Sources:** [interest.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/shifts/interest.py#L84-L89),
-  [state.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/onboarding/verification/state.py#L239-L280).
+- **Decision status:** Answered: KEEP the existing sign-up tracks, launch grill, 23 Oct 2026 - see ON-Q01.
+- **Actual today:** Pharmacist, Other Staff and Explorer are the worker tracks. Owner has a separate sign-up track. The Other Staff form collects details by role. Evidence: `main:frontend_web/src/pages/register.tsx:26`, `pr257:frontend_mobile/app/register.tsx:37`.
 
-#### ON-Q03 — Where must role-appropriate verification be enforced?
-- **Validation: STILL VALID — WITH A CORRECTION to #184's "current" text.**
-  **Decision status: OPEN. Severity: Critical** (launch-gating; audit's #2 critical item).
-- **Context:** Public apply, accept and counter-offer were said to check Verified plus the
-  latest AHPRA result. Members, other audiences and internal rostering skip it (ON-01).
-- **ACTUAL TODAY (corrected):** Gated today are **public apply** (`interest.py:89`) and
-  **public offer accept** (`offers.py:349,411`) — both via `require_public_ahpra()` /
-  `lock_public_ahpra()`, and both skipped for members of the posting pharmacy
-  (`is_public_shift_member_access()`, anonymous public shifts do NOT count as member
-  access). **NOT gated:** counter-offer *submission* (`serialization/offers.py:155`
-  `create()` — no gate at all; the gate only bites later when the worker accepts the
-  generated offer); manager-issued offers (`assignment.py:25 offer_shift()`); dedicated
-  offers (`assignment.py:259 offer_dedicated_shift()`, incl. Talent Board "Request
-  booking"); chain/org/favourite-tier interest; internal rostering
-  (`assignment.py:141 roster_direct_staff()`). So #184's sentence "counter-offers also
-  check Verified" is **wrong at this head** — submission is ungated; only the final
-  accept is gated.
-- **Options:** **KEEP — Keep current logic:** public apply and accept checked; members and
-  internal shifts exempt; counter-offer submission, dedicated offers and non-public tiers
-  unchecked. | **B — Every outside booking:** also check non-members on chain,
-  organisation and Talent Board bookings (and, per new Q20/Q21, at counter-offer
-  submission and at offer time). | **C — B plus internal rostering:** also check
-  registered roles before assignment.
-- **RECOMMENDED: B. Severity: Critical.** A suspended or unregistered "pharmacist" can
-  today be booked through a direct offer, a chain-tier shift or a counter-offer that a
-  manager accepts — the pharmacy only discovers it at the worker's accept step, or never
-  if the worker is a member. AHPRA's employer guidance says to check the public register;
-  the platform is the party doing the booking. C goes further (internal rosters are the
-  employer's own staff — the employer already checks them; keep C for later).
-- **Normal case:** public pharmacist applies → Verified + AHPRA checked, blocked if
-  suspended. **Edge case:** favourite locum of *that* pharmacy applies to its public
-  shift → exempt today (see ON-P01). **Denied role / wrong tenant:** a worker from
-  another pharmacy's chain tier faces no check at all today. **Payment/notification:**
-  an ungated booking that later fails AHPRA at accept wastes the reservation/payment
-  window (D02 deadlines) and notifies nobody until accept. **Retry/concurrency:** the
-  accept-time row lock (`lock_public_ahpra`) is the only concurrency protection, and it
-  only exists on the public path.
-- **Sources:** [interest.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/shifts/interest.py#L22-L36),
-  [offers.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/shifts/offers.py#L339-L411),
-  [serialization/offers.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/shifts/serialization/offers.py#L155-L183),
-  [assignment.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/shifts/assignment.py#L25-L29),
-  [state.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/onboarding/verification/state.py#L171-L195).
+#### ON-Q02 — Worker access before full verification
 
-#### ON-P01 — Who is exempt from AHPRA gates on public shifts?
-- **Validation: STILL VALID.** **Decision status: OPEN.**
-- **Context:** Anyone with an accepted membership at the posting pharmacy, including
-  favourite locums, skips AHPRA; invitations never need AHPRA.
-- **ACTUAL TODAY:** Confirmed. `is_public_shift_member_access()` (`interest.py:22`) treats
-  active staff + favourite employment types as members; `require_public_ahpra()` skips
-  them; `ahpra_frozen()` never pauses a member; a suspended member keeps internal access
-  and only loses *other* pharmacies' public shifts. One nuance #184 did not state:
-  member exemption does **not** apply to *anonymous* public shifts
-  (`post_anonymously` → not member access), so members must pass AHPRA there.
-- **Options:** **KEEP — Keep current logic:** all members, including favourite locums, are
-  exempt at their own pharmacy. | **A — Employees exempt; favourites checked:** favourite
-  locums are outside contractors; they pass AHPRA like public workers. |
-  **B — Nobody exempt:** members are checked too; suspended members lose all pharmacist shifts.
-- **RECOMMENDED: A. Severity: High.** Employers check their own staff, but a favourite
-  locum is an outside contractor the platform books. Today a suspended favourite keeps
-  booking that pharmacy's shifts; AHPRA tells employers to check the public register.
-  B would also block employed staff the pharmacy already vetted — too strict for launch.
-- **Normal case:** employed pharmacist works their own pharmacy's shifts, never gated.
-  **Edge case:** favourite locum suspended mid-week keeps their upcoming bookings at
-  that pharmacy (only *future public* bookings elsewhere are cancelled). **Payment/**
-  **notification:** suspension of a member notifies that member's pharmacies
-  (`announce_member_suspension()`), but the bookings themselves are *not* cancelled.
-- **Sources:** [interest.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/shifts/interest.py#L22-L36),
-  [state.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/onboarding/verification/state.py#L225-L237).
+- **Decision status:** Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation.
+- **Actual today:** Workers verify their email and mobile before entering the dashboard. Anonymous public browsing is still available. Booking checks apply separately. Evidence: `main:frontend_web/src/components/ProtectedRoute.tsx:26`, `pr257:frontend_mobile/app/login.tsx:71`.
 
-#### ON-Q04 — When must a worker's pay details (ABN or TFN, bank, super) be ready?
-- **Validation: STILL VALID.** **Decision status: OPEN.**
-- **Context:** ABN/TFN readiness is checked only at offer acceptance. TFN payroll details
-  can come later. Workers only learn what's missing when accepting (ON-11).
-- **ACTUAL TODAY:** Confirmed. `_external_payment_profile()` (`engagement.py:265`) —
-  ABN needs `abn` + `abn_verified` + `abn_entity_confirmed` at accept; TFN needs only
-  the *preference* at accept, and `build_shift_engagement_terms()` marks TFN/super
-  `payroll_setup_status=DEFERRED` with "Assignment is not blocked". A shift posted for
-  ABN cannot be accepted by a TFN worker and vice versa (preference mismatch → 400).
-  Staff members skip the payment gate entirely (`acceptance_required=False`).
-  Whether the checklist shows on apply/offer screens (the ON-11 frontend half) was
-  **NOT INSPECTED**; the backend readiness summary exists and is exposed to managers
-  on membership applications (`memberships/serializers.py:336 _application_payment_profile_status`).
-- **Options:** **KEEP — Keep current logic:** readiness checked at accept only; workers
-  find gaps then. | **A — Before applying:** fewer surprises, more drop-off before the
-  first application. | **B — Before accepting, shown early:** today's gate, but the
-  checklist shows on apply and offer screens. | **C — Before first payout only:** fastest
-  booking; risk of unpaid or wrongly classified work.
-- **RECOMMENDED: B. Severity: Medium.** The gate itself is right; the surprise is the
-  problem. Airtasker and ShiftKey ask for tax/payment details up front; showing the
-  checklist on apply and offer screens fixes the surprise without adding drop-off.
-- **Normal case:** ABN pharmacist accepts → ABN verified at accept, invoice route set.
-  **Edge case:** TFN worker accepts with no TFN/super on file → assignment is created
-  timesheet-only; payroll activation waits. **Payment side effect:** a TFN worker who
-  never completes payroll details can work shifts that never reach ChemistTasker Payroll.
-  **Web/Expo difference:** NOT INSPECTED (accept dialogs not re-read).
-- **Sources:** [engagement.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/shifts/engagement.py#L265-L300),
-  [engagement.py (terms)](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/shifts/engagement.py#L629-L720),
-  [memberships/serializers.py](https://github.com/chemisttasker11-ezy/ChemistTasker-Ezy1/blob/97c4543e051b43fe30ec7e2e61ad3d69957a918e/backend/memberships/serializers.py#L336-L357).
+#### ON-Q03 — Where verification is enforced
+
+- **Decision status:** Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01. Engineering: see BL-01.
+- **Actual today:** Public interest, ordinary offer creation and acceptance, and counter-offer submission and acceptance use the public gate. Several booking actions already call it for other tiers, but the shared guard skips non-public shifts. Dedicated offer creation follows a separate path. Evidence: `pr257:backend/shifts/interest.py:89`, `pr257:backend/shifts/base.py:348`, `:400`, `:462`, `pr257:backend/shifts/offers.py:339`, `pr257:backend/onboarding/verification/state.py:171`.
+
+#### ON-P01 — Who skips the AHPRA check
+
+- **Decision status:** Answered: A, employees are exempt and favourites are checked, launch grill, 23 Oct 2026 - see AHPRA-FAV-01. Engineering: see BL-02.
+- **Actual today:** A favourite with an active accepted membership can bypass the check on a named public shift at that pharmacy, like eligible employed staff. Evidence: `pr257:backend/shifts/interest.py:21`.
+
+#### ON-Q04 — When pay details are ready
+
+- **Decision status:** Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04. Engineering: see BL-03.
+- **Actual today:** Missing or unverified ABN details block external acceptance. A TFN worker can accept and be assigned with TFN/super setup incomplete. The assignment stays timesheet-only until a manager activates payroll. Staff engagements use their own terms. Evidence: `pr257:backend/shifts/engagement.py:265`, `:716`, `pr257:backend/shifts/offers.py:566`.
+- **Follow-up for engineering:** Check where the readiness checklist already appears on web and Expo. Add the early notice where missing and reconcile the deferred-payroll exception with the answer.
 
 #### ON-Q05 — What can Explorers (new to pharmacy) do with shifts?
 - **Validation: STILL VALID.** **Decision status: OPEN.**
@@ -659,38 +540,14 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
 
 ### New questions found during re-validation (not in #184)
 
-#### GM02-Q20 — Should submitting a counter-offer on a public shift require Verified/AHPRA, like applying does?
-- **Type: decision. Severity: High. Decision status: OPEN.**
-- **ACTUAL TODAY:** Counter-offer submission has no gate (`serialization/offers.py:155`
-  `create()`); it also writes interest rows bypassing `express_interest()`
-  (`counter_offers.py:90`). An unverified or suspended worker can counter-offer; the
-  gate only bites if the manager accepts it *and* the worker then accepts the generated
-  offer (F8). #184 wrongly said counter-offers are checked.
-- **Options:** **KEEP — Keep current logic:** gate only at final accept. |
-  **A — Gate submission like applying:** same Verified/AHPRA check as `express_interest`
-  on public shifts; members exempt as in ON-P01. | **B — Warn the manager instead:**
-  submission allowed, but the counter-offer shows the worker's verification state.
-- **RECOMMENDED: A.** Negotiating with a worker who cannot legally be booked wastes the
-  manager's time and the shift's D02 window. The accept-time gate stays as a backstop
-  (a suspension landing between submission and accept is still caught by the row lock).
-- **Normal case:** verified pharmacist counters → proceeds. **Edge case:** worker's
-  registration lapses between counter and accept → accept is refused (existing lock).
-  **Web/Expo difference:** NOT INSPECTED (counter-offer screens not re-read).
-- **Sources:** same as ON-Q03.
+#### GM02-Q20 — Counter-offer verification
+- **Decision status:** Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01. Engineering: see BL-01.
+- **Actual today:** Public counter-offer submission and acceptance already run the public verification gate. The shared guard skips non-public shifts (`pr257:backend/shifts/base.py:400`, `:462`, `pr257:backend/onboarding/verification/state.py:174`).
 
 #### GM02-Q21 — Should a manager be warned or blocked from offering a shift to an unverified or suspended worker?
 - **Type: decision. Severity: High. Decision status: OPEN.**
-- **ACTUAL TODAY:** `offer_shift()` and `offer_dedicated_shift()` (`assignment.py:25,259`)
-  check only the candidate's role. A manager can offer any shift to any user id —
-  including an unverified, suspended or wrong-role worker — and the worker is emailed
-  "Shift offer received". The worker is gated only at accept (F8). Talent Board
-  "Request booking" goes through the same dedicated-offer path (web/mobile screens NOT
-  re-inspected at this head).
-- **Options:** **KEEP — Keep current logic:** offer anyone; gate at accept only. |
-  **A — Show status, allow the offer:** the offer screen shows Verified/AHPRA state; the
-  manager decides. | **B — Block offers to suspended / not-found workers; warn for
-  merely-unverified:** suspended workers cannot be offered at all; unverified workers
-  can, with a warning (they are still gated at accept).
+- **ACTUAL TODAY:** Ordinary offer creation checks public shifts. Dedicated offer creation uses a different path. The shared guard skips non-public shifts (`pr257:backend/shifts/base.py:348`, `pr257:backend/shifts/posting.py:159`, `pr257:backend/onboarding/verification/state.py:174`). The booking check is settled in ON-Q03. The open detail is what the manager sees or can send before an outside worker accepts where the creation path still permits the offer.
+- **Options:** A — Show readiness and let the manager send the offer while the worker finishes checks. B — Stop the offer for a suspended or not-found worker and warn when verification is incomplete.
 - **RECOMMENDED: B.** Blocking suspended workers stops the platform sending booking
   emails to people who cannot legally work; warning (not blocking) unverified workers
   preserves the case where verification completes before accept. A alone still lets
@@ -768,14 +625,13 @@ Severity: Critical / High / Medium / Low = launch impact if decided wrong or lef
 
 ### ON-P03 — Which AHPRA lookup should run at launch?
 
-**Ask this first, before ON-Q03, ON-Q06, ON-Q07 and ON-P02.**
+**Ask this first, before ON-Q06, ON-Q07 and ON-P02.**
 
 **Why first:** every other AHPRA question assumes the enforcement machinery works.
 It only fully works on the **desktop** source. On the default ScrapingBee source the
 Re-check button returns 409, the post-expiry recheck queue never fires, the admin
 overdue alerts never run, and (unconfirmed — see the question) the suspension /
-not-found handling may stay inert. Deciding *where* to enforce (ON-Q03) or *how often*
-to re-check (ON-Q06) before deciding *which lookup runs* would be deciding on a false
+not-found handling may stay inert. The outside-booking scope is settled in ON-Q03. Re-check frequency is a separate question (ON-Q06).
 picture of what the code does.
 
 **Plain English:** ChemistTasker checks a pharmacist's registration against AHPRA's
@@ -809,23 +665,23 @@ suspension, not-found and Re-check handling the rest of the Grill assumes. If th
 office PC cannot stay on, the honest fallback is KEEP *plus* recording that the
 automatic protections in ON-Q06/Q07/P02 do not run — not pretending they do.
 
-**What this unblocks:** ON-Q03 (enforcement scope), ON-Q06 (re-check cadence), ON-Q07
-(unconfirmed registration), ON-P02 (suspension), GM02-Q22 (expiry as a block).
-**Suggested second question:** ON-Q03 (where verification is enforced).
+**What this unblocks:** ON-Q06 (re-check cadence), ON-Q07 and ON-P02.
+
+**Suggested second question:** ON-Q06 (re-check cadence).
 
 ---
 
 ## 4. Code gaps vs decision gaps
 
-### 4.1 Decision gaps (owner must choose first — 22 open)
+### 4.1 Decision status by question
 
 | ID | Question | Severity | Status |
 |---|---|---|---|
-| ON-Q01 | Sign-up tracks | Low | OPEN |
-| ON-Q02 | What a worker can do before Verified | Medium | OPEN |
-| ON-Q03 | Where verification is enforced | Critical | OPEN (current text corrected) |
-| ON-P01 | Who is exempt from AHPRA gates | High | OPEN |
-| ON-Q04 | When pay details must be ready | Medium | OPEN |
+| ON-Q01 | Sign-up tracks | Low | Answered: KEEP the existing sign-up tracks, launch grill, 23 Oct 2026 - see ON-Q01 |
+| ON-Q02 | What a worker can do before Verified | Medium | Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation |
+| ON-Q03 | Where verification is enforced | Critical | Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01 |
+| ON-P01 | Who is exempt from AHPRA gates | High | Answered: A, employees are exempt and favourites are checked, launch grill, 23 Oct 2026 - see AHPRA-FAV-01 |
+| ON-Q04 | When pay details must be ready | Medium | Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04 |
 | ON-Q05 | What Explorers can do with shifts | High | OPEN |
 | ON-Q06 | How AHPRA is re-checked | Critical | OPEN (current text corrected) |
 | ON-P03 | Which AHPRA lookup runs at launch | Critical | OPEN — **ask first** |
@@ -839,7 +695,7 @@ automatic protections in ON-Q06/Q07/P02 do not run — not pretending they do.
 | ON-Q13 | Save a payment method at setup | High | OPEN |
 | ON-Q14 | How organisations join | Medium | OPEN |
 | ON-Q15 | Must every step work on mobile | — | **UNVERIFIED — re-check mobile first** |
-| GM02-Q20 | Gate counter-offer submission? | High | OPEN (new) |
+| GM02-Q20 | Counter-offer verification | High | Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01. Engineering: see BL-01. |
 | GM02-Q21 | Warn/block offers to unverified workers? | High | OPEN (new) |
 | GM02-Q22 | Stored AHPRA expiry as a block? | High | OPEN (new) |
 | GM02-Q23 | Intern talent posts: same expiry check? | Medium | OPEN (new) |
@@ -855,8 +711,8 @@ Settled, do not re-ask: **ON-Q10** (super on ABN terms — the notice already ex
 | CG-01 | No scheduled AHPRA register re-scan; only a 15-min admin alert about overdue desktop checks | `settings.py:271`, `tasks.py:380` | ON-P03, ON-Q06 |
 | CG-02 | Progress % does not match Verified: counts resume/bio/rates/referees; ignores email/mobile *verification* | `services/progress.py` vs `policy.requirements()` | None (fix: drive UI from `verification_summary().missing`) — but confirm the UI actually uses `missing` (frontend NOT INSPECTED) |
 | CG-03 | Stored `ahpra_expiry_date` not enforced at apply/accept | `state.py:ahpra_state()` reads `AhpraCheck.register_data`, not the stored date | GM02-Q22 |
-| CG-04 | Counter-offer submission + manager/dedicated offers bypass all verification | `serialization/offers.py:155`, `assignment.py:25,259` | ON-Q03, GM02-Q20, GM02-Q21 |
-| CG-05 | Internal rostering never checks Verified/AHPRA, even for pharmacist/intern roles | `assignment.py:141-237` | ON-Q03 (option C) |
+| CG-04 | The shared verification guard skips non-public paths. Public counter-offer submission and acceptance and ordinary public offers already use it. | `pr257:backend/shifts/base.py:348`, `:400`, `:462`; `pr257:backend/onboarding/verification/state.py:174` | BL-01 |
+| CG-05 | Internal employee rostering is outside the carried outside-booking check. | `assignment.py:141-237` | ON-Q03 / ON-P01 |
 | CG-06 | Talent-board authenticated feed still leaks full names/user IDs (`ExplorerPostReadSerializer`); only `public_feed` redacts | `talent/serializers/explorer.py:13-17,187-195` | GM-18 (TB-01) — adjacent, listed here because it is a worker-identity issue |
 | CG-07 | `add_view` counts every authenticated call, no limit | `talent/views/explorer.py:230` | GM-18 (TB-07) — adjacent |
 | CG-08 | `offers.accept()` runs the AHPRA gate *before* checking the offer belongs to the caller | `offers.py:349` vs `:351` | None (ordering wart; fix when touching accept) |
@@ -879,14 +735,13 @@ member exemption, Re-check, desktop verifier exist in code).
 
 | # | Backlog item (draft only) | Needs decision | Notes |
 |---|---|---|---|
-| B1 | Extend `require_public_ahpra` / `lock_public_ahpra` to non-public tiers and dedicated offers (or the scope the owner picks) | ON-Q03 | Backend gates + web/Expo error states; tests: non-member chain/org apply, dedicated offer accept, suspended worker |
-| B2 | Gate counter-offer submission (or manager warning) | GM02-Q20, ON-Q03 | Serializer + web/Expo counter-offer screens |
+| B1/B2 | Engineering: see BL-01 | ON-Q03 | Keep public coverage and enforce the shared check for outside bookings across tiers |
 | B3 | Offer-time verification display / block for suspended workers | GM02-Q21 | Manager offer screens (web + Expo); do not leak AHPRA detail beyond status |
 | B4 | AHPRA re-check job (daily scan of booked workers, or the cadence the owner picks) + source selection | ON-P03, ON-Q06 | Needs a runnable lookup source; desktop PC on-call vs ScrapingBee cost; beat task + tests |
 | B5 | Stored-expiry block at apply/accept (or the alternative the owner picks) | GM02-Q22 | Include intern expiry source (CG-09) |
 | B6 | Intern AHPRA-expiry check on talent publish | GM02-Q23 | Read expiry from latest check |
-| B7 | Favourite-locum AHPRA exemption change (if owner picks A) | ON-P01 | `is_public_shift_member_access()` + member-suspension handling |
-| B8 | Payment-readiness checklist on apply/offer screens | ON-Q04 | Worker-facing; backend summary exists (`worker_payment_profile_status`); screens NOT INSPECTED — verify first |
+| B7 | Engineering: see BL-02 | ON-P01 | Keep the employee exemption and check favourites |
+| B8 | Engineering: see BL-03 | ON-Q04 | Early readiness notice and acceptance gate, including TFN/super |
 | B9 | Explorer apply path: hide boards or block apply with upgrade prompt (per owner pick) | ON-Q05 | Web + Expo; dead-applicant cleanup |
 | B10 | ID check for all workers (if owner picks A/C) | ON-Q08 | Gate change via `VERIFICATION_EXTRA_REQUIREMENTS` + grace; coordinate with ON-R01 retention |
 | B11 | Evidence retention/deletion schedule + AhpraCheck snapshot deletion | ON-R01 | Legal review first; do not build B before the decision |
@@ -940,7 +795,8 @@ Tests seen but not read (existence only): `backend/shifts/test_ahpra_application
 
 | Status | Questions |
 |---|---|
-| OPEN (22) | ON-Q01, ON-Q02, ON-Q03, ON-P01, ON-Q04, ON-Q05, ON-Q06, ON-P03, ON-Q07, ON-P02, ON-Q08, ON-R01, ON-Q09, ON-Q11, ON-Q12, ON-Q13, ON-Q14, GM02-Q20, GM02-Q21, GM02-Q22, GM02-Q23, GM02-Q24 |
+| OPEN (16) | ON-Q05, ON-Q06, ON-P03, ON-Q07, ON-P02, ON-Q08, ON-R01, ON-Q09, ON-Q11, ON-Q12, ON-Q13, ON-Q14, GM02-Q21, GM02-Q22, GM02-Q23, GM02-Q24 |
+| ANSWERED / REFERENCE (6) | ON-Q01, ON-Q02 (single re-confirmation at GM01-Q04), ON-Q03, ON-P01, ON-Q04, GM02-Q20 (covered by ON-Q03) |
 | SETTLED — do not re-ask (1) | ON-Q10 |
 | UNVERIFIED — re-check before asking (1) | ON-Q15 |
 
@@ -962,3 +818,21 @@ Tests seen but not read (existence only): `backend/shifts/test_ahpra_application
 12. `onboarding/services/skills.py:61` insurance comment (file not fetched).
 
 *End of GM-02 trace. Documentation only — no code was modified.*
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### Already answered by the owner: do not re-ask (launch grill, 23 Oct 2026)
+The launch-grill artifact database `answers` records these five decisions on 23 Oct 2026.
+
+| Question | Owner answer | Code today | What follows |
+|---|---|---|---|
+| ON-Q01 sign-up tracks | **KEEP** (three tracks; one "other staff" form that changes by role) | Unchanged | Closed |
+| ON-Q02 what a worker can do before Verified | **KEEP**, given against the old description that signed-in workers browse every board | The dashboard already required mobile verification at #184 | Re-confirm once at GM01-Q04 |
+| ON-Q03 where verification is enforced | **B**: Nadia and Sara are checked on every outside booking | Public apply and acceptance, ordinary public offers, and public counter-offer submission and acceptance already use the guard. That guard skips non-public bookings. | Engineering: see BL-01 |
+| ON-P01 who skips the AHPRA check | **A**: Omar (employee) skips the check, Ben (favourite) is checked | Gap: favourites are treated as members and skip it (`is_public_shift_member_access`, `interest.py:22`) | Backlog BL-02. AHPRA-FAV-01 / GM-05 Q-01 are answered and drop out of the ask order |
+| ON-Q04 when pay details must be ready | **B**: Sara is told early and must finish before accepting | Missing or unverified ABN blocks acceptance; missing TFN/super allows assignment and defers payroll. The early checklist is missing in the traced flow. | Engineering: see BL-03 for early notice and the acceptance change |

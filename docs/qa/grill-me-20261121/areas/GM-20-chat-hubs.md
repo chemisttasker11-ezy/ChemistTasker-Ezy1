@@ -1,5 +1,11 @@
 # GM-20 Chat/Hubs — Grill Me trace (read-only)
 
+> **Corrections against current code (21 Nov 2026 review).** 11 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 10 hold, 1 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q10 | Per-type push controls exist; no per-room mute | MAIN-ONLY for push preferences — PR257 only | PR257 provides user-level push categories and quiet hours. These do not add a per-conversation mute setting. | `main:backend/notifications/services.py:102`; `pr257:backend/notifications/services.py:119`; `pr257:backend/chat/realtime.py:87` |
+
 - **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 - **Traced head (PR #249, stacked on #248):** `97c4543e051b43fe30ec7e2e61ad3d69957a918e` — verified live via `pull_request_read` get on 2026-11-21; matches the Issue #250 snapshot exactly, so this trace is current at that SHA.
 - **Method:** Issue #250 + PR #184 format. No GitHub rate-limit was hit; all questions below were re-validated against the #249 head (not carried from Oct 2026).
@@ -484,3 +490,20 @@ Nothing below is decided. Each item waits on the question in brackets; code gaps
 - The talent-API identity leak (TB-01/TB-02) was not re-traced — it belongs to GM-18 (talent), not GM-20; only its chat interaction (TB-Q02 option B) is covered here.
 - Hub poll internals (`pharmacy_hub/polls.py`), hub group admin flows (`groups.py`), and the Moderation tab UI were only skimmed or not inspected — marked as partially inspected / unknown above.
 - PR #249's W6 remediation (hub/chat) is still pending per the PR body; this trace is a snapshot of the head as it stands, not a verdict on W6.
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-20-W01: Messages sent through a since-revoked membership can't be edited or deleted (W-08, D20)
+**Scenario:** Tom removes Ali's team membership after Ali posts in the team chat. Ali tries to edit or delete that message. In a second case, Ali can still enter the same room through another valid membership.
+**What happens today:** If Ali loses access to the room, the old message is excluded from lookup and the action returns 404. If his other membership still grants room access, the action on the old message returns 403. Current members can still read and act through their valid membership (`pr257:backend/chat/views.py:659`, `:727`, `:758`).
+**Recommendation first: KEEP.** The person acting on a message needs valid authority for that message. Ali can ask Tom or the privacy team for help with removal.
+- **KEEP (recommended):** Ali cannot edit or delete messages sent through the revoked membership.
+- **A:** Ali can request deletion of his own old message after revocation. He gets no editing rights or room access back.
+- **DEFER**
+
+**Status:** OPEN (orchestrator decision waiting for owner confirmation)

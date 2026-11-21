@@ -1,5 +1,19 @@
 # GM-26 — Admin / Privacy / Security / Release — Grill Me trace (read-only)
 
+> **Corrections against current code (21 Nov 2026 review).** 24 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 15 hold, 9 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q12 / Q13 | Every adverse result leaves bookings, or every suspension cancels everything | WRONG — both formulations are too broad | Adverse stored states block relevant new public actions. Cancellation is limited to eligible future public bookings, respects member exemptions and retains history-protected assignments. | `pr257:backend/onboarding/verification/state.py:162`; `pr257:backend/shifts/cancellation.py:33`; `pr257:backend/shifts/cancellation.py:37`; `pr257:backend/shifts/cancellation.py:47` |
+| Q15 / Q16 / Q39 | Anonymous pharmacy identity remains hidden until later notices | WRONG | An offered worker can receive the pharmacy name before acceptance through terms preview. Other applicant notices also disclose it, so the existing anonymity behaviour is inconsistent across routes. | `pr257:backend/shifts/engagement.py:640`; `pr257:backend/shifts/serialization/offers.py:235`; `pr257:backend/shifts/emails.py:434` |
+| Q27 | Any future assignment can be rated | WRONG | Both directions require an assignment dated before today. That still does not prove attendance, completion or approved hours. | `main:backend/ratings/views.py:82`; `pr257:backend/ratings/views.py:92` |
+| Q38 / CG-16 | “No app-level audit-logging code … anywhere” | WRONG | Roster, marketplace, content and Django-admin reconciliation have audit records. The open question is coverage and operational access, not whether all application auditing is absent. | `main:backend/workforce/models.py:747`; `pr257:backend/marketplace/models.py:309`; `pr257:backend/public_hub/models.py:185`; `pr257:backend/billing/admin.py:110` |
+| Q41 | Acceptance logging absent; Expo legal links unknown | WRONG — partially | Registration records acceptance and its timestamp, but not a legal-document version. Expo links to Terms of Service and Privacy Policy; actual deployed document equivalence remains a runtime/content check. | `pr257:backend/users/serializers.py:173`; `pr257:backend/users/models.py:81`; `pr257:frontend_mobile/app/register.tsx:433` |
+| Q42 / Q43 / Q46 | Production settings, pentest and rollback readiness | UNVERIFIABLE | Code defaults and environment guards are inspectable; production values, external security work and migration/rollback rehearsal are not. Keep those assertions explicitly unverified by this review. | `pr257:backend/core/settings.py:24`; `pr257:backend/core/settings.py:27`; `pr257:backend/core/settings.py:90`; `pr257:backend/core/settings.py:660` |
+| Q45 B62 | Region-admin M2M assignment alone grants roster authority | WRONG as a current hole | Roster authority requires owner/superuser status, pharmacy roster capability or an organisation capability covering that pharmacy. An assignment alone does not grant the broad authority described by the old finding. | `pr257:backend/organizations/access.py:164`; `pr257:backend/workforce/permissions.py:13`; `pr257:backend/workforce/permissions.py:37`; `pr257:backend/shifts/base.py:223` |
+| Q45 B65 | Any authenticated user can probe another pharmacy’s pricing | WRONG | The action itself checks pharmacy-management permission before calculating rates. The base-class exemption does not bypass that action-level guard. | `main:backend/shifts/lifecycle.py:213`; `pr257:backend/shifts/lifecycle.py:213` |
+| Q47 / Q48 | Pharmacist mobile add-profile remains broken | STALE | PR257 redirects the pharmacist onboarding route to the supported basic-profile form. Reassess any remaining progress/readiness concerns independently of the retired route. | `pr257:frontend_mobile/app/pharmacist/onboarding.tsx:5` |
+
 **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 **Issue:** #250 — Grill Me, one consolidated backend + web + Expo sign-off before launch
 **Method:** PR #184 / Issue #250 (each question: ACTUAL TODAY, Keep-current-logic option,
@@ -295,20 +309,13 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 - **Scenario:** Without ID checks, a person can work shifts under another pharmacist's credentials; the pharmacy discovers it only after a patient-safety incident. With universal ID, onboarding is slower but impersonation risk falls sharply.
 - **Status:** NOT RE-VALIDATED. **Source:** ON-Q08. (GM-02 owns the credential mechanics.)
 
-#### GM26-Q08 — [P1 · decision] What can a worker do before they are Verified? (gate scope)
-- **Verdict: CHANGED (partial) — A01 (adopted GM-01).** The Oct 2026 "current" ("Login needs an email code. Signed-in workers browse every board") was incomplete when written: `ProtectedRoute` forces PHARMACIST / OTHER_STAFF / EXPLORER without mobile verification to `/mobile-verify` on every dashboard route, and both login screens route there first. Current code therefore already implements option **B** ("Browse after email and mobile") for the dashboard — while anonymous public boards stay open to anyone. The gate already existed at the #184 head. The Verified half (public applying needs Verified, staff/favourites skip it) was NOT re-checked here beyond GM-18's public-gate confirmation.
-- **ACTUAL TODAY (Oct 2026, corrected):** Login needs an email code. Signed-in workers browse every board; public applying needs Verified, staff and favourites skip it. Suspended, not-found or unreadable AHPRA results also block public applying; suspended non-members are locked out entirely. (ON-Q02, gap ON-01)
-- **RECOMMENDED:** A — Browse everything, gate applying: see all open shifts; the apply button asks them to finish checks. (GM-01 re-asked this as GM01-Q04 and recommends KEEP the current strict rule, option B — the owner must settle which recommendation stands.)
-- **ALTERNATIVE A (Keep current logic):** Browse everything after email login; only public applications need Verified. **B:** Browse after email and mobile. **C:** Nothing until Verified (strictest; many workers leave before finishing).
-- **Status:** CHANGED (partial — adopted GM-01). **Source:** ON-Q02.
+#### GM26-Q08 — Browse access before full verification
+- **Status:** Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation.
+- **Actual today:** The worker dashboard requires email and mobile verification. Anonymous browsing stays open on public boards (`main:frontend_web/src/components/ProtectedRoute.tsx:26`).
 
-#### GM26-Q09 — [P1 · decision] Where must role-appropriate verification be enforced?
-- **Verdict: STILL VALID in substance — A18 (adopted GM-18).** `backend/onboarding/verification/state.py::require_public_ahpra` (line 171) acts only `if is_public_shift(shift) and not member-access`; `queue_public_recheck` (line 197) returns early unless `settings.AHPRA_SOURCE == 'desktop'`. Under the default config no fresh lookup runs before a dedicated booking.
-- **ACTUAL TODAY (Oct 2026):** Public apply, accept and counter-offer check Verified + latest AHPRA result. Pharmacy members (incl. favourites) are exempt; other audiences and internal assignments stay unchecked. (ON-Q03, gap ON-01)
-- **RECOMMENDED:** B — Every outside booking: also check non-members on chain, organisation and Talent Board bookings.
-- **ALTERNATIVE A (Keep current logic):** Public only; members and internal shifts exempt. **C:** B plus internal rostering.
-- **Scenario:** A favourite pharmacist whose registration lapsed keeps getting chain shifts with no check, because "member" exempts them — the exemption swallows the safety rule.
-- **Status:** STILL VALID (adopted GM-18). **Source:** ON-Q03.
+#### GM26-Q09 — Verification on outside bookings
+- **Status:** Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01. Engineering: see BL-01.
+- **Actual today:** The shared verification guard skips non-public shifts (`pr257:backend/onboarding/verification/state.py:174`).
 
 #### GM26-Q10 — [P1 · decision] How should AHPRA be re-checked after sign-up?
 - **Verdict: CHANGED (partial) — A18 (adopted GM-18; see Q35).** The new `verification/state.py` state machine exists; default source is still `scrapingbee` (confirmed by me at head, `backend/core/settings.py:642`); no synchronous fresh lookup runs before booking; `queue_public_recheck` returns early unless source is `desktop`.
@@ -635,7 +642,7 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 | DG-03 | Identity reveal trigger + what stays hidden | GM26-Q01–Q03 |
 | DG-04 | Verification-evidence retention schedule (APP 11) | GM26-Q06 |
 | DG-05 | ID-check scope | GM26-Q07 |
-| DG-06 | Verification gate scope (public vs all audiences vs internal) | GM26-Q08/Q09 |
+| DG-06 | Gate scope answered. Browse policy has one re-confirmation at GM01-Q04. | GM26-Q08/Q09; VERIFY-GATE-01 |
 | DG-07 | AHPRA re-check cadence + lookup source (ScrapingBee vs desktop) | GM26-Q10/Q11 |
 | DG-08 | Unconfirmed/suspended registration: warn vs cancel vs review | GM26-Q12/Q13 |
 | DG-09 | Indemnity cover scope | GM26-Q14 |
@@ -690,7 +697,7 @@ Verdict key: **V** = re-validated at head in this re-run · **A18/A17/A01** = ad
 | GM26-Q05 | CHANGED (partial — adopted GM-18) | P1 |
 | GM26-Q06 | STILL VALID (re-validated) | P1 |
 | GM26-Q07 | NOT RE-VALIDATED | P1 |
-| GM26-Q08/Q09 | CHANGED (partial — adopted GM-01/GM-18) | P1 |
+| GM26-Q08/Q09 | Answered references to GM01-Q04 and VERIFY-GATE-01 | P1 |
 | GM26-Q10/Q11 | CHANGED (partial — adopted GM-18) | P1 |
 | GM26-Q12/Q13 | NOT RE-VALIDATED | P1 |
 | GM26-Q14 – Q20 | NOT RE-VALIDATED (Q14 P1, Q15/Q16 P1, Q17 P1, Q18 P2, Q19 P1, Q20 P1) | — |
@@ -752,3 +759,36 @@ Do not start this work until the owner answers §4 (GM26-Q36) and the questions 
 ~80 sequential GitHub calls, no real HTTP 429 in this re-run (one false detector stop on a blob SHA
 containing "429", corrected and resumed). All §3 "ACTUAL TODAY" text marked NOT RE-VALIDATED is
 October 2026 evidence from PR #184 `questions.json`, explicitly not re-validated against current code.*
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-26-W01: Production reCAPTCHA keys (W-05, D167): owner action, not a choice
+**Scenario:** Sara registers on the web on launch day; Jack registers in the phone app.
+**What happens today:** Vite, Next and Expo registration use reCAPTCHA. O4 row A15 was skipped because the local rig had no keys.
+**Owner action:** Set `VITE_RECAPTCHA_SITE_KEY` for Vite, `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` for Next, `EXPO_PUBLIC_RECAPTCHA_SITE_KEY` for Expo, and `RECAPTCHA_SECRET_KEY` on the backend. Run staging registration on all three clients. See GM01-Q14 for the separate sign-in choice. Evidence: `pr257:frontend_web/src/pages/register.tsx:58`, `main:frontend_web/landing_next/migrated/pages/register.tsx:58`, `pr257:frontend_mobile/app/register.tsx:108`, `pr257:backend/core/settings.py:641`.
+**Status:** OWNER ACTION (production checklist)
+
+### GM-26-W02: Dependabot pull requests (W-09, D11)
+**Scenario:** Tom chooses which dependency updates to merge before launch.
+**What happens today:** The 21 Nov 2026 inventory recorded 30 open Dependabot PRs. The 11 Nov D11 review recommends merging #243 first, then #244 after lint and visual checks, and merging #265. It recommends holding #263 and #264 for a combined CodeQL change and closing #266 because SDK 58 supersedes it. #212 is in the waiting list with no recorded D11 verdict. #207, #206, #178, #177, #174, #90 and the older #60–#78 group also still need triage.
+**Recommendation first: A.** Follow D11. Review #212 and the remaining action bumps in one batch. Confirm which older updates SDK 58 supersedes before closing them.
+- **A (recommended):** Tom merges the D11 updates in order and keeps #212 pending until reviewed with the remaining dependency changes.
+- **B:** Tom gets a separate review for every remaining PR, including #212, before launch.
+- **DEFER:** Tom decides after launch.
+
+**Status:** OPEN (the owner merges; agents merge nothing)
+
+### GM-26-W03: Keep the node-forge 1.4.1 RSA patch? (W-14, register item 6)
+**What happens today:** The patch and its regression are present (`pr257:frontend_mobile/scripts/dependency-security.test.cjs:486`). Release register item 6 reports that clean, unpatched node-forge 1.4.1 passed the regression and that the patch was kept as defence in depth (`main:docs/qa/RELEASE_DECISIONS_20261102.md:14`).
+**Recommendation first: KEEP** until the next node-forge release, then drop it. Technical sign-off, low risk either way.
+**Status:** OPEN (technical sign-off)
+
+### GM-26-W04: When does the minimatch 3.1.5 exception (GHSA-g3hv-75wg-m249) end? (W-14, register item 9)
+**What happens today:** the gate accepts only the fingerprinted root copy, which lacks the vulnerable function.
+**Recommendation first:** remove it when Expo / React Native leave glob 7 or the advisory range is corrected; re-check at every Expo SDK upgrade. Technical sign-off.
+**Status:** OPEN (technical sign-off)

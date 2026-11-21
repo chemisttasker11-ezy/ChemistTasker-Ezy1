@@ -1,5 +1,7 @@
 # ChemistTasker Grill Me — Issue #250 (2026-11-21)
 
+> **Owner: start at [OWNER_GRILL.md](OWNER_GRILL.md) (review of 21 Nov).** It is the one page to go through: what is already answered, open questions per area, where the 17 waiting decisions went, claims corrected against current code (`main` 8ccf8f77 for web, `agent/pr257-int` 21add924 for Expo), the new area GM-27 (mobile-only flows) and the separate [ENGINEERING_BACKLOG.md](ENGINEERING_BACKLOG.md).
+
 > **Second independent follow-up review (21 Nov 2026):** Read [INDEPENDENT_FOLLOWUP_REVIEW_2026-11-21.md](INDEPENDENT_FOLLOWUP_REVIEW_2026-11-21.md) before using the 311/277 counts or classifying launch blockers. The 540→311 arithmetic is verified, but its semantic de-duplication ledger predates the rebuilt GM-18 numbering and contains at least eight incompatible mappings. Totals remain **PROVISIONAL**, not owner-signed-off. The 617 blocking items are repeated area-level rows and conditional on the still-unanswered LAUNCH-01. This PR remains docs-only, draft and not release acceptance.
 
 **Docs only. No product code, schema, payments, feature toggles, production data, merges or deployments in this PR.** This is the documentation/decision task from Issue #250: one consolidated, owner-led "Grill Me" review to confirm ChemistTasker's actual business logic before launch.

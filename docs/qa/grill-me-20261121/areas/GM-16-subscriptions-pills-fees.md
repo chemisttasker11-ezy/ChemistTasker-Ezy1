@@ -1,5 +1,11 @@
 # GM-16 — Subscriptions / Pills / Fees — Grill Me trace (COMPLETE — re-run 2026-11-21)
 
+> **Corrections against current code (21 Nov 2026 review).** 11 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 10 hold, 1 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q16 | Subscription management includes “billing managers, scoped org admins” | WRONG | Subscription and seat management is limited to the pharmacy owner or an `ORG_ADMIN` of its organisation. Permission to pay a shift charge is a separate, broader permission. | `main:backend/billing/utils.py:32`; `pr257:backend/billing/utils.py:41` |
+
 - **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 - **Issue:** #250 (Grill Me, 26 areas) — **PR #184** (Oct 2026) is the format example
 - **Re-validation target:** active PR #249 (stacked on #248)
@@ -157,14 +163,9 @@ Statuses: ✅ STILL VALID · 🔄 CHANGED · 🟢 PART-FIXED / FIXED · ❓ NOT 
 - Other / defer. Edge: `is_subscriber` reads the *local* status, which the webhook maps from Stripe `trialing` → `active` — trialling owners get the discount (see GM16-Q08).
 - Source: `backend/billing/shift_payments.py` + `checkout_prices.py` + `stripe_support.py` @ 97c4543e. Code gap (config), not a decision gap, for the hard-coded half; the discount half needs no decision.
 
-**GM16-Q03 — [LA-Q06 / SH-02] Fix before launch? The old 10%/20% penalty route is still live. — ✅ STILL VALID as code-present (routing now verified)**
-- ACTUAL TODAY (verified in-file + routing): `charge_penalty` still exists at the PR #249 head — 20% ≤24h, 10% 24–72h of total agreed wages, ad-hoc Stripe checkout, no payee recorded. It is still **routed** (`billing/urls.py` line 16, GM-17 adopted), still has a **view** (`views.py:charge_penalty`, permission-checked), and is still **exported from shared-core** (`chargeShiftPenalty`). No UI was found calling it in the traced screens.
-- RECOMMENDED: remove or suspend before launch. Severity: high — a callable legacy charge contradicts carried decision NOPEN ("no money penalties, ever" — for workers) and the unimplemented P09 table, and has no disclosed recipient. Do not introduce any replacement charge until Australian legal review (LA-R02 / GM16-Q14).
-- ALTERNATIVE A — Keep current logic: leave the function and route live. Scenario: support uses it once for a late pharmacy cancel; the pharmacy is charged 20% of wages with no agreement text naming it. Trade-off: a tool exists for week-one cancellations, but with legal and disclosure risk.
-- ALTERNATIVE B — Remove the route, keep the function dead: no charge possible from the app. Scenario: a late cancel has no money consequence until P09 is built. Trade-off: safest legally, weakest deterrent.
-- ALTERNATIVE C — Replace with the P09 table (0/0/10/15/20/25/30%) paid to the worker, after legal review and disclosure in the agreement (see GM16-Q11). Trade-off: coherent, but the most work.
-- Other / defer. Edge: penalty is computed over *all* assignments on the shift, not the cancelled dates only (P09 says cancelled dates only) — a second verified mismatch.
-- Source: `backend/billing/shift_payments.py::charge_penalty` + `views.py:charge_penalty` + `urls.py` (GM-17) + `shared-core/src/domains/billing/api.ts` @ 97c4543e.
+**GM16-Q03 — Legacy cancellation charging (LA-Q06 / SH-02)**
+- **Actual today:** The billing route and shared-core export remain available behind the existing live collection guard. The calculation uses the old bands and all assignments.
+- **Status:** Engineering: see BL-04. Launch scope remains in GM15-01 and LAUNCH-01.
 
 **GM16-Q04 — [PO-Q15 / SH-04] When should booking fees start? — 🔄 CHANGED (mechanism fully verified now)**
 - ACTUAL TODAY (verified, `settings.py:674-682` + `utils.py` + `release_guards.py`): **two mechanisms coexist.** (1) `BILLING_LIVE_DATE = _date(2025, 6, 1)` with comment "June 1, 2026 — flip this to go live" — the date/comment contradiction is real at head — and `FREE_TRIAL_DAYS = 0`; `get_billing_state_for_account` returns PRE_LIVE before the date, FREE_TRIAL within the trial window, else PAYMENT_REQUIRED. (2) Live *collection* is separately gated by `BILLING_LIVE_SHIFT_FULFILLMENT_ENABLED` (default False) + Stripe key mode (test only in non-production envs; staging + live key rejected). The Oct 2026 claim ("live 2025-06-01, comment says 2026, FREE_TRIAL_DAYS = 0") describes mechanism (1) correctly; mechanism (2) is new since Oct.
@@ -294,7 +295,7 @@ Why this one first: every other GM-16 question (trial, refunds, cancellation fee
 
 ### Code gaps (no owner decision needed — just build/fix; timing is the only question)
 1. **Hard-coded Stripe Price IDs** (`checkout_prices.py`, `stripe_support.py` — verified): move to settings/env per environment. (LA-Q07 second half.) Before live checkout.
-2. **Legacy `charge_penalty` still routed + exported** (verified: `urls.py` line 16, `views.py`, shared-core): remove/suspend the route (and the function, if unrouted) before launch. (SH-02 / LA-Q06.) No decision needed to *remove* it; a decision is needed only to *replace* it with P09 charging.
+2. **Legacy cancellation charging (SH-02 / LA-Q06):** superseded by BL-04 in the central engineering backlog. Preserve the route and shared-core export behind the existing flag. Correct the charge before enabling live collection.
 3. **Pay card shows `$n × 30 AUD` always** (Vite `ActiveShiftCard.tsx`, Expo `ActiveShiftCards.tsx` — verified): show the true fee (locum vs PT/FT, subscriber vs standard) before payment. (GM16-Q06.)
 4. **Fee/GST/total not shown before posting** (posting wizard NOT re-traced): show wages, super, fee, GST, total before posting and before payment — needs the GST decision first (GM16-Q15), then it is a build task. (PO-Q04.)
 5. **Billing-date/comment contradiction** (`settings.py:681-682`): `BILLING_LIVE_DATE = 2025-06-01` with comment "June 1, 2026". Fix the date or the comment, and confirm which gate (date vs flag) is authoritative (GM16-Q04).
@@ -340,14 +341,14 @@ Why this one first: every other GM-16 question (trial, refunds, cancellation fee
 
 ### Decision status per question
 - Decided: **none** in this trace. (Carried P09/F01/F04/NOPEN/D01–D03 are #184-era decisions, not re-confirmed here — and D02/D03 are verified **not implemented** by GM-13.)
-- Ready to decide now: GM16-Q01-FIRST (prices + lapse), GM16-Q02 config half (no decision needed), GM16-Q03 (remove legacy penalty), GM16-Q16 cancel path, GM16-Q17 pill refunds.
+- Ready to decide now: GM16-Q01-FIRST (prices + lapse), GM16-Q16 (cancel path), GM16-Q17 (pill refunds). Engineering for GM16-Q03: see BL-04.
 - Blocked on re-trace: GM16-Q06 (pre-posting half), GM16-Q10 (staff-count gating).
 - Blocked on external advice: GM16-Q14 (legal), GM16-Q15 (tax).
 - Owned by another area: GM16-Q12/Q13 (GM-17-Q01 refund vs credit), GM16-Q18 (GM-14-Q03 pharmacy acceptance).
 
 ### Implementation backlog — PROPOSED ONLY, after owner answers (nothing here is decided)
 1. Move Stripe Price IDs to per-environment config; add staging test prices. (After GM16-Q01; before live checkout.)
-2. Remove/suspend `charge-penalty` route (routing verified). (After GM16-Q03.)
+2. Engineering: see BL-04 for feature-preserving cancellation charging behind the existing flag.
 3. Implement lapse grace + pre-charge warning, reading `current_period_end`. (After GM16-Q01-FIRST option B, if chosen.)
 4. Fix pay-card total (true fee by type + subscriber status) and show full cost (wages, super, fee, GST, total) pre-posting and pre-payment, web + Expo. (After GM16-Q06/Q15.)
 5. Build or confirm refund/credit engine + approver workflow + cancellation-pay channel. (After GM16-Q12; GM-17 boundary.)
@@ -362,3 +363,32 @@ Why this one first: every other GM-16 question (trial, refunds, cancellation fee
 1. Re-trace the two remaining ❓ items: `backend/billing/test_subscription_accounts.py` (staff-count gating) and the posting wizard's pre-posting cost display (GM16-Q06 half).
 2. Confirm the extra-seat Stripe Price dollar value from the Stripe dashboard (not from code — the $5 in `pricing.ts` is a client estimate).
 3. Ask the owner GM16-Q01-FIRST first, one question at a time (per #250), before any implementation.
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-16-W01: Launch with no free trial, or with a trial? (W-02, D153)
+**Scenario:** Tom signs up his pharmacy, posts his first shift, then offers it to Sara.
+**What happens today:** The default trial is zero days. `PAYMENT_REQUIRED` is used in offer acceptance, where a qualifying booking waits for payment before confirmation. Tom can post without subscribing. Live fulfilment collection has its own release switch and defaults off (`pr257:backend/shifts/posting.py:100`, `pr257:backend/shifts/offers.py:406`, `pr257:backend/core/settings.py:678`, `:685`). O4 used a 30-day trial override and did not verify live Stripe.
+**Recommendation first: B.** Give Tom 30 days before the standard payment rule applies to eligible bookings.
+- **KEEP (0 days):** Tom can post. Standard payment rules apply from the first eligible acceptance, once live collection is enabled.
+- **B (recommended):** Tom gets 30 trial days for eligible bookings, then standard payment rules apply.
+- **C:** Tom gets another trial length chosen by the owner.
+- **DEFER**
+
+**Note:** Stripe live acceptance is a production checklist item (GM-26), whatever the answer here.
+**Status:** OPEN
+
+### GM-16-W02: Subscription and seats: web only for launch? (W-07)
+**Scenario:** Tom opens the Subscription screen in the phone app to add two seats.
+**What happens today:** The server can change Tom's existing extra-seat subscription in Stripe directly. It opens a new Stripe Checkout session when Tom needs to buy extra seats for the first time. The phone opens the returned Checkout URL. These actions have no billing portal (`pr257:backend/billing/subscription_operations.py:160`, `:196`, `pr257:frontend_mobile/roles/owner/subscription-seats.tsx:104`, `:128`).
+**Recommendation first: A.** Keep purchases and seat changes on the web for launch. Tom can see the plan and seat count on his phone.
+- **A (recommended):** Tom sees his plan and seats on the phone and goes to the web to buy or change them.
+- **KEEP:** Tom can change seats from the phone. The app opens Stripe Checkout when the server returns a new session.
+- **DEFER**
+
+**Status:** OPEN

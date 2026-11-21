@@ -1,5 +1,13 @@
 # GM-12 Interest / Offers — Grill Me trace (read-only, docs only)
 
+> **Corrections against current code (21 Nov 2026 review).** 12 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 9 hold, 3 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| Q02 / CG-01 | onboarding helper “appears unused” | WRONG | Composition binds this helper into the verification port, and the public guard calls it. Do not delete it as dead code. | binding: `main:backend/composition/foundation_services.py:62`; call: `pr257:backend/onboarding/verification/state.py:176`; implementation: `pr257:backend/shifts/interest.py:40` |
+| Q17 / Q19 | withdrawing interest never permits escalation to resume | WRONG | Withdrawal sends no notice, but deleting the last interest can permit automatic escalation on a later queryset access. Offer decline alone does not remove interest. | DELETE route: `pr257:backend/shifts/offers.py:55`; current-interest filter: `pr257:backend/shifts/escalation.py:91` |
+| Q25 | acceptance requires current `terms_version` | MAIN-ONLY, reversed: candidate protection | pr257 returns `TERMS_CHANGED` when required terms differ from those shown. main does not perform this version comparison, so the protection must be labelled candidate-only. | main acceptance: `main:backend/shifts/offers.py:386`; candidate comparison: `pr257:backend/shifts/offers.py:387`; fingerprint: `pr257:backend/shifts/engagement.py:739` |
+
 **Repo:** `chemisttasker11-ezy/ChemistTasker-Ezy1`
 **Issue:** #250 — Grill Me, one consolidated backend + Web + Expo sign-off before launch
 **Method source:** PR #184 (`docs/qa/launch-grill/questions.json`, `AUDIT.md`, `LAUNCH_GRILL.html`), head `c786a4b8182ebf9b505d47cd81980eb3b9851ce3`
@@ -200,31 +208,21 @@ Plain English first: a worker says "I'm interested" in a shift; the pharmacy see
 
 Status key: **VALIDATED** = re-checked in current code at 97c4543e · **PARTLY** = one half checked, the other not · **NOT RE-VALIDATED** = Oct 2026 evidence only, do not present as current · **NEW** = arises from this trace. "Keep current logic" is offered only where the inspected code actually shows current logic.
 
-## GM-12-Q01 — Where must Verified + current AHPRA be enforced? [FIRST — see §4]
-- **Old ID:** ON-Q03 (also ON-Q02, ON-P01). **Status: VALIDATED — CHANGED (hole now proven).**
-- **ACTUAL TODAY (validated):** Interest: gate runs ONLY on PLATFORM shifts, and NOT for accepted staff/favourite members reaching a public named shift (`interest.py:79-89, :21`). Accept: `require_public_ahpra` is called UNCONDITIONALLY (`offers.py:349`) — **but the function itself is a no-op for non-public shifts** (`state.py:require_public_ahpra` gates only if `is_public_shift(shift)` AND NOT member access). Counter-offer submit (`base.py`) and claim (`browse.py:249`) call the same check with the same no-op behaviour. Dedicated offers: `offer_dedicated_shift` has NO AHPRA check; gating is at the accept callers only. **A worker refused at public interest can today be handed the same shift through a chain/org/favourite offer and the code does not stop it.**
-- **RECOMMENDED:** B — enforce at every external acceptance (offer accept, claim, dedicated offer, counter-offer submit), not only on public interest. Rationale: the public-only interest gate plus a no-op accept call is an ambiguous split; the bypass is now proven, not suspected. Severity: HIGH (legal / patient-safety trust signal — an unregistered "pharmacist" booked through a direct offer). Benefits: one rule everywhere, no bypass by tier. Risks: favourites/chain workers who are trusted but lapsed get blocked until re-verified — needs a clear in-app message and a re-check path. Legal/financial: AHPRA registration is the core trust signal; booking an unregistered pharmacist risks regulatory breach and invalidates the platform's verification promise.
-- **ALTERNATIVE A — Keep current logic (as inspected):** public-interest gate + member bypass + accept call that no-ops for non-public shifts. Scenario: a favourite locum whose AHPRA lapsed is offered a chain shift — today the code does not block them at interest (non-public tier) and does not block them at accept. Trade-off: least build, keeps the bypass trusts, leaves the hole open.
-- **ALTERNATIVE B — (Recommended) Every external acceptance:** as above. Scenario: same lapsed favourite — blocked at offer accept with "registration could not be confirmed, re-check" and the pharmacy is told the offer is on hold, not silently dead.
-- **ALTERNATIVE C — B plus rostering into pharmacist/intern roles:** also gate internal roster placement. Scenario: an employed pharmacist whose registration lapses mid-employment cannot be rostered to pharmacist shifts until re-verified. Trade-off: strongest safety, most operational friction for internal staff.
-- **Other / defer:** describe / defer with a date.
-- **Normal case:** verified pharmacist applies/accepts anywhere — passes. **Edge:** lapsed AHPRA mid-process; member bypass on a public named shift; adverse transition (`state.py:apply_state_transition`) cancels upcoming assignments but does not stop a fresh non-public offer. **Retry/concurrency:** re-check queued on commit when the gate runs (`queue_public_recheck`); expiry drives recheck due, not a direct block (ON-02 PARTLY). **Denied role / wrong tenant:** wrong role refused before the gate; cross-pharmacy membership does not count (bypass is per-pharmacy). **Payment/notification:** none at gate time; a blocked accept sends no owner notice in the inspected code. **Web/Expo difference:** none in the rule (shared backend); whether either client surfaces the block clearly is NOT INSPECTED.
+## GM-12-Q01 — Verification on outside bookings
+- **Status:** Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01. Engineering: see BL-01.
+- **Actual today:** Public booking actions use the verification guard, but it skips non-public shifts. Public counter-offer submission and acceptance are covered. Dedicated offer creation follows a separate path (`pr257:backend/shifts/base.py:348`, `:400`, `:462`, `pr257:backend/onboarding/verification/state.py:174`).
 
-## GM-12-Q02 — What can a worker do before they are Verified?
-- **Old ID:** ON-Q02. **Status: VALIDATED — CHANGED (narrower).**
-- **ACTUAL TODAY:** Anyone signed in can browse (per `browse.py` querysets — no Verified filter on listing). Interest on public shifts is gated (Q01); interest on non-public tiers is NOT gated in `interest.py`. Accept calls the AHPRA check unconditionally but it no-ops for non-public shifts. Explorer branch exists only in the apparently-unused `_require_public_shift_onboarding` (`interest.py:40`); `require_public_ahpra`'s Explorer handling is not separately traced (see CG-01).
-- **RECOMMENDED:** Keep the browse-open / act-gated shape, but make the gate the same everywhere (see Q01) and show the missing step on the apply/offer screen instead of only at the moment of refusal. Severity: MEDIUM.
-- **ALTERNATIVE A — Keep current logic:** browse open, gates only where the code puts them. **ALTERNATIVE B — Hide apply/offer actions until Verified:** cleaner UX, less frustration. **ALTERNATIVE C — Verified-lite (email+mobile only) can express interest, full Verified to accept.** Other / defer.
+## GM-12-Q02 — Browse access before full verification
+- **Status:** Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation.
+- **Actual today:** Workers need email and mobile verification to reach the dashboard. Anonymous users can read public boards (`main:frontend_web/src/components/ProtectedRoute.tsx:26`).
 
-## GM-12-Q03 — Who is exempt from AHPRA gates on public shifts?
-- **Old ID:** ON-P01. **Status: VALIDATED — STILL VALID (with an accept-side caveat).**
-- **ACTUAL TODAY:** Accepted staff/favourite members of the posting pharmacy, reaching its public NAMED shift (not anonymous), whose role covers the shift, skip the public-interest AHPRA gate (`is_public_shift_member_access`, `interest.py:21-38`). At accept, the gate only runs for public shifts (`state.py`); whether members are exempt *inside* `lock_public_ahpra` for public shifts was not separately traced — residual UNKNOWN (see §6). For non-public shifts everyone is effectively exempt because the gate no-ops.
-- **RECOMMENDED:** Keep the exemption at interest, but REMOVE it at accept unless the member's registration was confirmed recently — or keep it and document it as a deliberate trust decision. Severity: MEDIUM-HIGH. **ALTERNATIVE A — Keep current logic** (exempt members everywhere the gate allows). **ALTERNATIVE B — No exemption:** members pass the same gate as strangers. **ALTERNATIVE C — Time-boxed exemption:** member bypass only if AHPRA was confirmed within N days. Other / defer.
+## GM-12-Q03 — AHPRA exemption
+- **Status:** Answered: A, employees are exempt and favourites are checked, launch grill, 23 Oct 2026 - see AHPRA-FAV-01. Engineering: see BL-02.
+- **Actual today:** Eligible employed staff and favourites can bypass the public gate on named shifts at that pharmacy (`pr257:backend/shifts/interest.py:21`).
 
-## GM-12-Q04 — When must a worker's pay details (ABN/TFN, bank, super) be ready?
-- **Old ID:** ON-Q04. **Status: VALIDATED — CHANGED (now answered).**
-- **ACTUAL TODAY:** Checked at offer acceptance, inside `build_shift_engagement_terms` (`engagement.py:_external_payment_profile`). ABN path **RAISES if ABN missing/unverified/entity-unconfirmed** — ABN workers ARE blocked at accept. TFN path does NOT block — readiness is computed, `payroll_ready=False` → settlement TIMESHEET_ONLY, "TFN/super setup may be completed after shift acceptance". `validate_tfn_payroll_profile` requires TFN + super fund name/USI/member number. Worker learns what is missing when accepting (nothing surfaces it earlier in the traced code). Staff path: `acceptance_required=False`, settlement PAYROLL iff `pharmacy.use_chemisttasker_payroll` else TIMESHEET_ONLY.
-- **RECOMMENDED:** Surface payment readiness on the apply and offer screens (worker side) and on the applicant card (pharmacy side) — the Oct 2026 recommendation stands, now grounded in current code. Severity: MEDIUM. **ALTERNATIVE A — Keep current logic** (learn at accept). **ALTERNATIVE B — Block interest until pay-ready.** **ALTERNATIVE C — Warn at interest, block at accept.** Other / defer. **Decide jointly with GM-09-Q01 (payer model) and GM-09-Q07 (ABN/TFN model).**
+## GM-12-Q04 — When pay details are ready
+- **Status:** Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04. Engineering: see BL-03.
+- **Actual today:** Missing or unverified ABN blocks acceptance. Missing TFN/super permits assignment and defers payroll (`pr257:backend/shifts/engagement.py:265`, `:716`).
 
 ## GM-12-Q05 — What can Explorers (new to pharmacy) do with shifts?
 - **Old ID:** ON-Q05. **Status: PARTLY VALIDATED.** Explorer branch exists in `_require_public_shift_onboarding` (`interest.py:40-46`: Verified ExplorerOnboarding required for public shifts) but that helper is apparently not called by `express_interest`; `require_public_ahpra`'s Explorer handling is not separately traced. Accept path for Explorers UNKNOWN. Explorer shifts tab state not inspected.
@@ -331,26 +329,16 @@ Status key: **VALIDATED** = re-checked in current code at 97c4543e · **PARTLY**
 - **RECOMMENDED:** Show pay, times, breaks, duties, site, cancellation table + platform terms version before accept; record pharmacy acceptance of the same terms. Severity: HIGH (P09 fees cannot be charged without pre-acceptance disclosure). **ALTERNATIVE A — Keep current logic** (pay/times/legal notices only — Oct 2026). **ALTERNATIVE B — Full disclosure + dual acceptance (recommended).** Other / defer. **Decide jointly with GM-13 (agreement/terms) and GM-14 (Award).**
 
 ## GM-12-Q26 — Code-gap timing questions (LAUNCH area, GM-12 slice)
-- **LA-Q05** (payment readiness surfaced late — ON-11): **VALIDATED — CHANGED.** Readiness is checked only at accept (Q04 answered: ABN blocked, TFN deferred). Fix before launch? A/B/C — surface it on apply/offer screens.
+- **LA-Q05** (payment readiness surfaced late): ON-Q04 is answered. Engineering: see BL-03 for the early notice and acceptance gate. Launch timing is in LAUNCH-01.
 - **LA-Q09** (pending offers can outlive the shift — SH-07): **VALIDATED.** Lazy expiry + no start-cap confirmed; 48h value confirmed. Fix before launch? A/B/C — cap at start + eager expiry.
-- **LA-P03** (chain/org shifts skip the AHPRA gate): **VALIDATED.** The hole is proven end-to-end (Q01). Fix before launch? A/B/C.
+- **LA-P03** (chain/org shifts skip the shared AHPRA gate): answered in ON-Q03. Engineering: see BL-01. Launch scope: see LAUNCH-01.
 - **LA-Q15** (web/mobile disagree on Talent Board booking permissions — TB-07): **NOT RE-VALIDATED** (no frontend inspected). Narrowed: both clients share one API client (`shared-core/api.ts`), so the *endpoint* behaviour cannot disagree; whether both UIs expose the same actions is NOT verified. Fix before launch? A/B/C.
 
 ---
 
-# 4. SINGLE first decision question to ask the owner first
+# 4. Owner interview order
 
-## GM-12-Q01 — Where must Verified + current AHPRA be enforced?
-
-**Plain English:** Today, a worker is checked for verification/AHPRA when they show interest in a *public* shift — but not when they show interest in a staff, favourites, chain or organisation shift, and not (provably) when they accept an offer that came through those private routes. The accept code calls the AHPRA check on *every* offer, but the check itself does nothing for non-public shifts — that is now proven in the code, not suspected. Before we decide anything else about offers, counters, dedicated bookings or instant book, we must settle the one rule that decides whether an unregistered "pharmacist" can be booked through a back door.
-
-**Options:**
-- **A — Keep current logic (as inspected):** Verified/AHPRA checked on public-shift interest (with the staff/favourite member bypass on named public shifts); accept calls the check unconditionally but it no-ops for non-public shifts. *Trade-off:* least build; leaves the chain/org/favourite bypass open — now a proven hole.
-- **B — RECOMMENDED: Enforce at every external acceptance.** Verified + current AHPRA checked at offer accept, claim, dedicated offer, and counter-offer submit — for every audience, public or private. A lapsed worker is blocked with a clear message and the pharmacy is told the offer is on hold. *Trade-off:* strongest safety; trusted favourites who lapse are blocked until they re-verify.
-- **C — B plus rostering:** as B, and also gate rostering a worker into a pharmacist/intern role. *Trade-off:* safest; most friction for internal staff.
-- **Other (describe) / Defer (with a date).**
-
-**Why first:** it is HIGH severity, legal/patient-safety, and it blocks Q03, Q05, Q18, Q06/Q07 and LA-P03 — every other GM-12 answer changes depending on it. It also resolves a real ambiguity in the current code that this trace has now closed: the gate is public-only by construction, not by accident.
+The verification, exemption and pay-readiness policies are recorded in GM-12-Q01 to Q04. Start the remaining offer questions at GM-12-Q06 (instant booking). Explorer access is owned by GM-24.
 
 ---
 
@@ -372,8 +360,7 @@ Status key: **VALIDATED** = re-checked in current code at 97c4543e · **PARTLY**
 - **CG-13** — No `reservations.py` module and no reservation-expiry job found; D03 reservation-expiry implementation untraced (GM-13 territory). Confirm where reservations expire, or build it.
 
 ## Decision gaps (owner must choose first — do not build until answered)
-- **DG-01** Q01 — verification enforcement scope (FIRST).
-- **DG-02** Q03 — member exemption from AHPRA gates.
+- **Verification and member exemption (Q01/Q03):** answered. Engineering: see BL-01 and BL-02.
 - **DG-03** Q10/Q24 — offer-expiry length, start-cap, eager vs lazy, countdown.
 - **DG-04** Q11/Q19 — decline/expiry fallback: re-offer next vs resume escalation vs manual only.
 - **DG-05** Q12/Q15 — parallel offers: serial vs parallel, first-accept-hold vs first-paid-wins (lock now proven; stale-rival handling still open).
@@ -383,7 +370,7 @@ Status key: **VALIDATED** = re-checked in current code at 97c4543e · **PARTLY**
 - **DG-09** Q08/Q09 — applicant ordering + what the pharmacy sees / when identity is revealed (quota value still UNKNOWN).
 - **DG-10** Q20/Q21/Q22 — reservation withdrawal, overlapping applications/bookings.
 - **DG-11** Q25 — pre-acceptance disclosure (cancellation table, terms version, dual acceptance).
-- **DG-12** Q04/Q05 — pay-readiness timing; Explorer shift access.
+- **DG-12** Q05 — Explorer shift access (owned by GM-24). Q04 pay readiness is answered.
 
 ---
 
@@ -391,10 +378,10 @@ Status key: **VALIDATED** = re-checked in current code at 97c4543e · **PARTLY**
 
 | Q | Old ID | Status | Current-code source (97c4543e) or Oct 2026 source |
 |---|---|---|---|
-| Q01 | ON-Q03 | VALIDATED — CHANGED | `backend/shifts/interest.py:79-89` (PLATFORM-only gate), `:21-38` (member bypass); `backend/shifts/offers.py:349` (unconditional accept call); `onboarding/verification/state.py:require_public_ahpra` (no-op for non-public) |
-| Q02 | ON-Q02 | VALIDATED — CHANGED | Same as Q01; `_require_public_shift_onboarding` `interest.py:40` apparently unused |
-| Q03 | ON-P01 | VALIDATED — STILL VALID | `backend/shifts/interest.py:21-38`; accept-side member treatment inside `lock_public_ahpra` NOT separately traced |
-| Q04 | ON-Q04 | VALIDATED — CHANGED | `backend/shifts/engagement.py:_external_payment_profile` (ABN raises; TFN defers to TIMESHEET_ONLY) |
+| Q01 | ON-Q03 | Answered: B, check every outside booking, launch grill, 23 Oct 2026 - see VERIFY-GATE-01 | `pr257:backend/onboarding/verification/state.py:174` |
+| Q02 | ON-Q02 | Answered: KEEP, launch grill, 23 Oct 2026 - see GM01-Q04 for the single re-confirmation | `main:frontend_web/src/components/ProtectedRoute.tsx:26` |
+| Q03 | ON-P01 | Answered: A, employees are exempt and favourites are checked, launch grill, 23 Oct 2026 - see AHPRA-FAV-01 | `pr257:backend/shifts/interest.py:21` |
+| Q04 | ON-Q04 | Answered: B, tell the worker early and require pay details before acceptance, launch grill, 23 Oct 2026 - see ON-Q04 | `pr257:backend/shifts/engagement.py:265`, `:716` |
 | Q05 | ON-Q05 | PARTLY | `interest.py:40-46` (Explorer branch in unused helper) |
 | Q06 | BK-Q01 | VALIDATED — CHANGED | `backend/shifts/browse.py:249` (`claim_shift`, staff-only) |
 | Q07 | BK-Q02 | VALIDATED — CHANGED | Same as Q06; no reliability score in inspected files |

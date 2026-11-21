@@ -1,5 +1,12 @@
 # GM-07 — Internal roster / cover / swap — Full Grill Documentation
 
+> **Corrections against current code (21 Nov 2026 review).** 10 claims checked at `main` `8ccf8f77` and `pr257` `21add924`; 8 hold, 2 below need the correction shown. Where a question below says otherwise, this table wins. Full evidence: [`../followup/claim-check-2026-11-21.md`](../followup/claim-check-2026-11-21.md).
+
+| Where | Claim in this file | Verdict | Correct statement | Evidence |
+|---|---|---|---|---|
+| W01 | “cover approvals … refuse dates outside the posting window” | WRONG as a blanket statement (already fixed in the W question text) | The posting window covers new vacancy creation and changed posting dates. Existing-assignment release and swap/replacement approval do not all apply that window. | GUARDED new-shift request: `pr257:backend/shifts/worker_requests.py:263`; existing-assignment release: `:241`; replacement: `pr257:backend/workforce/roster/worker_actions.py:315`; open-shift creation: `pr257:backend/workforce/roster/views.py:441` |
+| W02 | booked roster manager may “edit and cancel” own booking | WRONG for cancellation/deletion (already fixed in the W question text) | A booked roster manager can make permitted edits, including description edits. Booked/payment-pending deletion is still refused, so do not claim unrestricted cancellation is currently allowed. | authority: `pr257:backend/organizations/access.py:164`; GUARDED roster deletion: `pr257:backend/workforce/roster/views.py:237`; ordinary deletion: `pr257:backend/shifts/deletion.py:10` |
+
 > **Independent senior audit correction, 21 November 2026:** The owner already approved R04C: the replacement target accepts, passes role/conflict checks, and a manager approves the transfer. The current manager-only transfer is therefore an **IMPLEMENTATION GAP**, not an OPEN yes/no decision and not a supersession. Likewise R04A's per-pharmacy cover-publication control and R06's same-Shift/Slot needs-cover rule are binding directions with missing implementation. The original GM-07-Q04/Q06/Q07 text below is retained as a historical trace of the implementation mismatch; only ask the owner for genuinely missing detail or an explicit change of approved policy. See [owner ledger](../OWNER_DECISION_LEDGER.md).
 
 
@@ -196,47 +203,23 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 **Sources:** `backend/workforce/models.py` (`RosterAcknowledgement`), `backend/workforce/roster/publication.py` (`_notify_roster_publication`, `publish_roster_period`), `backend/workforce/roster/urls.py` (acknowledge + acknowledgement-status endpoints).
 **Decision status:** OPEN — NEW.
 
-### GM-07-Q04 — Should the swap/cover target have to accept before the manager approves? (carried R04C — CONTRADICTED BY THE CODE — FIRST QUESTION, see Part D)
+### GM-07-Q04 — Target consent before swap or cover approval (R04C)
 
-**Plain English:** the rulebook says a replacement is only fulfilled when three things happen: the target accepts, they pass the role and conflict checks, and a manager approves. The code does two of the three. The target is never asked — a manager can move a shift onto someone who never agreed to it.
+**Decision status:** Answered: the target accepts, passes role and conflict checks, and a manager approves, carried R04C - see BL-06. Engineering: see BL-06.
 
-**ACTUAL TODAY — Web and Expo (same backend):** Swap: worker names a colleague; manager approves; the assignment moves (`approve_direct_swap`). Cover: manager picks a replacement; manager approves; the assignment moves (`approve_cover_replacement`). In neither flow is the target notified, asked, or given an accept/decline step — there is no target-facing endpoint in `worker_actions.py` or `roster/urls.py`, and no notification is sent by either function. Role/conflict/leave/availability checks run at request time (swap only) and again at approval time (both). The transfer is atomic and under the replacement's own staff terms.
-**Normal case:** worker A asks worker B to swap; manager approves; B finds out when they open their roster. **Edge case:** B is on approved leave by approval day — re-validation blocks it (good). B simply doesn't want the shift — there is no way to say no before it lands on them. B is the *requester's* pick but B never sees the request. **Retry/concurrency:** approval locks request + assignment; a stale request (requester no longer assigned) is refused. **Denied role / wrong tenant:** only that pharmacy's managers approve; the target must hold an active accepted membership at that pharmacy. **Payment/notification:** the transfer changes who gets paid for the shift (replacement's own terms/rates); the replacement is not notified by the code read (CG-03). **Web/Expo difference:** none — the absence is backend-wide; no client can offer an accept step that doesn't exist.
-**RECOMMENDED:** Add a target-accept step (RECOMMENDED, severity: high): manager approval becomes "manager proposes, target accepts, transfer completes" — or "target accepts first, then manager approves" (either order, but both must happen, per carried R04C). A target who declines sends the request back to the manager to pick someone else; a target who doesn't answer in N hours (owner picks N) releases the request back to the manager. The carried decision already says this — the code is the part that is wrong, not the decision.
-**ALTERNATIVE A — Keep current logic (manager-only transfer):** Trade-off: no work; the carried R04C decision is silently violated, and a worker can be assigned a shift they never agreed to — which will surface as a refusal, a no-show (GM-08), or a dispute.
-**ALTERNATIVE B — Manager approves, target can decline after (veto window):** the transfer happens, but the target has e.g. 12 hours to decline and hand it back. Trade-off: fast, but the shift is assigned to someone who may hand it back late.
-**ALTERNATIVE C — Drop R04C (rewrite the carried decision):** the owner formally decides manager approval alone is enough, and R04C is superseded. Trade-off: honest; needs the decision ledger updated (the register, not just this file) and the target at least notified.
-**Other (describe) / Defer.**
-**Sources:** `backend/workforce/roster/worker_actions.py` (`request_direct_swap`, `approve_direct_swap`, `submit_cover_request`, `approve_cover_replacement` — no accept step, no target notification), `backend/workforce/roster/urls.py` (no target-accept endpoint), carried R04C.
-**Decision status:** OPEN — carried R04C vs code contradiction. **Ask first (Part D).**
+**Actual today:** A manager can approve a swap or replacement without the target accepting. The role, conflict, leave and availability checks still run (`pr257:backend/workforce/roster/worker_actions.py:209`, `:329`).
 
-### GM-07-Q05 — Who can be asked to cover — named colleagues only, or favourites and the public too? (carried R04B)
+### GM-07-Q05 — Cover invitations and widening (R04B)
 
-**Plain English:** the rulebook says staff invite named eligible colleagues, and widening to favourites or the public needs a manager. In practice, a cover request names nobody at all — the manager picks whoever they like at approval time, and the only way to reach beyond the pharmacy's staff is to release the shift to the marketplace.
+**Decision status:** Answered: staff invite named eligible colleagues; a manager must widen to favourites or the public, carried R04B - see BL-06. Engineering: see BL-06.
 
-**ACTUAL TODAY — Web and Expo (same backend):** Swap: the requester names one colleague (F05). Cover: the requester names nobody; the manager chooses any eligible worker at approval (must hold an active accepted membership at the pharmacy, pass role/overlap/leave/availability checks). There is no invite-to-cover step, no favourites list in this flow, no public widening step. Release+escalate (F09) is the only path to a wider audience, and it needs a manager and deletes the assignment.
-**Normal case:** worker can't work Saturday; manager picks the part-timer who is free. **Edge case:** nobody on staff is free — the manager must release to the marketplace (losing the roster link) or leave the shift assigned to the absent worker. A favourite locum (not employed) can never be picked as a roster replacement — they can only be offered the shift as a marketplace offer (GM-12). **Retry/concurrency:** n/a. **Denied role / wrong tenant:** the replacement must be a member of *that* pharmacy; a member of another site in the same org cannot be picked here (cross-site cover is an attendance concept, GM-08, not a roster one). **Payment/notification:** the replacement is paid on their own staff terms; the favourite/public path would pay on offer terms instead (GM-12/GM-14). **Web/Expo difference:** none — backend behaviour.
-**RECOMMENDED:** Keep named-colleague swaps; for cover, let the requester *suggest* up to 3 named colleagues (the manager may still pick anyone eligible), and keep favourites/public behind a manager decision — but make that decision a one-tap "offer to favourites" / "release to marketplace" from the cover request itself, instead of the separate release flow. Severity: medium — the current flow works, but the requester has no voice in who covers them.
-**ALTERNATIVE A — Keep current logic:** swap names a colleague; cover names nobody; manager picks; marketplace only via release. Trade-off: no work; the requester's preferences are invisible and the marketplace path is a separate, destructive step (it deletes the assignment).
-**ALTERNATIVE B — Requester invites, invitee accepts:** the worker invites named colleagues; an invitee who accepts becomes the proposed replacement for the manager to approve. Trade-off: matches R04B's "invite" language and gives the target a voice (pairs with Q04); more states to manage.
-**ALTERNATIVE C — Open cover board:** any eligible staff member can claim an open cover request (first-come, manager confirms). Trade-off: fastest fill; the manager loses the pick, and two claims can race (needs the same locking the approval path already has).
-**Other (describe) / Defer.**
-**Sources:** `backend/workforce/roster/worker_actions.py` (`submit_cover_request` — no target; `approve_cover_replacement` — manager picks), carried R04B, `backend/workforce/roster/validation.py` (`worker_issues` — membership required).
-**Decision status:** OPEN.
+**Actual today:** A swap names one colleague. A cover request names nobody and the manager picks an eligible worker at approval. Manager release to the marketplace is the current route to a wider audience (`pr257:backend/workforce/roster/worker_actions.py:279`).
 
-### GM-07-Q06 — The "publish cover" setting: build it, or delete it? (carried R04A + LA-Q11)
+### GM-07-Q06 — Per-pharmacy permission to publish cover (R04A / LA-Q11)
 
-**Plain English:** the rulebook says the owner sets, per pharmacy, who can publish cover. The product has a toggle with that exact name — but nothing in the backend reads it, so flipping it changes nothing. Either the setting needs to be built, or the rule needs to be rewritten.
+**Decision status:** Answered: the pharmacy setting controls who can publish cover, carried R04A and R06 - see BL-06.
 
-**ACTUAL TODAY — Web and Expo (same backend):** `Pharmacy.auto_publish_worker_requests` exists (help text: "If True, worker-initiated swap/cover requests will automatically create and publish a new shift. If False, the request must be approved by the owner or admin first."). The flag is referenced in web `PharmacyPage` / `PharmacyPage.model.ts` and mobile `PharmacyForm.tsx` (default-branch search) — but in **no backend file** (same search, 12 hits: models/serializers/clients/docs only). There is no "publish cover" step in `worker_actions.py` at all: cover requests are never published, they wait for a manager. The help text also contradicts carried R06 (a cover opened as a vacancy is the *same* shift/slot, not a *new* shift).
-**Normal case:** owner turns the toggle on, expecting cover requests to auto-publish — nothing changes. **Edge case:** owner turns it on for a pharmacy where workers should *not* self-publish — still nothing changes, which accidentally keeps them safe. **Retry/concurrency:** n/a. **Denied role:** n/a. **Payment/notification:** an auto-published shift would go to the marketplace and could be booked and paid — the toggle promises a money path that doesn't exist. **Web/Expo difference:** none — dead on both.
-**RECOMMENDED:** Delete the toggle and rewrite R04A in the decision ledger: cover is never auto-published; a cover request always waits for a manager (which is what the code does today), and "publish" means the manager's release+escalate choice (F09). If the owner wants auto-publish later, it becomes a new feature with a design, not a toggle that lies. Severity: medium — a dead toggle that promises marketplace publication is worse than no toggle.
-**ALTERNATIVE A — Keep current logic (dead toggle):** Trade-off: no work; owners keep flipping a switch that does nothing, and the help text keeps contradicting R06.
-**ALTERNATIVE B — Build auto-publish as written:** when the toggle is on, a worker cover request automatically creates and publishes a new shift. Trade-off: implements the help text; but it contradicts R06 (same shift/slot, no duplicate) and R04 (stay assigned until a manager decides) — the owner would need to supersede both carried decisions first.
-**ALTERNATIVE C — Build per-pharmacy "who can publish cover":** the owner picks which roles (e.g. managers only, or roster managers too) may publish a cover request to named colleagues. Trade-off: implements R04A as written; needs the publish-cover step that doesn't exist yet (Q07's vacancy).
-**Other (describe) / Defer.**
-**Sources:** `backend/organizations/models.py` (`auto_publish_worker_requests` + help text, read at head), `backend/workforce/roster/worker_actions.py` (no read of the flag, no publish step), default-branch search for `auto_publish_worker_requests` (12 hits, no backend reader), carried R04A/R06, LA-Q11.
-**Decision status:** OPEN.
+**Actual today:** Web and Expo expose `auto_publish_worker_requests`. The cover handler does not consult it. Its help text promises a new shift, while R06 keeps the existing shift and slot (`pr257:backend/organizations/models.py:240`, `pr257:backend/workforce/roster/worker_actions.py:234`). Engineering: see BL-06.
 
 ### GM-07-Q07 — When cover is needed, should the shift become a visible vacancy ("needs cover")?
 
@@ -296,27 +279,9 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ---
 
-## Part D — SINGLE first decision question
+## Part D — First owner question
 
-### GM-07-Q04 — Should the swap/cover target have to accept before the manager approves?
-
-**Ask this first because:** it is the one place where the code contradicts a carried decision. The rulebook (R04C, decided in the shift-lifecycle register and carried into #184) says a replacement is fulfilled when the target *accepts*, passes the checks, and a manager approves. The code does the checks and the approval — and never asks the target. Every other GM-07 question (who can be asked, vacancies, deadlines, pay terms) assumes the target is a willing participant; today they are not asked at all. If the owner confirms R04C, the target-accept step is the first thing to build; if the owner supersedes it, the decision ledger must be updated before anything else is built on top of it.
-
-**Question (plain English):** Today, when a manager approves a swap or a cover, the shift moves to the new worker immediately — the new worker is never asked whether they want it. The rulebook we already agreed says the new worker has to accept first. Should we build the accept step, or change the rule?
-
-**Options:**
-
-- **A — Build the accept step (RECOMMENDED):** manager approval becomes "manager proposes, target accepts, transfer completes" — or "target accepts first, then manager approves" (either order, but both must happen). *What happens:* worker B gets asked, can accept or decline; a decline sends the request back to the manager to pick someone else; no answer in N hours releases the request back to the manager. *Trade-off:* the carried decision is honoured; one more step and one more wait per swap/cover.
-- **B — Keep current logic (manager-only transfer):** *What happens:* the shift moves on manager approval alone; the new worker finds out from their roster. *Trade-off:* no work; the carried R04C decision is silently violated, and a worker can be assigned a shift they never agreed to — which surfaces later as a refusal, a no-show, or a dispute.
-- **C — Manager approves, target can decline after (veto window):** *What happens:* the transfer happens, but the target has e.g. 12 hours to decline and hand it back. *Trade-off:* fast, but the shift is assigned to someone who may hand it back late.
-- **D — Drop R04C (rewrite the carried decision):** the owner formally decides manager approval alone is enough, and R04C is superseded in the decision ledger. *What happens:* the code stays as it is, but the target is at least notified. *Trade-off:* honest; needs the register updated, not just this file.
-- **Other (describe) / defer.**
-
-**Evidence:** `backend/workforce/roster/worker_actions.py` (`approve_direct_swap`, `approve_cover_replacement` — no accept step, no target notification), `backend/workforce/roster/urls.py` (no target-accept endpoint), carried R04C ("The target accepts, passes role and conflict checks, and a manager approves the transfer").
-
-**Second question after this one:** GM-07-Q06 (the dead "publish cover" toggle — build it or delete it, since it decides what R04A means).
-
-**Decision status:** OPEN.
+Start at **GM-07-W01** (posting-window limit for roster planning). Target consent and cover publishing are carried rules. Engineering: see BL-06.
 
 ---
 
@@ -327,7 +292,7 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 | # | Gap | Code to touch | Notes |
 |---|---|---|---|
 | CG-01 | Reject reason classification is a substring hack: SWAP vs COVER is decided by whether the word "swap" appears in the request note | `backend/workforce/roster/worker_actions.py` (`reject_worker_shift_request`) | A cover request whose reason mentions "swap" is logged as SWAP_REJECTED. Store the request kind on the row instead (needs `WorkerShiftRequest` model read first) |
-| CG-02 | `auto_publish_worker_requests` is read by NO backend code — the toggle changes nothing; its help text contradicts R06/R04B | `backend/organizations/models.py`, `backend/workforce/roster/worker_actions.py` | Field exists at head; mobile form now references it. See GM-07-Q06 (delete it or build it) and GM-04 CG-02 |
+| CG-02 | The cover handler does not use `auto_publish_worker_requests`. Its help text conflicts with R06/R04B. | `backend/organizations/models.py`, `backend/workforce/roster/worker_actions.py` | Engineering: see the central BL-06. Wire the existing toggle to the carried policy. |
 | CG-03 | No notifications on swap/cover request, approval, rejection, or release (none found in `worker_actions.py`) | `backend/workforce/roster/worker_actions.py`, `backend/notifications/*` | Publish *does* notify (F02). The request/decision silence means workers and targets learn late or never. Verify in `v2_views.py` too (not read) — the views may notify where the service doesn't |
 | CG-04 | No notification on roster unpublish (whole week or single shift) was found | `backend/workforce/roster/publication.py` (`unpublish_roster_period`, `unpublish_roster_shift`) | Workers lose shifts silently. Same fix shape as the publish notice |
 | CG-05 | No expiry/cleanup for pending swap/cover requests (a request can stay PENDING after its shift has passed) | `backend/workforce/roster/worker_actions.py`, `backend/shifts/worker_requests.py` | Pairs with Q08's deadline decision; the cleanup itself is a code gap once the deadline is chosen |
@@ -337,9 +302,9 @@ Per-question format: plain-English explanation first, then ACTUAL TODAY with **W
 
 ### Decision gaps (owner must choose first — do not build until answered)
 
-GM-07-Q01 (weekly shape) · Q02 (who can publish) · Q03 (acknowledgement consequences) · Q04 (target accept — FIRST, contradicts carried R04C) · Q05 (who can be asked to cover) · Q06 (publish-cover setting: build or delete) · Q07 ("needs cover" vacancy) · Q08 (request deadlines) · Q09 (pay terms on transfer) · Q10 (release tier). Plus carried-rule conflicts to resolve: R04C vs code (Q04), R04A vs code (Q06), R06 vs code (Q07).
+GM-07-W01 (planning window) · W02 (booked manager) · Q01 (weekly shape) · Q02 (who can publish) · Q03 (acknowledgement consequences) · Q07 (vacancy visibility within R06) · Q08 (request deadlines) · Q09 (pay terms on transfer) · Q10 (release tier).
 
-**Order to ask:** Q04 → Q06 → Q05 → Q07 → Q08 → Q01 → Q02 → Q03 → Q10 → Q09. (Q04 first per Part D — it decides whether the target is a participant at all; Q06 second because it decides what "publish cover" means before Q05/Q07 can be built.)
+**Order to ask:** W01 → W02 → Q07 → Q08 → Q01 → Q02 → Q03 → Q10 → Q09.
 
 ---
 
@@ -349,9 +314,9 @@ GM-07-Q01 (weekly shape) · Q02 (who can publish) · Q03 (acknowledgement conseq
 
 | Backlog item | Depends on (owner decision) | Files / functions to touch | Tests to add / update |
 |---|---|---|---|
-| BL-01 Target-accept step for swap/cover (or ledger update superseding R04C) | Q04 | `backend/workforce/roster/worker_actions.py` (new accept function), `backend/workforce/roster/v2_views.py` + `urls.py` (new endpoint), `backend/shifts/worker_requests.py` (target response field), notifications | Target accepts/declines/ignores; manager approval before/after accept; stale-request protection still holds |
-| BL-02 Publish-cover setting: delete toggle OR build per-pharmacy publish rule | Q06 | `backend/organizations/models.py`, `frontend_web/src/pages/dashboard/sidebar/PharmacyPage.tsx`, `frontend_mobile/roles/shared/pharmacies/PharmacyForm.tsx`, decision ledger (R04A) | Toggle on/off changes behaviour (or toggle removed); help text matches R06 |
-| BL-03 Cover request: requester suggests colleagues; manager "offer to favourites / release to marketplace" from the request | Q05 | `backend/workforce/roster/worker_actions.py` (`submit_cover_request`, `approve_cover_replacement`), `backend/workforce/roster/v2_views.py` | Suggested colleagues shown; favourite/public widening needs a manager; replacement still passes `worker_issues` |
+| BL-01 Target acceptance before transfer | R04C, carried | Engineering: see the central BL-06 | Target consent, checks and manager approval all required |
+| BL-02 Existing per-pharmacy cover setting | R04A and R06, carried | Engineering: see the central BL-06 | Setting controls permission; cover keeps the same shift and slot |
+| BL-03 Cover invites to named colleagues | R04B, carried | Engineering: see the central BL-06 | Widening to favourites or public requires a manager |
 | BL-04 "Needs cover" vacancy display (staff-only, or wider per decision) | Q07 | `backend/workforce/roster/worker_actions.py` (+ vacancy flag), roster list endpoints, roster screens (web + Expo) | Same shift/slot, no duplicate; vacancy scoped to the decided audience; vacancy clears on approval/release |
 | BL-05 Request deadlines + near-start escalation + pending-request expiry | Q08 | `backend/workforce/roster/worker_actions.py`, notification code, roster screens | Request inside window escalates; pending at start flagged/expired per decision |
 | BL-06 Unpublish + request/decision notifications (target, requester, owner) | Q01/Q04/Q05 (content) + CG-03/CG-04 (mechanics) | `backend/workforce/roster/publication.py`, `backend/workforce/roster/worker_actions.py`, `backend/notifications/*` | Publish/unpublish/approve/reject/release each notify the right people exactly once |
@@ -361,7 +326,7 @@ GM-07-Q01 (weekly shape) · Q02 (who can publish) · Q03 (acknowledgement conseq
 | BL-10 Pay-terms preview on approval + transfer notices | Q09 | `backend/workforce/roster/v2_views.py` (approval screens), `backend/workforce/roster/worker_actions.py` (`_reassign`) | Replacement's rate shown pre-approval; both workers notified with the rate |
 | BL-11 Code gaps CG-01–CG-08, timed by owner | As noted in Part E | As per Part E | Each with web + Expo verification |
 
-**Ordering note:** BL-01 (target accept) first after the first decision — it changes the shape of every later roster flow — then BL-02/BL-04 (what "publish cover" and "vacancy" mean), then BL-03/BL-05/BL-06 (notifications + deadlines). GM-06-Q06 (approved leave → shift) must be decided alongside BL-01/BL-03, because leave approval is the other way a cover request gets created. GM-08 owns the no-show/late rules that BL-05's deadlines interact with.
+**Ordering note:** Target consent, the existing cover setting and named invitations are covered by the central BL-06. Ask GM-06-Q06 alongside roster cover where approved leave creates a request. GM-08 owns the no-show and late rules.
 
 ---
 
@@ -374,3 +339,35 @@ GM-07-Q01 (weekly shape) · Q02 (who can publish) · Q03 (acknowledgement conseq
 - Adopted without re-trace: GM-01 sessions; GM-05 membership (R01, capabilities, removal Q-09); GM-06 employment/leave (this session); GM-04 chain/org definitions; GM-18 LA-Q12; GM-25 structural trace.
 
 *End of GM-07 documentation. No code was changed. No branch or PR was created.*
+
+
+---
+
+## Added 2026-11-21: waiting owner decisions (review of PR #267)
+
+Evidence refs: `pr257:` = `origin/agent/pr257-int` at `21add924` (Expo app + newest backend), `main:` = `origin/main` at `8ccf8f77` (web as deployed). Each question is asked once, recommendation first. Source: the orchestrator's waiting-decision list of 21 Nov (items W-01 to W-17, mapped in [`../OWNER_GRILL.md`](../OWNER_GRILL.md) section 3).
+
+### GM-07-W01: Does the 4-month posting window also apply to roster planning? (W-01, D148)
+**Scenario:** Tom builds a week template, then uses "copy week" to fill the roster six months ahead for Omar, Ali and Mia.
+**What happens today (pr257 only; deployed main has no server posting window):** new vacancy creation, recurrence and changed posting dates refuse dates outside the window (pharmacy-local today to the end of the fourth following calendar month) (`pr257:backend/shifts/posting.py:66` `validate_posting_window`, called at `:100` and `:228`; roster open-shift path `pr257:backend/workforce/roster/views.py:441`). Roster planning writers (week templates, copy week, bulk create, roster slot edits) do **not** check it, so Tom's copy succeeds. Releasing an existing assignment and approving a swap or replacement don't all apply it either.
+**Recommendation first: A.** Use the same date limit for roster planning and vacancy posting.
+- **A (recommended):** The copy stops at the window edge and tells Tom which weeks were skipped.
+- **KEEP:** Tom can plan a year ahead and make permitted description edits. Moving dates outside the window is refused (`pr257:backend/shifts/posting.py:213`, `:228`).
+- **B:** Tom can plan within a longer roster-only window, such as 12 months.
+- **DEFER**
+
+**Status:** OPEN
+
+### GM-07-W02: May a roster manager edit or cancel a shift they are booked on themselves? (W-06, D178)
+**Scenario:** Omar is Tom's pharmacist and has the roster-manager role at Brisbane. He is also booked on Saturday's shift there. He edits that shift's description, then tries to cancel it.
+**What happens today:** Omar can edit the description. Agreed terms stay locked. Deleting a shift with booked or payment-pending staff is refused for any manager. The general D04 cancellation action is still to be built (`pr257:backend/workforce/roster/views.py:237`, `pr257:backend/workforce/roster/worker_actions.py:55`, O4 D178).
+**Recommendation first: A.** Ask another manager or Tom to edit Omar's booked shift or use the future cancellation action.
+- **A (recommended):** Omar asks another manager to make either change.
+- **B:** Omar can edit the description. Another manager uses the future cancellation action.
+- **C:** Omar keeps his current edit rights and can use the future D04 cancellation action with the same guards as other roster managers.
+- **DEFER**
+
+**Status:** OPEN
+
+### GM-07-W03: Plain draft roster staff are deleted with their shift (W-12, carried grill #9)
+**Answered:** yes (owner, grill #9, carried in the job memory). **Still true in code:** `pr257:backend/workforce/roster/views.py:233-234` deletes plain rostered staff on a draft shift together with it, and refuses when staff are offer-booked or payment-pending. Not re-asked.
