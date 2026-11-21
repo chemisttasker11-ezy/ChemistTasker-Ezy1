@@ -1,5 +1,7 @@
 # ChemistTasker Grill Me — Issue #250 (2026-11-21)
 
+> **Second independent follow-up review (21 Nov 2026):** Read [INDEPENDENT_FOLLOWUP_REVIEW_2026-11-21.md](INDEPENDENT_FOLLOWUP_REVIEW_2026-11-21.md) before using the 311/277 counts or classifying launch blockers. The 540→311 arithmetic is verified, but its semantic de-duplication ledger predates the rebuilt GM-18 numbering and contains at least eight incompatible mappings. Totals remain **PROVISIONAL**, not owner-signed-off. The 617 blocking items are repeated area-level rows and conditional on the still-unanswered LAUNCH-01. This PR remains docs-only, draft and not release acceptance.
+
 **Docs only. No product code, schema, payments, feature toggles, production data, merges or deployments in this PR.** This is the documentation/decision task from Issue #250: one consolidated, owner-led "Grill Me" review to confirm ChemistTasker's actual business logic before launch.
 
 **Start here:** [`INDEPENDENT_SENIOR_AUDIT_2026-11-21.md`](INDEPENDENT_SENIOR_AUDIT_2026-11-21.md), then [`OWNER_DECISION_LEDGER.md`](OWNER_DECISION_LEDGER.md) and [`GRILL_ME_CONSOLIDATED_QUEUE.md`](GRILL_ME_CONSOLIDATED_QUEUE.md) — 540 area-question entries reduced by 16 enumerated merges to 524, **not yet proven 524 independent unanswered owner questions**. The 26-step dependency-ordered ask order remains a draft interview route. Per-area traces are in `areas/`; senior-review records are in `senior-reviews/`.
@@ -19,18 +21,26 @@
 
 ## Honest caveats — read before answering
 
-- **Do not ask until re-validated:** GM-02 ON-Q15 (folded into MOBILE-PARITY-01); GM-05 Q-16/Q-17; GM-22 Q07, Q15, and Q03's cancel half; GM-25 C05, C06, C07, C10, C17, C18; GM-26 Q07, Q12–Q20, Q22–Q26, Q33. GM-26 Q43 (pentest) is UNKNOWN — nothing evidenced.
+- **Follow-up verification status:** [`followup/followup-unverified-closure.md`](followup/followup-unverified-closure.md) reports 24 source-verified, 4 partial (GM-02 ON-Q15, GM-05 Q-16, GM-25 C05/C18), and 1 UNKNOWN (GM-26 Q43 pentest). This is source verification, **not** a claim that live device/security testing passed.
 - **GM-26 open items:** B62/B63/B65 negative tests, B64 fix verification, exact-head CI, live staging check, production env values, Expo privacy parity.
-- **GM-18:** the worker trace file was not recovered; the deliverable here is the senior-review file (`areas/GM-18-talent-recruitment-SENIOR-REVIEW-ONLY.md`), whose findings were independently verified at head and which carries the 26 GM-18 questions.
+- **GM-18 (follow-up correction):** the original historical trace was not recovered, but a new 26-question trace is now in [`areas/GM-18-talent-recruitment.md`](areas/GM-18-talent-recruitment.md). Its reconstructed numbering is authoritative for the new trace; it has **not yet been reconciled** against the older 311/277 canonical mapping.
 - **GM-08 file name:** the area file is named `GM-08-attendance-kiosk.md` here; its header records that it overwrites the earlier BLOCKED-429 stub of the same content.
 - **GM-21/GM-22 caveat:** some `search_code` results reflect the default branch (`main`), not the PR head — flagged wherever a finding rests on search alone.
 - **No NEW owner answers recorded in this PR.** Thirty historical decisions in #184 are binding unless explicitly superseded by the owner. No implementation is authorised by the Grill documentation alone; unverified questions cannot be claimed complete.
 - **Later development candidate exists:** PR #257 at `ad01356e…` is 220 commits ahead of the reviewed PR #249 head, including backend, mobile, shared-core and web changes; compare before accepting mobile/marketplace/chat conclusions. PR #257 remains an unmerged integration candidate.
 - **CI and runtime acceptance are not proven by this documentation:** GM-25/GM-26 remain partial, as do native Android/iOS, production settings and staged payment acceptance.
 
+## Follow-up review files
+
+- [FOLLOWUP_2026-11-21.md](FOLLOWUP_2026-11-21.md) — developer's summary of reconstructed GM-18, de-duplication, #257 comparison and unverified closure.
+- [INDEPENDENT_FOLLOWUP_REVIEW_2026-11-21.md](INDEPENDENT_FOLLOWUP_REVIEW_2026-11-21.md) — second-pass independent evidence, exact correction requests and release caveats.
+- [followup/followup-genuine-dedup.md](followup/followup-genuine-dedup.md) — mathematically reconciled **snapshot only**, canonical GM-18 mappings need correction.
+- [followup/followup-pr257-refresh.md](followup/followup-pr257-refresh.md) — source-level PR #249/#257 refresh, but not a complete 220-commit functional comparison.
+- [followup/followup-launch-blocking.md](followup/followup-launch-blocking.md) — 617 blocking and 206 optional **area-level rows**, conditional on LAUNCH-01.
+
 ## Independent review updates
 
-This draft PR has now been independently reviewed. The consolidated queue was corrected to point at actual in-PR area files (not transient `~/workspace` paths), to respect carried owner approvals, to treat D02/D03 as already decided, and to separate unverified current behaviour from launch readiness. Original per-area documents remain snapshot evidence from #249 and may contain obsolete worker process notes such as “no PR created”; those statements are historical, not this PR's current status. GM-18's original full trace is missing, so a 39-line senior summary **must not be represented as complete 26-question evidence**.
+This draft PR has now been independently reviewed. The consolidated queue was corrected to point at actual in-PR area files (not transient `~/workspace` paths), to respect carried owner approvals, to treat D02/D03 as already decided, and to separate unverified current behaviour from launch readiness. Original per-area documents remain snapshot evidence from #249 and may contain obsolete worker process notes such as “no PR created”; those statements are historical, not this PR's current status. GM-18's original historical trace remains missing, but the new 26-question reconstruction is now present. Its identifiers and de-duplication mappings must be reconciled.
 
 ## Ask order (one question at a time)
 
