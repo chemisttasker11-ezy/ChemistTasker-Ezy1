@@ -37,36 +37,38 @@ This is the one page Tom (the owner) goes through. It sits on top of the 27 area
 
 "Open" = questions to ask, after removing answered ones, questions merged into another area (counted once, where they are owned) and questions the PR itself marks not re-validated (asked after re-validation). Added = the waiting decisions placed in this review (section 3).
 
-| # | Area(s) | Open | Added this review | First question |
+| # | Area(s) | Open (22 Nov) | Added this review | First question |
 |---|---|---|---|---|
 | 0 | **LAUNCH-01** (owned by GM-26), with GM-21-W01, GM-16-W01, GM-16-W02 | 1 + 3 | marketplace switches, free trial, web-only billing | What launches, on which surfaces, after which gates? |
-| 1 | GM-01 Sessions/auth | 18 | GM01-Q04 note | GM01-Q04 (re-confirm) |
-| 1 | GM-02 Worker onboarding | 13 | answered table | ON-P03: which AHPRA lookup runs at launch? |
-| 1 | GM-05 Roles/membership | 12 | W01 invitee active before password | GM-05-W01 |
-| 2 | GM-03 Pharmacy setup | 11 | | PHARM-GATE-01 |
-| 2 | GM-04 Organisations | 11 | | GM-04-Q01 |
-| 3 | GM-10 Posting/rates | 12 | | RATE-01 (after GM-09-Q01) |
+| 1 | GM-01 Sessions/auth | 16 | GM01-Q04 note | GM01-Q04 (re-confirm) |
+| 1 | GM-02 Worker onboarding | 17 | answered table | ON-P03: which AHPRA lookup runs at launch? |
+| 1 | GM-05 Roles/membership | 14 | W01 invitee active before password | GM-05-W01 |
+| 2 | GM-03 Pharmacy setup | 7 | | PHARM-GATE-01 |
+| 2 | GM-04 Organisations | 8 | | GM-04-Q01 |
+| 3 | GM-10 Posting/rates | 13 | | RATE-01 (after GM-09-Q01) |
 | 3 | GM-11 Audience/escalation | 11 | | GM-11-Q01 |
-| 3 | GM-12 Interest/offers | 22 | | GM-12-Q06 |
-| 4 | GM-13 Reservation/payment | 9 | W01 paid orphan, W02 release only by cancellation | GM-13-W01 |
-| 4 | GM-16 Subscriptions/fees | 16 | W01, W02 (asked in row 0) | GM16-Q01-FIRST |
+| 3 | GM-12 Interest/offers | 18 | | GM-12-Q06 |
+| 4 | GM-13 Reservation/payment | 5 | W01 paid orphan, W02 release only by cancellation | GM-13-W01 |
+| 4 | GM-16 Subscriptions/fees | 17 | W01, W02 (asked in row 0) | GM16-Q01-FIRST |
 | 5 | GM-08 Attendance/kiosk | 12 | W01 re-grill QR/PIN confirmation | GM-08-Q01 |
-| 6 | GM-09 Timesheet/payroll | 11 | W01 re-grill overnight activation | GM-09-Q01 |
-| 7 | GM-14 Terms/Award/GST/super | 12 | W01 re-grill stale terms | ACCEPT-01 |
-| 7 | GM-17 Invoices/refunds | 18 | W01 answered by R1 | REFUND-01 |
-| 8 | GM-15 Cancellation/disputes | 42 | W01 (defect, not a question) | GM15-01 |
+| 6 | GM-09 Timesheet/payroll | 12 | W01 re-grill overnight activation | GM-09-Q01 |
+| 7 | GM-14 Terms/Award/GST/super | 9 | W01 re-grill stale terms | ACCEPT-01 |
+| 7 | GM-17 Invoices/refunds | 12 | W01 answered by R1 | REFUND-01 |
+| 8 | GM-15 Cancellation/disputes | 32 | W01 (defect, not a question) | GM15-01 |
 | 9 | GM-06 Employment/leave | 9 | | GM-06-Q06 |
 | 9 | GM-07 Roster/cover/swap | 9 | W01 posting window, W02 self-dealing, W03 answered | GM-07-W01 |
-| 10 | GM-18 Talent/recruitment | 25 | | AUDIENCE-01, then OFFER-01 |
+| 10 | GM-18 Talent/recruitment | 14 | | AUDIENCE-01, then OFFER-01 |
 | 10 | GM-19 Availability/matching | 13 | | GM-19-Q03 |
-| 10 | GM-24 Explorer/public | 21 | W01 explorer admin rows; D93 answered | GM-24-Q01 |
-| 11 | GM-20 Chat/Hubs | 19 | W01 revoked-member edits | GM20-Q01 |
-| 11 | GM-22 Notifications/rewards | 26 | | GM22-04 |
-| 12 | GM-21 Marketplace | 19 | W01 (asked in row 0) | after LAUNCH-01 |
-| 12 | GM-23 Calendars/operations | 29 | W01 deferred | GM-23-01 |
-| 13 | GM-25 Web/Next/Expo parity | 25 | | MOBILE-PARITY-01 (after the joint re-check) |
-| 13 | **GM-27 Mobile-only flows (new)** | 7 | Q01–Q07, including cached export and QR retention | GM27-Q01 |
-| 14 | GM-26 Admin/privacy/security/release | 27 | W01 reCAPTCHA keys (owner action), W02 Dependabot, W03 node-forge, W04 minimatch | GM26 first non-launch question |
+| 10 | GM-24 Explorer/public | 15 | W01 explorer admin rows; D93 answered | GM-24-Q01 |
+| 11 | GM-20 Chat/Hubs | 20 | W01 revoked-member edits | GM20-Q01 |
+| 11 | GM-22 Notifications/rewards | 16 | | GM22-04 |
+| 12 | GM-21 Marketplace | 21 | W01 (asked in row 0) | after LAUNCH-01 |
+| 12 | GM-23 Calendars/operations | 15 | W01 deferred | GM-23-01 |
+| 13 | GM-25 Web/Next/Expo parity | 27 | | MOBILE-PARITY-01 (after the joint re-check) |
+| 13 | **GM-27 Mobile-only flows (new)** | 9 | Q01–Q07, including cached export and QR retention | GM27-Q01 |
+| 14 | GM-26 Admin/privacy/security/release | 17 | W01 reCAPTCHA keys (owner action), W02 Dependabot, W03 node-forge, W04 minimatch | GM26 first non-launch question |
+
+**Total open: 388** (each asked once; counts include the waiting-decision and OD questions; GM-15-W01 is a defect, not a question).
 
 
 **Update 22 Nov (orchestrator, done alone at the owner's request):** duplicates merged. Each repeated question is now asked once: 90 questions carry their 168 copies, and every copy says "Merged 22 Nov: asked once, as X in GM-nn" (talent-board questions stay in GM-18 and availability in GM-19; the rest are asked the first time they come up in this order). **388 questions are open** (counted from each area's question headings: 168 merged copies and 37 answered ones excluded). The GM-21 and GM-24 "Platforms per question" tables had shifted question numbers and were rebuilt from the real headings; 12 waiting-decision (W) questions missing from those tables were added. All 173 web/Expo rows were checked by hand and their refs re-pointed at the exact line (re-exports followed). Wrong claims corrected: GM-04 organisation invoices (web has a summary only), GM-17 subscription by invoice (web-only), GM-02 banking (neither onboarding asks for bank details), GM-07 worker swap (missing on Expo, now BL-34), GM-07 acknowledgement, GM-24 Explorer shifts. Still loose: about 45 refs point at a type, import or log line in the right file (second pass pending).

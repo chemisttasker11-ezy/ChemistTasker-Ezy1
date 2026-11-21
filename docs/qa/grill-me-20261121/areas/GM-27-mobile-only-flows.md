@@ -15,7 +15,7 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | External calendar and map intent launch | Shift cards do not provide direct external map/calendar intent buttons (`frontend_web/src/pages/dashboard/sidebar/ActiveShiftsPage/index.tsx`). | One-tap button opens Google Calendar editor or Google Maps directions (`frontend_mobile/app/next-shifts.tsx:133`). | Expo only | Intended: Mobile leverages native device URL schemes for navigation and scheduling. |
 | App lock / biometric return protection | Web has no client-side inactivity lock or biometric gate (`frontend_web/src/App.tsx`). | Configurable app lock protects screen after 60s background delay (`frontend_mobile/components/security/AppLockGate.tsx:172`). | Expo only | Intended: Mobile app provides device PIN/biometric privacy protection for shared dispensary devices. |
 | Multi-role workspace switching and session restore | Role switching handled via layout dropdown and URL routes (`frontend_web/src/layouts/WorkspaceSwitcher.tsx:11`). | Worker or manager switches workspace from the switcher in the app shell (`frontend_mobile/components/shell/WorkspaceSwitch.tsx:63`). | Yes | Parity question: Expo persists and restores persona state locally, while web relies on session cookies and route prefixes. |
-| Worker QR contact invitation and scanning | Profile generates public profile URL without camera scanner (`frontend_web/src/pages/PublicTalentBoardPage.tsx`). | Owner scans worker QR to generate 14-day invitation link (`frontend_mobile/features/share/InviteFromWorkerQr.tsx:43`). | Expo only | Intended: Mobile app uses camera hardware to scan worker contact QRs. |
+| Worker QR contact invitation and scanning | Profile generates public profile URL without camera scanner (`frontend_web/src/pages/PublicTalentBoardPage.tsx`). | Owner scans worker QR to generate 14-day invitation link (`frontend_mobile/features/share/InviteFromWorkerQr.tsx:44`). | Expo only | Intended: Mobile app uses camera hardware to scan worker contact QRs. |
 
 ### Platforms per question
 | Question id | Platforms |
@@ -39,7 +39,7 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 | Calendar and directions | Sara opens a live or cached next shift | Opens a Google Calendar event editor or Google Maps directions if the shift has an address (`pr257:frontend_mobile/app/next-shifts.tsx:133`) | Expo flow | Links use the displayed row | Cached results show a warning. Both links remain available |
 | App lock | Lina returns after the app was inactive or in the background | Optional, off by default. Default delay is 60 seconds if enabled (`pr257:frontend_mobile/utils/appLock.ts:36`, `pr257:frontend_mobile/components/security/AppLockGate.tsx:172`) | Expo flow | Phone storage | Device biometrics or passcode unlock it |
 | Opening workspace | Grace or Tom opens the app | Fresh sign-in resets the persona. A restored session can reuse an eligible saved persona. Organisation routing and owner setup can take precedence (`pr257:frontend_mobile/app/login.tsx:71`, `pr257:frontend_mobile/app/index.tsx:24`) | Web picks its own route | Phone storage | Verification and an approved return link can change the destination |
-| Contact QR | Tom scans Sara's worker QR | A currently public worker listing and staff-management permission let him make a reusable 14-day application link (`pr257:frontend_mobile/features/share/InviteFromWorkerQr.tsx:43`, `:89`) | Expo flow | Public contacts use AsyncStorage and account sync. Invitation codes use device-only SecureStore | Eligible applicants still need pharmacy approval |
+| Contact QR | Tom scans Sara's worker QR | A currently public worker listing and staff-management permission let him make a reusable 14-day application link (`pr257:frontend_mobile/features/share/InviteFromWorkerQr.tsx:44`, `:89`) | Expo flow | Public contacts use AsyncStorage and account sync. Invitation codes use device-only SecureStore | Eligible applicants still need pharmacy approval |
 
 ## Questions
 
@@ -87,7 +87,7 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 ### GM27-Q05 — Should an invitation from a worker's QR be single-use?
 **Scenario:** Tom scans Sara's worker QR at a CPD event and taps “Invite to my pharmacy”.
-**What happens today:** Sara must have a currently public worker listing. With staff-management permission, Tom can share a reusable 14-day link. Any eligible recipient can apply through it. The pharmacy still approves each application (`pr257:frontend_mobile/features/share/InviteFromWorkerQr.tsx:43`, `:89`, `pr257:backend/memberships/views.py:252`).
+**What happens today:** Sara must have a currently public worker listing. With staff-management permission, Tom can share a reusable 14-day link. Any eligible recipient can apply through it. The pharmacy still approves each application (`pr257:frontend_mobile/features/share/InviteFromWorkerQr.tsx:44`, `:89`, `pr257:backend/memberships/views.py:252`).
 **Recommendation first: A.** Make that link single-use for Sara. Keep pharmacy approval.
 - **A (recommended):** Sara alone can use the link to submit one application within seven days. Tom's pharmacy still approves it.
 - **KEEP:** Sara or another eligible recipient can apply during the 14-day window. The pharmacy approves each application.

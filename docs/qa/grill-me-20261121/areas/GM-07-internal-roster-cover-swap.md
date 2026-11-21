@@ -20,11 +20,11 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Build draft roster week | Manager plans shifts on calendar grid (`frontend_web/src/components/roster/HorizontalCalendarGrid.tsx:28`). | Manager views and edits roster calendar (`frontend_mobile/app/manager/roster/calendar.tsx:1`). | Yes | — |
-| Validate and publish roster | Manager validates roster requirements and publishes week (`frontend_web/src/components/roster/RosterManagerOverview.tsx:79`). | Manager accesses published roster view (`frontend_mobile/app/attendance/published-roster.tsx:1`). | Yes | — |
+| Build draft roster week | Manager plans shifts on calendar grid (`frontend_web/src/components/roster/HorizontalCalendarGrid.tsx:28`). | Manager views and edits roster calendar (`frontend_mobile/app/manager/roster/calendar.tsx:3`). | Yes | — |
+| Validate and publish roster | Manager validates roster requirements and publishes week (`frontend_web/src/features/workforce/RosterPublishReviewDialog.tsx:81`). | Manager accesses published roster view (`frontend_mobile/app/attendance/published-roster.tsx:23`). | Yes | — |
 | Worker roster view & acknowledgement | Worker reviews schedule on roster grid (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:770`). | Worker sees the published roster in My Roster, with a notice linking to the acknowledgement screen (`frontend_mobile/app/my-roster.tsx:494`). | Yes | — |
 | Shift swap request | Worker requests a swap with a named colleague from the roster action dialog (`frontend_web/src/pages/dashboard/sidebar/RosterWorkerPage.tsx:113`). | Missing: My Roster offers leave, cover and claim only; a worker cannot request a swap (managers can approve swaps on Expo) (`frontend_mobile/app/my-roster.tsx:69-71`, `frontend_mobile/features/parity/roster.tsx:640`). | No | Corrected 22 Nov (orchestrator review): missing on Expo. Defect BL-34 (the app must carry every web feature), not an owner question. |
-| Roster audit trail | Manager overview records roster status and revision summaries (`frontend_web/src/components/roster/RosterPlanningToolbar.tsx:132`). | Mobile manager roster audit screen inspects historical changes (`frontend_mobile/app/manager/roster/audit.tsx:1`). | Yes | — |
+| Roster audit trail | Manager overview records roster status and revision summaries (`frontend_web/src/components/roster/RosterPlanningToolbar.tsx:132`). | Mobile manager roster audit screen inspects historical changes (`frontend_mobile/app/manager/roster/audit.tsx:3`). | Yes | — |
 
 ### Platforms per question
 | Question id | Platforms |

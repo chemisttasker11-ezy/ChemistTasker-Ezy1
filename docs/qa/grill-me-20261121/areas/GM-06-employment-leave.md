@@ -18,11 +18,11 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Create employment engagement | Manager configures employment terms and award rates in engagements panel (`frontend_web/src/features/workforce/EmploymentEngagementsPanel.tsx:150`). | Manager creates and views employment engagements (`frontend_mobile/app/workforce/employment-engagements/index.tsx:1`). | Yes | — |
-| Part-time contracted hours recording | Engagement terms dialog records agreed part-time hours (`frontend_web/src/pages/dashboard/sidebar/ShiftsBoard/components/ShiftEngagementTermsDialog.tsx:15`). | Mobile workforce settings records contracted hours for part-time staff (`frontend_mobile/app/workforce-settings.tsx:274`). | Yes | — |
-| Minimum staffing / coverage rules | Coverage panel displays pharmacy coverage requirements (`frontend_web/src/features/workforce/RosterCoveragePanel.tsx:20`). | Manager roster coverage screen reviews staffing coverage (`frontend_mobile/app/manager/roster/coverage.tsx:1`). | Yes | — |
+| Create employment engagement | Manager configures employment terms and award rates in engagements panel (`frontend_web/src/features/workforce/EmploymentEngagementsPanel.tsx:150`). | Manager creates and views employment engagements (`frontend_mobile/app/workforce/employment-engagements/index.tsx:3`). | Yes | — |
+| Part-time contracted hours recording | Engagement terms dialog records agreed part-time hours (`frontend_web/src/features/workforce/WorkforceSettingsPage.tsx:115`). | Mobile workforce settings records contracted hours for part-time staff (`frontend_mobile/app/workforce-settings.tsx:274`). | Yes | — |
+| Minimum staffing / coverage rules | Coverage panel displays pharmacy coverage requirements (`frontend_web/src/features/workforce/RosterCoveragePanel.tsx:20`). | Manager roster coverage screen reviews staffing coverage (`frontend_mobile/app/manager/roster/coverage.tsx:3`). | Yes | — |
 | Worker requests leave | Worker submits leave request in My Leave page (`frontend_web/src/features/workforce/MyLeavePage.tsx:6`). | Worker creates leave request with reason and date range (`frontend_mobile/app/my-leave.tsx:67`). | Yes | — |
-| Manager reviews and decides leave | Manager approves or rejects pending leave requests (`frontend_web/src/features/workforce/ManagerLeavePage.tsx:6`). | Manager reviews pending leave requests from workforce screen (`frontend_mobile/app/workforce/leave-requests.tsx:1`). | Yes | — |
+| Manager reviews and decides leave | Manager approves or rejects pending leave requests (`frontend_web/src/features/workforce/ManagerLeavePage.tsx:6`). | Manager reviews pending leave requests from workforce screen (`frontend_mobile/app/workforce/leave-requests.tsx:29`). | Yes | — |
 
 ### Platforms per question
 | Question id | Platforms |

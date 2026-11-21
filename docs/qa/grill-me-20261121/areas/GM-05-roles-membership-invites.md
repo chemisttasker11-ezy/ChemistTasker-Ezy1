@@ -21,11 +21,11 @@ Source for both web and Expo is `origin/agent/pr257-int` `21add924` (what merges
 
 | Flow | Web (Vite + Next) | Expo | Same? | If different |
 |---|---|---|---|---|
-| Direct email staff invite | Manager opens invite modal to send direct email invitation to staff (`frontend_web/src/pages/dashboard/sidebar/owner/InviteStaffModal.tsx:25`). | Manager sends invitation via staff management screen (`frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:41`). | Yes | — |
-| Shareable invite links | Manager generates shareable join link with role presets (`frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:339`). | Mobile app surfaces admin invitations screen to generate join links (`frontend_mobile/app/admin-invitations.tsx:1`). | Yes | — |
-| Promote staff to pharmacy manager | Owner promotes member to pharmacy admin/manager in staff list (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx:165`). | Manager assigns permissions on staff member profile (`frontend_mobile/app/manager/roster/staff.tsx:1`). | Yes | — |
-| Remove member from pharmacy | Owner deletes pharmacy admin or staff membership (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx:192`). | Manager removes staff member from roster directory (`frontend_mobile/app/admin/pharmacies/[id]/staff.tsx:1`). | Yes | — |
-| Locum & staff directory | Owner manages active pharmacy staff and locum memberships (`frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:144`). | Manager views pharmacy staff roster directory (`frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:502`). | Yes | — |
+| Direct email staff invite | Manager opens invite modal to send direct email invitation to staff (`frontend_web/src/pages/dashboard/sidebar/owner/InviteStaffModal.tsx:25`). | Manager sends invitation via staff management screen (`frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:444`). | Yes | — |
+| Shareable invite links | Manager generates shareable join link with role presets (`frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:339`). | Mobile app surfaces admin invitations screen to generate join links (`frontend_mobile/app/admin-invitations.tsx:5`). | Yes | — |
+| Promote staff to pharmacy manager | Owner promotes member to pharmacy admin/manager in staff list (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx:165`). | Manager assigns permissions on staff member profile (`frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:149`). | Yes | — |
+| Remove member from pharmacy | Owner deletes pharmacy admin or staff membership (`frontend_web/src/pages/dashboard/sidebar/owner/PharmacyAdmins.tsx:192`). | Manager removes staff member from roster directory (`frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:252`). | Yes | — |
+| Locum & staff directory | Owner manages active pharmacy staff and locum memberships (`frontend_web/src/pages/dashboard/sidebar/owner/StaffManager.tsx:144`). | Manager views pharmacy staff roster directory (`frontend_mobile/roles/shared/pharmacies/StaffManager.tsx:126`). | Yes | — |
 
 ### Platforms per question
 | Question id | Platforms |
