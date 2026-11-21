@@ -19,6 +19,11 @@
     "owner": "Expo device/media import boundary",
     "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
   },
+  "frontend_mobile/features/parity/finance.tsx|unresolved-client-transport|fetch|#2": {
+    "classification": "false-positive",
+    "owner": "Expo device/media import boundary",
+    "rationale": "This fetch reads a local DocumentPicker, ImagePicker, attachment or selected-image URI into a Blob for a subsequent SDK-owned FormData upload; it is NOT a Django or external domain HTTP request. The actual upload remains in named ethical/marketplace/finance/hub SDK operations. Keep this explicit finding so future URL changes still receive review."
+  },
   "frontend_mobile/features/parity/marketplace.tsx|unresolved-client-transport|fetch|#1": {
     "classification": "false-positive",
     "owner": "Expo device/media import boundary",

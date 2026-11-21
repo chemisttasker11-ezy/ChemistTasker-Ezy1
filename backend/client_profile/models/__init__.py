@@ -75,6 +75,5 @@ from client_profile.models.shifts import (
     ShiftSaved,
     LeaveRequest,
     WorkerShiftRequest,
+    ShiftSubmissionReceipt,
 )
-
-from client_profile.models.submission_receipt import ShiftSubmissionReceipt

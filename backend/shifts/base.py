@@ -4,7 +4,7 @@ import json
 
 from infrastructure.request_fingerprint import request_fingerprint
 from rest_framework.renderers import JSONRenderer
-from client_profile.models import ShiftSubmissionReceipt
+from shifts.models import ShiftSubmissionReceipt
 
 log = logging.getLogger(__name__)
 

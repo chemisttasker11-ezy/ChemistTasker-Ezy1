@@ -17,6 +17,7 @@ from shifts.models import (
     ShiftSaved,
     ShiftSlot,
     ShiftSlotAssignment,
+    ShiftSubmissionReceipt,
     WorkerShiftRequest,
     _assert_roster_assignment_mutable,
     _assert_roster_shift_mutable,
@@ -43,5 +44,6 @@ __all__ = [
     "ShiftCounterOfferSlot",
     "ShiftSaved",
     "LeaveRequest",
+    "ShiftSubmissionReceipt",
     "WorkerShiftRequest",
 ]

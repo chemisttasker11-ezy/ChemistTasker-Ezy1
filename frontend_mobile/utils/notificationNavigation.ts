@@ -295,7 +295,9 @@ export const resolveWorkforceNotificationRoute = ({
   if (!(timesheetId > 0) && actionUrl) {
     try {
       const url = new URL(actionUrl, 'http://localhost');
-      if (url.pathname.includes('/workforce/timesheets')) timesheetId = Number(url.searchParams.get('timesheet'));
+      if (url.pathname.includes('/workforce/timesheets')) {
+        timesheetId = Number(url.searchParams.get('timesheet'));
+      }
     } catch {
       // not a timesheet link
     }
