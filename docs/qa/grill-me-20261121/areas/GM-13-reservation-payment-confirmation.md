@@ -1,5 +1,8 @@
 # GM-13 — Reservation / payment confirmation — Full Grill Documentation
 
+> **Independent senior audit correction, 21 November 2026:** D02 and D03 are **ALREADY APPROVED** owner rules, not fresh questions. D02: >48 h before shift start gives 24 h to pay; 12–48 h gives 6 h; 2–12 h gives 2 h; <=2 h gives 30 min; deadline never extends past start. D03: on unpaid expiry, release to the SAME audience and notify manager and worker with no automatic escalation or penalty. `checkout_reservations.py` stores a Stripe provider expiry but not the D02 business deadline. Treat GM13-Q01/Q02 as **IMPLEMENTATION GAP and validation checkpoint**, not a prompt to choose Stripe 24h as an alternative to a settled policy. Preserve the original trace as historical source evidence. See [owner ledger](../OWNER_DECISION_LEDGER.md).
+
+
 **Area:** GM-13 Reservation/payment confirmation (Issue #250, area 13 of 26)
 **Method:** Issue #250 interview rules + PR #184 format; Web (Vite + Next) and Expo traced together in every question, side by side, including parity gaps.
 **Status:** TRACED + VALIDATED at PR #249 head. Decision status per question in Part C. No owner decision recorded yet. No code changed in this phase — documentation and decisions only. This file overwrites the 2026-11-21 partial, which was BLOCKED by a GitHub 429 before any current-code check.
