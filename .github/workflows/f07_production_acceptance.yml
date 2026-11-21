@@ -55,7 +55,7 @@ jobs:
           --health-retries 5
     steps:
       - name: Checkout exact F07 candidate
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.TESTED_SHA }}
           fetch-depth: 0
@@ -78,7 +78,7 @@ jobs:
           # Exact identity, migration scope and the F06 schema comparison remain.
 
       - name: Checkout exact F06 deployment baseline
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.F06_BASE_SHA }}
           path: .f06-baseline
@@ -228,7 +228,7 @@ jobs:
       DASHBOARD_PUBLIC_URL: http://127.0.0.1:4173
     steps:
       - name: Checkout exact F07 candidate
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.TESTED_SHA }}
           persist-credentials: false
@@ -379,7 +379,7 @@ jobs:
       FRONTEND_BASE_URL: https://chemisttasker.invalid
     steps:
       - name: Checkout exact F07 candidate
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.TESTED_SHA }}
           persist-credentials: false
