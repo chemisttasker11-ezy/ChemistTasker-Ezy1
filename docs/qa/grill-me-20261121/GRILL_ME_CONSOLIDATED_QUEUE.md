@@ -1,6 +1,6 @@
 # ChemistTasker Grill Me — consolidated queue (Issue #250)
 
-**Status: READY FOR PARENT'S OWN FINAL REVIEW — not yet shown to the owner, no PR/branch created.**
+**Status: DRAFT PR #267 — review assembled, independently audited, not owner-decided and not launch-signed-off. See `INDEPENDENT_SENIOR_AUDIT_2026-11-21.md` and `OWNER_DECISION_LEDGER.md` before asking any question.**
 **Head traced:** PR #249 API head `97c4543e051b43fe30ec7e2e61ad3d69957a918e` (`fix/pr248-expo-production-waves-20261104`, open draft). The PR body text naming a "working head `26cae2d6`" is the short SHA of the last listed implementation commit, not the branch head — every area traced at `97c4543e`.
 **Method:** 26 areas traced area by area (backend → Vite → Next → Expo, file/function/test/commit per claim), old #184 questions re-validated against current code before being asked, senior-reviewed (worker areas by the coordinator, re-run areas by the coordinator with independent spot-checks at head). Documentation/decisions only — no code changed.
 **Bases:** main `8ccf8f7` (last commit 3 Nov 2026), PR #249 head `97c4543e`.
@@ -9,36 +9,36 @@
 
 | Area | Status | Qs | First question (ask this first) | Deliverable file |
 |---|---|---|---|---|
-| GM-01 Sessions/auth | Traced + senior-reviewed (corrections applied) | 19 | GM01-Q04 — must a worker verify mobile before browsing anything? | `~/workspace/proactivity/chemisttasker-grill-gm01.md` |
-| GM-02 Worker onboarding/credentials | Traced + senior-reviewed (pass with corrections) | 24 (22 OPEN, 1 SETTLED ON-Q10, 1 UNVERIFIED ON-Q15) | ON-P03 — which AHPRA lookup runs at launch? | `~/workspace/grill-gm02/GM-02-worker-onboarding-credentials.md` |
-| GM-03 Pharmacy/owner setup | Traced + senior-reviewed (pass with corrections) | 12 | GM-03-Q01 — what must a pharmacy pass before posting to outside workers? | `~/workspace/chemisttasker-gm03-pharmacy-owner-setup.md` |
-| GM-04 Organisations/chains/regions | Traced (re-run) + senior-reviewed PASS | 12 | GM-04-Q01 — how do organisations join? | `~/workspace/GM-04-organisations-chains-regions.md` |
-| GM-05 Roles/membership/invites | Traced + senior-reviewed (pass with corrections) | 19 (16 OPEN, 2 NOT VERIFIED Q-16/Q-17, 1 code invariant Q-19) | Q-01 — should favourite locums be exempt from the AHPRA check on public shifts? | `~/workspace/chemisttasker-grill/gm-05-roles-membership-invites.md` |
-| GM-06 Employment/leave | Traced (re-run) + senior-reviewed PASS | 9 | GM-06-Q06 — when leave is approved, what happens to the rostered shift? | `~/workspace/GM-06-employment-leave.md` |
-| GM-07 Internal roster/cover/swap | Traced (re-run) + senior-reviewed PASS | 10 | GM-07-Q04 — must the swap/cover target accept before the manager approves? | `~/workspace/GM-07-internal-roster-cover-swap.md` |
-| GM-08 Attendance/kiosk | Traced (re-run) + senior-reviewed PASS | 11 | GM-08-Q01 — who may clock in; may a verified locum with no booking walk in and work? | `~/workspace/gm08-attendance-kiosk-trace-BLOCKED-rate-limit.md` |
-| GM-09 Timesheet/payroll | Traced (re-run) + senior-reviewed PASS | 10 | Q1 — who pays whom, and when? | `~/workspace/chemisttasker-grill-gm09/GM-09-timesheet-payroll.md` |
-| GM-10 Shift posting/rates | Traced (re-run) + senior-reviewed PASS | 12 | GM-10-Q03 — fixed vs negotiable rate | `~/workspace/GM-10-shift-posting-rates.md` |
-| GM-11 Audience/escalation | Traced (re-run) + senior-reviewed PASS | 13 | GM-11-Q01 — who is told on escalation, and when does it stop? | `~/workspace/goals/chemisttasker-grill-me/files/GM-11-audience-escalation-trace.md` |
-| GM-12 Interest/offers | Traced (re-run) + senior-reviewed PASS | 26 | GM-12-Q01 — where must Verified + current AHPRA be enforced? | `~/workspace/grill-me/GM-12-interest-offers.md` |
-| GM-13 Reservation/payment confirmation | Traced (re-run) + senior-reviewed PASS WITH NOTE | 13 | GM13-Q01 — D02 pay-by window does not exist; build D02 as decided | `~/workspace/grill-me-gm13-reservation-payment.md` |
-| GM-14 Terms/Award/GST/super | Traced (re-run) + senior-reviewed PASS | 12 | GM14-Q03 — does the pharmacy accept the same agreement? | `~/workspace/chemisttasker-grill/GM-14-terms-award-gst-super.md` |
-| GM-15 Cancellation/disputes/ratings | Traced + senior-reviewed PASS | 49 | GM15-01 — what cancellation can launch, given fees are not yet enforceable? | `~/workspace/grill-me/gm-15-cancellation-disputes-ratings.md` |
-| GM-16 Subscriptions/Pills/fees | Traced (re-run) + senior-reviewed PASS | 18 | GM16-Q01-FIRST — confirm launch price table exactly as coded | `~/workspace/grill-me-gm16-subscriptions-pills-fees.md` |
-| GM-17 Invoices/refunds | Traced + senior-reviewed PASS | 18 | GM17-Q01 — when a pharmacy cancels a paid booking, cash refund, platform credit, or nothing? | `~/workspace/grill-gm17-invoices-refunds.md` |
-| GM-18 Talent/recruitment | Traced + senior-reviewed PASS | 26 | GM-18-Q01 — who can see the talent board? | See note † below |
-| GM-19 Availability/matching | Traced (re-run) + senior-reviewed PASS | 13 | GM-19-Q03 — when does availability "match" a shift? | `~/workspace/grill-me/GM-19-availability-matching.md` |
-| GM-20 Chat/Hubs | Traced + senior-reviewed PASS | 19 | GM20-Q01 — who can start a direct chat with whom? | `~/workspace/grill-gm20-chat-hubs.md` |
-| GM-21 Ordinary/ethical marketplace | Traced (re-run) + senior-reviewed PASS | 20 | GM21-Q01 — launch scope (merged into LAUNCH-01, §2.1) | `~/workspace/grill-gm21/GM-21-ordinary-ethical-marketplace.md` |
-| GM-22 Notifications/rewards | Traced (re-run) + senior-reviewed PASS | 28 (Q07, Q15 NOT RE-VALIDATED; Q03 partial) | GM22-04 — which channels carry those notices? | `~/workspace/goals/chemisttasker-grill-me/files/GM-22-notifications-rewards-trace.md` |
-| GM-23 Calendars/operations | Traced (re-run) + senior-reviewed PASS | 29 | GM-23-01 — is the worker availability calendar the single live source of truth? (alt first: GM-23-23 timezone) | `~/workspace/grill-me/gm-23-calendars-operations.md` |
-| GM-24 Explorer/public | Traced + senior-reviewed PASS | 32 | GM-24-Q01 — what can Explorers ("new to pharmacy") do with shifts? | `~/workspace/grill-me/gm-24-explorer-public.md` |
-| GM-25 Web/Next/Expo parity/UX | Traced (re-run) + senior-reviewed PASS | 38 (C05, C06, C07, C10, C17, C18 NOT RE-VALIDATED) | GM25-Q01 — launch cut (merged into LAUNCH-01, §2.1) | `~/workspace/grill-me/GM-25-web-next-expo-parity.md` |
-| GM-26 Admin/privacy/security/release | Traced (re-run) + senior-reviewed PASS WITH NOTE | 48 (Q07, Q12–Q20, Q22–Q26, Q33 NOT RE-VALIDATED; Q43 pentest UNKNOWN) | GM26-Q36 — launch cut (merged into LAUNCH-01, §2.1) | `~/workspace/grill-me/GM-26-admin-privacy-security-release.md` |
+| GM-01 Sessions/auth | Traced + senior-reviewed (corrections applied) | 19 | GM01-Q04 — must a worker verify mobile before browsing anything? | [`areas/GM-01-sessions-auth.md`](areas/GM-01-sessions-auth.md) |
+| GM-02 Worker onboarding/credentials | Traced + senior-reviewed (pass with corrections) | 24 (22 OPEN, 1 SETTLED ON-Q10, 1 UNVERIFIED ON-Q15) | ON-P03 — which AHPRA lookup runs at launch? | [`areas/GM-02-worker-onboarding-credentials.md`](areas/GM-02-worker-onboarding-credentials.md) |
+| GM-03 Pharmacy/owner setup | Traced + senior-reviewed (pass with corrections) | 12 | GM-03-Q01 — what must a pharmacy pass before posting to outside workers? | [`areas/GM-03-pharmacy-owner-setup.md`](areas/GM-03-pharmacy-owner-setup.md) |
+| GM-04 Organisations/chains/regions | Traced (re-run) + senior-reviewed PASS | 12 | GM-04-Q01 — how do organisations join? | [`areas/GM-04-organisations-chains-regions.md`](areas/GM-04-organisations-chains-regions.md) |
+| GM-05 Roles/membership/invites | Traced + senior-reviewed (pass with corrections) | 19 (16 OPEN, 2 NOT VERIFIED Q-16/Q-17, 1 code invariant Q-19) | Q-01 — should favourite locums be exempt from the AHPRA check on public shifts? | [`areas/GM-05-roles-membership-invites.md`](areas/GM-05-roles-membership-invites.md) |
+| GM-06 Employment/leave | Traced (re-run) + senior-reviewed PASS | 9 | GM-06-Q06 — when leave is approved, what happens to the rostered shift? | [`areas/GM-06-employment-leave.md`](areas/GM-06-employment-leave.md) |
+| GM-07 Internal roster/cover/swap | Traced (re-run) + senior-reviewed PASS | 10 | GM-07-Q04 — must the swap/cover target accept before the manager approves? | [`areas/GM-07-internal-roster-cover-swap.md`](areas/GM-07-internal-roster-cover-swap.md) |
+| GM-08 Attendance/kiosk | Traced (re-run) + senior-reviewed PASS | 11 | GM-08-Q01 — who may clock in; may a verified locum with no booking walk in and work? | [`areas/GM-08-attendance-kiosk.md`](areas/GM-08-attendance-kiosk.md) |
+| GM-09 Timesheet/payroll | Traced (re-run) + senior-reviewed PASS | 10 | Q1 — who pays whom, and when? | [`areas/GM-09-timesheet-payroll.md`](areas/GM-09-timesheet-payroll.md) |
+| GM-10 Shift posting/rates | Traced (re-run) + senior-reviewed PASS | 12 | GM-10-Q03 — fixed vs negotiable rate | [`areas/GM-10-shift-posting-rates.md`](areas/GM-10-shift-posting-rates.md) |
+| GM-11 Audience/escalation | Traced (re-run) + senior-reviewed PASS | 13 | GM-11-Q01 — who is told on escalation, and when does it stop? | [`areas/GM-11-audience-escalation.md`](areas/GM-11-audience-escalation.md) |
+| GM-12 Interest/offers | Traced (re-run) + senior-reviewed PASS | 26 | GM-12-Q01 — where must Verified + current AHPRA be enforced? | [`areas/GM-12-interest-offers.md`](areas/GM-12-interest-offers.md) |
+| GM-13 Reservation/payment confirmation | Traced (re-run) + senior-reviewed PASS WITH NOTE | 13 | GM13-Q01 — D02 pay-by window does not exist; build D02 as decided | [`areas/GM-13-reservation-payment-confirmation.md`](areas/GM-13-reservation-payment-confirmation.md) |
+| GM-14 Terms/Award/GST/super | Traced (re-run) + senior-reviewed PASS | 12 | GM14-Q03 — does the pharmacy accept the same agreement? | [`areas/GM-14-terms-award-gst-super.md`](areas/GM-14-terms-award-gst-super.md) |
+| GM-15 Cancellation/disputes/ratings | Traced + senior-reviewed PASS | 49 | GM15-01 — what cancellation can launch, given fees are not yet enforceable? | [`areas/GM-15-cancellation-disputes-ratings.md`](areas/GM-15-cancellation-disputes-ratings.md) |
+| GM-16 Subscriptions/Pills/fees | Traced (re-run) + senior-reviewed PASS | 18 | GM16-Q01-FIRST — confirm launch price table exactly as coded | [`areas/GM-16-subscriptions-pills-fees.md`](areas/GM-16-subscriptions-pills-fees.md) |
+| GM-17 Invoices/refunds | Traced + senior-reviewed PASS | 18 | GM17-Q01 — when a pharmacy cancels a paid booking, cash refund, platform credit, or nothing? | [`areas/GM-17-invoices-refunds.md`](areas/GM-17-invoices-refunds.md) |
+| GM-18 Talent/recruitment | Traced + senior-reviewed PASS | 26 | GM-18-Q01 — who can see the talent board? | [`areas/GM-18-talent-recruitment-SENIOR-REVIEW-ONLY.md`](areas/GM-18-talent-recruitment-SENIOR-REVIEW-ONLY.md) |
+| GM-19 Availability/matching | Traced (re-run) + senior-reviewed PASS | 13 | GM-19-Q03 — when does availability "match" a shift? | [`areas/GM-19-availability-matching.md`](areas/GM-19-availability-matching.md) |
+| GM-20 Chat/Hubs | Traced + senior-reviewed PASS | 19 | GM20-Q01 — who can start a direct chat with whom? | [`areas/GM-20-chat-hubs.md`](areas/GM-20-chat-hubs.md) |
+| GM-21 Ordinary/ethical marketplace | Traced (re-run) + senior-reviewed PASS | 20 | GM21-Q01 — launch scope (merged into LAUNCH-01, §2.1) | [`areas/GM-21-ordinary-ethical-marketplace.md`](areas/GM-21-ordinary-ethical-marketplace.md) |
+| GM-22 Notifications/rewards | Traced (re-run) + senior-reviewed PASS | 28 (Q07, Q15 NOT RE-VALIDATED; Q03 partial) | GM22-04 — which channels carry those notices? | [`areas/GM-22-notifications-rewards.md`](areas/GM-22-notifications-rewards.md) |
+| GM-23 Calendars/operations | Traced (re-run) + senior-reviewed PASS | 29 | GM-23-01 — is the worker availability calendar the single live source of truth? (alt first: GM-23-23 timezone) | [`areas/GM-23-calendars-operations.md`](areas/GM-23-calendars-operations.md) |
+| GM-24 Explorer/public | Traced + senior-reviewed PASS | 32 | GM-24-Q01 — what can Explorers ("new to pharmacy") do with shifts? | [`areas/GM-24-explorer-public.md`](areas/GM-24-explorer-public.md) |
+| GM-25 Web/Next/Expo parity/UX | Traced (re-run) + senior-reviewed PASS | 38 (C05, C06, C07, C10, C17, C18 NOT RE-VALIDATED) | GM25-Q01 — launch cut (merged into LAUNCH-01, §2.1) | [`areas/GM-25-web-next-expo-parity-ux.md`](areas/GM-25-web-next-expo-parity-ux.md) |
+| GM-26 Admin/privacy/security/release | Traced (re-run) + senior-reviewed PASS WITH NOTE | 48 (Q07, Q12–Q20, Q22–Q26, Q33 NOT RE-VALIDATED; Q43 pentest UNKNOWN) | GM26-Q36 — launch cut (merged into LAUNCH-01, §2.1) | [`areas/GM-26-admin-privacy-security-release.md`](areas/GM-26-admin-privacy-security-release.md) |
 
-**Totals:** 540 questions as written across the 26 area files; **524 unique questions after de-duplication (§3)**. All OPEN; no owner decisions recorded for any question yet (except GM-02 ON-Q10 SETTLED by code, and GM-05 Q-19 which is a code invariant to confirm only, not a decision).
+**Totals:** 540 area-question entries as written; 524 after 16 enumerated merges (§3), **not yet globally de-duplicated**. Many are OPEN; other entries are UNVERIFIED, adopted reference-only or source-invariant checks. Existing 30 owner-carried decisions remain binding; no NEW owner answers were recorded in this PR.
 
-† GM-18: senior-review file is `~/workspace/chemisttasker-grill/senior-review-gm18-talent-recruitment.md` (verified findings, 26 questions GM-18-Q01–Q26). The worker trace file path was not recovered in this consolidation pass — locate it before the PR so the file index is complete.
+† GM-18: only the 39-line [senior-review summary](areas/GM-18-talent-recruitment-SENIOR-REVIEW-ONLY.md) was recovered. The original full area trace and 26 full question-and-alternative records are **missing** from this PR. This area is PARTIALLY VERIFIED, not COMPLETE; recover the trace or reconstruct it at the fixed code head before the owner interview.
 
 **Senior-review records:**
 - GM-01 corrections: `~/workspace/proactivity/chemisttasker-grill-gm01.md` (applied; see §4).
@@ -125,18 +125,18 @@
 **Owner:** GM-10 (Q03/Q12) — but ask only AFTER GM-09-Q01 (who pays whom, and when?) and the GM-14 Award floor (MA000012, hard-coded rates) are decided. The rate rule cannot be answered before the payer model and the Award floor are known.
 **Current behaviour:** FIXED shift can be created at $0.00 (`posting.py`: `validated_data['fixed_rate'] = default_fixed or weekday_rate or slot_rate or Decimal('0.00')`); no GST anywhere except an unused `gst_registered` flag; no tax invoice.
 
-### 2.11 PAYBY-01 — D02 pay-by window cascade (sequencing, not a merge)
+### 2.11 PAYBY-01 — D02/D03 binding implementation checkpoint (sequencing, not a new owner question)
 
-**Question:** What is the pay-by window, and what happens on expiry?
-**Owner:** GM-13 (Q01 — build D02 as decided) — decide FIRST; GM-16 Q05/Q07 and GM-19 alert timing adopt it. GM-13's finding (D02 does not exist; LA-P01 still valid and worse — cancel declines `ACCEPTED_AWAITING_PAYMENT` offers but never touches checkout/reservation or Stripe session) cascades to those areas.
-**Recommendation:** A — 24h/6h/2h/30min + expiry job + D03.
-**Pass-with-note (GM-13):** my own fetch of `backend/billing/checkout_reservations.py` failed (exit 1, cause unknown, not retried); the finding is corroborated three other ways, including my earlier read of `CELERY_BEAT_SCHEDULE` (no expiry/reservation job) and GM-12/GM-19 finding no `reservations.py`. The file should be re-read before the PR.
+**Previously APPROVED owner decisions (not open):** D02 — more than 48 h before shift start: 24 h to pay; 12–48 h: 6 h; 2–12 h: 2 h; 2 h or less: 30 minutes; NEVER beyond shift start. D03 — unpaid expiry releases the reserved occurrence to the SAME existing audience, NOT to a wider tier, with manager and worker notices, without an automatic penalty. Source: `docs/qa/shift-lifecycle/OWNER_DECISION_REGISTER.md` in the #184 history and #184 `docs/qa/launch-grill/questions.json`.
+**Actual code mismatch, confirmed independently:** At #249 head `97c4543e`, `backend/billing/checkout_reservations.py` (blob `715d1bac...`) has provider-reported Stripe session expiry but no D02 `pay_by` policy. A provider session TTL is not the owner-approved booking reservation policy; the trace also found no scheduled D02/D03 expiry runner. This is an implementation gap, **not an invitation to choose a new window**.
+**Disposition:** Maintain D02/D03 as APPROVED, IMPLEMENTATION GAP. GM-13 owns an idempotent deadline/expiration design; GM-16 Q05/Q07, GM-19 alert timing and GM-11 audience handling reference it. Recheck concurrent payment/expiry, failed webhook, stale sessions, cancelled holds, refund/reconciliation and checkout-orphan recovery before enabling live booking charges. Only ask the owner if a genuinely missing policy detail is isolated or they explicitly request a policy change. Never auto-escalate on D03 expiry.
 
-### 2.12 CARRIED-01 — carried decisions superseded by re-trace (supersession, not a merge)
+### 2.12 CARRIED-01 — owner-approved decisions vs implementation mismatches (no automatic supersession)
 
-**Question set:** GM-07 carried R04C/R04A/R06 and GM-15 LA-P01 are superseded by the re-trace — confirm the supersession, do not re-ask the old questions as if they were still open.
-**Owner:** GM-07 (Q04 decides R04C: the target never accepts, contradicting carried R04C; R04A has no mechanism — `auto_publish_worker_requests` is read by no backend code; R06 has no "needs cover" display) and GM-15/GM-13 (LA-P01 payment-reset is decided by PAYBY-01 + REFUND-01, §2.11/§2.5).
-**Rule applied everywhere:** a carried #184 decision that the re-trace proves false is recorded as SUPERSEDED with its evidence, not re-asked.
+**Source-of-truth rule:** An APPROVED owner business decision remains APPROVED until the owner explicitly changes it in a versioned binding decision ledger. Source code disagreeing with it is **IMPLEMENTATION GAP / SOURCE MISMATCH**, never `SUPERSEDED`. A supersession requires a new owner answer, old/new decision IDs and effective context; the implementation must not silently redefine the policy.
+**Confirmed drift:** R04C (swap/cover target must accept, pass role/conflict checks AND manager approve) is APPROVED but `backend/workforce/roster/worker_actions.py` at #249 transfers without the target's consent. R04A (owner-controlled outward cover publication per pharmacy) is APPROVED, yet the setting has no evidenced backend effect. R06 (same Shift/Slot shown as "needs cover" on release) is APPROVED but display not built. E01A (widened audiences retain earlier eligible visibility) is APPROVED but escalation visibility has a reported drift requiring a negative visibility test. D02/D03 are APPROVED but reservation expiry mechanics are missing.
+**GM-07-Q04 handling:** Track target acceptance as a **required implementation**, not an undecided yes/no policy. Ask only separately about an unsupplied timeout/decline detail, or a deliberate new proposal to change R04C; include the source and acceptance tests. LA-P01/AHPRA cancellation payment cleanup is a code gap and must respect D02/D03 and the still-open refund policy, not be silently called "superseded".
+**Release consequence:** A mismatch remains OPEN and blocks that affected production workflow according to severity. It is not closed by changing the documentation to match incomplete code.
 
 ### Ownership splits already resolved (not duplicates — recorded so they are not re-raised)
 
@@ -148,7 +148,7 @@
 
 ## 3. De-duplication accounting
 
-540 questions as written → **524 unique questions** after 16 merges:
+540 area-question entries as written → **524 entries after the 16 explicitly documented merges**. This is verified arithmetic, **not proof that 524 independent owner decisions remain**: cross-area adopted and repeated questions (notably GM-19/GM-23, GM-02/GM-24 and GM-18/GM-26) still require canonical-ID mapping. Distinguish OPEN, APPROVED, IMPLEMENTATION GAP, UNVERIFIED and duplicate/reference-only entries before counting owner decisions.
 
 | Merge | Questions merged | Removed |
 |---|---|---|
@@ -163,7 +163,7 @@
 | MOBILE-PARITY-01 (§2.9) | GM02 ON-Q15 + GM03-Q05 + GM05 Q-16 → 1 | −2 |
 | **Total** | | **−16** |
 
-Sequencing dependencies (§2.10 RATE-01, §2.11 PAYBY-01) and supersessions (§2.12 CARRIED-01) remove no questions — they order them.
+Sequencing dependencies (§2.10 RATE-01) and the D02/D03 implementation checkpoint (§2.11 PAYBY-01) do not create new owner questions; carried-rule implementation mismatches (§2.12 CARRIED-01) are not decision supersessions.
 
 ## 4. GM-01 senior-review corrections — applied to the GM-01 file
 
@@ -186,7 +186,7 @@ Ask the merged questions once, in this dependency order. Each area's remaining q
 7. **AHPRA-FAV-01** (§2.3, GM-05 Q-01) — favourite locums and the AHPRA check.
 8. **GM-24-Q01** — what Explorers can do with shifts.
 9. **OFFER-01** (§2.2) — firm offer vs enquiry.
-10. **PAYBY-01** (§2.11, GM13-Q01) — D02 pay-by window.
+10. **D02/D03 IMPLEMENTATION CHECKPOINT** (§2.11, GM13-Q01) — apply the already-approved deadline and same-audience expiry rules; ask the owner only genuinely missing operational details.
 11. **REFUND-01** (§2.5, GM17-Q01) — refund vs credit.
 12. **GM-09-Q01** — who pays whom, and when?
 13. **ACCEPT-01** (§2.6, GM14-Q03) — pharmacy acceptance of the agreement.
@@ -207,10 +207,10 @@ Ask the merged questions once, in this dependency order. Each area's remaining q
 ## 6. Honest caveats for the parent's final review
 
 - **Not re-validated — do not ask until re-validated:** GM-02 ON-Q15 (folded into MOBILE-PARITY-01, §2.9); GM-05 Q-16/Q-17 (Q-16 folded into §2.9; Q-17 after GM-18 Q15); GM-22 Q07, Q15, and Q03's cancel half; GM-25 C05, C06, C07, C10, C17, C18; GM-26 Q07, Q12–Q20, Q22–Q26, Q33. GM-26 Q43 (pentest) is UNKNOWN — nothing evidenced.
-- **GM-13 note:** parent's own fetch of `backend/billing/checkout_reservations.py` failed (exit 1, cause unknown, not retried); re-read before the PR.
+- **GM-13 note (closed at source-read level):** `backend/billing/checkout_reservations.py` was independently fetched at #249 head `97c4543e` (blob `715d1bac...`): provider expiry exists but D02 deadline does not. Runtime/Stripe replay and scheduled expiry still require verification.
 - **GM-26 note:** B62/B63/B65 negative tests, B64 fix verification, exact-head CI, live staging check, production env values, and Expo privacy parity are still open — the worker flags them itself.
 - **GM-21/GM-22 caveat:** `search_code` results reflect the default branch (`main`), not the PR head — flagged wherever a finding rests on search alone.
 - **GM-18 file path:** worker trace file not recovered in this pass — locate before the PR (§1, †).
 - **GM-01 file:** the GM-01 senior-review corrections (§4) are recorded here; verify they are present in the file itself before the PR.
 - **Legacy HTML page:** the Grill Me HTML artifact (`grill-me`) still carries the 142 stale #184 questions with the "Stale — re-trace needed" stamp; it is NOT the consolidated queue in this file. The PR should carry this consolidated queue (524 unique questions), not the stale 142.
-- **No owner decisions recorded yet** for any question. No PR/branch created. Owner not notified.
+- **No new owner answers recorded in this PR.** Historic APPROVED decisions remain binding: see `OWNER_DECISION_LEDGER.md`. PR #267 exists and is still draft. No app code, merges or deployments are authorised by these documents.
