@@ -208,6 +208,14 @@ test('R blog topic selector sends topic+kind and retains query on page two',asyn
   assert.equal(h.calls.at(-1).topic,'career');
   h.host.unmount();
 });
+test('public Learning feed requests the supported career topic (no learning topic exists)',async()=>{
+  const h=articleHarness('learning');
+  h.pages.push({results:[],next:null});
+  await h.render();
+  assert.equal(h.calls.at(-1).topic,'career');
+  assert.equal(h.calls.at(-1).kind,undefined);
+  h.host.unmount();
+});
 test('C failing article page two preserves first-page results and visible error',async()=>{
   const h=articleHarness('news');
   h.pages.push({results:[{...article(4),kind:'news'}],next:'/api/v1/public-hub/articles/?page=2'});

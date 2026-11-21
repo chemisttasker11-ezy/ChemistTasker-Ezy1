@@ -14,7 +14,7 @@ from talent.models import ExplorerPost
 
 
 def years_ago(years, days=0):
-    today = date.today()
+    today = timezone.localdate()  # same date source as ExplorerOnboarding.age(); date.today() differs near midnight
     return (today.replace(year=today.year - years) - timedelta(days=days)).isoformat()
 
 

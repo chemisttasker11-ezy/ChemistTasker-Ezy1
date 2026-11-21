@@ -36,8 +36,8 @@ export default function ArticleFeed({ section }: { section: 'learning' | 'blog' 
   const [moreError, setMoreError] = useState('');
   const kind: PublicContentKind | undefined = section === 'learning' ? undefined : section;
   // Learning is deliberately a separate feed query; public topics only apply
-  // to blog/news and must never rewrite the existing learning content policy.
-  const topic = section === 'learning' ? 'learning'
+  // to blog/news. Learning content is the 'career' topic ("Careers & learning"; there is no 'learning' topic).
+  const topic = section === 'learning' ? 'career'
     : selectedTopic === 'all' ? undefined : selectedTopic;
   const title = section === 'learning' ? 'Learning' : section === 'blog' ? 'Blog' : 'News';
 
