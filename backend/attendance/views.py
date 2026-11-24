@@ -37,6 +37,7 @@ from attendance.models import AttendanceSession
 
 from attendance.api_support import _get_kiosk_device_from_request, _unexpected_error_response  # noqa: F401
 from attendance.kiosk_api import (  # noqa: F401  (historical import path)
+    KioskNoticeCodeView,
     KioskActivateView,
     KioskRequestPairingCodeView,
     KioskPairWithCodeView,

@@ -213,6 +213,7 @@ export const API_ENDPOINTS = {
 
     // --- Authenticated Attendance / Roster V2 ---
     attendance: {
+        kioskNoticeCode: '/attendance/kiosk/notice-code/',
         workerStatus: '/attendance/worker/status/',
         workerClockIn: '/attendance/worker/clock-in/',
         workerBreakStart: '/attendance/worker/break-start/',

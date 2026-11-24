@@ -4,12 +4,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, HelperText, RadioButton, Text, TextInput } from 'react-native-paper';
 import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { RootPageHeader } from '@/components/RootPageHeader';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { attendance } from '@chemisttasker/shared-core';
 
 type Pharmacy = { id: number; name: string; has_pin: boolean };
 export default function AttendancePinScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ show_setup_code?: string }>();
+  const [setupCode, setSetupCode] = useState('');
+  const [codeError, setCodeError] = useState('');
+  useEffect(() => {
+    if (params.show_setup_code !== '1') return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    attendance.getNoticeCode('pin').then(data => { if (active) {
+      setSetupCode(data.code);
+      timer = setTimeout(() => { setSetupCode(''); setCodeError('This verification code has expired.'); }, Math.max(0, Date.parse(data.expires_at || '') - Date.now()));
+    } })
+      .catch(() => { if (active) setCodeError('This verification code is unavailable or expired.'); });
+    return () => { active = false; if (timer) clearTimeout(timer); setSetupCode(''); };
+  }, [params.show_setup_code]);
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [selected, setSelected] = useState('');
   const [pin, setPin] = useState('');
@@ -44,6 +58,8 @@ export default function AttendancePinScreen() {
     <RootPageHeader title="Attendance PIN" disabled={saving} />
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text variant="headlineMedium">Attendance PIN</Text>
+    {!!setupCode && <Text>Your kiosk verification code: {setupCode}</Text>}
+    {!!codeError && <HelperText type="error">{codeError}</HelperText>}
     <Text>Choose your pharmacy, then set a 4 to 6 digit PIN for its attendance terminal. This is separate from your account password.</Text>
     {loading && <ActivityIndicator accessibilityLabel="Loading pharmacy memberships" />}
     {!!loadError && <><HelperText type="error" accessibilityLiveRegion="polite">{loadError}</HelperText><Button onPress={load}>Reload pharmacies</Button></>}

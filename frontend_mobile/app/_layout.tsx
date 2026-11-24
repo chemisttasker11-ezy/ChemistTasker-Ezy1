@@ -546,7 +546,7 @@ function KioskLinkNotificationGate() {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data: any = response?.notification?.request?.content?.data || {};
       const route = String(data.kiosk_link_route || '');
-      if (route.startsWith('/kiosk-link?source=kiosk&')) {
+      if (/^\/kiosk-link\?source=kiosk&authorization_id=\d+$/.test(route) || route === '/attendance-pin?show_setup_code=1') {
         guardedNavigation(() => router.push(route as any));
       }
     });
