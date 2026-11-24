@@ -18,6 +18,7 @@ from django.utils import timezone
 from shifts.pricing import expand_shift_slots
 from shifts.finalize import finalize_shift_offer
 from shifts.events import payroll_activated
+from shifts.payment_deadlines import offer_payment_deadline
 from shifts.payroll import activation_work_dates
 from shifts.emails import (
     active_shift_url_for_user,
@@ -425,7 +426,8 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
 
             if requires_payment:
                 offer.status = ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT
-                offer.save(update_fields=['status', 'updated_at'])
+                offer.pay_by_at = offer_payment_deadline(offer, timezone.now())
+                offer.save(update_fields=['status', 'pay_by_at', 'updated_at'])
                 if shift.payment_status != 'PENDING':
                     shift.payment_status = 'PENDING'
                     shift.save(update_fields=['payment_status'])

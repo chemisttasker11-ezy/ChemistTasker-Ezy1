@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from users.task_dispatch import async_task
+from shifts.events import unpaid_offer_cancelled
 from shifts.interest import is_public_shift_member_access
 from shifts.models import ShiftOffer, ShiftSlotAssignment
 from shifts.notifications import notify_shift_managers
@@ -64,15 +65,24 @@ def cancel_upcoming_assignments(user, *, reason='their AHPRA registration is pau
                   if (not offer.slot_id or entry['slot'].pk == offer.slot_id)
                   and (not offer.offered_slot_date or entry['date'] == offer.offered_slot_date)]
         future = [(slot, day) for slot, day in future if upcoming(day, offer.offered_start_time or slot.start_time)]
-        if not future:
+        if not future and (not cancel or offer.status != ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT
+                           or offer.shift.slots.exists()):
             continue
         if not cancel:
             retained.update({(offer.shift_id, day): (offer.shift, day) for _, day in future})
             continue
         # Keep a partially worked recurring offer as historical evidence.
         if not offer.slot_assignments.exists() and not any((offer.shift_id, day) in retained for _, day in future):
+            update_fields = ['status', 'updated_at']
+            if offer.status == ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT:
+                # Keep a durable retry marker on legacy offers and release after dropping the AHPRA/offer locks.
+                offer.pay_by_at = offer.pay_by_at or timezone.now()
+                update_fields.append('pay_by_at')
+                transaction.on_commit(lambda shift_id=offer.shift_id, offer_id=offer.pk:
+                                      unpaid_offer_cancelled.send(sender=ShiftOffer, shift_id=shift_id, offer_id=offer_id),
+                                      robust=True)
             offer.status = ShiftOffer.Status.DECLINED
-            offer.save(update_fields=['status', 'updated_at'])
+            offer.save(update_fields=update_fields)
         for _, day in future:
             if (offer.shift_id, day) not in retained:
                 cancelled[(offer.shift_id, day)] = (offer.shift, day)

@@ -9,12 +9,15 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework.exceptions import APIException, ValidationError
 
+from shifts.escalation import ESCALATION_FIELD_MAP, allowed_tiers, resolve_current_index
 from shifts.models import Shift, ShiftOffer, ShiftSlotAssignment
+from shifts.notifications import notify_shift_users, shift_manager_recipients
+from shifts.payment_deadlines import offer_payment_deadline
 from shifts.pricing import expand_shift_slots
 from shifts.occurrences import accepted_occurrences
 from .models import FulfillmentCheckout, FulfillmentReservation
 from .release_guards import assert_can_create_shift_charge
-from .stripe_support import stripe, _stripe_object_value
+from .stripe_support import stripe, stripe_object_value
 from .checkout_prices import FULFILLMENT_PRICES
 
 log = logging.getLogger(__name__)
@@ -77,6 +80,9 @@ def prepare_checkout(*, shift_id, actor, offer_ids, parameters):
         ).select_related("shift").order_by("pk"))
         if len(offers) != len(offer_ids):
             raise ValidationError("The selected offers changed. Refresh before checkout.")
+        now = timezone.now()
+        if any(offer.pay_by_at and offer.pay_by_at <= now for offer in offers):
+            raise CheckoutConflict("The payment deadline has passed. Refresh the shift.")
         requested = set()
         for offer in offers:
             keys = occurrence_keys(offer)
@@ -122,17 +128,18 @@ def open_checkout(attempt):
         raise CheckoutConflict("This checkout has already been paid. Refresh the shift.")
     if attempt.state == FulfillmentCheckout.State.EXPIRED:
         raise CheckoutConflict("This checkout has expired. Refresh before creating another checkout.")
+    payable = ShiftOffer.objects.filter(pk__in=attempt.offer_ids, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+    if payable.exclude(pay_by_at__lte=timezone.now()).count() != len(attempt.offer_ids):
+        raise CheckoutConflict("The reserved work is no longer payable. Refresh the shift.")
     assert_can_create_shift_charge("fulfillment")
     if attempt.checkout_url:
         return attempt.checkout_url
     if timezone.now() - attempt.created_at >= timedelta(hours=23):
         raise CheckoutUncertain("The provider outcome requires reconciliation before another checkout can be created.")
     try:
-        session = stripe.checkout.Session.create(
-            **attempt.parameters, idempotency_key=f"shift-fulfillment:{attempt.pk}",
-        )
-        session_id = _stripe_object_value(session, "id")
-        url = _stripe_object_value(session, "url")
+        session = _create_provider_session(attempt)
+        session_id = stripe_object_value(session, "id")
+        url = stripe_object_value(session, "url")
         if not isinstance(session_id, str) or not session_id or not isinstance(url, str) or not url:
             raise ValueError("Checkout response is missing its identity or URL")
         # One locked decision: once the session id is saved here, operator recovery (which needs no id) is refused.
@@ -144,7 +151,7 @@ def open_checkout(attempt):
                 if current.stripe_session_id and current.stripe_session_id != session_id:
                     raise ValueError("The provider returned a different session for the same attempt")
                 current.stripe_session_id, current.checkout_url = session_id, url
-                expires = _stripe_object_value(session, "expires_at")
+                expires = stripe_object_value(session, "expires_at")
                 if isinstance(expires, (int, float)):
                     current.provider_expires_at = datetime.fromtimestamp(expires, tz=datetime_timezone.utc)
                 current.state = FulfillmentCheckout.State.OPEN
@@ -163,6 +170,12 @@ def open_checkout(attempt):
             state=FulfillmentCheckout.State.UNKNOWN,
         )
         raise CheckoutUncertain("Checkout acceptance is uncertain. Retry this unchanged request; do not create another payment.")
+
+
+def _create_provider_session(attempt):
+    return stripe.checkout.Session.create(
+        **attempt.parameters, idempotency_key=f"shift-fulfillment:{attempt.pk}",
+    )
 
 
 def _expire_orphaned_session(attempt_id, session_id):
@@ -194,26 +207,84 @@ def _reclaim_orphaned_attempt(attempt_id, session_id):
         attempt.save(update_fields=["stripe_session_id", "state", "updated_at"])
 
 
-def expire_checkout(attempt):
+def expire_checkout(attempt, *, recover=False):
     """Keep reservations until the provider confirms expiry and no payment."""
-    if not attempt.stripe_session_id:
-        raise CheckoutUncertain("Reconcile the original provider request before expiring this checkout.")
-    session = stripe.checkout.Session.retrieve(attempt.stripe_session_id)
-    if _stripe_object_value(session, "status") == "open":
-        session = stripe.checkout.Session.expire(attempt.stripe_session_id)
-    if (_stripe_object_value(session, "id") != attempt.stripe_session_id
-            or _stripe_object_value(session, "status") != "expired"
-            or _stripe_object_value(session, "payment_status") != "unpaid"):
-        raise CheckoutConflict("The provider has not confirmed an expired, unpaid checkout. Reconcile its payment first.")
     with transaction.atomic():
         # Same order as preparation/webhook: shift, then attempt/reservations.
-        Shift.objects.select_for_update().get(pk=attempt.original_shift_id)
+        Shift.objects.select_for_update().filter(pk=attempt.original_shift_id).first()
         current = FulfillmentCheckout.objects.select_for_update().get(pk=attempt.pk)
         if current.state == FulfillmentCheckout.State.COMPLETE or current.payment_id:
             raise CheckoutConflict("This checkout has already been paid.")
+        if current.state == FulfillmentCheckout.State.EXPIRED:
+            return
+        session_id = current.stripe_session_id
+        if not session_id and recover and timezone.now() - current.created_at < timedelta(hours=23):
+            # Replay the original key if a lost acknowledgment left the session ID unknown.
+            assert_can_create_shift_charge("fulfillment")
+            session_id = stripe_object_value(_create_provider_session(current), "id")
+        if not session_id:
+            raise CheckoutUncertain("Reconcile the original provider request before expiring this checkout.")
+        session = stripe.checkout.Session.retrieve(session_id)
+        if (stripe_object_value(session, "id") == session_id
+                and stripe_object_value(session, "status") == "open"
+                and stripe_object_value(session, "payment_status") in (None, "unpaid")):
+            session = stripe.checkout.Session.expire(session_id)
+        if (stripe_object_value(session, "id") != session_id
+                or stripe_object_value(session, "status") != "expired"
+                or stripe_object_value(session, "payment_status") != "unpaid"):
+            raise CheckoutConflict("The provider has not confirmed an expired, unpaid checkout. Reconcile its payment first.")
+        current.stripe_session_id = session_id
         current.state = FulfillmentCheckout.State.EXPIRED
-        current.save(update_fields=["state", "updated_at"])
-        current.reservations.update(active=False)
+        current.save(update_fields=["stripe_session_id", "state", "updated_at"])
+        current.reservations.filter(active=True).update(active=False)
+
+
+def expire_payment_reservation(shift_id, offer_id, *, now=None):
+    """Release a due or AHPRA-declined offer and any unpaid checkout covering it."""
+    now = now or timezone.now()
+    with transaction.atomic():
+        shift = Shift.objects.select_for_update().filter(pk=shift_id).first()
+        if shift is None:
+            return
+        offer = shift.offers.select_for_update(of=('self',)).filter(pk=offer_id).first()
+        if offer is None:
+            return
+        cancelled = offer.status == ShiftOffer.Status.DECLINED and offer.pay_by_at is not None
+        reserved_at = offer.engagement_terms_accepted_at or offer.updated_at
+        if not cancelled and (offer.status != ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT
+                              or (offer.pay_by_at or offer_payment_deadline(offer, reserved_at)) > now):
+            return
+        for attempt in shift.fulfillment_checkouts.exclude(state=FulfillmentCheckout.State.EXPIRED):
+            if offer_id not in attempt.offer_ids:
+                continue
+            try:
+                expire_checkout(attempt, recover=True)
+            except CheckoutConflict:
+                return  # Stripe or the ledger still owns the booking.
+            except Exception as exc:
+                log.warning("Could not confirm expiry for checkout %s (%s); retaining its holds", attempt.pk, type(exc).__name__)
+                return
+
+        shift_updates = {}
+        if not cancelled:
+            offer.status = ShiftOffer.Status.EXPIRED
+            offer.save(update_fields=['status', 'updated_at'])
+            tiers = allowed_tiers(shift.pharmacy)
+            wider_tiers = tiers[resolve_current_index(shift, tiers) + 1:]
+            shift_updates.update({ESCALATION_FIELD_MAP[tier]: None for tier in wider_tiers})
+            recipients = {user.pk: user for user in [offer.user, *shift_manager_recipients(shift)]}
+            notify_shift_users(recipients.values(), shift=shift, title="Shift payment deadline passed",
+                               body="The payment deadline passed and the unpaid reservation was released.",
+                               kind="shift_payment_expired", payload={'offer_id': offer.pk}, deliver_on_commit=True)
+
+        if shift.payment_status == 'PENDING' and not shift.offers.filter(
+            status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+        ).exists():
+            paid = (shift.offers.filter(status=ShiftOffer.Status.ACCEPTED).exists()
+                    or shift.payments.filter(payment_type='fulfillment', status='paid').exists())
+            shift_updates['payment_status'] = 'PAID' if paid else 'NOT_REQUIRED'
+        if shift_updates:
+            Shift.objects.filter(pk=shift.pk).update(**shift_updates)
 
 
 # open_checkout may still reach the provider at 23 h and a session stays payable for 24 h (no expires_at is set).
@@ -242,6 +313,9 @@ def expire_unreconciled_checkout(attempt):
 
 def guard_fulfillment(*, offer, checkout_id=None):
     """Called under the booking owner's shift lock, including free/pill booking."""
+    if (checkout_id is None and offer.status == ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT
+            and offer.pay_by_at and offer.pay_by_at <= timezone.now()):
+        raise ValidationError({'code': 'payment_deadline_passed', 'detail': 'The payment deadline has passed.'})
     release_cancelled_paid_work(offer.shift_id)
     keys = occurrence_keys(offer)
     whole = f"{offer.shift_id}:whole"
@@ -287,12 +361,12 @@ def bind_paid_checkout(session, metadata, payment):
         normalize = lambda value: "" if value is None else str(value)
         if normalize(expected.get(field)) != normalize(metadata.get(field)):
             return attempt, "checkout_metadata_mismatch"
-    session_id = _stripe_object_value(session, "id")
+    session_id = stripe_object_value(session, "id")
     if not session_id or attempt.stripe_session_id not in (None, session_id):
         return attempt, "checkout_session_mismatch"
-    if _stripe_object_value(session, "currency") != "aud":
+    if stripe_object_value(session, "currency") != "aud":
         return attempt, "checkout_currency_mismatch"
-    if _stripe_object_value(session, "amount_total") != attempt.expected_amount_cents:
+    if stripe_object_value(session, "amount_total") != attempt.expected_amount_cents:
         return attempt, "checkout_amount_mismatch"
     if attempt.payment_id not in (None, payment.pk):
         return attempt, "duplicate_paid_checkout_intent"

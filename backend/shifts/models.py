@@ -702,6 +702,7 @@ class ShiftOffer(models.Model):
         related_name="generated_shift_offers",
     )
     expires_at = models.DateTimeField(null=True, blank=True)
+    pay_by_at = models.DateTimeField(null=True, blank=True, db_index=True)
     last_buzzed_at = models.DateTimeField(null=True, blank=True)
     payment_preference_snapshot = models.CharField(max_length=10, blank=True)
     settlement_channel = models.CharField(max_length=16, blank=True)

@@ -269,6 +269,10 @@ CELERY_TASK_ROUTES = {
     "onboarding.tasks.verify_skill_certificate_task": {"queue": "ocr"},
 }
 CELERY_BEAT_SCHEDULE = {
+    'expire-shift-payment-reservations': {
+        'task': 'billing.tasks.expire_payment_reservations',
+        'schedule': 60.0,
+    },
     'cleanup-pitch-receipts-daily': {
         'task': 'talent.tasks.cleanup_expired_pitch_receipts',
         'schedule': crontab(hour=2, minute=30),
