@@ -32,6 +32,7 @@ def is_web_client(request):
 
 
 _is_web_client = is_web_client
+TRUSTED_DEVICE_COOKIE = "ct_trusted_device"
 
 
 def issue_session_tokens(request, refresh, *, remember_me=False):
@@ -100,7 +101,7 @@ def _cookie_kwargs():
     return kwargs
 
 
-def _set_auth_cookies(response, *, access_token, refresh_token):
+def set_auth_cookies(response, *, access_token, refresh_token):
     # Both tokens were issued by this response, even if their deadline has just passed.
     refresh = token_backend.decode(refresh_token, verify=False)
     persistent = refresh.get('session_kind') == 'native' or refresh.get('remember_me') is True
@@ -119,7 +120,18 @@ def _set_auth_cookies(response, *, access_token, refresh_token):
     )
 
 
-def _clear_auth_cookies(response):
+def set_trusted_device_cookie(response, token, max_age):
+    response.set_cookie(TRUSTED_DEVICE_COOKIE, token, max_age=max_age, **_cookie_kwargs())
+
+
+def clear_trusted_device_cookie(response):
+    kwargs = _cookie_kwargs()
+    response.delete_cookie(
+        TRUSTED_DEVICE_COOKIE, path=kwargs["path"], domain=kwargs.get("domain"), samesite=kwargs["samesite"],
+    )
+
+
+def clear_auth_cookies(response):
     cookie_kwargs = _cookie_kwargs()
     domain = cookie_kwargs.get("domain")
     path = cookie_kwargs.get("path", "/")
@@ -138,7 +150,7 @@ def _clear_auth_cookies(response):
     )
 
 
-def _build_authenticated_user_payload(user):
+def build_authenticated_user_payload(user, *, current_user=False):
     from users.serializers import serialize_org_memberships
 
     org_memberships = OrganizationMembership.objects.filter(user=user)
@@ -188,14 +200,17 @@ def _build_authenticated_user_payload(user):
     # Onboarding models depend on the users app: resolve this helper at call time,
     # so importing users.sessions cannot form a module-level app dependency cycle.
     from onboarding.services.work_profile import newcomer_type
-    capabilities = user_features().content_capabilities
-    member_hubs = user_features().member_hubs
+    extra = {}
+    if current_user:
+        extra = {
+            "content_capabilities": user_features().content_capabilities(user),
+            "eligible_hubs": user_features().member_hubs(user),
+            "public_community_enabled": bool(getattr(settings, "PUBLIC_COMMUNITY_ENABLED", False)),
+        }
 
     return {
+        **extra,
         "id": user.id,
-        "content_capabilities": capabilities(user),
-        "eligible_hubs": member_hubs(user),
-        "public_community_enabled": bool(getattr(settings, "PUBLIC_COMMUNITY_ENABLED", False)),
         "username": user.username,
         "email": user.email,
         "first_name": user.first_name,
@@ -211,3 +226,11 @@ def _build_authenticated_user_payload(user):
         "billing_active": is_billing_active(),
         "in_free_trial": is_in_free_trial(user),
     }
+
+
+_set_auth_cookies = set_auth_cookies
+_clear_auth_cookies = clear_auth_cookies
+
+
+def _build_authenticated_user_payload(user):
+    return build_authenticated_user_payload(user, current_user=True)

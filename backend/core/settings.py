@@ -338,7 +338,9 @@ AXES_COOLOFF_TIME = timedelta(hours=1)
 AXES_RESET_ON_SUCCESS = True
 AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
 AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
-AXES_SENSITIVE_PARAMETERS = ["username", "ip_address", "captcha_token", "recovery_code"]
+AXES_SENSITIVE_PARAMETERS = [
+    "username", "ip_address", "captcha_token", "recovery_code", "code", "challenge_token", "trusted_device_token",
+]
 
 PASSWORD_RESET_TIMEOUT = 60 * 60
 

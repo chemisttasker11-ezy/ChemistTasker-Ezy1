@@ -2,6 +2,7 @@
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.utils import timezone
 from access_control.pharmacy_roles import PharmacyAdminPolicy
 from access_control.admin_roles import validate_admin_user
 
@@ -201,3 +202,24 @@ class WebSocketTicket(models.Model):
 class RevokedSession(models.Model):
     session_id = models.CharField(max_length=255, primary_key=True)
     revoked_at = models.DateTimeField(auto_now_add=True)
+
+
+class UserSession(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="api_sessions")
+    sid = models.CharField(max_length=255, unique=True)
+    device_label = models.CharField(max_length=60)
+    client_kind = models.CharField(max_length=6, choices=[("web", "Web"), ("native", "Native")])
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+
+class UserTwoFactor(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
+    email_confirmed = models.BooleanField(default=False)
+    authenticator_confirmed = models.BooleanField(default=False)
+    email_code_hash = models.CharField(max_length=128, blank=True)
+    email_code_sent_at = models.DateTimeField(null=True, blank=True)
+    email_code_guesses = models.PositiveSmallIntegerField(default=0)
+    trusted_device_version = models.PositiveIntegerField(default=0)

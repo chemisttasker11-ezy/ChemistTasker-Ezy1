@@ -32,7 +32,7 @@ class SessionRefreshRevocationTests(TestCase):
                     rotated = self.refresh(str(original))
                     self.assertEqual(rotated.status_code, 200, rotated.data)
                     latest = rotated.data['refresh']
-                    with patch('users.api_auth.notify_auth_changed'):
+                    with patch('users.device_sessions.notify_auth_changed'):
                         logged_out = APIClient().post('/api/v1/users/logout/', {
                             'refresh': str(original) if stale_logout else latest,
                         }, format='json')

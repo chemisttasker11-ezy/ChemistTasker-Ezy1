@@ -12,9 +12,10 @@ import { fetchApi } from '../../transport/application';
 import type { CurrentUserApi } from '../../contracts/accounts';
 import type { ExplorerPostApi } from '../../types';
 import type { Collection } from '../../contracts/common';
+import { SESSION_SECURITY_ROUTES } from './sessionSecurity';
+import type { CompleteTwoFactorLogin, EmailCodeSent, LoginCredentials, LoginSession } from './sessionSecurity';
 
 export type BrowserIdentityTransport = { baseUrl: string; fetchImpl?: typeof fetch };
-type BrowserSessionResponse = { access: string; refresh?: string; user: any };
 const client = (options: BrowserIdentityTransport, credentials: RequestCredentials = 'same-origin', bearer?: string | null) =>
   createApiClient({
     baseUrl: options.baseUrl,
@@ -32,10 +33,28 @@ export async function browserCsrfToken(options: BrowserIdentityTransport): Promi
   return result.csrfToken;
 }
 export async function browserLoginSession(
-  options: BrowserIdentityTransport, payload: { email: string; password: string; remember_me: boolean },
-): Promise<BrowserSessionResponse> {
+  options: BrowserIdentityTransport, payload: Omit<LoginCredentials, 'device_name' | 'trusted_device_token'>,
+): Promise<LoginSession> {
   const csrf = await browserCsrfToken(options);
-  return client(options, 'include').post<BrowserSessionResponse>(API_ENDPOINTS.login, payload, {
+  return client(options, 'include').post<LoginSession>(API_ENDPOINTS.login, payload, {
+    ...publicRequest,
+    headers: { ...browserLabel, 'X-CSRFToken': csrf },
+  });
+}
+export async function browserCompleteTwoFactorLogin(
+  options: BrowserIdentityTransport, payload: CompleteTwoFactorLogin,
+): Promise<LoginSession> {
+  const csrf = await browserCsrfToken(options);
+  return client(options, 'include').post<LoginSession>(SESSION_SECURITY_ROUTES.completeTwoFactorLogin, payload, {
+    ...publicRequest,
+    headers: { ...browserLabel, 'X-CSRFToken': csrf },
+  });
+}
+export async function browserSendTwoFactorLoginCode(
+  options: BrowserIdentityTransport, challenge_token: string,
+): Promise<EmailCodeSent> {
+  const csrf = await browserCsrfToken(options);
+  return client(options, 'include').post<EmailCodeSent>(SESSION_SECURITY_ROUTES.sendTwoFactorLoginCode, { challenge_token }, {
     ...publicRequest,
     headers: { ...browserLabel, 'X-CSRFToken': csrf },
   });

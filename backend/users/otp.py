@@ -101,6 +101,21 @@ def generate_otp() -> str:
     return f"{secrets.randbelow(900000) + 100000}"
 
 
+def deliver_two_factor_email(user, code):
+    from users.tasks import send_async_email
+
+    return deliver_email_best_effort(
+        send_async_email,
+        subject="Your ChemistTasker two-factor code",
+        recipient_list=[user.email],
+        template_name="emails/otp_email.html",
+        text_template="emails/otp_email.txt",
+        context={"otp": code},
+        event="two_factor_email",
+        user_id=user.pk,
+    )
+
+
 def normalize_au_mobile(raw: str) -> str:
     """
     Normalize Australian numbers to 61XXXXXXXXX format.

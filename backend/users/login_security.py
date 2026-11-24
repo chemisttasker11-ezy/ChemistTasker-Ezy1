@@ -3,6 +3,7 @@ responses built from it.
 
 Logs go to the historical "users.views" channel that operators filter on."""
 import logging
+from django.contrib.auth.signals import user_login_failed
 from axes.utils import reset as reset_axes_attempts
 from rest_framework import status
 from rest_framework.response import Response
@@ -243,4 +244,21 @@ def finish_login_attempt(request, *, email, password, attempt_state, response):
 
     if attempt_state and attempt_state["failures"] and not attempt_state["locked"]:
         reset_axes_attempts(ip=attempt_state["ip_address"], username=email)
+    return response
+
+
+def two_factor_attempt_state(request, user):
+    state = _get_login_attempt_state(request, {User.USERNAME_FIELD: user.email.lower()})
+    return state, _login_failure_response(state) if state and state["locked"] else None
+
+
+def record_two_factor_failure(request, user):
+    email = user.email.lower()
+    user_login_failed.send(
+        sender=__name__, credentials={User.USERNAME_FIELD: email}, request=request,
+    )
+    response = finish_login_attempt(request, email=email, password=None, attempt_state=None, response=None)
+    if response.status_code == status.HTTP_401_UNAUTHORIZED:
+        response.data.update(code="invalid_two_factor_code", detail="Invalid or expired two-factor code.")
+        response.data.pop("captcha_required", None)
     return response

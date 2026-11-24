@@ -6,7 +6,7 @@ from django.conf.urls.static import static
 from .sitemap import sitemap_web
 from .admin_site import otp_admin_site
 from two_factor.urls import urlpatterns as two_factor_urlpatterns
-from .two_factor_views import AdminAwareLoginView
+from .two_factor_views import AdminAwareLoginView, AdminTwoFactorProfileView
 from django.http import JsonResponse
 from django.db import connection
 from public_hub.attachment_access import HubMediaAccess
@@ -29,6 +29,11 @@ def health_check(request):
 two_factor_patterns, two_factor_app_name = two_factor_urlpatterns
 two_factor_patterns = list(two_factor_patterns)
 two_factor_patterns[0] = path('account/login/', AdminAwareLoginView.as_view(), name='login')
+two_factor_patterns = [
+    path('account/two_factor/', AdminTwoFactorProfileView.as_view(), name='profile')
+    if pattern.name == 'profile' else pattern
+    for pattern in two_factor_patterns
+]
 
 urlpatterns = [
     # Legacy raw chat uploads must never bypass participant authentication,

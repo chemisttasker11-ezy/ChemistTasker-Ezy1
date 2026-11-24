@@ -7,7 +7,7 @@ import logging
 from django.utils import timezone
 from django.contrib.sessions.models import Session
 from django.db import transaction
-from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+from users.device_sessions import sign_out_everywhere
 
 
 def _delete_storage_path(storage, name, *, field_name, user_id):
@@ -82,16 +82,7 @@ def _revoke_user_sessions(user):
         logging.getLogger("users.views").exception("Failed to revoke Django sessions for user %s", user.id)
 
 
-def _revoke_user_tokens(user):
-    try:
-        for token in OutstandingToken.objects.filter(user=user):
-            BlacklistedToken.objects.get_or_create(token=token)
-    except Exception:
-        logging.getLogger("users.views").exception("Failed to revoke JWT tokens for user %s", user.id)
-    from users.models import WebSocketTicket
-    from users.tokens import notify_auth_changed
-    WebSocketTicket.objects.filter(user=user).delete()
-    transaction.on_commit(lambda: notify_auth_changed(user.id))
+_revoke_user_tokens = sign_out_everywhere
 
 
 @transaction.atomic

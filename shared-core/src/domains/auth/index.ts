@@ -16,6 +16,7 @@ export {
   passwordReset,
   passwordResetConfirm,
 } from './api';
+export * from './sessionSecurity';
 export {
   getOnboarding,
   updateOnboarding,
