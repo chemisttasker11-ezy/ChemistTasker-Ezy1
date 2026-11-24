@@ -7,6 +7,7 @@ from users.models import OrganizationMembership
 
 from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability, user_can_manage_pharmacy
 from organizations.models import PharmacyAdmin
+from notifications.models import Notification
 from notifications.services import notify_users
 
 log = logging.getLogger(__name__)
@@ -107,14 +108,24 @@ def notify_shift_managers(
 
 
 def notify_worker_credentials(shift, worker, credentials):
+    """Tell each manager once per worker and shift. Callers hold the shift lock, so concurrent checks cannot repeat it."""
     if credentials is None:
         return
+    kind = "shift_worker_credentials_notice"
+    managers = shift_manager_recipients(shift)
+    notified = set(Notification.objects.filter(
+        user__in=managers, payload__notification_kind=kind, payload__shift_id=shift.pk, payload__worker_id=worker.pk,
+    ).values_list("user_id", flat=True))
+    managers = [manager for manager in managers if manager.pk not in notified]
+    if not managers:
+        return
     worker_name = worker.get_full_name() or worker.email
-    notify_shift_managers(
-        shift,
+    notify_shift_users(
+        managers,
+        shift=shift,
         title="Worker credentials need review",
         body=f"{worker_name} did not pass the booking credential check.",
-        kind="shift_worker_credentials_notice",
+        kind=kind,
         payload={"worker_id": worker.pk, "worker_credentials": credentials},
         deliver_on_commit=True,
     )

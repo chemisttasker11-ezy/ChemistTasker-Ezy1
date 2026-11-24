@@ -346,7 +346,9 @@ AXES_SENSITIVE_PARAMETERS = [
     "username", "ip_address", "captcha_token", "recovery_code", "code", "challenge_token", "trusted_device_token",
 ]
 
-PASSWORD_RESET_TIMEOUT = 60 * 60
+# Invitation links (first password) last as long as the invitation; reset links are limited to one hour.
+PASSWORD_RESET_TIMEOUT = 7 * 24 * 60 * 60
+PASSWORD_RESET_LINK_SECONDS = 60 * 60
 
 REST_FRAMEWORK = {
     # Preserve the established numeric ID wire contract through DRF 3.17's BigIntegerField mapping.

@@ -3,11 +3,13 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import vm from 'node:vm';
-import { bearerBelongsToDifferentUser, safeNext, loginHref, refreshBrowserSession, logoutSession } from '../landing_next/shared/browser-session.ts';
+import './load-shared-core.mjs';
 import { canAccessRoute } from '../src/components/routeAccess.ts';
 import { safeHubAttachmentUrl } from '../landing_next/lib/safe-hub-attachment.ts';
 import { resolveDashboardPath } from '../src/utils/dashboardPath.ts';
-import * as browserSession from '../landing_next/shared/browser-session.ts';
+
+const browserSession = await import('../landing_next/shared/browser-session.ts');
+const { bearerBelongsToDifferentUser, safeNext, loginHref, refreshBrowserSession, logoutSession } = browserSession;
 
 test('Next API fences a session change during CSRF lookup', async () => {
   const ts = createRequire(import.meta.url)('typescript');
