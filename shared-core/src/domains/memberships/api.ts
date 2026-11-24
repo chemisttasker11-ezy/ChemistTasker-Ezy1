@@ -27,11 +27,12 @@ export async function bulkInviteMembersService(payload: unknown) {
     const data = await bulkInviteMembers(payload);
     return data;
 }
-export function deleteMembership(id: number | string) {
-    return fetchApi(`/memberships/${id}/`, { method: 'DELETE' });
+export function deleteMembership(id: number | string, confirmedBookings?: 'keep') {
+    const query = confirmedBookings === 'keep' ? '?confirmed_bookings=keep' : '';
+    return fetchApi(`/memberships/${id}/${query}`, { method: 'DELETE' });
 }
-export async function deleteMembershipService(membershipId: number | string) {
-    await deleteMembership(membershipId);
+export async function deleteMembershipService(membershipId: number | string, confirmedBookings?: 'keep') {
+    await deleteMembership(membershipId, confirmedBookings);
 }
 export function getMembershipInviteLinks(params?: Record<string, unknown>) {
     const query = buildQuery(params);

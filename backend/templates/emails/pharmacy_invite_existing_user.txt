@@ -9,6 +9,9 @@ Please review this invitation from Manage Memberships. You can accept it if you 
 Review invitation: {{ membership_url|default:frontend_dashboard_link }}
 
 You will not get member access to this pharmacy until you accept the invitation.
+{% if expired_application_url %}
+This invitation is open for seven days. After it expires, sign in and apply to join: {{ expired_application_url }}
+{% endif %}
 
 If you have any questions or need assistance, our team is always happy to help.
 

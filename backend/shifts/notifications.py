@@ -29,7 +29,7 @@ def shift_url_for_user(shift, user) -> str:
     return f"/dashboard/owner/shifts/{shift.id}"
 
 
-def shift_manager_recipients(shift) -> list:
+def shift_manager_recipients(shift, *, include_org_wide=True) -> list:
     users_by_id = {}
 
     def add(user):
@@ -50,7 +50,7 @@ def shift_manager_recipients(shift) -> list:
     if organization_id:
         for org_membership in OrganizationMembership.objects.filter(
             organization_id=organization_id,
-            role__in=["ORG_ADMIN", "CHIEF_ADMIN", "REGION_ADMIN"],
+            role__in=["ORG_ADMIN", "CHIEF_ADMIN", "REGION_ADMIN"] if include_org_wide else ["REGION_ADMIN"],
         ).select_related("user"):
             if user_can_manage_pharmacy(org_membership.user, shift.pharmacy):
                 add(org_membership.user)
@@ -98,8 +98,9 @@ def notify_shift_managers(
     kind: str,
     payload: dict | None = None,
     deliver_on_commit: bool = False,
+    include_org_wide: bool = True,
 ) -> list:
-    recipients = shift_manager_recipients(shift)
+    recipients = shift_manager_recipients(shift, include_org_wide=include_org_wide)
     notify_shift_users(recipients, shift=shift, title=title, body=body, kind=kind, payload=payload,
                        deliver_on_commit=deliver_on_commit)
     return recipients
@@ -117,4 +118,23 @@ def notify_worker_credentials(shift, worker, credentials):
         payload={"worker_id": worker.pk, "worker_credentials": credentials},
         deliver_on_commit=True,
     )
+
+
+def notify_shift_change(shift, *, kind, title, workers=(), already_notified=(), include_managers=True):
+    """Tell participants and followers once without disclosing worker or pharmacy details to followers."""
+    recipients = {user.pk: user for user in workers if user.is_active}
+    if include_managers:
+        recipients.update({
+            user.pk: user for user in shift_manager_recipients(shift, include_org_wide=False)
+            if user_can_manage_pharmacy(user, shift.pharmacy)
+        })
+    for row in shift.saved_by.filter(user__is_active=True).select_related("user"):
+        recipients.setdefault(row.user_id, row.user)
+    for user_id in already_notified:
+        recipients.pop(user_id, None)
+    if recipients:
+        notify_shift_users(
+            recipients.values(), shift=shift, title=title,
+            body="Open the shift to see its current details.", kind=kind,
+        )
 

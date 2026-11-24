@@ -18,6 +18,8 @@ class PharmacyFeatures:
     pricing_data_error: Callable
     can_manage_roster_pharmacy: Callable
     protect_pharmacy_shift_deletion: Callable
+    pharmacy_booking_impact: Callable
+    preserve_pharmacy_bookings: Callable
 
 
 _services: PharmacyFeatures | None = None

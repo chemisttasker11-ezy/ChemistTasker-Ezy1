@@ -20,7 +20,7 @@ def work_interval(pharmacy, work_date, start_time, end_time):
     return start, end
 
 
-def worker_issues(pharmacy, worker, work_date, start_time, end_time, role, exclude_assignment_id=None):
+def worker_issues(pharmacy, worker, work_date, start_time, end_time, role, exclude_assignment_id=None, *, allow_invited=False):
     """Validate planning/replacement eligibility; attendance has its own locum exception."""
     errors, warnings = [], []
     name = user_display_name(worker)
@@ -29,9 +29,10 @@ def worker_issues(pharmacy, worker, work_date, start_time, end_time, role, exclu
         errors.append({"type": kind, "message": message, "user_id": worker.pk,
                        "date": str(work_date), **details})
 
-    memberships = list(Membership.objects.filter(
-        user=worker, pharmacy=pharmacy, is_active=True, status=Membership.Status.ACCEPTED,
-    ).exclude(role="CONTACT"))
+    eligible = Q(is_active=True, status=Membership.Status.ACCEPTED)
+    if allow_invited:
+        eligible |= Membership.roster_invite_filter()
+    memberships = list(Membership.objects.filter(eligible, user=worker, pharmacy=pharmacy).exclude(role="CONTACT"))
     if not worker.is_active or not memberships:
         error("INACTIVE_MEMBERSHIP", f"Worker {name} requires an active accepted membership at this pharmacy.")
 

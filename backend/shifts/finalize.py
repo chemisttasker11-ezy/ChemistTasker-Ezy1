@@ -1,5 +1,6 @@
 """Finalising an accepted shift offer: assignments, rates and notifications."""
 from shifts.pricing import expand_shift_slots, get_locked_rate_for_slot
+from shifts.pharmacy_changes import booking_site
 from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
 from datetime import timedelta
 from decimal import Decimal
@@ -164,7 +165,10 @@ def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None, payment_complet
                     payment_preference_snapshot=staff_defaults.get('payment_preference_snapshot', offer.payment_preference_snapshot),
                     settlement_channel=staff_defaults.get('settlement_channel', offer.settlement_channel),
                     engagement_kind=staff_defaults.get('engagement_kind', offer.engagement_kind),
-                    engagement_terms_snapshot=staff_defaults.get('engagement_terms_snapshot', offer.engagement_terms_snapshot),
+                    engagement_terms_snapshot={
+                        **(staff_defaults.get('engagement_terms_snapshot', offer.engagement_terms_snapshot) or {}),
+                        'booking_site': booking_site(shift.pharmacy),
+                    },
                     engagement_terms_accepted_at=staff_defaults.get('engagement_terms_accepted_at', offer.engagement_terms_accepted_at),
                     payroll_activated_at=offer.payroll_activated_at,
                     source_offer=offer,

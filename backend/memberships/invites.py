@@ -8,8 +8,9 @@ operators and the public error-surface tests read.
 import logging
 
 from django.contrib.auth.tokens import default_token_generator
+from django.core import signing
 from django.db import transaction
-from django.utils.crypto import get_random_string
+from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
@@ -17,7 +18,7 @@ from rest_framework import serializers
 from users.task_dispatch import async_task
 from memberships.access import user_can_invite_members_to_pharmacy
 from memberships.labels import membership_role_label
-from memberships.models import Membership, MembershipApplication
+from memberships.models import DIRECT_INVITE_DURATION, Membership, MembershipApplication
 from memberships.role_resolution import membership_role_refusal
 from memberships.notifications import _frontend_base_url_for_notifications
 from memberships.serializers import (
@@ -34,8 +35,72 @@ from users.normalization import sanitize_email_text as clean_email
 logger = logging.getLogger("memberships.views")
 
 
+DIRECT_APPLICATION_PREFIX = "direct-"
+DIRECT_APPLICATION_SALT = "memberships.expired-direct-invite"
+
+
+def direct_invite_expiry(membership):
+    if membership.status != Membership.Status.PENDING or membership.invited_by_id is None:
+        return None
+    sent = membership.direct_invited_at
+    if sent is None:
+        if hasattr(membership, "admin_assignment"):
+            return None
+        sent = membership.created_at
+    return sent + DIRECT_INVITE_DURATION
+
+
+def direct_invite_expired(membership, now):
+    expires_at = direct_invite_expiry(membership)
+    return expires_at is not None and expires_at <= now
+
+
+def direct_application_token(membership):
+    sent = membership.direct_invited_at or membership.created_at
+    return DIRECT_APPLICATION_PREFIX + signing.dumps(
+        [membership.pk, sent.isoformat()], salt=DIRECT_APPLICATION_SALT,
+    )
+
+
+def expired_invite_from_token(token, *, for_update=False):
+    try:
+        pk, sent = signing.loads(token.removeprefix(DIRECT_APPLICATION_PREFIX), salt=DIRECT_APPLICATION_SALT)
+    except (signing.BadSignature, ValueError, TypeError):
+        return None
+    rows = Membership.objects.select_related("pharmacy", "invited_by")
+    if for_update:
+        rows = rows.select_for_update(of=("self",))
+    membership = rows.filter(pk=pk, pharmacy__isnull=False).first()
+    if not membership or not direct_invite_expired(membership, timezone.now()):
+        return None
+    if (membership.direct_invited_at or membership.created_at).isoformat() != sent:
+        return None
+    if not user_can_invite_members_to_pharmacy(membership.invited_by, membership.pharmacy):
+        return None
+    return membership
+
+
+def direct_application_category(membership):
+    return "FULL_PART_TIME" if membership.is_pharmacy_staff_member else "LOCUM_CASUAL"
+
+
+def activate_first_password_invites(user):
+    """Join current direct invites when the invitee sets their first password."""
+    now = timezone.now()
+    remaining = MAX_ACTIVE_PHARMACY_MEMBERSHIPS - _count_active_memberships(user)
+    if remaining <= 0:
+        return
+    ids = list(Membership.objects.filter(
+        user=user, status=Membership.Status.PENDING, is_active=False, invited_by__isnull=False,
+        direct_invited_at__gt=now - DIRECT_INVITE_DURATION,
+    ).exclude(pharmacy__isnull=True).order_by("direct_invited_at", "pk").values_list("pk", flat=True)[:remaining])
+    Membership.objects.filter(pk__in=ids, status=Membership.Status.PENDING).update(
+        status=Membership.Status.ACCEPTED, is_active=True, responded_at=now, updated_at=now,
+    )
+
+
 @transaction.atomic
-def create_membership_invite(data, inviter, *, request=None):
+def create_membership_invite(data, inviter, *, request=None, source_application_id=None):
     """
     Helper to create or invite a user as a membership and send emails.
     Returns: (membership_instance, None) if successful, (None, error_message) if not.
@@ -65,7 +130,6 @@ def create_membership_invite(data, inviter, *, request=None):
         except Pharmacy.DoesNotExist:
             return None, 'Pharmacy not found.'
 
-        source_application_id = data.get('source_application_id')
         pending_application_qs = MembershipApplication.objects.filter(
             pharmacy=pharmacy,
             email__iexact=email,
@@ -84,8 +148,6 @@ def create_membership_invite(data, inviter, *, request=None):
         # Pharmacy locks alone do not coordinate two simultaneous invites to
         # different pharmacies for the same existing user.
         user = User.objects.select_for_update().filter(email__iexact=email).first()
-        user_created = False
-        
         if not user:
             try:
                 if role == "PHARMACIST":
@@ -97,11 +159,10 @@ def create_membership_invite(data, inviter, *, request=None):
 
                 user = User.objects.create_user(
                     email=email,
-                    password=get_random_string(12),
+                    password=None,
                     role=user_role,
                     is_otp_verified=False,
                 )
-                user_created = True
             except Exception:
                 logger.exception(
                     "Membership invite: user creation failed (inviter_id=%s pharmacy_id=%s)",
@@ -121,8 +182,9 @@ def create_membership_invite(data, inviter, *, request=None):
 
         # Membership exists?
         existing_membership = Membership.objects.filter(user=user, pharmacy_id=pharmacy_id).first()
+        now = timezone.now()
         if existing_membership:
-            if existing_membership.status == Membership.Status.PENDING:
+            if existing_membership.status == Membership.Status.PENDING and not direct_invite_expired(existing_membership, now):
                 return None, 'This user already has a pending invitation for this pharmacy.'
             if existing_membership.status == Membership.Status.ACCEPTED and existing_membership.is_active:
                 return None, 'User is already a member of this pharmacy.'
@@ -146,8 +208,11 @@ def create_membership_invite(data, inviter, *, request=None):
             'intern_half': data.get('intern_half', None),
             'student_year': data.get('student_year', None),
         }
-        activate_immediately = bool(data.get('activate_immediately'))
-        if user_created or activate_immediately:
+        needs_first_password = not user.has_usable_password() and not user.is_otp_verified
+        activate_immediately = bool(data.get('activate_immediately')) and (
+            not needs_first_password or source_application_id is not None
+        )
+        if activate_immediately:
             membership_data['is_active'] = True
             membership_data['status'] = Membership.Status.ACCEPTED
         else:
@@ -166,7 +231,9 @@ def create_membership_invite(data, inviter, *, request=None):
         membership_serializer = MembershipSerializer(**serializer_kwargs)
         try:
             membership_serializer.is_valid(raise_exception=True)
-            membership = membership_serializer.save(invited_by=inviter)
+            membership = membership_serializer.save(
+                invited_by=inviter, direct_invited_at=None if activate_immediately else now, responded_at=None,
+            )
             if existing_membership:
                 membership.revoke_admin_access()
             desired_status = membership_data.get('status', Membership.Status.ACCEPTED)
@@ -215,11 +282,13 @@ def create_membership_invite(data, inviter, *, request=None):
                 "is_admin": is_admin_role,                    # <-- NEW
                 "admin_landing_url": admin_landing_url,       # <-- NEW
             }
+            if not activate_immediately:
+                context["expired_application_url"] = f"{base}/membership/apply/{direct_application_token(membership)}"
 
             recipient_list = [user.email]
 
 
-            if user_created:
+            if needs_first_password:
                 uid = urlsafe_base64_encode(force_bytes(user.pk))
                 token = default_token_generator.make_token(user)
                 context["magic_link"] = f"{base}/reset-password/{uid}/{token}/"

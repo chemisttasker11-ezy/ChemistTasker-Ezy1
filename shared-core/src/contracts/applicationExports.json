@@ -45,6 +45,7 @@
   "deleteChainService": "domains/organizations/api.ts",
   "fetchChainPharmaciesService": "domains/organizations/api.ts",
   "getPharmacyById": "domains/organizations/api.ts",
+  "getPharmacyBookingImpact": "domains/organizations/api.ts",
   "createPharmacy": "domains/organizations/api.ts",
   "updatePharmacy": "domains/organizations/api.ts",
   "lookupPharmacyAbn": "domains/organizations/api.ts",

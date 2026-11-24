@@ -70,6 +70,20 @@ def publish_roster_period(roster_period, published_by, force_warnings=False, *, 
         if period.status == RosterPeriod.Status.PUBLISHED:
             return period, validation
 
+        from shifts.engagement import staff_assignment_defaults
+        from workforce.roster.assignment_rates import refresh_assignment_rate
+        for assignment in get_roster_period_assignments(period).filter(
+            engagement_terms_snapshot__draft_invite_membership_id__isnull=False,
+        ).select_related("user", "slot"):
+            final_terms = staff_assignment_defaults(
+                user=assignment.user, pharmacy=period.pharmacy,
+                work_date=assignment.slot_date or assignment.slot.date,
+            )
+            for field, value in final_terms.items():
+                setattr(assignment, field, value)
+            assignment.save(update_fields=list(final_terms))
+            refresh_assignment_rate(assignment)
+
         # Update period
         period.status = RosterPeriod.Status.PUBLISHED
         period.published_at = timezone.now()

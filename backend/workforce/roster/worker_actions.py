@@ -13,6 +13,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from workforce.roster.permissions import is_authorized_attendance_manager
+from shifts.notifications import notify_shift_change
 from shifts.models import (
     LeaveRequest,
     Shift,
@@ -228,6 +229,13 @@ def approve_direct_swap(
                 "new_user_id": target_user.id,
             },
         )
+        transaction.on_commit(
+            lambda: notify_shift_change(
+                assignment.shift, kind="shift_swap_approved", title="Shift swap confirmed",
+                workers=(req.requested_by, target_user),
+            ),
+            robust=True,
+        )
 
     return assignment
 
@@ -348,6 +356,14 @@ def approve_cover_replacement(
             },
         )
 
+        transaction.on_commit(
+            lambda: notify_shift_change(
+                assignment.shift, kind="shift_cover_approved", title="Shift cover confirmed",
+                workers=(req.requested_by, replacement_user),
+            ),
+            robust=True,
+        )
+
     return assignment
 
 
@@ -426,6 +442,15 @@ def release_worker_from_assignment(
                 "shift_id": shift.id if shift else None,
             },
         )
+
+        if shift:
+            transaction.on_commit(
+                lambda: notify_shift_change(
+                    shift, kind="shift_worker_released", title="Shift updated",
+                    workers=(released_worker,),
+                ),
+                robust=True,
+            )
 
     return shift
 

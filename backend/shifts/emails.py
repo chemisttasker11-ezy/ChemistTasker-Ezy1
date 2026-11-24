@@ -11,6 +11,7 @@ from shifts.travel import (
 )
 from memberships.models import Membership
 from shifts.models import ShiftCounterOffer, ShiftInterest, ShiftOffer
+from shifts.notifications import notify_shift_change
 from users.task_dispatch import async_task
 from datetime import date, datetime, time
 from decimal import Decimal
@@ -424,6 +425,11 @@ def send_shift_updated_notifications(shift):
         ).values_list("user_id", flat=True)
     )
     user_ids.discard(getattr(shift, "created_by_id", None))
+    workers = [row.user for row in shift.slot_assignments.filter(user__is_active=True).select_related("user")]
+    notify_shift_change(
+        shift, kind="shift_updated", title="Shift updated",
+        workers=workers, already_notified=user_ids,
+    )
     if not user_ids:
         return
 

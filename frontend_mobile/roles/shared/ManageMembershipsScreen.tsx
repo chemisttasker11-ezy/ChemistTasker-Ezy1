@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Chip, Icon, Modal, Portal, Snackbar, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter, type Href } from 'expo-router';
 import {
   getMyMemberships,
   respondToMyMembership,
@@ -35,6 +36,7 @@ type Membership = {
   admin_capabilities?: string[];
   capabilities?: string[];
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'LEFT';
+  expired_invite_application_token?: string | null;
   pharmacy_detail?: {
     name?: string;
     suburb?: string | null;
@@ -65,6 +67,7 @@ function adminCapabilitiesText(membership: Membership) {
 }
 
 export default function ManageMembershipsScreen() {
+  const router = useRouter();
   const { user, refreshUser } = useAuth();
   const generationRef = useRef(0);
   const currentAccountRef = useRef(user?.id ?? null);
@@ -237,6 +240,7 @@ export default function ManageMembershipsScreen() {
           const pharmacy = membership.pharmacy_detail;
           const pending = membership.status === 'PENDING';
           const accepted = membership.status === 'ACCEPTED';
+          const applicationToken = membership.expired_invite_application_token;
           const hasAdminInvitation = adminInvitations.some((invitation) => invitation.membership_id === membership.id);
           const capabilitiesText = adminCapabilitiesText(membership);
           return (
@@ -256,7 +260,7 @@ export default function ManageMembershipsScreen() {
                     </Text>
                   </View>
                   <Chip compact style={[styles.chip, pending ? styles.pendingChip : accepted ? styles.acceptedChip : styles.neutralChip]}>
-                    {label(membership.status)}
+                    {applicationToken ? 'Expired' : label(membership.status)}
                   </Chip>
                 </View>
                 <Text style={styles.detail}>{[pharmacy?.suburb, pharmacy?.state, pharmacy?.postcode].filter(Boolean).join(', ') || 'Address details not provided'}</Text>
@@ -265,7 +269,12 @@ export default function ManageMembershipsScreen() {
                 ) : null}
                 <Text style={styles.detail}>Invited by {invitedBy(membership)}</Text>
                 <View style={styles.actions}>
-                  {pending && !hasAdminInvitation ? (
+                  {applicationToken ? (
+                    <Button mode="contained" style={styles.primaryButton} onPress={() => router.push(
+                      `/membership/apply/${encodeURIComponent(applicationToken)}` as Href
+                    )}>Apply to join</Button>
+                  ) : null}
+                  {pending && !applicationToken && !hasAdminInvitation ? (
                     <>
                       <Button mode="contained" icon="check-circle-outline" loading={actingKey === `membership-${membership.id}`} disabled={Boolean(actingKey)} onPress={() => runAction(membership, 'accept')} style={styles.primaryButton}>Accept</Button>
                       <Button mode="outlined" icon="close-circle-outline" disabled={Boolean(actingKey)} onPress={() => runAction(membership, 'reject')} textColor={theme.colors.error} style={styles.dangerOutline}>Reject</Button>

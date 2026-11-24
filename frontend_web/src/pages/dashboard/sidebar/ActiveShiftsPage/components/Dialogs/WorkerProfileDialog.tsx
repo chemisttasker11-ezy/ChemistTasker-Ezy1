@@ -1,6 +1,7 @@
 // The booked worker's profile in Shift Centre Confirmed and History: the same CandidateProfile as Review and Reveal.
 // Contact details and the CV come only with Confirmed (owner decision 2026-10-14); the backend leaves them out of History.
-import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@mui/material';
+import { useState } from 'react';
+import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from '@mui/material';
 import { FileText, Mail, MessageCircle, Phone } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { ShiftUser, ShiftWorkProfile } from '@chemisttasker/shared-core';
@@ -21,6 +22,7 @@ export function WorkerProfileDialog({ open, loading, profile, onClose, canMessag
   // Stay in the current workspace (/dashboard/owner, /dashboard/organization, /dashboard/admin/12).
   const base = /^\/dashboard\/(admin\/\d+|[a-z-]+)/.exec(location.pathname)?.[0] ?? '/dashboard/owner';
   const p = profile as (ShiftUser & Partial<ShiftWorkProfile>) | null;
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const name = [p?.firstName, p?.lastName].filter(Boolean).join(' ') || 'Booked worker';
   const hasContact = Boolean(p?.email || p?.phoneNumber || p?.resume);
   return (
@@ -32,6 +34,20 @@ export function WorkerProfileDialog({ open, loading, profile, onClose, canMessag
         ) : p ? (
           <Stack spacing={2.5}>
             <CandidateProfile name={name} bio={p.shortBio || undefined} profile={p as unknown as ShiftWorkProfile} />
+            {p.bookingDocumentsUrl && (
+              <Stack spacing={1} alignItems="flex-start">
+                <TextField label="Pharmacy documents link" value={p.bookingDocumentsUrl} fullWidth
+                  slotProps={{ input: { readOnly: true } }} onFocus={event => event.target.select()} />
+                {navigator.clipboard && (
+                  <Button variant="outlined" onClick={() => {
+                    const url = p.bookingDocumentsUrl;
+                    if (url) void navigator.clipboard.writeText(url).then(() => setCopiedUrl(url)).catch(() => undefined);
+                  }} sx={{ minHeight: 44 }}>
+                    {copiedUrl === p.bookingDocumentsUrl ? "Link copied" : "Copy link"}
+                  </Button>
+                )}
+              </Stack>
+            )}
             {hasContact && (
               <Box component="section" aria-labelledby="worker-contact" sx={{ pt: 2, borderTop: '1px solid var(--ct-border-color)' }}>
                 <Typography id="worker-contact" component="h4" sx={{ fontSize: 13, fontWeight: 600, color: 'var(--ct-text-primary)', mb: 1 }}>

@@ -134,6 +134,17 @@ class Pharmacy(models.Model):
                                 related_name='pharmacies'
                              )
     verified               = models.BooleanField(default=False)
+    marketplace_review_status = models.CharField(
+        max_length=10, blank=True, default="",
+        choices=[("APPROVED", "Approved"), ("REJECTED", "Rejected"), ("REVOKED", "Revoked")],
+    )
+    marketplace_review_note = models.TextField(blank=True)
+    marketplace_reviewed_at = models.DateTimeField(null=True, blank=True)
+    marketplace_reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+    )
+    marketplace_approval_number = models.CharField(max_length=80, blank=True)
+    marketplace_business_phone = models.CharField(max_length=32, blank=True)
     abn                    = models.CharField(max_length=20, blank=True, null=True)
     abn_entity_name        = models.CharField(max_length=255, blank=True, null=True)
     abn_entity_type        = models.CharField(max_length=100, blank=True, null=True)

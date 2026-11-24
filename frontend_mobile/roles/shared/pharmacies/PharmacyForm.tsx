@@ -37,6 +37,7 @@ import {
     createPharmacy,
     updatePharmacy,
     getPharmacyById,
+    getPharmacyBookingImpact,
     lookupPharmacyAbn,
     appendPharmacyFormFields,
     verifyPharmacyWriteReadback,
@@ -264,6 +265,18 @@ export default function PharmacyForm({
     const abnDigits = form.abn.replace(/\D/g, '');
     const abnInvalid = abnDigits.length > 0 && abnDigits.length !== 11;
     const abnIsLocked = abnLocked || abnConfirmedLocal;
+
+    const [bookingDates, setBookingDates] = useState<string[]>([]);
+    useEffect(() => {
+        let current = true;
+        setBookingDates([]);
+        if (mode === 'edit' && pharmacyId) {
+            void getPharmacyBookingImpact(pharmacyId).then(({ bookings }) => {
+                if (current) setBookingDates([...new Set(bookings.map(booking => booking.date))]);
+            }).catch(() => undefined);
+        }
+        return () => { current = false; };
+    }, [mode, pharmacyId]);
 
     // Initial Load
     useEffect(() => {
@@ -888,6 +901,11 @@ export default function PharmacyForm({
                             mobileWrap
                         />
                         {error ? <Text style={styles.error}>{error}</Text> : null}
+                        {bookingDates.length > 0 ? (
+                            <Text accessibilityLiveRegion="polite" variant="bodyMedium">
+                                Changes to the address or opening hours will notify booked workers for {bookingDates.join(', ')}. Their agreed shift location and hours stay the same.
+                            </Text>
+                        ) : null}
 
                         {/* Django may have saved data before readback fails.
                             Disable editing until GET-only reconciliation finishes;

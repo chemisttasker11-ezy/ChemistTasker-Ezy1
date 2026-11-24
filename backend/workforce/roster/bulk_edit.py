@@ -138,6 +138,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                             user=worker,
                             pharmacy=roster_period.pharmacy,
                             work_date=shift_date,
+                            allow_invited=True,
                         ),
                     )
                 changed_slots.add(new_slot.pk)
@@ -165,6 +166,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                     user=worker,
                     pharmacy=roster_period.pharmacy,
                     work_date=slot.date,
+                    allow_invited=True,
                 )
                 ShiftSlotAssignment.objects.update_or_create(
                     slot=slot,
@@ -294,6 +296,7 @@ def bulk_edit_roster_period(roster_period, operations, user):
                             user=worker,
                             pharmacy=roster_period.pharmacy,
                             work_date=target_date,
+                            allow_invited=True,
                         )
                         ShiftSlotAssignment.objects.update_or_create(
                             slot=slot,

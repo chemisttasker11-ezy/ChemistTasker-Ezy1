@@ -21,7 +21,12 @@ Set your password:
 
 {{ magic_link }}
 
-After you set your password, you’ll have immediate access to all community shifts for {{ pharmacy_name }}.
+{% if expired_application_url %}
+Set your password while your seven-day invitation is open to join {{ pharmacy_name }}.
+If the invitation has expired, sign in and apply to join: {{ expired_application_url }}
+{% else %}
+After you set your password, you can access your pharmacy workspace.
+{% endif %}
 {% endif %}
 
 We’re excited to have you on the team—welcome aboard!
