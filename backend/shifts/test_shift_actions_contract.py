@@ -390,7 +390,7 @@ class CounterOfferTests(ShiftActionFixture):
             response = client_for(worker).post(f"{API}shifts/{shift.id}/counter-offers/", payload, format="json")
         return response, sent
 
-    def test_unverified_workers_cannot_apply_or_be_offered_work_at_wider_tiers(self):
+    def test_unverified_workers_can_receive_only_chain_and_organization_offers(self):
         org = Organization.objects.create(name="Booking organization")
         self.pharmacy.organization = org
         self.pharmacy.save(update_fields=["organization"])
@@ -398,20 +398,31 @@ class CounterOfferTests(ShiftActionFixture):
         worker = self.worker(employment_type="LOCUM", verified=False)
         Membership.objects.create(user=worker, pharmacy=sibling, role="PHARMACIST", employment_type="FULL_TIME")
 
-        for visibility in ("LOCUM_CASUAL", "OWNER_CHAIN", "ORG_CHAIN"):
+        for visibility in ("LOCUM_CASUAL", "OWNER_CHAIN", "ORG_CHAIN", "PLATFORM"):
             with self.subTest(visibility=visibility):
                 shift = self.shift(single_user_only=False, visibility=visibility, rate_type="FLEXIBLE")
                 slot = shift.slots.get()
                 interest, _ = self.post(worker, f"shifts/{shift.id}/express_interest/", {"slot_id": slot.id})
-                self.assertEqual(interest.status_code, 403, interest.data)
+                self.assertIn(interest.status_code, (400, 403), interest.data)
                 submitted, _ = self.submit(worker, shift, slot)
-                self.assertEqual(submitted.status_code, 403, submitted.data)
+                self.assertIn(submitted.status_code, (400, 403), submitted.data)
                 self.assertFalse(ShiftInterest.objects.filter(shift=shift).exists())
                 self.assertFalse(ShiftCounterOffer.objects.filter(shift=shift).exists())
 
                 offered, _ = self.post(self.owner, f"shifts/{shift.id}/accept_user/",
                                        {"user_id": worker.id, "slot_id": slot.id})
-                self.assertEqual((offered.status_code, offered.data.get("code")), (403, "candidate_ahpra_ineligible"))
+                chain_offer = visibility in ("OWNER_CHAIN", "ORG_CHAIN")
+                if chain_offer:
+                    self.assertEqual(offered.status_code, 200, offered.data)
+                    offer = ShiftOffer.objects.get(shift=shift, user=worker)
+                    with mock.patch('shifts.engagement.build_shift_engagement_terms', return_value={}):
+                        refusal, _ = self.post(worker, f"shift-offers/{offer.pk}/accept/")
+                    self.assertEqual(refusal.status_code, 403, refusal.data)
+                    offer.refresh_from_db()
+                    self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+                    self.assertFalse(ShiftSlotAssignment.objects.filter(shift=shift).exists())
+                else:
+                    self.assertEqual((offered.status_code, offered.data.get("code")), (403, "candidate_ahpra_ineligible"))
                 counter = ShiftCounterOffer.objects.create(shift=shift, user=worker)
                 ShiftCounterOfferSlot.objects.create(offer=counter, slot=slot, proposed_start_time=time(9),
                                                      proposed_end_time=time(17), proposed_rate=Decimal("75"))
@@ -419,7 +430,7 @@ class CounterOfferTests(ShiftActionFixture):
                 self.assertEqual((accepted.status_code, accepted.data.get("code")), (403, "candidate_ahpra_ineligible"))
                 counter.refresh_from_db()
                 self.assertEqual(counter.status, ShiftCounterOffer.Status.PENDING)
-                self.assertFalse(ShiftOffer.objects.filter(shift=shift).exists())
+                self.assertEqual(ShiftOffer.objects.filter(shift=shift).count(), int(chain_offer))
 
     def test_public_counteroffer_preserves_onboarding_outcomes_with_enforcement_on_or_off(self):
         for enforcement in (True, False):

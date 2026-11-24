@@ -28,7 +28,13 @@ def offer_shift(*, shift, candidate, slot_id):
     is refreshed instead of duplicated; an expired one is closed first. Returns the response body."""
     from onboarding.verification.state import lock_public_ahpra
 
-    lock_public_ahpra(candidate, shift, manager=True)
+    group_tiers = ('OWNER_CHAIN', 'ORG_CHAIN')
+    if shift.visibility in group_tiers:
+        shift = Shift.objects.select_for_update().get(pk=shift.pk)
+        if shift.visibility not in group_tiers:
+            raise ShiftActionRefused('The shift audience changed. Refresh before sending this offer.', 409)
+    else:
+        lock_public_ahpra(candidate, shift, manager=True)
     if not _user_can_perform_shift_role(candidate, shift.role_needed):
         raise ShiftActionRefused('The candidate role does not cover this shift.')
     # For multi-slot shifts, auto-pick when possible (prefer unassigned)
