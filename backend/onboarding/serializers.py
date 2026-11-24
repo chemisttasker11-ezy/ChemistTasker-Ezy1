@@ -2,6 +2,8 @@
 
 
 from rest_framework import serializers
+
+from onboarding.services.indemnity import indemnity_status
 from onboarding.models import (
     ExplorerOnboarding,
     OtherStaffOnboarding,
@@ -242,6 +244,10 @@ class PharmacistOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
 
     skills = serializers.ListField(child=serializers.CharField(), required=False)
     skill_certificates = serializers.SerializerMethodField(read_only=True)
+    indemnity_status = serializers.SerializerMethodField()
+
+    def get_indemnity_status(self, obj):
+        return indemnity_status(obj)
    
     # write-only control flags
     tab = serializers.CharField(write_only=True, required=False)
@@ -255,6 +261,7 @@ class PharmacistOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
         "government_id": DOCUMENT_UPLOAD_POLICY,
         "identity_secondary_file": DOCUMENT_UPLOAD_POLICY,
         "resume": DOCUMENT_UPLOAD_POLICY,
+        "indemnity_certificate": DOCUMENT_UPLOAD_POLICY,
     }
 
     class Meta:
@@ -301,6 +308,7 @@ class PharmacistOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
             'rate_preference',
 
             # ---------- Profile preferences ----------
+            'indemnity_insurer', 'indemnity_expiry', 'indemnity_certificate', 'indemnity_status',
             'short_bio', 'resume',
 
             'verified','progress_percent','verification',
@@ -537,6 +545,17 @@ class OtherStaffOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
     # Skills
     skills = serializers.ListField(child=serializers.CharField(), required=False)
     skill_certificates = serializers.SerializerMethodField(read_only=True)
+    indemnity_status = serializers.SerializerMethodField()
+
+    def get_indemnity_status(self, obj):
+        return indemnity_status(obj)
+
+    def to_representation(self, instance):
+        result = super().to_representation(instance)
+        if result['indemnity_status'] is None:
+            for field in ('indemnity_insurer', 'indemnity_expiry', 'indemnity_certificate'):
+                result.pop(field, None)
+        return result
 
     # write-only control flags
     tab = serializers.CharField(write_only=True, required=False)
@@ -556,6 +575,7 @@ class OtherStaffOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
         "cpr_certificate": DOCUMENT_UPLOAD_POLICY,
         "s8_certificate": DOCUMENT_UPLOAD_POLICY,
         "resume": DOCUMENT_UPLOAD_POLICY,
+        "indemnity_certificate": DOCUMENT_UPLOAD_POLICY,
     }
 
     class Meta:
@@ -604,6 +624,7 @@ class OtherStaffOnboardingV2Serializer(RefreshVerifiedMixin, UploadValidationMix
             'years_experience',  
 
             # ---------- PROFILE ----------
+            'indemnity_insurer', 'indemnity_expiry', 'indemnity_certificate', 'indemnity_status',
             'short_bio','resume',
 
             'verified','progress_percent','verification',

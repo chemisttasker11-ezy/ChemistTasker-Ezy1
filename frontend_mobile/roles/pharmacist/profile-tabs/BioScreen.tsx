@@ -1,3 +1,4 @@
+import IndemnityCover from '../../../components/IndemnityCover';
 import React, { useEffect, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -126,6 +127,7 @@ export default function PharmacistBioScreen() {
           </Button>
         ) : null}
 
+        <IndemnityCover role="pharmacist" />
         {error ? <HelperText type="error">{error}</HelperText> : null}
         <Button mode="contained" onPress={save} loading={saving} disabled={saving}>Save Profile</Button>
       </ScrollView>
