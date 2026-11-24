@@ -94,6 +94,10 @@ server {
         proxy_pass http://chemisttasker_frontend;
     }
 
+    location ~ ^/(kiosk|kiosk-link|attendance-pin)/?$ {
+        proxy_pass http://chemisttasker_frontend;
+    }
+
     location /dashboard/ {
         proxy_pass http://chemisttasker_frontend;
     }

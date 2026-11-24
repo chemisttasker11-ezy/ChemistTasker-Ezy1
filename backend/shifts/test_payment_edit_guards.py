@@ -62,6 +62,16 @@ class Claim3BookedShiftPharmacyMove(_ShiftMixin, TestCase):
         self.assertEqual(assignment.shift.pharmacy_id, self.pharmacy.pk,
                          f"booked assignment moved to another pharmacy (PATCH {r.status_code})")
 
+    def test_failed_pricing_does_not_create_a_zero_rate_assignment(self):
+        from rest_framework.exceptions import ValidationError
+        from shifts.finalize import finalize_shift_offer
+
+        with patch('shifts.finalize.get_locked_rate_for_slot', return_value=(Decimal('0'), {'error': 'missing wage'})):
+            with self.assertRaises(ValidationError) as refusal:
+                finalize_shift_offer(self.booked)
+        self.assertEqual(refusal.exception.detail['code'], 'booking_rate_unavailable')
+        self.assertFalse(self.shift.slot_assignments.exists())
+
     def test_claim3_unmanaged_target_refused_control(self):
         stranger_owner, stranger_pharmacy = make_owner_with_pharmacy("Repro204 Stranger")
         self.book()

@@ -489,7 +489,7 @@ export default function StaffManager({
     if (!id) return;
     setDeleteLoadingId(id);
     try {
-      await deleteMembershipService(String(id));
+      await deleteMembershipService(String(id), "keep");
       setToast({ message: "Removed from the team.", severity: "success" });
       onMembershipsChanged();
     } catch (error: any) {
@@ -618,10 +618,10 @@ export default function StaffManager({
         title={confirmRemove ? `Remove ${confirmRemove.name}?` : "Remove team member?"}
         body={
           <>
-            They'll lose access to {pharmacyName || "this pharmacy"}'s roster, chat and hub. Their past shifts and timesheets stay on record. You can invite them again later.
+            They'll lose access to {pharmacyName || "this pharmacy"}'s roster, chat and hub. Confirmed bookings stay in place. To cancel or reassign any, close this dialog and review the roster first.
           </>
         }
-        confirmLabel="Remove"
+        confirmLabel="Remove and keep bookings"
         busyLabel="Removing…"
         busy={Boolean(deleteLoadingId)}
         onConfirm={() => confirmRemove && handleRemoveMembership(confirmRemove.id)}

@@ -185,6 +185,15 @@ test('return links preserve permitted destinations and reject external or login 
  for(const path of ['https://example.com','//example.com','/\\example.com','/login?next=/login','javascript:alert(1)','/hubs/../../login','/dashboard/owner/logout?workspace=internal&pharmacy_id=2','/dashboard/admin/1/logout/','/dashboard/pharmacist/%6cogout',null])assert.equal(safeNext(path),null);
 });
 
+test('sign-in preserves Vite kiosk notice destinations',()=>{
+ for(const path of ['/kiosk-link?source=kiosk&authorization_id=42','/attendance-pin?show_setup_code=1']){
+  assert.equal(safeNext(path),path);
+  assert.equal(new URL(loginHref(path),'https://example.test').searchParams.get('next'),path);
+ }
+ assert.equal(safeNext('/kiosk-link/other'),null);
+ assert.equal(safeNext('/attendance-pin/other'),null);
+});
+
 test('logout route cannot force generic dashboard return after a different user logs in',()=>{
  assert.equal(loginHref('/dashboard/owner/logout'),'/login');
  assert.equal(loginHref('/dashboard/admin/101/logout/?foo=bar'),'/login');

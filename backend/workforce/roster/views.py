@@ -200,7 +200,7 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
         controlled_pharmacies_query = managed_pharmacies_for(user)
 
         qs = Membership.objects.filter(
-            is_active=True,
+            Q(is_active=True, status=Membership.Status.ACCEPTED) | Membership.roster_invite_filter(),
             pharmacy__in=controlled_pharmacies_query
         )
 

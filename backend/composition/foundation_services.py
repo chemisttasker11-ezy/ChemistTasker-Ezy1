@@ -10,7 +10,7 @@ from billing import utils as billing_utils
 from marketplace import public_sitemap as marketplace_sitemap
 from public_hub import permissions as content_permissions, sitemap_sources as content_sitemap
 from rewards import registration, services as reward_services
-from shifts import access, cancellation, deletion, engagement, escalation, holidays, interest, pricing_data
+from shifts import access, cancellation, deletion, engagement, escalation, holidays, interest, pharmacy_changes, pricing_data
 from shifts import public_sitemap as shift_sitemap
 from talent import account_cleanup
 from workforce import award_rates, membership_services, permissions as workforce_permissions
@@ -47,6 +47,8 @@ def configure_foundation_services():
         pricing_data_error=lambda: pricing_data.PricingDataError,
         can_manage_roster_pharmacy=_live(workforce_permissions, 'can_manage_roster_pharmacy'),
         protect_pharmacy_shift_deletion=_live(deletion, 'protect_pharmacy_shift_deletion'),
+        pharmacy_booking_impact=_live(pharmacy_changes, 'pharmacy_booking_impact'),
+        preserve_pharmacy_bookings=_live(pharmacy_changes, 'preserve_pharmacy_bookings'),
     ))
     configure_employment_services(EmploymentServices(
         worker_payment_profile_status=_live(engagement, 'worker_payment_profile_status'),
@@ -54,6 +56,7 @@ def configure_foundation_services():
         latest_engagement=_live(membership_services, 'latest_engagement'),
         classification_options=_live(award_rates, 'classification_options'),
         resolve_award_schedule=_live(award_rates, 'resolve_award_schedule'),
+        future_confirmed_bookings=_live(pharmacy_changes, 'pharmacy_booking_impact'),
     ))
     configure_verification_features(VerificationFeatures(
         shift_refusal_type=lambda: access.ShiftActionRefused,

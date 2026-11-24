@@ -187,6 +187,7 @@ export {
   deleteChainService,
   fetchChainPharmaciesService,
   getPharmacyById,
+  getPharmacyBookingImpact,
   createPharmacy,
   updatePharmacy,
   lookupPharmacyAbn,

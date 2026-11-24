@@ -128,10 +128,14 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
     ]
 
     workers_map = {
-        m.user_id: {"worker_id": m.user_id, "worker_name": user_display_name(m.user),
-                    "role": m.role, "total_shifts": 0, "total_hours": 0.0, "shifts": []}
-        for m in Membership.objects.filter(pharmacy=pharmacy, status=Membership.Status.ACCEPTED,
-                                            is_active=True, user__is_active=True).exclude(role="CONTACT").select_related("user")
+        m.user_id: {"worker_id": m.user_id,
+                    "worker_name": user_display_name(m.user) + (" (Invited)" if m.status == Membership.Status.PENDING else ""),
+                    "role": m.role, "invited": m.status == Membership.Status.PENDING,
+                    "total_shifts": 0, "total_hours": 0.0, "shifts": []}
+        for m in Membership.objects.filter(
+            Q(is_active=True, status=Membership.Status.ACCEPTED) | Membership.roster_invite_filter(),
+            pharmacy=pharmacy, user__is_active=True,
+        ).exclude(role="CONTACT").select_related("user")
     }
     for a in assignments_list:
         uid = a.user_id
@@ -227,7 +231,7 @@ def get_roster_period_grid(pharmacy, week_start, week_end):
     }
 
 
-def validate_roster_period(roster_period):
+def validate_roster_period(roster_period, *, allow_invited=False):
     from workforce.roster.validation import worker_issues
     assignments = list(get_roster_period_assignments(roster_period))
     errors, warnings = [], []
@@ -235,7 +239,7 @@ def validate_roster_period(roster_period):
         found_errors, found_warnings = worker_issues(
             assignment.shift.pharmacy, assignment.user, assignment.slot_date or assignment.slot.date,
             assignment.slot.start_time, assignment.slot.end_time, assignment.shift.role_needed,
-            exclude_assignment_id=assignment.pk,
+            exclude_assignment_id=assignment.pk, allow_invited=allow_invited,
         )
         errors.extend(dict(item, assignment_id=assignment.pk) for item in found_errors)
         warnings.extend(dict(item, assignment_id=assignment.pk) for item in found_warnings)

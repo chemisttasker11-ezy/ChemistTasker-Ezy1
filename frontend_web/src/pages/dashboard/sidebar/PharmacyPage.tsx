@@ -62,6 +62,7 @@ import {
   getOnboarding,
   getPharmacyClaims,
   getPharmacyById,
+  getPharmacyBookingImpact,
   lookupPharmacyAbn,
   updatePharmacy,
   updatePharmacyClaim,
@@ -286,6 +287,18 @@ function PharmacyPageContent({
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Pharmacy | null>(null);
+  const [bookingDates, setBookingDates] = useState<string[]>([]);
+  const editingPharmacyId = editing?.id;
+  useEffect(() => {
+    let current = true;
+    setBookingDates([]);
+    if (editingPharmacyId) {
+      void getPharmacyBookingImpact(editingPharmacyId).then(({ bookings }) => {
+        if (current) setBookingDates([...new Set(bookings.map(booking => booking.date))]);
+      }).catch(() => undefined);
+    }
+    return () => { current = false; };
+  }, [editingPharmacyId]);
   const createIdempotencyKeyRef = useRef<string | null>(null);
   const [tabIndex, setTabIndex] = useState(0);
   const lastTabIndex = tabLabels.length - 1;
@@ -570,6 +583,11 @@ function PharmacyPageContent({
 
   const renderPharmacyFormSections = () => (
     <>
+      {editing && bookingDates.length > 0 && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Changes to the address or opening hours will notify booked workers for {bookingDates.join(", ")}. Their agreed shift location and hours stay the same.
+        </Alert>
+      )}
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}

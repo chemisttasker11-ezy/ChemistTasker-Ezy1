@@ -3,7 +3,7 @@ export type MagicMembershipInfo = {
   pharmacy: number;
   pharmacy_name: string;
   category: 'FULL_PART_TIME' | 'LOCUM_CASUAL';
-  expires_at?: string;
+  expires_at?: string | null;
   payroll_enabled?: boolean;
 };
 

@@ -7,6 +7,7 @@ from datetime import date, time, timedelta
 from decimal import Decimal
 from unittest import mock
 
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -15,7 +16,8 @@ from client_profile.characterization_support import make_owner_with_pharmacy, ma
 from memberships.models import Membership
 from shifts.models import Shift, ShiftInterest, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
-from workforce.roster.publication import republish_roster_shift, unpublish_roster_shift
+from workforce.roster.bulk_edit import bulk_edit_roster_period
+from workforce.roster.publication import publish_roster_period, republish_roster_shift, unpublish_roster_shift
 
 
 class RosterSlotHTTPContractTests(TestCase):
@@ -63,6 +65,34 @@ class RosterSlotHTTPContractTests(TestCase):
     def publish_fixture(self):
         # Build every slot while DRAFT, then exercise production unpublish/PATCH.
         RosterPeriod.objects.filter(pk=self.period.pk).update(status=RosterPeriod.Status.PUBLISHED)
+
+    def test_draft_can_plan_an_invited_worker_but_publication_waits_for_joining(self):
+        invited = make_user("PHARMACIST")
+        invited.set_unusable_password()
+        invited.is_otp_verified = False
+        invited.save(update_fields=["password", "is_otp_verified"])
+        membership = Membership.objects.create(
+            user=invited, pharmacy=self.pharmacy, invited_by=self.owner, role="PHARMACIST",
+            employment_type="FULL_TIME", is_active=False, status=Membership.Status.PENDING,
+            direct_invited_at=timezone.now(),
+        )
+        day = self.week + timedelta(days=1)
+        bulk_edit_roster_period(self.period, [{
+            "action": "create_shift", "date": str(day), "start_time": "09:00", "end_time": "17:00",
+            "role": "PHARMACIST", "user_id": invited.pk,
+        }], self.owner)
+        assignment = ShiftSlotAssignment.objects.get(user=invited, slot_date=day)
+        self.assertEqual(assignment.engagement_terms_snapshot["draft_invite_membership_id"], membership.pk)
+        with self.assertRaisesMessage(ValidationError, "active accepted membership"):
+            publish_roster_period(self.period, self.owner)
+
+        membership.status = Membership.Status.ACCEPTED
+        membership.is_active = True
+        membership.save(update_fields=["status", "is_active"])
+        publish_roster_period(self.period, self.owner)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.engagement_terms_snapshot["membership_id"], membership.pk)
+        self.assertNotIn("draft_invite_membership_id", assignment.engagement_terms_snapshot)
 
     def payload(self, **slot_overrides):
         return {

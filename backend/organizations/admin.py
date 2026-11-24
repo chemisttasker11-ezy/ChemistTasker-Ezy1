@@ -1,6 +1,9 @@
 """Django admin for the organizations app (moved from client_profile/admin.py)."""
+from django import forms
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
+from organizations.pharmacy_profile import record_marketplace_review, validate_marketplace_review
 
 
 @admin.register(Organization)
@@ -57,8 +60,24 @@ class ChainAdmin(admin.ModelAdmin):
     )
 
 
+class PharmacyMarketplaceReviewForm(forms.ModelForm):
+    class Meta:
+        model = Pharmacy
+        fields = "__all__"
+
+    def clean(self):
+        data = super().clean()
+        if "marketplace_review_status" in self.changed_data:
+            if self.instance.marketplace_review_status and not data.get("marketplace_review_status"):
+                raise ValidationError("Choose a review decision to change the existing decision.")
+            validate_marketplace_review(self.instance, data)
+        return data
+
+
 @admin.register(Pharmacy)
 class PharmacyModelAdmin(admin.ModelAdmin):
+    form = PharmacyMarketplaceReviewForm
+    readonly_fields = ("verified", "marketplace_reviewed_by", "marketplace_reviewed_at")
     list_display = (
         'name',
         'owner',
@@ -93,7 +112,18 @@ class PharmacyModelAdmin(admin.ModelAdmin):
                 'email',
             ),
         }),
+        ("Marketplace review", {
+            "fields": (
+                "marketplace_approval_number", "marketplace_business_phone", "marketplace_review_status",
+                "marketplace_review_note", "marketplace_reviewed_by", "marketplace_reviewed_at",
+            ),
+        }),
     )
+
+    def save_model(self, request, obj, form, change):
+        if "marketplace_review_status" in form.changed_data:
+            record_marketplace_review(obj, request.user)
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(PharmacyAdmin)

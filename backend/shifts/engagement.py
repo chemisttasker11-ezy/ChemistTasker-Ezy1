@@ -7,7 +7,8 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 
-from memberships.models import Membership
+from memberships.models import FAVORITE_STAFF_EMPLOYMENT_TYPES, Membership
+from organizations.chains import active_owner_chains_for_pharmacy
 from shifts.access import staff_membership_can_claim_role
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 
@@ -38,6 +39,20 @@ def direct_pharmacy_staff_membership(*, user, pharmacy):
     ).first()
 
 
+def outside_booking_source(user, pharmacy):
+    memberships = Membership.objects.filter(
+        user=user, is_active=True, status=Membership.Status.ACCEPTED,
+    )
+    if memberships.filter(pharmacy=pharmacy, employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES).exists():
+        return "FAVOURITE"
+    staff = memberships.filter(employment_type__in=PHARMACY_STAFF_TYPES)
+    if staff.filter(pharmacy__chains__in=active_owner_chains_for_pharmacy(pharmacy)).exists():
+        return "CHAIN"
+    if pharmacy.organization_id and staff.filter(pharmacy__organization_id=pharmacy.organization_id).exists():
+        return "ORGANISATION"
+    return "PUBLIC"
+
+
 ACCEPTED_TERMS_FIELDS = (
     "payment_preference_snapshot", "settlement_channel", "engagement_kind",
     "engagement_terms_snapshot", "engagement_terms_accepted_at", "unit_rate", "rate_reason",
@@ -58,12 +73,22 @@ def keep_accepted_terms(defaults, *, slot, slot_date):
     return defaults
 
 
-def staff_assignment_defaults(*, user, pharmacy, work_date):
+def staff_assignment_defaults(*, user, pharmacy, work_date, allow_invited=False):
     """Build the immutable payroll snapshot for a direct pharmacy-staff roster assignment."""
     if isinstance(work_date, str):
         work_date = date.fromisoformat(work_date)
 
     membership = direct_pharmacy_staff_membership(user=user, pharmacy=pharmacy)
+    if not membership and allow_invited:
+        invite = Membership.objects.filter(Membership.roster_invite_filter(), user=user, pharmacy=pharmacy).first()
+        if invite:
+            return {
+                "payment_preference_snapshot": PAYMENT_TFN,
+                "settlement_channel": SETTLEMENT_TIMESHEET_ONLY,
+                "engagement_kind": KIND_STAFF_EMPLOYMENT,
+                "engagement_terms_snapshot": {"draft_invite_membership_id": invite.pk},
+                "engagement_terms_accepted_at": None,
+            }
     if not membership:
         raise ValidationError({
             "user": (
@@ -76,6 +101,7 @@ def staff_assignment_defaults(*, user, pharmacy, work_date):
     if not getattr(pharmacy, "use_chemisttasker_payroll", False):
         snapshot = {
             "version": 1,
+            "booking_source": "STAFF",
             "engagement_kind": KIND_STAFF_EMPLOYMENT,
             "settlement_channel": SETTLEMENT_TIMESHEET_ONLY,
             "payment_preference": PAYMENT_TFN,
@@ -119,6 +145,7 @@ def staff_assignment_defaults(*, user, pharmacy, work_date):
 
     snapshot = {
         "version": 1,
+        "booking_source": "STAFF",
         "engagement_kind": KIND_STAFF_EMPLOYMENT,
         "settlement_channel": SETTLEMENT_PAYROLL,
         "payment_preference": PAYMENT_TFN,
@@ -605,6 +632,7 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
 
         return {
             "version": 1,
+            "booking_source": "STAFF",
             "acceptance_required": False,
             "engagement_kind": KIND_STAFF_EMPLOYMENT,
             "settlement_channel": SETTLEMENT_PAYROLL if payroll_enabled else SETTLEMENT_TIMESHEET_ONLY,
@@ -644,6 +672,7 @@ def build_shift_engagement_terms(*, shift, user, offer=None):
         "role": shift.role_needed,
         "shift_id": shift.id,
         "source_visibility": shift.visibility,
+        "booking_source": outside_booking_source(user, pharmacy),
         "occurrences": occurrences,
         "accepted_at": None,
         "accepted_by_user_id": None,

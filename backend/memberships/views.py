@@ -33,8 +33,13 @@ from memberships.access import (  # noqa: F401  (historical import path of the i
     user_can_invite_members_to_pharmacy,
     user_can_invite_members_to_pharmacy as _user_can_invite_members_to_pharmacy,
 )
-from memberships.applications import ApplicationRefused, approve_application, reject_application
-from memberships.invites import bulk_invite, create_membership_invite
+from memberships.applications import (
+    ApplicationRefused, apply_to_expired_invite, approve_application, reject_application, submit_application,
+)
+from memberships.invites import (
+    DIRECT_APPLICATION_PREFIX, bulk_invite, create_membership_invite,
+    direct_application_category, direct_invite_expired, expired_invite_from_token,
+)
 from memberships.notifications import (  # noqa: F401  (historical import path of the notification helpers)
     _format_membership_person,
     _frontend_base_url_for_notifications,
@@ -96,6 +101,8 @@ class MembershipViewSet(viewsets.ModelViewSet):
             locked = Membership.objects.select_for_update().get(pk=original.pk)
 
             will_be_active = serializer.validated_data.get("is_active", locked.is_active)
+            if will_be_active and locked.direct_invited_at and locked.status == Membership.Status.PENDING:
+                raise DRFValidationError({"is_active": "The worker needs to join from their invitation first."})
             if will_be_active and not locked.is_active:
                 active_count = _count_active_memberships(
                     locked.user,
@@ -112,7 +119,29 @@ class MembershipViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         """Remove membership access while preserving historical chat messages."""
-        self.get_object().remove()
+        original = self.get_object()
+        with transaction.atomic():
+            User.objects.select_for_update().only("pk").get(pk=original.user_id)
+            membership = get_object_or_404(Membership.objects.select_for_update(), pk=original.pk)
+            self.check_object_permissions(request, membership)
+            if membership.status == Membership.Status.PENDING:
+                membership.status = Membership.Status.REJECTED
+                membership.is_active = False
+                membership.responded_at = timezone.now()
+                membership.save(update_fields=["status", "is_active", "responded_at", "updated_at"])
+                membership.revoke_admin_access()
+            else:
+                if request.query_params.get("confirmed_bookings") != "keep" and membership.pharmacy_id:
+                    bookings = employment_services().future_confirmed_bookings(
+                        membership.pharmacy, user_id=membership.user_id,
+                    )
+                    if bookings:
+                        return Response({
+                            "code": "confirmed_bookings_need_decision",
+                            "detail": "Keep the confirmed bookings, or cancel or reassign them before removing this member.",
+                            "bookings": bookings,
+                        }, status=status.HTTP_409_CONFLICT)
+                membership.remove()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _create_membership_invite(self, data, inviter):
@@ -221,6 +250,17 @@ class MagicLinkInfoView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, token):
+        if token.startswith(DIRECT_APPLICATION_PREFIX):
+            membership = expired_invite_from_token(token)
+            if not membership:
+                return Response({'detail': 'This application link is unavailable.'}, status=410)
+            return Response({
+                'pharmacy': membership.pharmacy_id,
+                'pharmacy_name': membership.pharmacy.name,
+                'category': direct_application_category(membership),
+                'expires_at': None,
+                'payroll_enabled': bool(membership.pharmacy.use_chemisttasker_payroll),
+            })
         try:
             link = MembershipInviteLink.objects.get(token=token)
         except (MembershipInviteLink.DoesNotExist, DjangoValidationError):   # unknown token, or not a UUID at all
@@ -245,6 +285,12 @@ class SubmitMembershipApplication(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, token):
+        if token.startswith(DIRECT_APPLICATION_PREFIX):
+            try:
+                app = apply_to_expired_invite(request, token)
+            except ApplicationRefused as refusal:
+                return Response(refusal.body, status=refusal.status)
+            return Response(MembershipApplicationSerializer(app).data, status=201)
         try:
             link = MembershipInviteLink.objects.get(token=token)
         except (MembershipInviteLink.DoesNotExist, DjangoValidationError):   # unknown token, or not a UUID at all
@@ -252,14 +298,10 @@ class SubmitMembershipApplication(APIView):
         if not link.is_valid():
             return Response({'detail': 'Link expired or inactive.'}, status=410)
 
-        payload = request.data.copy()
-        payload['invite_link'] = link.pk  # serializer will lock category+pharmacy from link
-
         # Enforce membership limit for workers responding via magic link
-        email_raw = payload.get('email')
+        email_raw = request.data.get('email')
         if email_raw:
             email_clean = clean_email((email_raw or '').strip().lower())
-            payload['email'] = email_clean
             try:
                 existing_user = User.objects.get(email=email_clean)
             except User.DoesNotExist:
@@ -278,23 +320,7 @@ class SubmitMembershipApplication(APIView):
             # Serialize direct invites and link applications for the same pharmacy
             # so both paths cannot pass duplicate checks concurrently.
             Pharmacy.objects.select_for_update().get(pk=link.pharmacy_id)
-            serializer = MembershipApplicationSerializer(data=payload, context={'request': request})
-            serializer.is_valid(raise_exception=True)
-            app = serializer.save(
-                pharmacy=link.pharmacy,
-                category=link.category,
-                invite_link=link,
-                submitted_by=request.user if request.user.is_authenticated else None,
-            )
-
-            # async notify owner + admins only after the application commits
-            transaction.on_commit(
-                lambda app_id=app.id: async_task(
-                    'client_profile.tasks.email_membership_application_submitted', app_id
-                ),
-                robust=True,
-            )
-
+            app = submit_application(request, link)
         return Response(MembershipApplicationSerializer(app).data, status=201)
 
 
@@ -432,6 +458,9 @@ class MyMembershipsViewSet(viewsets.ReadOnlyModelViewSet):
                 validate_admin_user_for_api(membership.user)
             if membership.status != Membership.Status.PENDING:
                 return Response({'detail': 'Only pending invitations can be accepted.'}, status=status.HTTP_400_BAD_REQUEST)
+            if direct_invite_expired(membership, timezone.now()):
+                return Response({'detail': 'This invitation has expired.', 'code': 'invitation_expired'},
+                                status=status.HTTP_410_GONE)
             active_count = _count_active_memberships(request.user, exclude_membership_id=membership.pk)
             if active_count >= MAX_ACTIVE_PHARMACY_MEMBERSHIPS:
                 return Response(

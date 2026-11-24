@@ -31,8 +31,12 @@
         </p>
         <a class="btn" href="{{ magic_link }}" style="display:inline-block; background:#433894; color:#ffffff !important; padding:13px 26px; border-radius:8px; text-decoration:none; font-weight:700; font-size:15px; line-height:1.2; margin:16px 0;">Set Your Password</a>
         <p>
-            After you set your password, you’ll have immediate access to all community shifts for {{ pharmacy_name }}.<br>
-            (You can complete your profile later if you want to apply for public shifts.)
+            {% if expired_application_url %}
+            Set your password while your seven-day invitation is open to join {{ pharmacy_name }}.
+            If the invitation has expired, sign in and <a href="{{ expired_application_url }}">apply to join</a>.
+            {% else %}
+            After you set your password, you can access your pharmacy workspace.
+            {% endif %}
         </p>
         {% endif %}
         <p>

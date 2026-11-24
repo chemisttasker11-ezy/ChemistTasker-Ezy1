@@ -55,10 +55,14 @@ class MyShiftSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         # Only the post's pay is redacted; the worker's own agreed line items stay intact.
-        return project_published_rates(
-            super().to_representation(instance),
-            user=getattr(self.context.get('request'), 'user', None), pharmacy=instance.pharmacy,
-        )
+        user = getattr(self.context.get('request'), 'user', None)
+        data = super().to_representation(instance)
+        terms = instance.slot_assignments.filter(user_id=getattr(user, 'pk', None)).order_by(
+            'slot_date', 'slot__date', 'pk',
+        ).values_list('engagement_terms_snapshot', flat=True).first()
+        if terms and terms.get('booking_site'):
+            data['pharmacy_detail'].update(terms['booking_site'])
+        return project_published_rates(data, user=user, pharmacy=instance.pharmacy)
 
     @staticmethod
     def build_allowed_tiers(pharmacy):

@@ -13,6 +13,7 @@ from django.conf import settings
 from rest_framework.views import APIView
 from users.tasks import send_async_email
 from users.delivery import deliver_email_best_effort
+from users.membership_port import membership_services
 from django.core.exceptions import ValidationError as DjangoValidationError
 from users.login_security import _reset_login_lockout_state
 from users.account_deletion import _revoke_user_sessions, _revoke_user_tokens
@@ -26,7 +27,16 @@ class RevokingPasswordResetConfirmView(PasswordResetConfirmView):
 
     @transaction.atomic
     def form_valid(self, form):
+        user = User.objects.select_for_update().get(pk=self.user.pk)
+        if user.password != self.user.password:
+            return self.form_invalid(form)
+        first_password = not user.has_usable_password() and not user.is_otp_verified
+        if first_password:
+            user.is_otp_verified = True
+        self.user = form.user = user
         response = super().form_valid(form)
+        if first_password:
+            membership_services().activate_first_password_invites(user)
         _revoke_user_tokens(self.user)
         _revoke_user_sessions(self.user)
         return response
@@ -65,9 +75,15 @@ class PasswordResetConfirmAPIView(APIView):
             return Response({'new_password1': list(exc.messages)}, status=400)
 
         with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=user.pk)
+            if not default_token_generator.check_token(user, token):
+                return Response({'detail':'Invalid or expired token.'}, status=400)
+            first_password = not user.has_usable_password() and not user.is_otp_verified
             user.set_password(pw1)
             user.is_otp_verified = True
             user.save()
+            if first_password:
+                membership_services().activate_first_password_invites(user)
             _reset_login_lockout_state(user)
             _revoke_user_tokens(user)
             _revoke_user_sessions(user)

@@ -508,6 +508,8 @@ class ShiftEditTests(ShiftPostingFixture):
         shift = Shift.objects.get(pk=response.data["id"])
         interested = self.member("LOCUM")
         ShiftInterest.objects.create(shift=shift, slot=None, user=interested)
+        follower = self.member("LOCUM")
+        shift.saved_by.create(user=follower)
 
         with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
             edited = client_for(self.owner).patch(f"{API}shifts/{shift.id}/", {
@@ -524,6 +526,7 @@ class ShiftEditTests(ShiftPostingFixture):
         # the update is announced to workers with interest, counter offers or live offers (not as a new posting)
         self.assertEqual([(e["template"], e["to"]) for e in sent], [("emails/shift_updated.html", (interested.email,))])
         self.assertEqual(Notification.objects.filter(user=interested, title="Shift updated: Posting Pharmacy").count(), 1)
+        self.assertEqual(Notification.objects.filter(user=follower, title="Shift updated").count(), 1)
 
     def test_an_invalid_slot_in_an_edit_changes_nothing(self):
         # Regression: the edit used to save the shift's fields before validating the new slots, so a 400 for a bad
