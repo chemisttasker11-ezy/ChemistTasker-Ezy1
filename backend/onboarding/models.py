@@ -148,7 +148,25 @@ class OnboardingNotification(models.Model):
         return f"{self.onboarding} – {self.notification_type} sent at {self.sent_at}"
 
 
-class OwnerOnboarding(models.Model):
+class GovIdCheckMethod(models.TextChoices):
+    AUTOMATIC_OCR = "automatic_ocr", "Automatic OCR"
+    ADMIN_REVIEW = "admin_review", "Admin review"
+
+
+class GovIdResult(models.Model):
+    gov_id_checked_at = models.DateTimeField(blank=True, null=True, editable=False)
+    gov_id_check_method = models.CharField(
+        max_length=16, choices=GovIdCheckMethod.choices, blank=True, db_default="", editable=False,
+    )
+    gov_id_checked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True, editable=False, related_name="+",
+    )
+
+    class Meta:
+        abstract = True
+
+
+class OwnerOnboarding(GovIdResult):
     ROLE_CHOICES = [
         ("MANAGER", "Pharmacy Manager"),
         ("PHARMACIST", "Pharmacist"),
@@ -230,7 +248,7 @@ class OwnerOnboarding(models.Model):
         return max(years, 0)
 
 
-class PharmacistOnboarding(models.Model):
+class PharmacistOnboarding(GovIdResult):
     REFEREE_REL_CHOICES = [
     ('manager', 'Manager'),
     ('supervisor', 'Supervisor'),
@@ -362,7 +380,7 @@ class PharmacistOnboarding(models.Model):
 
 
 
-class OtherStaffOnboarding(models.Model):
+class OtherStaffOnboarding(GovIdResult):
     ROLE_CHOICES = [
         ("INTERN", "Intern Pharmacist"),
         ("TECHNICIAN", "Dispensary Technician"),
@@ -538,7 +556,7 @@ class OtherStaffOnboarding(models.Model):
 
 
 
-class ExplorerOnboarding(models.Model):
+class ExplorerOnboarding(GovIdResult):
     # "New to pharmacy": which kind of newcomer, asked once at sign-up (codes kept from the Explorer profile).
     ROLE_CHOICES = [
         ("OVERSEAS", "Overseas-qualified"),

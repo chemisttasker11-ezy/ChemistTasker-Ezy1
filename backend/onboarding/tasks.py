@@ -25,6 +25,8 @@ from django.utils import timezone
 from infrastructure.integrations.abr import _parse_abn_html_fields, abn_lookup
 from users.task_dispatch import async_task
 from onboarding.emails import get_candidate_role, simple_name_match
+from onboarding.models import GovIdCheckMethod
+from onboarding.services.gov_id import has_gov_id_result, record_gov_id_result
 from onboarding.services.work_profile import referee_profile_target
 from onboarding.verification.ahpra import (
     _update_ahpra_fields,
@@ -128,6 +130,12 @@ def verify_filefield_task(
     first_name = first_name or getattr(obj.user, "first_name", "") or ""
     last_name  = last_name  or getattr(obj.user, "last_name", "")  or ""
     email      = email      or getattr(obj.user, "email", "")      or ""
+
+    if verification_field == "gov_id_verified":
+        if not has_gov_id_result(obj):
+            verified, note = _document_name_check(getattr(obj, file_field), first_name, last_name)
+            record_gov_id_result(obj, verified, GovIdCheckMethod.AUTOMATIC_OCR, note=note, only_if_pending=True)
+        return
 
     # If a verification note already exists, the task has already run.
     if note_field and getattr(obj, note_field, None):

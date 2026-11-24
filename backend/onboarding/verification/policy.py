@@ -10,6 +10,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from onboarding.qualifications import has_verified_dispensing_qualification
+from onboarding.services.gov_id import has_gov_id_result
 from onboarding.services.skill_identity import canonical_skill, registry
 
 VERIFIED, PENDING, NOT_SUPPLIED, FAILED = 'verified', 'pending', 'not_supplied', 'failed'
@@ -169,7 +170,11 @@ def badges(profile) -> list[dict]:
     if role == 'STUDENT':
         rows.append({'code': 'ENROLMENT',
                      'state': _flag_state(profile, getattr(profile, 'university_id', None), 'university_id_verified', 'university_id_verification_note')})
-    rows.append({'code': 'ID', 'state': _flag_state(profile, getattr(profile, 'government_id', None), 'gov_id_verified', 'gov_id_verification_note')})
+    if has_gov_id_result(profile):
+        id_state = VERIFIED if getattr(profile, 'gov_id_verified', False) else FAILED
+    else:
+        id_state = PENDING if getattr(profile, 'government_id', None) else NOT_SUPPLIED
+    rows.append({'code': 'ID', 'state': id_state})
     rows.append({'code': 'REFERENCES', 'state': _referees_state(profile)})
     if getattr(profile, 'abn_verified', False):
         # The ABN is confirmed by its owner in the payment tab; there is no pending state worth showing.

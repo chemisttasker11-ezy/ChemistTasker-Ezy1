@@ -6,7 +6,8 @@ from django.db import transaction
 from onboarding.verification.ahpra_numbers import _user_numbers
 from onboarding.verification.ahpra_numbers import ahpra_number_owner_conflict, normalize, sync_ahpra_registrations
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, OwnerOnboarding, PharmacistOnboarding, RefereeResponse
-from onboarding.models import AhpraCheck
+from onboarding.models import AhpraCheck, GovIdCheckMethod
+from onboarding.services.gov_id import ID_EVIDENCE, record_gov_id_result, reset_gov_id_result
 from django.utils import timezone
 from django.utils.html import format_html
 import json
@@ -86,6 +87,43 @@ class RoleScopedOnboardingAdminMixin:
         if db_field.name == "user" and self.user_role:
             kwargs["queryset"] = db_field.remote_field.model.objects.filter(role=self.user_role)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class GovIdReviewAdminMixin:
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == "gov_id_verified":
+            return forms.ChoiceField(
+                label="Government ID review", required=False,
+                choices=[("", "Keep current result"), ("on", "Approve"), ("reject", "Reject")],
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form_class = super().get_form(request, obj, **kwargs)
+
+        class GovIdReviewForm(form_class):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.initial["gov_id_verified"] = ""
+
+            def clean_gov_id_verified(self):
+                self.gov_id_review = self.cleaned_data["gov_id_verified"]
+                return self.instance.gov_id_verified
+
+        return GovIdReviewForm
+
+    def save_model(self, request, obj, form, change):
+        review = getattr(form, "gov_id_review", "")
+        note = obj.gov_id_verification_note
+        evidence_changed = any(field in form.changed_data for field in ID_EVIDENCE)
+        if evidence_changed:
+            reset_gov_id_result(obj)
+        super().save_model(request, obj, form, change)
+        if review:
+            note = note if "gov_id_verification_note" in form.changed_data else ""
+            record_gov_id_result(obj, review == "on", GovIdCheckMethod.ADMIN_REVIEW, request.user, note)
+        elif not evidence_changed and obj.gov_id_checked_at is None and "gov_id_verification_note" in form.changed_data and (note or "").strip():
+            record_gov_id_result(obj, obj.gov_id_verified, GovIdCheckMethod.ADMIN_REVIEW, request.user, note)
 
 
 class AhpraOwnershipAdminMixin:
@@ -187,7 +225,7 @@ class OwnerOnboardingAdminForm(forms.ModelForm):
 
 
 @admin.register(OwnerOnboarding)
-class OwnerOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+class OwnerOnboardingAdmin(AhpraOwnershipAdminMixin, GovIdReviewAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     user_role = "OWNER"
     form = OwnerOnboardingAdminForm
     list_display = [
@@ -226,7 +264,7 @@ class OwnerOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAdminMi
 
 
 @admin.register(PharmacistOnboarding)
-class PharmacistOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+class PharmacistOnboardingAdmin(AhpraOwnershipAdminMixin, GovIdReviewAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     user_role = "PHARMACIST"
     list_display = [
         'user', 'payment_preference', 'verified', 'member_of_chain',
@@ -250,7 +288,8 @@ class PharmacistOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAd
     ]
     fields = [
         'user',
-        'government_id', 'ahpra_number', 'ahpra_first_registration_date', 'ahpra_years_since_first_registration', 'short_bio', 'resume',
+        'government_id', 'identity_secondary_file', 'gov_id_verified', 'gov_id_verification_note',
+        'ahpra_number', 'ahpra_first_registration_date', 'ahpra_years_since_first_registration', 'short_bio', 'resume',
         'skills', 'skill_certificates', 'payment_preference',
         'abn', 'gst_registered', 'super_fund_name', 'super_usi', 'super_member_number',
         # Referee 1
@@ -274,7 +313,7 @@ class PharmacistOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAd
 
 
 @admin.register(OtherStaffOnboarding)
-class OtherStaffOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+class OtherStaffOnboardingAdmin(AhpraOwnershipAdminMixin, GovIdReviewAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     user_role = "OTHER_STAFF"
     list_display = [
         'user', 'role_type', 'classification_level', 'student_year',
@@ -299,7 +338,8 @@ class OtherStaffOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAd
         'user__username', 'user__email', 'user__first_name', 'user__last_name', 'role_type'
     ]
     fields = [
-        'user', 'government_id', 'role_type', 'skills', 'skill_certificates', 'years_experience',
+        'user', 'government_id', 'identity_secondary_file', 'gov_id_verified', 'gov_id_verification_note',
+        'role_type', 'skills', 'skill_certificates', 'years_experience',
         'payment_preference', 'classification_level', 'student_year', 'intern_half',
         'ahpra_number', 'ahpra_verified', 'ahpra_verification_note',
         'ahpra_proof', 'hours_proof', 'certificate', 'university_id',
@@ -321,7 +361,7 @@ class OtherStaffOnboardingAdmin(AhpraOwnershipAdminMixin, RoleScopedOnboardingAd
 
 
 @admin.register(ExplorerOnboarding)
-class ExplorerOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
+class ExplorerOnboardingAdmin(GovIdReviewAdminMixin, RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
     user_role = "EXPLORER"
     list_display = [
         'user', 'role_type', 'verified', 'gov_id_verified',
@@ -332,7 +372,8 @@ class ExplorerOnboardingAdmin(RoleScopedOnboardingAdminMixin, admin.ModelAdmin):
         'user__username', 'user__email', 'user__first_name', 'user__last_name', 'role_type'
     ]
     fields = [
-        'user', 'government_id', 'role_type', 'interests',
+        'user', 'government_id', 'identity_secondary_file', 'gov_id_verified', 'gov_id_verification_note',
+        'role_type', 'interests',
         # Referee 1
         'referee1_name', 'referee1_relation', 'referee1_email', 'referee1_confirmed',
         # Referee 2
