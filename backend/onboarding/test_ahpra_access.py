@@ -43,6 +43,13 @@ class AhpraAccessTests(TestCase):
                                  'expiry_date': '2099-01-02',
                              }, **kwargs)
 
+    def open_public_shift(self, pharmacy, owner):
+        shift, _, assignment = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=2))
+        assignment.delete()
+        shift.role_needed = 'PHARMACIST'
+        shift.save(update_fields=['role_needed'])
+        return shift
+
     def test_state_uses_current_number_and_structured_status_not_notes(self):
         self.finish(note='Suspended - irrelevant note text')
         self.assertEqual(ahpra_state(self.profile)['state'], 'ok')
@@ -164,6 +171,7 @@ class AhpraAccessTests(TestCase):
             self.assertIn('registration type is not accepted', managers.call_args.kwargs['body'])
             self.assertEqual(len(email.call_args_list), 2)
             self.assertEqual(len(mail.outbox), 1)
+            self.assertIn('AHPRA support review', mail.outbox[0].subject)
             self.assertIn('Type: Non Practising', mail.outbox[0].body)
             close.assert_not_called()
 
@@ -188,7 +196,8 @@ class AhpraAccessTests(TestCase):
         internal_shift, _, internal = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=2))
         internal_shift.visibility = 'FULL_PART_TIME'
         internal_shift.save(update_fields=['visibility'])
-        with patch('shifts.cancellation.notify_shift_managers', return_value=[owner]) as managers,                 patch('shifts.cancellation.async_task') as email:
+        with patch('shifts.cancellation.notify_shift_managers', return_value=[owner]) as managers, \
+                patch('shifts.cancellation.async_task') as email, patch('users.task_dispatch.async_task') as worker_email:
             with self.captureOnCommitCallbacks(execute=True):
                 check = check_fixture(self.profile)
                 apply_ahpra_result(check, result(check.pk, profession='Medicine'))
@@ -201,13 +210,121 @@ class AhpraAccessTests(TestCase):
         self.assertEqual(ShiftSlotAssignment.objects.filter(pk__in=[public.pk, internal.pk]).count(), 2)
         managers.assert_called_once()
         self.assertEqual(managers.call_args.args[0], shift)
-        self.assertIn('needs immediate resolution', managers.call_args.kwargs['body'])
+        self.assertIn('booking stands for now', managers.call_args.kwargs['body'])
         self.assertEqual(email.call_args.kwargs['recipient_list'], [owner.email])
+        worker_email.assert_called_once()
+        self.assertEqual(worker_email.call_args.kwargs['recipient_list'], [self.user.email])
         self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('AHPRA support review', mail.outbox[0].subject)
         self.assertIn(f'Shift {shift.pk}: ', mail.outbox[0].body)
         self.assertNotIn(f'Shift {internal_shift.pk}:', mail.outbox[0].body)
 
+    def test_confirmed_not_found_blocks_applications_and_starts_support_review(self):
+        self.finish()
+        self.finish(outcome='review')
+        owner, pharmacy = make_owner_with_pharmacy()
+        shift, slot, booking = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=2))
+        offer = ShiftOffer.objects.create(shift=shift, slot=slot, user=self.user, status=ShiftOffer.Status.ACCEPTED)
+        public = self.open_public_shift(pharmacy, owner)
+        with patch('shifts.cancellation.notify_shift_managers', return_value=[owner]) as managers, \
+                patch('shifts.cancellation.async_task') as pharmacy_email, patch('users.task_dispatch.async_task') as worker_email:
+            for attempt, outcome in enumerate(('not_found', 'not_found', 'found')):
+                with self.captureOnCommitCallbacks(execute=True):
+                    check = check_fixture(self.profile)
+                    self.assertTrue(apply_ahpra_result(check, result(check.pk, outcome, registration_status='')))
+                    self.assertEqual(len(mail.outbox), int(attempt > 0))
+        response = self.client.post(f'/api/v1/shifts/{public.pk}/express_interest/', {}, format='json')
+        self.assertEqual((response.status_code, response.json().get('code')), (403, 'ahpra_not_found'))
+        self.assertTrue(ShiftSlotAssignment.objects.filter(pk=booking.pk).exists())
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['admin@example.test'])
+        self.assertIn('AHPRA support review', mail.outbox[0].subject)
+        self.assertIn(f'User id: {self.user.pk}', mail.outbox[0].body)
+        self.assertIn(f'Shift {shift.pk}: {slot.date} - {pharmacy.name}', mail.outbox[0].body)
+        worker_email.assert_called_once()
+        self.assertEqual(worker_email.call_args.kwargs['recipient_list'], [self.user.email])
+        self.assertIn('checking your AHPRA registration', worker_email.call_args.kwargs['context']['message'])
+        managers.assert_called_once()
+        self.assertEqual(managers.call_args.args[0], shift)
+        self.assertIn('booking stands for now', managers.call_args.kwargs['body'])
+        pharmacy_email.assert_called_once()
+        self.assertEqual(pharmacy_email.call_args.kwargs['recipient_list'], [owner.email])
+
+    def test_unreadable_after_confirmation_keeps_public_access_and_bookings(self):
+        owner, pharmacy = make_owner_with_pharmacy()
+        _, _, booking = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=2))
+        for manual in (False, True):
+            with self.subTest(manual=manual):
+                confirmed = self.finish(status=None if manual else 'Registered',
+                                        reviewed_at=timezone.now() if manual else None)
+                self.profile.verified = self.profile.ahpra_verified = True
+                self.profile.save(update_fields=['verified', 'ahpra_verified'])
+                public = self.open_public_shift(pharmacy, owner)
+                with self.captureOnCommitCallbacks(execute=True):
+                    check = check_fixture(self.profile)
+                    self.assertTrue(apply_ahpra_result(check, result(check.pk, registration_status='Unknown')))
+                summary = self.client.get('/api/v1/pharmacist/onboarding/me/').json()['ahpra']
+                self.assertEqual(summary['state'], 'ok')
+                self.assertEqual(summary['checked_at'], confirmed.completed_at.isoformat())
+                self.assertIn(str(timezone.localtime(confirmed.completed_at).date()), summary['note'])
+                self.assertIn('re-check is pending', summary['note'])
+                self.profile.refresh_from_db()
+                self.assertTrue(self.profile.verified and self.profile.ahpra_verified)
+                with patch('shifts.interest.async_task'):
+                    response = self.client.post(f'/api/v1/shifts/{public.pk}/express_interest/', {}, format='json')
+                self.assertEqual(response.status_code, 201, response.content)
+                self.assertTrue(ShiftSlotAssignment.objects.filter(pk=booking.pk).exists())
+                self.assertEqual(len(mail.outbox), 0)
+
+    def test_unreadable_recheck_restores_flags_cleared_by_legacy_result(self):
+        owner, pharmacy = make_owner_with_pharmacy()
+        public = self.open_public_shift(pharmacy, owner)
+        url = f'/api/v1/shifts/{public.pk}/express_interest/'
+        confirmed = check_fixture(self.profile)
+        self.assertTrue(apply_ahpra_result(confirmed, result(confirmed.pk)))
+        self.profile.refresh_from_db()
+        self.assertTrue(self.profile.verified and self.profile.ahpra_verified)
+
+        self.finish(outcome='review', status='Unknown')
+        self.profile.verified = self.profile.ahpra_verified = False
+        self.profile.save(update_fields=['verified', 'ahpra_verified'])
+        with patch('shifts.interest.async_task'):
+            response = self.client.post(url, {}, format='json')
+        self.profile.refresh_from_db()
+        self.assertFalse(self.profile.verified or self.profile.ahpra_verified)
+        self.assertEqual(response.status_code, 403, response.content)
+
+        unreadable = check_fixture(self.profile)
+        self.assertTrue(apply_ahpra_result(unreadable, result(unreadable.pk, registration_status='Unknown')))
+        self.profile.refresh_from_db()
+        self.assertTrue(self.profile.verified and self.profile.ahpra_verified)
+        with patch('shifts.interest.async_task'):
+            response = self.client.post(url, {}, format='json')
+        self.assertEqual(response.status_code, 201, response.content)
+
+    def test_third_consecutive_unreadable_after_confirmation_alerts_admins_once(self):
+        self.finish()
+        for count, outcome in enumerate(('found', 'review', 'found', 'blocked', 'found', 'found', 'found'), start=1):
+            with self.subTest(count=count):
+                with self.captureOnCommitCallbacks(execute=True):
+                    check = check_fixture(self.profile)
+                    payload = (result(check.pk, expiry_date='2000-01-01') if outcome == 'review'
+                               else result(check.pk, outcome, registration_status=''))
+                    self.assertTrue(apply_ahpra_result(check, payload))
+                    self.assertFalse(apply_ahpra_result(check, payload))
+                    self.assertEqual(len(mail.outbox), int(count > 6))
+                self.assertEqual(len(mail.outbox), int(count >= 6))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['admin@example.test'])
+        self.assertIn('three unreadable results', mail.outbox[0].body)
+
     def test_unknown_or_unreadable_status_needs_review_without_freeze_or_cancellation(self):
+        owner, pharmacy = make_owner_with_pharmacy()
+        public = self.open_public_shift(pharmacy, owner)
+        AhpraCheck.objects.filter(pk=self.finish().pk).update(registration_number='PHA0007654321')
+        self.finish(outcome='not_found', status=None)
         self.profile.verified = self.profile.ahpra_verified = True
         self.profile.save(update_fields=['verified', 'ahpra_verified'])
         for status in ('Expired', 'Under assessment', 'Not suspended', '', None, ['Suspended']):
@@ -224,6 +341,8 @@ class AhpraAccessTests(TestCase):
                 self.assertEqual(state['state'], 'unreadable')
                 self.assertIn("We couldn't read your AHPRA registration", state['note'])
                 self.assertEqual(self.client.get('/api/v1/public-job-board/').status_code, 200)
+                response = self.client.post(f'/api/v1/shifts/{public.pk}/express_interest/', {}, format='json')
+                self.assertEqual((response.status_code, response.json().get('code')), (403, 'ahpra_unreadable'))
                 self.profile.refresh_from_db()
                 self.assertFalse(self.profile.verified)
                 self.assertFalse(self.profile.ahpra_verified)
@@ -466,6 +585,7 @@ class AhpraAccessTests(TestCase):
                 self.assertEqual(ahpra_state(self.profile)['state'], 'ok' if verified else 'suspended')
 
     def test_suspension_cancels_future_once_notifies_once_and_redacts_emails(self):
+        self.finish()
         owner, pharmacy = make_owner_with_pharmacy()
         shift, _, future = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=2))
         _, _, past = make_assignment(pharmacy, owner, self.user, timezone.localdate() - timedelta(days=2))
@@ -487,6 +607,7 @@ class AhpraAccessTests(TestCase):
                         if call.args[0] == 'users.tasks.send_async_email']
             self.assertEqual(len(messages), 2)  # worker + pharmacy
             self.assertEqual(len(mail.outbox), 1)
+            self.assertIn('AHPRA support review', mail.outbox[0].subject)
             self.assertIn(f'User id: {self.user.pk}', mail.outbox[0].body)
             self.assertIn(f'Shift {shift.pk}', mail.outbox[0].body)
             for name in ('Jane', 'Doe'):

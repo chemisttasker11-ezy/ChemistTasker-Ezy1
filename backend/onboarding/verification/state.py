@@ -5,6 +5,7 @@ import logging
 
 from django.conf import settings
 from django.core.cache import caches
+from django.core.mail import mail_admins
 from django.db import transaction
 from django.utils import timezone
 
@@ -14,6 +15,8 @@ from onboarding.verification.ahpra import ahpra_name_match, registration_type_no
 from onboarding.verification.ahpra_numbers import full_registration_number
 
 ADVERSE_STATUSES = {'suspended', 'cancelled', 'surrendered'}
+CANCELLING_STATES = {'suspended', 'type_not_accepted'}
+LAPSE_STATES = {'not_found', 'rejected'}
 # Lookups with no real register record: they never change anyone's AHPRA state.
 VERIFIER_FAILURES = ('error', 'blocked')
 REVIEW_NOTE = (
@@ -42,53 +45,82 @@ def recent_rechecks(profile):
     ).order_by('created_at', 'pk')
 
 
-def ahpra_state(profile):
-    number = full_registration_number(getattr(profile, 'ahpra_number', None))
-    check = None
-    if profile is not None and number and hasattr(profile, '_meta'):
-        check = AhpraCheck.objects.filter(
-            model_name=profile._meta.object_name, object_pk=profile.pk,
-            registration_number=number, status='done',
-        ).exclude(outcome__in=VERIFIER_FAILURES).order_by('-completed_at', '-pk').first()
+def _completed_checks(profile, number):
+    return AhpraCheck.objects.filter(
+        model_name=profile._meta.object_name, object_pk=profile.pk,
+        registration_number=number, status='done',
+    ).exclude(outcome__in=VERIFIER_FAILURES).order_by('-completed_at', '-pk')
+
+
+def _register_fields(check):
     data = check.register_data if check and isinstance(check.register_data, dict) else {}
     raw_status = data.get('registration_status')
     status = (raw_status.strip() or None) if isinstance(raw_status, str) else None
-    normalized_status = (status or '').lower()
     raw_type = data.get('registration_type')
     registration_type = raw_type.strip() if isinstance(raw_type, str) else ''
+    return data, status, registration_type
+
+
+def _check_state(profile, check):
+    data, status, registration_type = _register_fields(check)
+    normalized_status = (status or '').lower()
     pharmacist = isinstance(profile, PharmacistOnboarding) or (
         isinstance(profile, OwnerOnboarding) and (profile.role == 'PHARMACIST' or profile.ahpra_switched_to_manager)
     )
+    # A different person's record cannot impose restrictions; an admin's review settles the match.
+    if not check.reviewed_at and data.get('name') and not ahpra_name_match(
+        data['name'], profile.user.first_name, profile.user.last_name
+    ):
+        return 'review'
+    if check.outcome == 'review' and normalized_status in ADVERSE_STATUSES | {'registered', 'not registered'}:
+        return 'review'
+    if check.outcome == 'not_found' or normalized_status == 'not registered':
+        return 'not_found'
+    if normalized_status in ADVERSE_STATUSES:
+        return 'suspended'
+    if check.outcome == 'rejected' and (normalized_status in ('', 'registered') or check.reviewed_at):
+        return 'rejected'
+    if normalized_status == 'registered' and pharmacist and registration_type.lower() != 'general':
+        return 'type_not_accepted'
+    if check.outcome == 'verified' and (normalized_status == 'registered' or check.reviewed_at):
+        return 'ok'
+    return 'unreadable' if normalized_status != 'registered' else 'pending'
+
+
+def ahpra_state(profile):
+    return _ahpra_state(profile)[0]
+
+
+def _ahpra_state(profile):
+    number = full_registration_number(getattr(profile, 'ahpra_number', None))
+    check = None
     state = 'pending'
-    if check:
-        # A different person's record cannot impose restrictions; an admin's review of the check settles it.
-        mismatch = not check.reviewed_at and bool(data.get('name')) and not ahpra_name_match(
-            data['name'], profile.user.first_name, profile.user.last_name)
-        if mismatch:
-            state = 'review'
-        elif check.outcome == 'review' and normalized_status in ADVERSE_STATUSES | {'registered', 'not registered'}:
-            state = 'review'
-        elif check.outcome == 'not_found' or normalized_status == 'not registered':
-            state = 'not_found'
-        elif normalized_status in ADVERSE_STATUSES:
-            state = 'suspended'
-        elif check.outcome == 'rejected' and normalized_status in ('', 'registered'):
-            # A rejection not explained by the status (wrong profession, admin) blocks public work;
-            # an unreadable status stays unreadable.
+    unreadable_streak = None
+    if profile is not None and number and hasattr(profile, '_meta'):
+        checks = _completed_checks(profile, number)
+        check = checks.first()
+    if check is not None:
+        state = _check_state(profile, check)
+        if state in ('ok', 'pending', 'unreadable') and checks.filter(reviewed_at__isnull=False).order_by(
+            '-reviewed_at', '-pk'
+        ).values_list('outcome', flat=True).first() == 'rejected':
+            # An admin rejection outlasts automatic re-checks until an admin verifies.
             state = 'rejected'
-        elif normalized_status == 'registered' and pharmacist and registration_type.lower() != 'general':
-            state = 'type_not_accepted'
-        elif AhpraCheck.objects.filter(
-            model_name=profile._meta.object_name, object_pk=profile.pk, registration_number=number,
-            status='done', reviewed_at__isnull=False,
-        ).order_by('-reviewed_at', '-pk').values_list('outcome', flat=True).first() == 'rejected':
-            # An admin rejection outlasts later automatic and user re-checks until an admin verifies.
-            state = 'rejected'
-        elif normalized_status == 'registered' and check.outcome == 'verified':
-            state = 'ok'
-        elif normalized_status != 'registered' and not (check.outcome == 'verified' and check.reviewed_at):
-            # An admin's manual verify carries no readable register status.
-            state = 'unreadable'
+        if state == 'unreadable':
+            count = None
+            restriction = None
+            for index, earlier in enumerate(checks[1:].iterator(), start=1):
+                earlier_state = _check_state(profile, earlier)
+                if count is None and earlier_state != 'unreadable':
+                    count = index
+                if earlier_state == 'ok':
+                    # An unreadable result cannot reinstate a registration after a confirmed lapse.
+                    check, state = restriction or (earlier, 'ok')
+                    unreadable_streak = count
+                    break
+                if restriction is None and earlier_state in CANCELLING_STATES | LAPSE_STATES:
+                    restriction = (earlier, earlier_state)
+    data, status, registration_type = _register_fields(check)
     user_id = getattr(profile, 'user_id', None)
     requested = None
     if user_id and number:
@@ -105,16 +137,16 @@ def ahpra_state(profile):
         retries = list(recent_rechecks(profile))
         attempts = len(retries)
         available = retries[0].created_at + timedelta(hours=24) if attempts >= 3 else None
-        last_two = list(AhpraCheck.objects.filter(
-            model_name=profile._meta.object_name, object_pk=profile.pk,
-            registration_number=number, status='done',
-        ).exclude(outcome__in=VERIFIER_FAILURES).order_by('-completed_at', '-pk')[:2])
+        last_two = list(checks[:2])
         contact_support = len(last_two) == 2 and all(
-            row.outcome != 'not_found' and str((row.register_data or {}).get('registration_status') or '').strip().lower()
+            row.outcome != 'not_found' and (_register_fields(row)[1] or '').lower()
             not in ADVERSE_STATUSES | {'registered', 'not registered'} for row in last_two
         )
     note = check.note if check else ''
-    if state == 'rejected':
+    if state == 'ok' and unreadable_streak is not None:
+        confirmed_on = f' on {timezone.localtime(check.completed_at).date()}' if check.completed_at else ''
+        note = f'Your AHPRA registration was last confirmed{confirmed_on}. A re-check is pending.'
+    elif state == 'rejected':
         note = 'Your AHPRA check was rejected. Contact support before applying for public shifts.'
     elif state == 'review':
         note = REVIEW_NOTE
@@ -141,7 +173,7 @@ def ahpra_state(profile):
         'checked_at': check.completed_at.isoformat() if check and check.completed_at else None,
         'recheck_available_at': available.isoformat() if available else None,
         'attempts': attempts, 'contact_support': contact_support,
-    }
+    }, unreadable_streak
 
 
 def member_suspension_note(status):
@@ -149,6 +181,13 @@ def member_suspension_note(status):
         f"Your AHPRA registration shows as {status}, so you can't apply for public shifts. "
         "Your work with your own pharmacy or organisation isn't affected. Please contact AHPRA."
     )
+
+
+def _keep_confirmation(profile, note):
+    if not profile.ahpra_verified or profile.ahpra_verification_note != note:
+        profile.ahpra_verified = True
+        profile.ahpra_verification_note = note
+        profile.save(update_fields=['ahpra_verified', 'ahpra_verification_note'])
 
 
 def require_ahpra_application(user):
@@ -239,7 +278,7 @@ def apply_state_transition(profile, previous):
     # The booking paths take this lock too (lock_public_ahpra); callers normally hold it already.
     type(profile).objects.select_for_update().filter(pk=profile.pk).first()
     profile.refresh_from_db()
-    current = ahpra_state(profile)
+    current, unreadable_streak = _ahpra_state(profile)
     if current['state'] in ('suspended', 'not_found', 'unreadable', 'rejected', 'type_not_accepted', 'review'):
         revoked = revoke_for_changed_evidence(profile, 'ahpra')
         if current['state'] in ('suspended', 'unreadable', 'rejected', 'type_not_accepted', 'review'):
@@ -253,26 +292,50 @@ def apply_state_transition(profile, previous):
         elif revoked:
             profile.save(update_fields=['verified'])
     elif current['state'] == 'ok':
+        if unreadable_streak is not None:
+            _keep_confirmation(profile, current['note'])
         if settings.AHPRA_ENFORCEMENT_ENABLED and isinstance(profile, OwnerOnboarding) and profile.ahpra_switched_to_manager:
             profile.role, profile.ahpra_switched_to_manager = 'PHARMACIST', False
             profile.save(update_fields=['role', 'ahpra_switched_to_manager'])
         refresh_verified(profile)
     if not settings.AHPRA_ENFORCEMENT_ENABLED:
         return
-    adverse_transition = current['state'] in ('suspended', 'type_not_accepted') and previous['state'] != current['state']
-    if adverse_transition:
-        cancel_upcoming_assignments = verification_features().cancel_upcoming_assignments
+    number = full_registration_number(profile.ahpra_number)
+    if unreadable_streak is not None:
+        if current['state'] == 'ok' and unreadable_streak == 3:
+            transaction.on_commit(lambda: mail_admins(
+                'AHPRA re-check unreadable', f'User id: {profile.user_id}\nNumber: {number}\n'
+                'The register returned three unreadable results in a row after a confirmed registration.'
+            ), robust=True)
+        return
+
+    state = current['state']
+    if previous['state'] == state:
+        return
+    bookings = None
+    if state in CANCELLING_STATES:
         reason = ('their AHPRA registration type is not accepted for pharmacist shifts'
-                  if current['state'] == 'type_not_accepted' else 'their AHPRA registration is paused')
-        bookings = cancel_upcoming_assignments(profile.user, reason=reason)
+                  if state == 'type_not_accepted' else 'their AHPRA registration is paused')
+        bookings = verification_features().cancel_upcoming_assignments(profile.user, reason=reason)
         transaction.on_commit(lambda: announce_suspension(profile, current, bookings), robust=True)
-    if current['state'] == 'rejected' and previous['state'] != 'rejected':
-        # A rejection keeps bookings: the pharmacy and our team resolve them by hand.
-        cancel_upcoming_assignments = verification_features().cancel_upcoming_assignments
-        bookings = cancel_upcoming_assignments(profile.user, cancel=False)['retained']
-        if bookings:
-            transaction.on_commit(lambda: announce_rejected_bookings(profile, bookings), robust=True)
-    if current['state'] == 'suspended' and previous['state'] != 'suspended':
+    elif state in LAPSE_STATES:
+        previously_confirmed = previous['state'] == 'ok' or any(
+            _check_state(profile, check) == 'ok'
+            for check in _completed_checks(profile, number).filter(outcome='verified').iterator()
+        )
+        if previously_confirmed or state == 'rejected':
+            report = verification_features().cancel_upcoming_assignments(profile.user, cancel=False)
+            if previously_confirmed or report['retained']:
+                bookings = report
+                transaction.on_commit(lambda: announce_booking_review(profile, report['retained']), robust=True)
+                if previously_confirmed:
+                    transaction.on_commit(lambda: email_worker_registration(
+                        profile, 'ChemistTasker support is checking your AHPRA registration. '
+                        'We will be in touch once we have reviewed it.'
+                    ), robust=True)
+    if bookings is not None:
+        transaction.on_commit(lambda: announce_support_review(profile, current, bookings), robust=True)
+    if state == 'suspended':
         if not profile.user.is_staff and ahpra_frozen(profile.user):
             transaction.on_commit(lambda: close_chat_sockets(profile.user_id), robust=True)
         transaction.on_commit(lambda: announce_member_suspension(profile.user, current['registration_status']), robust=True)
@@ -289,47 +352,44 @@ def close_chat_sockets(user_id):
 
 
 def announce_suspension(profile, state, bookings):
-    from django.conf import settings
-    from django.core.mail import send_mail
-    from users.task_dispatch import async_task
     from notifications.services import notify_users
 
     type_not_accepted = state['state'] == 'type_not_accepted'
     notify_users([profile.user_id], title='AHPRA registration type not accepted' if type_not_accepted else 'AHPRA registration paused',
                  body=state['note'], payload={'code': f"ahpra_{state['state']}"})
+    email_worker_registration(profile, state['note'])
+
+
+def announce_support_review(profile, state, bookings):
+    cancelled = '\n'.join(f"Shift {row['id']}: {row['date']} - {row['pharmacy']}" for row in bookings['cancelled'])
+    retained_note = ' - kept, needs manual action' if state['state'] in CANCELLING_STATES else ''
+    retained = '\n'.join(f"Shift {row['id']}: {row['date']} - {row['pharmacy']}{retained_note}"
+                         for row in bookings['retained'])
+    owner_note = ('Owner switched to Pharmacy Manager.\n' if isinstance(profile, OwnerOnboarding)
+                  and profile.ahpra_switched_to_manager and state['state'] in CANCELLING_STATES else '')
+    mail_admins('AHPRA support review',
+                f'User id: {profile.user_id}\nNumber: {full_registration_number(profile.ahpra_number)}\n'
+                f"State: {state['state']}\nStatus: {state['registration_status']}\nType: {state['registration_type']}\n"
+                f"{owner_note}Cancelled shifts:\n{cancelled or 'None'}\nRetained bookings:\n{retained or 'None'}")
+
+
+def email_worker_registration(profile, message):
+    from users.task_dispatch import async_task
+
     async_task('users.tasks.send_async_email', subject='Your AHPRA registration',
                recipient_list=[profile.user.email], template_name='emails/ahpra_status.html',
-               text_template='emails/ahpra_status.txt', context={'message': state['note']},
+               text_template='emails/ahpra_status.txt', context={'message': message},
                suppress_auto_notification=True)
-    recipients = getattr(settings, 'ADMIN_EMAILS', None) or [email for _, email in settings.ADMINS]
-    if recipients:
-        rows = '\n'.join(f"Shift {row['id']}: {row['date']} - {row['pharmacy']}" for row in bookings['cancelled'])
-        retained = '\n'.join(f"Shift {row['id']}: {row['date']} - {row['pharmacy']} - kept, needs manual action"
-                             for row in bookings['retained'])
-        subject = ('AHPRA owner switched to Pharmacy Manager' if isinstance(profile, OwnerOnboarding) else
-                   'AHPRA registration type not accepted' if type_not_accepted else 'AHPRA account paused')
-        send_mail(subject,
-                  f'User id: {profile.user_id}\nNumber: {full_registration_number(profile.ahpra_number)}\n'
-                  f"Status: {state['registration_status']}\nType: {state['registration_type']}\nCancelled shifts:\n{rows or 'None'}\n"
-                  f"Retained bookings:\n{retained or 'None'}",
-                  settings.DEFAULT_FROM_EMAIL, recipients)
 
 
-def announce_rejected_bookings(profile, bookings):
-    from django.core.mail import send_mail
+def announce_booking_review(profile, bookings):
     announce_bookings = verification_features().announce_bookings
 
     name = profile.user.get_full_name() or profile.user.email
-    announce_bookings(bookings, title='Booking needs immediate resolution',
-                      message=lambda row: (f"{name}'s AHPRA check was rejected. Their booking for shift {row['id']} on "
-                                           f"{row['date']} at {row['pharmacy']} needs immediate resolution."))
-    recipients = getattr(settings, 'ADMIN_EMAILS', None) or [email for _, email in settings.ADMINS]
-    if recipients:
-        rows = '\n'.join(f"Shift {row['id']}: {row['date']} - {row['pharmacy']}" for row in bookings)
-        send_mail('AHPRA rejected: bookings need immediate resolution',
-                  f'User id: {profile.user_id}\nNumber: {full_registration_number(profile.ahpra_number)}\n'
-                  f'Upcoming public bookings (not cancelled):\n{rows}',
-                  settings.DEFAULT_FROM_EMAIL, recipients)
+    announce_bookings(bookings, title='AHPRA support review',
+                      message=lambda row: (f"ChemistTasker support is checking {name}'s AHPRA registration. "
+                                           f"Their shift {row['id']} is on {row['date']} at {row['pharmacy']} "
+                                           'and the booking stands for now.'))
 
 
 def announce_member_suspension(user, status):
