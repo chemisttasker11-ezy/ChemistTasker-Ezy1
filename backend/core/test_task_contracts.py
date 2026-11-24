@@ -650,14 +650,14 @@ class DocumentVerificationContractTests(SimpleTestCase):
             overrides["azure_ocr"] = ocr
         with patch_impl(self.TASK, **overrides):
             task(self.TASK).run(
-                "PharmacistOnboarding", 5, "government_id", "Ann", "Lee", "ann@example.com", "gov_id_verified",
+                "OtherStaffOnboarding", 5, "certificate", "Ann", "Lee", "ann@example.com", "certificate_verified",
                 **kwargs,
             )
 
     def onboarding(self, **values):
         fields = dict(
             user=SimpleNamespace(first_name="Ann", last_name="Lee", email="ann@example.com"),
-            government_id=None, gov_id_verified=None, gov_id_verification_note="",
+            certificate=None, certificate_verified=None, certificate_verification_note="",
         )
         fields.update(values)
         obj = SimpleNamespace(**fields)
@@ -665,15 +665,15 @@ class DocumentVerificationContractTests(SimpleTestCase):
         return obj
 
     def test_existing_note_skips_the_run(self):
-        obj = self.onboarding(gov_id_verification_note="done")
-        self.run_task(obj, note_field="gov_id_verification_note")
+        obj = self.onboarding(certificate_verification_note="done")
+        self.run_task(obj, note_field="certificate_verification_note")
         obj.save.assert_not_called()
 
     def test_missing_file_is_not_verified_with_a_fixed_note(self):
         obj = self.onboarding()
-        self.run_task(obj, note_field="gov_id_verification_note")
-        self.assertIs(obj.gov_id_verified, False)
-        self.assertEqual(obj.gov_id_verification_note, "No file uploaded for this verification.")
+        self.run_task(obj, note_field="certificate_verification_note")
+        self.assertIs(obj.certificate_verified, False)
+        self.assertEqual(obj.certificate_verification_note, "No file uploaded for this verification.")
 
     def test_name_match_and_mismatch(self):
         import tempfile
@@ -681,20 +681,20 @@ class DocumentVerificationContractTests(SimpleTestCase):
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as handle:
             handle.write(b"\x89PNG")
             path = handle.name
-        obj = self.onboarding(government_id="file")
-        self.run_task(obj, local_path=path, ocr=lambda p: {"lines": ["ANN LEE"]}, note_field="gov_id_verification_note")
-        self.assertIs(obj.gov_id_verified, True)
-        self.assertEqual(obj.gov_id_verification_note, "")
+        obj = self.onboarding(certificate="file")
+        self.run_task(obj, local_path=path, ocr=lambda p: {"lines": ["ANN LEE"]}, note_field="certificate_verification_note")
+        self.assertIs(obj.certificate_verified, True)
+        self.assertEqual(obj.certificate_verification_note, "")
         import os
 
         self.assertFalse(os.path.exists(path))  # a temporary download is removed
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as handle:
             path = handle.name
-        obj = self.onboarding(government_id="file")
-        self.run_task(obj, local_path=path, ocr=lambda p: {"lines": ["SOMEONE ELSE"]}, note_field="gov_id_verification_note")
-        self.assertIs(obj.gov_id_verified, False)
-        self.assertEqual(obj.gov_id_verification_note, "Name mismatch found in your uploaded document")
+        obj = self.onboarding(certificate="file")
+        self.run_task(obj, local_path=path, ocr=lambda p: {"lines": ["SOMEONE ELSE"]}, note_field="certificate_verification_note")
+        self.assertIs(obj.certificate_verified, False)
+        self.assertEqual(obj.certificate_verification_note, "Name mismatch found in your uploaded document")
 
     def test_ocr_failure_note_is_fixed_and_secret_free(self):
         import tempfile
@@ -707,10 +707,10 @@ class DocumentVerificationContractTests(SimpleTestCase):
         def failing(_path):
             raise RuntimeError(f"https://ocr.example/?key={secret}")
 
-        obj = self.onboarding(government_id="file")
+        obj = self.onboarding(certificate="file")
         with self.assertLogs(task(self.TASK).run.__module__, level="WARNING") as logs:
-            self.run_task(obj, local_path=path, ocr=failing, note_field="gov_id_verification_note")
-        self.assertEqual(obj.gov_id_verification_note, "OCR processing failed.")
+            self.run_task(obj, local_path=path, ocr=failing, note_field="certificate_verification_note")
+        self.assertEqual(obj.certificate_verification_note, "OCR processing failed.")
         self.assertNotIn("SECRET-OCR", " ".join(logs.output))
 
     def test_pdf_detection(self):
@@ -1177,7 +1177,7 @@ class VerificationLogPrivacyTests(SimpleTestCase):
             path = handle.name
         target = SimpleNamespace(
             user=SimpleNamespace(first_name="Ann", last_name="Lee", email="ann@example.com"),
-            government_id="file", gov_id_verified=None, gov_id_verification_note="", save=mock.Mock(),
+            certificate="file", certificate_verified=None, certificate_verification_note="", save=mock.Mock(),
         )
         with patch_impl(
             name,
@@ -1186,21 +1186,21 @@ class VerificationLogPrivacyTests(SimpleTestCase):
             get_local_file_or_download=lambda field: path,
             azure_ocr=lambda p: {"lines": ["ANN LEE"]},
         ), self.assertLogs("onboarding", level="DEBUG") as logs:
-            task(name).run("PharmacistOnboarding", 5, "government_id", "Ann", "Lee", "a@x.test", "gov_id_verified",
-                           note_field="gov_id_verification_note")
+            task(name).run("OtherStaffOnboarding", 5, "certificate", "Ann", "Lee", "a@x.test", "certificate_verified",
+                           note_field="certificate_verification_note")
         self.assert_clean(logs)
 
-        target.gov_id_verification_note = ""
+        target.certificate_verification_note = ""
         with patch_impl(
             name,
             apps=SimpleNamespace(get_model=lambda label, model: mock.Mock()),
             fetch_instance_with_retries=lambda model, pk: target,
             get_local_file_or_download=lambda field: "/tmp/doc-path-missing.png",
         ), self.assertLogs("onboarding", level="DEBUG") as logs:
-            task(name).run("PharmacistOnboarding", 5, "government_id", "Ann", "Lee", "a@x.test", "gov_id_verified",
-                           note_field="gov_id_verification_note")
+            task(name).run("OtherStaffOnboarding", 5, "certificate", "Ann", "Lee", "a@x.test", "certificate_verified",
+                           note_field="certificate_verification_note")
         self.assert_clean(logs)
-        self.assertEqual(target.gov_id_verification_note, "Could not obtain the uploaded file for OCR.")
+        self.assertEqual(target.certificate_verification_note, "Could not obtain the uploaded file for OCR.")
 
     def test_ahpra_verification_logs_hold_no_names_or_numbers(self):
         name = "client_profile.tasks.verify_ahpra_task"

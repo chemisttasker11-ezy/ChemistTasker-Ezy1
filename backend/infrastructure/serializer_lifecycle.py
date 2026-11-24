@@ -40,7 +40,7 @@ def _file_has_changed(new_file, old_file):
     return getattr(new_file, "name", None) != getattr(old_file, "name", None)
 
 
-def _delete_file_if_unreferenced(file_field, *, current_instance=None):
+def delete_file_if_unreferenced(file_field, *, current_instance=None):
     name = getattr(file_field, "name", None)
     if not name:
         return False
@@ -71,6 +71,9 @@ def _should_clear_flag(initial_data, key):
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+_delete_file_if_unreferenced = delete_file_if_unreferenced
 
 
 class RemoveOldFilesMixin:

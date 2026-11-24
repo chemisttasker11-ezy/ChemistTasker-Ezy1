@@ -79,6 +79,7 @@ backend/onboarding/management/*
 !backend/onboarding/management/commands/
 backend/onboarding/management/commands/*
 !backend/onboarding/management/commands/ahpra_e2e.py
+!backend/onboarding/management/commands/delete_recorded_gov_id_files.py
 !backend/onboarding/management/commands/__init__.py
 !backend/onboarding/management/commands/reevaluate_verification.py
 

@@ -2,9 +2,10 @@
 details, with verification resets on change, per-type validation on submit and the document check queued on submit."""
 from rest_framework import serializers
 
-from infrastructure.serializer_lifecycle import _delete_file_if_unreferenced
+from infrastructure.serializer_lifecycle import delete_file_if_unreferenced
 from users.task_dispatch import async_task
 from onboarding.models import OwnerOnboarding
+from onboarding.services.gov_id import reset_gov_id_result
 from onboarding.verification.policy import revoke_for_changed_evidence
 
 
@@ -41,7 +42,7 @@ def apply_identity_tab(instance, vdata: dict, submit: bool):
             old_sec = getattr(instance, 'identity_secondary_file', None)
             if old_sec:
                 try:
-                    _delete_file_if_unreferenced(old_sec, current_instance=instance)
+                    delete_file_if_unreferenced(old_sec, current_instance=instance)
                 except Exception:
                     pass
                 instance.identity_secondary_file = None
@@ -49,7 +50,7 @@ def apply_identity_tab(instance, vdata: dict, submit: bool):
                 sec_changed = True
 
         # If type changes and no new meta provided, wipe old meta to avoid stale keys
-        if 'identity_meta' not in vdata:
+        if type_changed and 'identity_meta' not in vdata:
             instance.identity_meta = {}
             update_fields.append('identity_meta')
             meta_changed = True
@@ -63,7 +64,7 @@ def apply_identity_tab(instance, vdata: dict, submit: bool):
         if new_file is None:
             if old_file:
                 try:
-                    _delete_file_if_unreferenced(old_file, current_instance=instance)
+                    delete_file_if_unreferenced(old_file, current_instance=instance)
                 except Exception:
                     pass
             instance.government_id = None
@@ -71,7 +72,7 @@ def apply_identity_tab(instance, vdata: dict, submit: bool):
         else:
             if old_file and _fname(old_file) and _fname(old_file) != _fname(new_file):
                 try:
-                    _delete_file_if_unreferenced(old_file, current_instance=instance)
+                    delete_file_if_unreferenced(old_file, current_instance=instance)
                 except Exception:
                     pass
             instance.government_id = new_file
@@ -86,7 +87,7 @@ def apply_identity_tab(instance, vdata: dict, submit: bool):
         if new_sec is None:
             if old_sec:
                 try:
-                    _delete_file_if_unreferenced(old_sec, current_instance=instance)
+                    delete_file_if_unreferenced(old_sec, current_instance=instance)
                 except Exception:
                     pass
             instance.identity_secondary_file = None
@@ -94,7 +95,7 @@ def apply_identity_tab(instance, vdata: dict, submit: bool):
         else:
             if old_sec and _fname(old_sec) and _fname(old_sec) != _fname(new_sec):
                 try:
-                    _delete_file_if_unreferenced(old_sec, current_instance=instance)
+                    delete_file_if_unreferenced(old_sec, current_instance=instance)
                 except Exception:
                     pass
             instance.identity_secondary_file = new_sec
@@ -137,9 +138,7 @@ def apply_identity_tab(instance, vdata: dict, submit: bool):
 
     # --- reset verification flags if any relevant identity input changed
     if gov_id_changed or sec_changed or type_changed or meta_changed:
-        instance.gov_id_verified = False
-        instance.gov_id_verification_note = ""
-        update_fields += ['gov_id_verified', 'gov_id_verification_note']
+        update_fields.extend(reset_gov_id_result(instance))
         # Owner identity is a separate marketplace gate. Workers lose Verified only when their Verified relies on the
         # photo ID (overseas mobile skip, or a tightening that requires it); Submit alone never removes it.
         if not isinstance(instance, OwnerOnboarding) and revoke_for_changed_evidence(instance, 'gov_id'):
@@ -149,7 +148,7 @@ def apply_identity_tab(instance, vdata: dict, submit: bool):
         instance.save(update_fields=list(set(update_fields)))
 
     # --- Validate on submit (per type)
-    if submit:
+    if submit and (instance.government_id or not instance.gov_id_verified):
         errors = {}
         doc_type = getattr(instance, 'government_id_type')
         meta_now = getattr(instance, 'identity_meta') or {}
