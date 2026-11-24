@@ -178,7 +178,7 @@ class BookingLockOrderTests(TransactionTestCase):
     @staticmethod
     def locked_table(sql):
         if 'FOR UPDATE' in sql or 'FOR NO KEY UPDATE' in sql:
-            return search(r'FROM "([^"]+)"', sql)[1]
+            return search(r'\bFROM "([^"]+)"', sql)[1]
 
     def assert_booking_order(self, queries, profile_ids):
         shift, profile, offer, user, slot = (
