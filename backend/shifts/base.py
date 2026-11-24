@@ -126,7 +126,8 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             return None, None
         if len(key) > 255:
             raise ValidationError({'detail': 'Idempotency key is too long.'})
-        request.user = type(request.user).objects.select_for_update(no_key=True).get(pk=request.user.pk)
+        # The unique receipt serializes retries without locking the actor before a shift or profile.
+        request.user = type(request.user).objects.get(pk=request.user.pk)
         if not request.user.is_active:
             raise PermissionDenied()
         if operation == 'shift.counter_offer.create':

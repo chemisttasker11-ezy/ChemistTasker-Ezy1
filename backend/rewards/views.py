@@ -17,6 +17,7 @@ from rewards.services import (
     create_friend_referral,
     create_shift_referral,
     finalize_offers_with_pills,
+    lock_pending_pill_offers,
     get_or_create_referral_code,
     get_pill_balance,
     get_shift_post_pill_cost,
@@ -196,11 +197,7 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
                     })
                 if shift.payment_status != "PENDING":
                     raise DRFValidationError({"detail": "This shift does not require payment."})
-                pending = list(
-                    ShiftOffer.objects.select_for_update().filter(
-                        shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-                    ).order_by("pk")
-                )
+                pending = lock_pending_pill_offers(shift)
                 if offer_ids:
                     selected = [offer for offer in pending if offer.id in offer_ids]
                     if len(selected) != len(offer_ids):

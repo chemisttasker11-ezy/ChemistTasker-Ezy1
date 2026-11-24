@@ -1,5 +1,5 @@
 """Selected-offer normalization and booking finalization after billing authority is established."""
-from shifts.booking import lock_booking_workers
+from shifts.booking import lock_booking_offers, lock_booking_workers
 from shifts.finalize import BookingRosterBusy, expire_competing_offers
 
 
@@ -52,8 +52,9 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     from shifts.finalize import finalize_shift_offer
 
     target_offer_ids = _normalize_offer_ids(offer_ids)
-    Shift.objects.select_for_update().get(pk=shift.pk)
-    offers = ShiftOffer.objects.select_for_update().filter(shift=shift).order_by("created_at", "pk")
+    shift = Shift.objects.select_for_update().get(pk=shift.pk)
+    lock_booking_offers(shift, offer_ids=target_offer_ids)
+    offers = shift.offers.order_by("created_at", "pk")
     if not (target_offer_ids and unbookable is not None):
         offers = offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
 

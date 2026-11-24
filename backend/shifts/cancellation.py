@@ -38,6 +38,11 @@ def cancel_upcoming_assignments(user, *, reason='their AHPRA registration is pau
     # Today's start time is checked below: a negotiated offer can move it away from the slot template.
     from_today = Q(slot_date__gte=now.date()) | Q(slot_date__isnull=True, slot__date__gte=now.date())
     public = Q(shift__visibility='PLATFORM') | Q(engagement_terms_snapshot__booking_source='PUBLIC')
+    # Assignment deletions can lock roster weeks through their signals.
+    offers = list(ShiftOffer.objects.select_for_update(of=('self',)).filter(
+        public, user=user,
+        status__in=[ShiftOffer.Status.ACCEPTED, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
+    ).select_related('shift__pharmacy', 'slot').order_by('pk'))
     assignments = list(ShiftSlotAssignment.objects.select_for_update(of=('self',))
                        .filter(from_today, public, user=user)
                        .select_related('shift__pharmacy', 'slot', 'source_offer'))
@@ -62,10 +67,6 @@ def cancel_upcoming_assignments(user, *, reason='their AHPRA registration is pau
         cancelled[key] = (assignment.shift, day)
         # An AHPRA restriction must also remove published roster bookings. QuerySet.delete keeps deletion signals.
         ShiftSlotAssignment.objects.filter(pk=assignment.pk).delete()
-    offers = ShiftOffer.objects.select_for_update(of=('self',)).filter(
-        public, user=user,
-        status__in=[ShiftOffer.Status.ACCEPTED, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT],
-    ).select_related('shift__pharmacy', 'slot')
     for offer in offers:
         if not _is_public_booking(user, offer.shift, offer.engagement_terms_snapshot):
             continue

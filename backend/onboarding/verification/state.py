@@ -219,13 +219,28 @@ def require_public_ahpra(user, shift, *, schedule_recheck=True):
         transaction.on_commit(lambda: queue_public_recheck(user), robust=True)
 
 
+def lock_ahpra_profiles(workers):
+    """Lock profiles by model name and PK in booking order: shift, profiles, offers, users, slots, roster weeks."""
+    profiles = {}
+    for worker in workers:
+        profile = ahpra_profile(worker)
+        if profile is not None:
+            profiles[(profile._meta.object_name, profile.pk)] = type(profile)
+    for key in sorted(profiles):
+        profiles[key].objects.select_for_update().filter(pk=key[1]).first()
+
+
 def lock_public_ahpra(user, shift, *, manager=False, schedule_recheck=True, allow_group_booking=False):
-    """Inside the booking transaction: lock the worker's AHPRA profile row (apply_state_transition holds the same
-    lock) and re-check. For owner-driven group bookings, return the refusal code for the manager notice."""
+    """Lock the worker's profile before checking booking credentials."""
+    lock_ahpra_profiles([user])
+    return check_public_ahpra(
+        user, shift, manager=manager, schedule_recheck=schedule_recheck, allow_group_booking=allow_group_booking,
+    )
+
+
+def check_public_ahpra(user, shift, *, manager=False, schedule_recheck=True, allow_group_booking=False):
+    """Check credentials with the profile already locked, returning any group booking warning."""
     ShiftActionRefused = verification_features().shift_refusal_type()
-    profile = ahpra_profile(user)
-    if profile is not None:
-        type(profile).objects.select_for_update().filter(pk=profile.pk).first()
     try:
         if schedule_recheck:
             require_public_ahpra(user, shift)

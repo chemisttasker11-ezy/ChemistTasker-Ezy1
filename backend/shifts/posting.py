@@ -13,7 +13,8 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from shifts.announcements import announce_availability_matches, announce_posted_shift
-from shifts.assignment import lock_shift_offer_credentials, offer_dedicated_shift
+from shifts.assignment import check_shift_offer_credentials, offer_dedicated_shift
+from shifts.booking import lock_booking_profiles
 from shifts.emails import send_shift_updated_notifications
 from shifts.escalation import ESCALATION_FIELD_MAP, allowed_tiers as pharmacy_allowed_tiers, validate_visibility
 from shifts.limits import enforce_public_shift_daily_limit
@@ -145,6 +146,9 @@ def post_shift(
 
     with transaction.atomic():
         shift = Shift.objects.create(**validated_data)
+        dedicated_user = getattr(shift, 'dedicated_user', None)
+        if dedicated_user:
+            lock_booking_profiles([dedicated_user])
         for slot in slots_data:
             ShiftSlot.objects.create(shift=shift, **slot)
         # Announcements cannot undo a committed shift or suppress the next independent callback.
@@ -166,9 +170,8 @@ def post_shift(
                 request_data=rate_request_data,
             )
 
-        dedicated_user = getattr(shift, 'dedicated_user', None)
         if dedicated_user:
-            credentials = lock_shift_offer_credentials(dedicated_user, shift, manager=True)
+            credentials = check_shift_offer_credentials(dedicated_user, shift, manager=True)
             offer_dedicated_shift(shift, dedicated_user)
             notify_worker_credentials(shift, dedicated_user, credentials)
 

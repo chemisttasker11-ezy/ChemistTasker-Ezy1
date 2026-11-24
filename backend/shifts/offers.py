@@ -16,7 +16,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Avg
 from django.utils import timezone
 from shifts.pricing import expand_shift_slots
-from shifts.booking import ensure_worker_booking_available, lock_booking_workers
+from shifts.booking import ensure_worker_booking_available, lock_booking_workers, lock_offer_for_acceptance
 from shifts.finalize import finalize_shift_offer
 from shifts.events import payroll_activated
 from shifts.payment_deadlines import offer_payment_deadline
@@ -37,7 +37,7 @@ from django.db import transaction
 from decimal import Decimal
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.base import SHIFT_OFFER_BUZZ_COOLDOWN
-from shifts.assignment import lock_shift_offer_credentials, slot_locked_for_shift_offer
+from shifts.assignment import check_shift_offer_credentials, slot_locked_for_shift_offer
 from shifts.access import _user_can_perform_shift_role
 from shifts.serializers import (
     ShiftInterestSerializer,
@@ -338,10 +338,8 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             get_billing_state_for_pharmacy,
         )
 
-        offer = self.get_object()
-        shift = Shift.objects.select_for_update().get(pk=offer.shift_id)
-        offer = ShiftOffer.objects.select_for_update().get(pk=offer.pk)
-        credentials = lock_shift_offer_credentials(request.user, shift)
+        shift, offer = lock_offer_for_acceptance(self.get_object(), request.user)
+        credentials = check_shift_offer_credentials(request.user, shift)
         if offer.user_id != request.user.id:
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
         if offer.status != ShiftOffer.Status.PENDING:

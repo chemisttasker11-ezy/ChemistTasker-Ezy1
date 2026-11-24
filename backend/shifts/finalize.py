@@ -9,8 +9,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from shifts.access import ShiftActionRefused
-from shifts.assignment import lock_shift_offer_credentials
-from shifts.booking import ensure_worker_booking_available, lock_booking_workers
+from shifts.assignment import check_shift_offer_credentials
+from shifts.booking import ensure_worker_booking_available, lock_booking_profiles, lock_booking_workers
 from shifts.engagement import KIND_STAFF_EMPLOYMENT, staff_assignment_defaults
 from shifts.events import before_fulfillment
 from shifts.notifications import notify_worker_credentials
@@ -65,7 +65,7 @@ def _lock_roster_revisions(shift, occurrences):
 
 def _check_fulfillment_credentials(offer):
     try:
-        credentials = lock_shift_offer_credentials(offer.user, offer.shift, manager=True, schedule_recheck=False)
+        credentials = check_shift_offer_credentials(offer.user, offer.shift, manager=True, schedule_recheck=False)
     except ShiftActionRefused as exc:
         # Paid fulfillment reconciles a refused booking through its existing validation path.
         raise ValidationError(exc.detail) from exc
@@ -82,8 +82,10 @@ def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None, payment_complet
 
     with transaction.atomic():
         shift = Shift.objects.select_for_update().get(pk=offer.shift_id)
+        worker_id = offer.user_id
+        lock_booking_profiles([offer.user])
         offer.refresh_from_db(from_queryset=ShiftOffer.objects.select_for_update(of=("self",)))
-        if offer.shift_id != shift.pk:
+        if offer.shift_id != shift.pk or offer.user_id != worker_id:
             raise ValidationError({'detail': 'The selected offer changed. Refresh before fulfillment.'})
         if not shift.single_user_only and not offer.slot_id:
             raise ValidationError({"detail": "Offer is missing slot selection."})

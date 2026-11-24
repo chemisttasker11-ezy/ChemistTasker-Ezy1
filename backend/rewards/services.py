@@ -7,9 +7,9 @@ from django.db.models import Sum
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
-from shifts.booking import lock_booking_workers
+from shifts.booking import lock_booking_offers, lock_booking_workers
 from shifts.finalize import finalize_shift_offer
-from shifts.models import Shift
+from shifts.models import Shift, ShiftOffer
 from rewards.models import PillLedgerEntry, PillReferralCode, PillReferralEvent, PillRewardRule
 
 User = get_user_model()
@@ -380,8 +380,13 @@ def spend_pills_for_shift_post(*, user, shift: Shift, offer=None) -> PillLedgerE
     )
 
 
+def lock_pending_pill_offers(shift):
+    return [offer for offer in lock_booking_offers(shift)
+            if offer.status == ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT]
+
+
 def finalize_offers_with_pills(*, user, shift, offers):
-    """Debit and fulfill under the caller's shift and offer locks."""
+    """Debit and fulfill under the caller's shift, profile and offer locks."""
     lock_booking_workers({user.pk, *(offer.user_id for offer in offers)})
     entries = []
     for offer in offers:

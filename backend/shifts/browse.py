@@ -219,6 +219,7 @@ class CommunityShiftViewSet(BaseShiftViewSet):
         # membership update from making that queryset and the favorite-worker handling observe different tiers.
         with transaction.atomic():
             from onboarding.verification.state import lock_public_ahpra
+            Shift.objects.select_for_update().get(pk=shift.pk)
             lock_public_ahpra(user, shift)
             # --- 1. Membership verification (reachable through OWNER_CHAIN / ORG_CHAIN visibility) ---
             membership = Membership.objects.select_for_update().filter(
@@ -288,7 +289,6 @@ class CommunityShiftViewSet(BaseShiftViewSet):
                 )
 
             # --- 5. Check if shift already taken ---
-            Shift.objects.select_for_update().get(pk=shift.pk)
             any_assigned = shift.single_user_only and ShiftSlotAssignment.objects.filter(shift=shift).exists()
             if any_assigned:
                 return Response({"detail": "This shift is no longer available."}, status=status.HTTP_400_BAD_REQUEST)

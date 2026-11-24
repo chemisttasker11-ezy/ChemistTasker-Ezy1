@@ -30,16 +30,24 @@ def lock_shift_offer_credentials(worker, shift, *, manager=False, schedule_reche
     )
 
 
+def check_shift_offer_credentials(worker, shift, *, manager=False, schedule_recheck=True):
+    from onboarding.verification.state import check_public_ahpra
+
+    return check_public_ahpra(
+        worker, shift, manager=manager, schedule_recheck=schedule_recheck, allow_group_booking=True,
+    )
+
+
 @transaction.atomic
 def offer_shift(*, shift, candidate, slot_id):
     """Offer the shift (or one slot) to a candidate, who must confirm before any assignment exists. A pending offer
     is refreshed instead of duplicated; an expired one is closed first. Returns the response body."""
     from onboarding.verification.state import GROUP_BOOKING_TIERS
 
-    if shift.visibility in GROUP_BOOKING_TIERS:
-        shift = Shift.objects.select_for_update().get(pk=shift.pk)
-        if shift.visibility not in GROUP_BOOKING_TIERS:
-            raise ShiftActionRefused('The shift audience changed. Refresh before sending this offer.', 409)
+    original_visibility = shift.visibility
+    shift = Shift.objects.select_for_update().get(pk=shift.pk)
+    if original_visibility in GROUP_BOOKING_TIERS and shift.visibility not in GROUP_BOOKING_TIERS:
+        raise ShiftActionRefused('The shift audience changed. Refresh before sending this offer.', 409)
     credentials = lock_shift_offer_credentials(candidate, shift, manager=True)
     if not _user_can_perform_shift_role(candidate, shift.role_needed):
         raise ShiftActionRefused('The candidate role does not cover this shift.')

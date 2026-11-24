@@ -44,7 +44,7 @@ def outside_booking_source(user, pharmacy):
     )
     if memberships.filter(pharmacy=pharmacy, employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES).exists():
         return "FAVOURITE"
-    staff = memberships.filter(employment_type__in=PHARMACY_STAFF_TYPES)
+    staff = memberships.filter(employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES)
     if staff.filter(pharmacy__chains__in=active_owner_chains_for_pharmacy(pharmacy)).exists():
         return "CHAIN"
     if pharmacy.organization_id and staff.filter(pharmacy__organization_id=pharmacy.organization_id).exists():

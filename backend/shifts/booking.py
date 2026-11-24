@@ -3,16 +3,49 @@ from datetime import datetime, timedelta, timezone as datetime_timezone
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.http import Http404
 from rest_framework.exceptions import ValidationError
 
-from shifts.models import ShiftOffer, ShiftSlotAssignment
+from shifts.models import Shift, ShiftOffer, ShiftSlotAssignment
 from shifts.occurrences import accepted_occurrences
 from shifts.pricing import expand_shift_slots
 from organizations.timezone import get_pharmacy_timezone
 
 
+def lock_booking_profiles(workers):
+    from onboarding.verification.state import lock_ahpra_profiles
+
+    lock_ahpra_profiles(workers)
+
+
+def lock_booking_offers(shift, *, offer_ids=(), workers=()):
+    """With the shift locked, lock selected and live offers before any competing offer can be expired."""
+    offers = shift.offers.filter(Q(pk__in=offer_ids) | Q(status__in=[
+        ShiftOffer.Status.PENDING, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+    ]))
+    owners = dict(offers.values_list('pk', 'user_id'))
+    workers_by_id = get_user_model().objects.in_bulk(set(owners.values()))
+    workers_by_id.update((worker.pk, worker) for worker in workers)
+    lock_booking_profiles(workers_by_id.values())
+    locked = list(shift.offers.select_for_update(of=('self',)).filter(pk__in=owners).order_by('pk'))
+    if any(owners[offer.pk] != offer.user_id for offer in locked):
+        raise ValidationError({'detail': 'The selected offer changed. Refresh before fulfillment.'})
+    return locked
+
+
+def lock_offer_for_acceptance(offer, worker):
+    shift = Shift.objects.select_for_update().get(pk=offer.shift_id)
+    locked_offers = lock_booking_offers(shift, offer_ids=[offer.pk], workers=[worker])
+    locked_offer = next((row for row in locked_offers if row.pk == offer.pk), None)
+    if locked_offer is None:
+        raise Http404
+    if locked_offer.user_id != offer.user_id:
+        raise ValidationError({'detail': 'The selected offer changed. Refresh before accepting.'})
+    return shift, locked_offer
+
+
 def lock_booking_workers(worker_ids):
-    """Lock in user ID order inside the booking transaction, after its shift and offer locks."""
+    """Lock users by PK in booking order: shift, profiles, offers, users, slots, roster weeks."""
     # NO KEY UPDATE serializes bookings without blocking unrelated foreign-key inserts.
     list(get_user_model().objects.select_for_update(no_key=True).filter(
         pk__in=worker_ids,
