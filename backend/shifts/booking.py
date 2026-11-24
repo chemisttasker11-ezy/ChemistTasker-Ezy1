@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone as datetime_timezone
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from shifts.models import ShiftOffer, ShiftSlotAssignment
@@ -74,10 +73,9 @@ def ensure_worker_booking_available(offer, occurrences=None):
             assignment.source_offer,
         ), 'an assigned shift')
 
+    # Payment expiry transitions the offer only after confirming the provider no longer owns the hold.
     holds = ShiftOffer.objects.filter(
         user_id=offer.user_id, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-    ).filter(
-        Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()),
     ).exclude(pk=offer.pk).select_related('shift__pharmacy').prefetch_related('shift__slots')
     for hold in holds:
         for row in accepted_occurrences(hold, expand_shift_slots(hold.shift)):

@@ -130,6 +130,12 @@ def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
                     "offer_id": offer.id,
                 }
 
+            if 'error' in reason:
+                raise ValidationError({
+                    'code': 'booking_rate_unavailable',
+                    'detail': 'The booking rate could not be determined. Review the shift or employment rates.',
+                })
+
             try:
                 assn = ShiftSlotAssignment.objects.create(
                     shift=shift,

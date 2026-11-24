@@ -997,6 +997,7 @@ class BookingSafetyTests(ShiftActionFixture):
         worker = self.worker()
         held = self.offer(self.shift(), worker)
         self.assertEqual(self.accept(held).status_code, 200)
+        ShiftOffer.objects.filter(pk=held.pk).update(expires_at=timezone.now() - timedelta(seconds=1))
         second = self.offer(self.shift(), worker)
 
         response = self.accept(second, payment=False)
@@ -1007,6 +1008,29 @@ class BookingSafetyTests(ShiftActionFixture):
         second.refresh_from_db()
         self.assertEqual(held.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
         self.assertEqual(second.status, ShiftOffer.Status.PENDING)
+
+    def test_finalization_rejects_a_pricing_error_without_assigning(self):
+        from rest_framework.exceptions import ValidationError
+        from shifts.finalize import finalize_shift_offer
+
+        offer = self.offer(self.shift(), self.worker(), status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        with mock.patch('shifts.finalize.get_locked_rate_for_slot', return_value=(Decimal('0'), {'error': 'missing wage'})):
+            with self.assertRaises(ValidationError) as refusal:
+                finalize_shift_offer(offer)
+        self.assertEqual(refusal.exception.detail['code'], 'booking_rate_unavailable')
+        self.assertFalse(offer.slot_assignments.exists())
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+
+    def test_finalization_accepts_intentional_timesheet_only_zero(self):
+        from shifts.finalize import finalize_shift_offer
+
+        offer = self.offer(self.shift(), self.worker(), status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        reason = {'source': 'StaffEmployment', 'settlement_channel': 'TIMESHEET_ONLY'}
+        with mock.patch('shifts.finalize.get_locked_rate_for_slot', return_value=(Decimal('0'), reason)):
+            finalize_shift_offer(offer)
+        assignment = offer.slot_assignments.get()
+        self.assertEqual((assignment.unit_rate, assignment.rate_reason), (Decimal('0'), reason))
 
     def test_bl12_touching_edges_are_allowed(self):
         worker = self.worker()
@@ -1026,9 +1050,6 @@ class BookingSafetyTests(ShiftActionFixture):
         booked.slot_assignments.get().delete()
         for state in (ShiftOffer.Status.EXPIRED, ShiftOffer.Status.DECLINED):
             self.offer(self.shift(), worker, status=state)
-        self.offer(self.shift(), worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-                   expires_at=timezone.now() - timedelta(seconds=1))
-
         response = self.accept(self.offer(self.shift(), worker), payment=False)
 
         self.assertEqual(response.status_code, 200, response.data)
