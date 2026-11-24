@@ -44,6 +44,10 @@ def owner_secondary_id_upload_path(instance, filename):
     return onboarding_upload_path(instance, filename, "gov_ids_secondary")
 
 
+def indemnity_certificate_upload_path(instance, filename):
+    return onboarding_upload_path(instance, filename, "indemnity_certificates")
+
+
 def pharmacist_profile_photo_upload_path(instance, filename):
     return onboarding_upload_path(instance, filename, "profile_photos")
 
@@ -266,6 +270,9 @@ class PharmacistOnboarding(GovIdResult):
     ]
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    indemnity_insurer = models.CharField(max_length=255, blank=True)
+    indemnity_expiry = models.DateField(blank=True, null=True)
+    indemnity_certificate = models.FileField(upload_to=indemnity_certificate_upload_path, blank=True, null=True)
 
     profile_photo = models.ImageField(upload_to=pharmacist_profile_photo_upload_path, blank=True, null=True)
     government_id = models.FileField(upload_to=pharmacist_gov_id_upload_path, blank=True, null=True)
@@ -417,6 +424,9 @@ class OtherStaffOnboarding(GovIdResult):
 
     # --- Core ---
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    indemnity_insurer = models.CharField(max_length=255, blank=True)
+    indemnity_expiry = models.DateField(blank=True, null=True)
+    indemnity_certificate = models.FileField(upload_to=indemnity_certificate_upload_path, blank=True, null=True)
 
     profile_photo = models.ImageField(upload_to=otherstaff_profile_photo_upload_path, blank=True, null=True)
 

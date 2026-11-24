@@ -1,3 +1,4 @@
+import IndemnityCover from '../IndemnityCover';
 import AhpraStatus from '../../../components/AhpraStatus';
 import { useAhpra } from '../../../contexts/AhpraContext';
 // Role & qualifications (Pharmacy team). Required: the role, its classification or year, and an intern's AHPRA number.
@@ -223,6 +224,8 @@ export default function RegulatoryV2() {
           </Stack>
         )}
       </Stack>
+
+      {savedRole === "INTERN" && <IndemnityCover role="otherstaff" />}
 
       {role && role !== "INTERN" && (
         <Stack component="section" spacing={1.5} aria-labelledby="evidence-heading">

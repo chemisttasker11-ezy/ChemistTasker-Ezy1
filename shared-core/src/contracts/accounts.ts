@@ -17,6 +17,10 @@ export interface CurrentUserApi {
     in_free_trial?: boolean;
 }
 export interface OnboardingApi {
+    indemnity_insurer?: string;
+    indemnity_expiry?: string | null;
+    indemnity_certificate?: string | null;
+    indemnity_status?: 'shown' | 'expired' | 'missing' | null;
     ahpra?: import('../domains/onboarding/ahpra').AhpraSummary | null;
     id?: number;
     first_name?: string | null;

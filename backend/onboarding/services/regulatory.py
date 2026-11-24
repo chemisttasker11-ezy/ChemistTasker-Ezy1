@@ -2,6 +2,7 @@
 evidence documents (qualification certificate, university ID, ...). Documents earn badges and are checked by the
 document verification task; they never block submission (onboarding/verification/policy.py)."""
 from rest_framework import serializers
+from onboarding.services.indemnity import apply_indemnity_fields
 
 from infrastructure.serializer_lifecycle import _delete_file_if_unreferenced
 from users.task_dispatch import async_task
@@ -97,6 +98,8 @@ def apply_regulatory_tab(instance, vdata: dict, submit: bool):
     if submit:
         if str(instance.role_type or '').upper() == 'INTERN' and not (instance.ahpra_number or '').strip():
             raise serializers.ValidationError({'ahpra_number': ['Enter your AHPRA number (provisional registration).']})
+
+    apply_indemnity_fields(instance, vdata, update_fields)
 
     if update_fields:
         instance.save(update_fields=list(set(update_fields)))

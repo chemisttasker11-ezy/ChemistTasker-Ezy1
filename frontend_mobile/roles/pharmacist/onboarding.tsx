@@ -1,3 +1,4 @@
+import IndemnityCover from '../../components/IndemnityCover';
 import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, StyleSheet, View, Alert } from 'react-native';
 import { Text, Button, Chip, ProgressBar, IconButton } from 'react-native-paper';
@@ -178,6 +179,7 @@ export default function PharmacistOnboardingScreen() {
 
         {stepIndex === 1 && (
           <StepSection title="Professional Details" description="Credentials and registration">
+            <IndemnityCover role="pharmacist" />
             <StepField label="ABN" value={abn} onChangeText={setAbn} keyboardType="numeric" placeholder="XX XXX XXX XXX" />
             <StepField label="AHPRA Number" value={ahpraNumber} onChangeText={setAhpraNumber} placeholder="PHAXXXXXX" helperText={AHPRA_CONSENT_TEXT} />
             <StepActions onPrev={() => setStepIndex(0)} onNext={() => handleSave(2)} loading={submitting} nextLabel="Next: Skills" />
