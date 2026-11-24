@@ -1211,6 +1211,134 @@ class BookingSafetyTests(ShiftActionFixture):
         self.assertEqual(offer.pay_by_at, now + timedelta(hours=24))
         self.assertFalse(shift.fulfillment_checkouts.exists())
 
+    def test_bl12_accept_rejects_a_confirmed_booking_on_another_shift(self):
+        worker = self.worker()
+        first = self.offer(self.shift(), worker)
+        self.assertEqual(self.accept(first, payment=False).status_code, 200)
+        offer = self.offer(self.shift(), worker)
+
+        response = self.accept(offer)
+
+        self.assertIn(response.status_code, (400, 409), response.data)
+        self.assertEqual(response.data['code'], 'worker_booking_overlap')
+        self.assertIn(f'{DAY} 09:00', str(response.data['detail']))
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+
+    def test_bl12_finalization_rechecks_for_a_roster_assignment_after_acceptance(self):
+        from rest_framework.exceptions import ValidationError
+        from shifts.finalize import finalize_shift_offer
+
+        worker = self.worker()
+        offer = self.offer(self.shift(), worker)
+        self.assertEqual(self.accept(offer).status_code, 200)
+        other = self.shift()
+        slot = other.slots.get()
+        ShiftSlotAssignment.objects.create(
+            shift=other, slot=slot, slot_date=slot.date, user=worker, is_rostered=True,
+        )
+
+        with self.assertRaisesMessage(ValidationError, f'{DAY} 09:00'):
+            finalize_shift_offer(offer)
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.assertFalse(offer.shift.slot_assignments.exists())
+
+    def test_bl12_accept_rejects_overlap_with_another_unpaid_hold(self):
+        worker = self.worker()
+        held = self.offer(self.shift(), worker)
+        self.assertEqual(self.accept(held).status_code, 200)
+        ShiftOffer.objects.filter(pk=held.pk).update(expires_at=timezone.now() - timedelta(seconds=1))
+        second = self.offer(self.shift(), worker)
+
+        response = self.accept(second, payment=False)
+
+        self.assertIn(response.status_code, (400, 409), response.data)
+        self.assertIn(f'{DAY} 09:00', str(response.data['detail']))
+        held.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(held.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.assertEqual(second.status, ShiftOffer.Status.PENDING)
+
+    def test_finalization_rejects_a_pricing_error_without_assigning(self):
+        from rest_framework.exceptions import ValidationError
+        from shifts.finalize import finalize_shift_offer
+
+        offer = self.offer(self.shift(), self.worker(), status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        with mock.patch('shifts.finalize.get_locked_rate_for_slot', return_value=(Decimal('0'), {'error': 'missing wage'})):
+            with self.assertRaises(ValidationError) as refusal:
+                finalize_shift_offer(offer)
+        self.assertEqual(refusal.exception.detail['code'], 'booking_rate_unavailable')
+        self.assertFalse(offer.slot_assignments.exists())
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+
+    def test_finalization_accepts_intentional_timesheet_only_zero(self):
+        from shifts.finalize import finalize_shift_offer
+
+        offer = self.offer(self.shift(), self.worker(), status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        reason = {'source': 'StaffEmployment', 'settlement_channel': 'TIMESHEET_ONLY'}
+        with mock.patch('shifts.finalize.get_locked_rate_for_slot', return_value=(Decimal('0'), reason)):
+            finalize_shift_offer(offer)
+        assignment = offer.slot_assignments.get()
+        self.assertEqual((assignment.unit_rate, assignment.rate_reason), (Decimal('0'), reason))
+
+    def test_bl12_touching_edges_are_allowed(self):
+        worker = self.worker()
+        first = self.offer(self.shift(), worker)
+        self.assertEqual(self.accept(first, payment=False).status_code, 200)
+        second = self.offer(self.shift(), worker)
+        second.shift.slots.update(start_time=time(17), end_time=time(19))
+
+        response = self.accept(second, payment=False)
+
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_bl12_cancelled_assignment_and_inactive_offers_are_ignored(self):
+        worker = self.worker()
+        booked = self.offer(self.shift(), worker)
+        self.assertEqual(self.accept(booked, payment=False).status_code, 200)
+        booked.slot_assignments.get().delete()
+        for state in (ShiftOffer.Status.EXPIRED, ShiftOffer.Status.DECLINED):
+            self.offer(self.shift(), worker, status=state)
+        response = self.accept(self.offer(self.shift(), worker), payment=False)
+
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_bl12_accept_compares_overnight_work_in_absolute_time(self):
+        worker = self.worker()
+        self.pharmacy.timezone = 'Australia/Perth'
+        self.pharmacy.save(update_fields=['timezone'])
+        overnight = self.shift(single_user_only=False)
+        overnight.slots.update(start_time=time(22), end_time=time(6))
+        # The negotiated Perth end of 07:00 is 09:00 in Brisbane.
+        held = self.offer(overnight, worker, offered_end_time=time(7), offered_slot_date=DAY)
+        self.assertEqual(self.accept(held).status_code, 200)
+        _, other_pharmacy = make_owner_with_pharmacy('Brisbane overlap')
+        other_pharmacy.timezone = 'Australia/Brisbane'
+        other_pharmacy.save(update_fields=['timezone'])
+        second = self.shift()
+        Shift.objects.filter(pk=second.pk).update(pharmacy=other_pharmacy)
+        second.slots.update(date=DAY + timedelta(days=1), start_time=time(8, 30), end_time=time(10))
+
+        response = self.accept(self.offer(second, worker))
+
+        self.assertIn(response.status_code, (400, 409), response.data)
+        self.assertIn(f'{DAY + timedelta(days=1)} 07:00', str(response.data['detail']))
+
+    def test_bl12_accept_and_finalization_lock_the_worker_row(self):
+        from shifts.finalize import finalize_shift_offer
+
+        worker = self.worker()
+        offer = self.offer(self.shift(), worker)
+        users = type(worker).objects
+        with mock.patch.object(users, 'select_for_update', wraps=users.select_for_update) as lock:
+            self.assertEqual(self.accept(offer).status_code, 200)
+            lock.assert_called_once_with(no_key=True)
+            lock.reset_mock()
+            self.assertEqual(len(finalize_shift_offer(offer)[0]), 1)
+            lock.assert_called_once_with(no_key=True)
+
     def test_offer_terms_version_requires_reviewed_snapshot_and_preserves_pending_on_stale(self):
         """D2: missing and changed terms cannot reserve work; unchanged reviewed terms still can."""
         from shifts.engagement import shift_engagement_terms_version
@@ -1486,7 +1614,9 @@ class BookingSafetyTests(ShiftActionFixture):
                                         {'slot_id': slot.id, 'slot_date': str(slot.date)}]})]:
                 response, _ = self.post(self.owner, f'shifts/{shift.id}/{action}/', payload)
                 self.assertEqual(response.status_code, expected, response.data)
-            offer = self.offer(self.shift(single_user_only=False), worker)
+            offer_shift = self.shift(single_user_only=False)
+            offer_shift.slots.update(date=slot.date + timedelta(days=1))
+            offer = self.offer(offer_shift, worker)
             self.assertEqual(self.accept(offer).status_code, expected)
 
     def test_f05_n1_explorer_requires_verification_to_apply(self):

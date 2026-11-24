@@ -308,14 +308,16 @@ class AhpraApplicationGateTests(TestCase):
         self.member(self.shift.pharmacy)
         self.user.is_otp_verified = self.user.is_mobile_verified = True
         self.user.save(update_fields=['is_otp_verified', 'is_mobile_verified'])
+        shift_date = timezone.localdate() + timedelta(days=5)
         for state in ('suspended', 'not_found', 'unreadable', 'type_not_accepted', 'rejected'):
             self.set_state(state)
             for action in ('express_interest', 'claim', 'accept'):
                 with self.subTest(state=state, action=action):
                     shift, slot, assignment = make_assignment(
                         self.shift.pharmacy, self.shift.created_by, self.user,
-                        timezone.localdate() + timedelta(days=5),
+                        shift_date,
                     )
+                    shift_date += timedelta(days=1)
                     assignment.delete()
                     shift.role_needed, shift.visibility = 'PHARMACIST', 'FULL_PART_TIME'
                     shift.save(update_fields=['role_needed', 'visibility'])
