@@ -1761,7 +1761,7 @@
         },
         {
           "path": "workforce/roster/assignment_rates.py",
-          "line": 19,
+          "line": 17,
           "import": "shifts.pricing",
           "kind": "delayed"
         },

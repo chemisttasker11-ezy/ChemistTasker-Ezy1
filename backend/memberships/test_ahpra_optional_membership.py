@@ -7,7 +7,7 @@ from django.core.cache import caches
 from django.test import override_settings
 from django.utils import timezone
 
-from client_profile.characterization_support import client_for, make_assignment, make_user
+from client_profile.characterization_support import client_for, make_assignment, make_owner_with_pharmacy, make_user
 from memberships.models import Membership
 from memberships.test_membership_workflows_contract import MembershipFixture
 from onboarding.models import PharmacistOnboarding
@@ -83,9 +83,10 @@ class AhpraOptionalMembershipTests(MembershipFixture):
         self.assertFalse(refresh_verified(profile))
         profile.refresh_from_db()
         self.assertFalse(profile.verified)
+        _, other_pharmacy = make_owner_with_pharmacy('Another pharmacy')  # reached as an outside worker (BL-01)
         public = self.internal_shift(visibility='PLATFORM')
-        public.post_anonymously = True  # reached as a public worker, not as this pharmacy's member
-        public.save(update_fields=['post_anonymously'])
+        public.pharmacy = other_pharmacy
+        public.save(update_fields=['pharmacy'])
         response = self.post(worker, f'shifts/{public.pk}/express_interest/')
         self.assertEqual((response.status_code, response.json()['code']), (403, 'ahpra_suspended'))
         self.assertFalse(ShiftInterest.objects.filter(shift=public, user=worker).exists())
