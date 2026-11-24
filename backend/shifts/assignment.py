@@ -17,24 +17,30 @@ from shifts.access import ShiftActionRefused, _user_can_perform_shift_role, staf
 from shifts.emails import build_offer_shift_details, build_shift_offer_context
 from shifts.engagement import keep_accepted_terms, staff_assignment_defaults
 from shifts.models import Shift, ShiftOffer, ShiftSlot, ShiftSlotAssignment
-from shifts.notifications import notify_shift_users
+from shifts.notifications import notify_shift_users, notify_worker_credentials
 
 OFFER_EXPIRY_HOURS = 48
+
+
+def lock_shift_offer_credentials(worker, shift, *, manager=False, schedule_recheck=True):
+    from onboarding.verification.state import lock_public_ahpra
+
+    return lock_public_ahpra(
+        worker, shift, manager=manager, schedule_recheck=schedule_recheck, allow_group_booking=True,
+    )
 
 
 @transaction.atomic
 def offer_shift(*, shift, candidate, slot_id):
     """Offer the shift (or one slot) to a candidate, who must confirm before any assignment exists. A pending offer
     is refreshed instead of duplicated; an expired one is closed first. Returns the response body."""
-    from onboarding.verification.state import lock_public_ahpra
+    from onboarding.verification.state import GROUP_BOOKING_TIERS
 
-    group_tiers = ('OWNER_CHAIN', 'ORG_CHAIN')
-    if shift.visibility in group_tiers:
+    if shift.visibility in GROUP_BOOKING_TIERS:
         shift = Shift.objects.select_for_update().get(pk=shift.pk)
-        if shift.visibility not in group_tiers:
+        if shift.visibility not in GROUP_BOOKING_TIERS:
             raise ShiftActionRefused('The shift audience changed. Refresh before sending this offer.', 409)
-    else:
-        lock_public_ahpra(candidate, shift, manager=True)
+    credentials = lock_shift_offer_credentials(candidate, shift, manager=True)
     if not _user_can_perform_shift_role(candidate, shift.role_needed):
         raise ShiftActionRefused('The candidate role does not cover this shift.')
     # For multi-slot shifts, auto-pick when possible (prefer unassigned)
@@ -86,6 +92,8 @@ def offer_shift(*, shift, candidate, slot_id):
     offered_end_time = slot_obj.end_time if slot_obj else None
     offered_rate = slot_obj.rate if slot_obj else (shift.fixed_rate or shift.max_hourly_rate or shift.min_hourly_rate)
 
+    notify_worker_credentials(shift, candidate, credentials)
+    credential_response = {'worker_credentials': credentials} if credentials is not None else {}
     if existing_offer:
         existing_offer.offered_slot_date = offered_slot_date
         existing_offer.offered_start_time = offered_start_time
@@ -102,6 +110,7 @@ def offer_shift(*, shift, candidate, slot_id):
             'status': 'Offer is already pending candidate confirmation.',
             'offer_id': existing_offer.id,
             'worker_confirmation_required': True,
+            **credential_response,
         }
     else:
         offer = ShiftOffer.objects.create(
@@ -145,6 +154,7 @@ def offer_shift(*, shift, candidate, slot_id):
     return {
         'status': f'Offer sent to {candidate.get_full_name() or candidate.email}.',
         'offer_id': offer.id,
+        **credential_response,
     }
 
 

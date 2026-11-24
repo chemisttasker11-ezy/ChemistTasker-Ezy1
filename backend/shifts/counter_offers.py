@@ -10,15 +10,15 @@ from django.utils import timezone
 
 from users.task_dispatch import async_task
 from shifts.access import ShiftActionRefused, _user_can_perform_shift_role
-from shifts.assignment import OFFER_EXPIRY_HOURS, slot_locked_for_shift_offer
+from shifts.assignment import OFFER_EXPIRY_HOURS, lock_shift_offer_credentials, slot_locked_for_shift_offer
 from shifts.emails import (
     build_counter_offer_shift_details,
     build_offer_shift_details,
     build_shift_counter_offer_context,
     worker_offer_url,
 )
-from shifts.models import ShiftCounterOffer, ShiftInterest, ShiftOffer, ShiftSlotAssignment
-from shifts.notifications import notify_shift_managers, notify_shift_users
+from shifts.models import Shift, ShiftCounterOffer, ShiftInterest, ShiftOffer, ShiftSlotAssignment
+from shifts.notifications import notify_shift_managers, notify_shift_users, notify_worker_credentials
 
 
 def visible_counter_offers_for_shift(*, shift, user, can_manage_pharmacy: bool):
@@ -109,9 +109,8 @@ def ensure_interest_for_counter_offer(*, shift, user, offer):
 def accept_counter_offer(*, shift, offer, slot_id, decided_by):
     """Accept a counter offer (for one slot, or the first free one) by turning it into worker offers the candidate
     must confirm. Returns the response body."""
-    from onboarding.verification.state import lock_public_ahpra
-
-    lock_public_ahpra(offer.user, shift, manager=True)
+    shift = Shift.objects.select_for_update().get(pk=shift.pk)
+    credentials = lock_shift_offer_credentials(offer.user, shift, manager=True)
     if not _user_can_perform_shift_role(offer.user, shift.role_needed):
         raise ShiftActionRefused('The candidate role does not cover this shift.')
     offer_slot_ids = list(offer.slots.values_list('slot_id', flat=True))
@@ -202,6 +201,7 @@ def accept_counter_offer(*, shift, offer, slot_id, decided_by):
     offer.decided_by = decided_by
     offer.decided_at = timezone.now()
     offer.save(update_fields=['status', 'decided_by', 'decided_at', 'updated_at'])
+    notify_worker_credentials(shift, offer.user, credentials)
 
     if offer.user and offer.user.email:
         ctx = build_shift_counter_offer_context(shift, offer, recipient=offer.user)

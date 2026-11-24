@@ -14,6 +14,7 @@ from onboarding.verification.ahpra import ahpra_name_match, registration_type_no
 from onboarding.verification.ahpra_numbers import full_registration_number
 
 ADVERSE_STATUSES = {'suspended', 'cancelled', 'surrendered'}
+GROUP_BOOKING_TIERS = ('OWNER_CHAIN', 'ORG_CHAIN')
 # Lookups with no real register record: they never change anyone's AHPRA state.
 VERIFIER_FAILURES = ('error', 'blocked')
 REVIEW_NOTE = (
@@ -179,9 +180,9 @@ def require_public_ahpra(user, shift, *, schedule_recheck=True):
         transaction.on_commit(lambda: queue_public_recheck(user), robust=True)
 
 
-def lock_public_ahpra(user, shift, *, manager=False, schedule_recheck=True):
+def lock_public_ahpra(user, shift, *, manager=False, schedule_recheck=True, allow_group_booking=False):
     """Inside the booking transaction: lock the worker's AHPRA profile row (apply_state_transition holds the same
-    lock) and re-check, so a booking cannot commit around a suspension that has not yet cancelled bookings."""
+    lock) and re-check. For owner-driven group bookings, return the refusal code for the manager notice."""
     ShiftActionRefused = verification_features().shift_refusal_type()
     profile = ahpra_profile(user)
     if profile is not None:
@@ -191,7 +192,12 @@ def lock_public_ahpra(user, shift, *, manager=False, schedule_recheck=True):
             require_public_ahpra(user, shift)
         else:
             require_public_ahpra(user, shift, schedule_recheck=False)
-    except ShiftActionRefused:
+    except ShiftActionRefused as exc:
+        if allow_group_booking and shift.visibility in GROUP_BOOKING_TIERS:
+            if schedule_recheck:
+                transaction.on_commit(lambda: queue_public_recheck(user), robust=True)
+            code = exc.detail.get('code') if isinstance(exc.detail, dict) else None
+            return {'ok': False, 'code': code or 'booking_onboarding_required'}
         if not manager:
             raise
         raise ShiftActionRefused({'code': 'candidate_ahpra_ineligible',

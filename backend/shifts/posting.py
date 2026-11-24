@@ -13,11 +13,12 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from shifts.announcements import announce_availability_matches, announce_posted_shift
-from shifts.assignment import offer_dedicated_shift
+from shifts.assignment import lock_shift_offer_credentials, offer_dedicated_shift
 from shifts.emails import send_shift_updated_notifications
 from shifts.escalation import ESCALATION_FIELD_MAP
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.models import Shift, ShiftOffer, ShiftSlot
+from shifts.notifications import notify_worker_credentials
 from organizations.timezone import get_pharmacy_timezone
 
 
@@ -158,9 +159,9 @@ def post_shift(
 
         dedicated_user = getattr(shift, 'dedicated_user', None)
         if dedicated_user:
-            from onboarding.verification.state import lock_public_ahpra
-            lock_public_ahpra(dedicated_user, shift, manager=True)
+            credentials = lock_shift_offer_credentials(dedicated_user, shift, manager=True)
             offer_dedicated_shift(shift, dedicated_user)
+            notify_worker_credentials(shift, dedicated_user, credentials)
 
     return shift
 

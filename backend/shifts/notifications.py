@@ -104,3 +104,17 @@ def notify_shift_managers(
                        deliver_on_commit=deliver_on_commit)
     return recipients
 
+
+def notify_worker_credentials(shift, worker, credentials):
+    if credentials is None:
+        return
+    worker_name = worker.get_full_name() or worker.email
+    notify_shift_managers(
+        shift,
+        title="Worker credentials need review",
+        body=f"{worker_name} did not pass the booking credential check.",
+        kind="shift_worker_credentials_notice",
+        payload={"worker_id": worker.pk, "worker_credentials": credentials},
+        deliver_on_commit=True,
+    )
+

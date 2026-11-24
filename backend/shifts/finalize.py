@@ -7,8 +7,10 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from shifts.access import ShiftActionRefused
+from shifts.assignment import lock_shift_offer_credentials
 from shifts.engagement import KIND_STAFF_EMPLOYMENT, staff_assignment_defaults
 from shifts.events import before_fulfillment
+from shifts.notifications import notify_worker_credentials
 from shifts.occurrences import accepted_occurrence_pairs, accepted_occurrences
 
 
@@ -41,13 +43,12 @@ def _accepted_offer_rate_for_occurrence(offer, slot_id, slot_date):
 
 
 def _check_fulfillment_credentials(offer):
-    from onboarding.verification.state import lock_public_ahpra
-
     try:
-        lock_public_ahpra(offer.user, offer.shift, manager=True, schedule_recheck=False)
+        credentials = lock_shift_offer_credentials(offer.user, offer.shift, manager=True, schedule_recheck=False)
     except ShiftActionRefused as exc:
         # Paid fulfillment reconciles a refused booking through its existing validation path.
         raise ValidationError(exc.detail) from exc
+    notify_worker_credentials(offer.shift, offer.user, credentials)
 
 
 def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
