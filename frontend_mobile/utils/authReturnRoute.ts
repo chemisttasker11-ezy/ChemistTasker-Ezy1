@@ -19,13 +19,20 @@ const SAFE_QUERY_PARAMS = new Set([
  * - /explore and /explore/*
  * Rejects external, protocol-relative, backslash, traversal, and encoded escape routes.
  */
-export function sanitizeReturnTo(raw: unknown): string | null {
+export function sanitizeReturnTo(raw: unknown, mode?: 'session'): string | null {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
   if (typeof candidate !== 'string' || /[\x00-\x1f\x7f]/.test(candidate)) return null;
 
   // Strip fragment junk
   const clean = candidate.split('#')[0].trim();
   if (!clean.startsWith('/') || clean.startsWith('//')) return null;
+
+  if (mode === 'session') {
+    const path = clean.split('?')[0];
+    if (!/^\/(?:[a-z0-9_-]+\/?)*$/i.test(path) || path.includes('//')) return null;
+    if (/\/(?:logout|sign-out|login|sign-in|register|welcome|verify-otp|mobile-verify|forgot-password|reset-password)(?:\/|$)/i.test(path)) return null;
+    return clean;
+  }
 
   // Reject control characters (ASCII 0-31, 127)
   if (/[\x00-\x1f\x7f]/.test(clean)) return null;
@@ -70,3 +77,19 @@ export function sanitizeReturnTo(raw: unknown): string | null {
     return pathPart;
   }
 }
+
+let currentSessionReturnRoute: string | null = null;
+
+export function updateSessionReturnRoute(pathname: string, params: Record<string, string | string[] | undefined>, segments: readonly string[]) {
+  const dynamicKeys = new Set(segments.filter(segment => segment.startsWith('['))
+    .map(segment => segment.slice(1, -1).replace(/^\.\.\./, '')));
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || dynamicKeys.has(key)) continue;
+    for (const item of Array.isArray(value) ? value : [value]) query.append(key, item);
+  }
+  const search = query.toString();
+  currentSessionReturnRoute = sanitizeReturnTo(search ? `${pathname}?${search}` : pathname, 'session');
+}
+
+export const getSessionReturnRoute = () => currentSessionReturnRoute;

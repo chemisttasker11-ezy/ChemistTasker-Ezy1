@@ -5,18 +5,19 @@ import NetInfo from '@react-native-community/netinfo';
 import {
   getOnboarding,
   hasAdminCapability,
-  logoutSession as sharedLogoutSession,
+  LOGOUT_QUEUED_MESSAGE,
   normalizeAdminCapability,
   login as sharedLogin,
+  startBrowserLogoutRetry,
   type AuthorityMembership,
   type AuthorityAdminAssignment,
 } from '@chemisttasker/shared-core';
 import { nativeIdentityTransport } from '../utils/nativeIdentityTransport';
-import { getBrowserCsrfToken } from '../utils/browserAuth';
+import { getSessionReturnRoute } from '../utils/authReturnRoute';
 import { resolveApiBaseUrl } from '../utils/apiUrl';
 import { registerForPushNotificationsAsync, registerDeviceTokenWithBackend } from '../utils/pushNotifications';
 import * as Device from 'expo-device';
-import { clearStoredSession, getSessionGeneration, invalidateSessionGeneration, getValidAccessToken, primeInMemorySession, readStoredSession, writeStoredSession } from '../utils/authSession';
+import { clearStoredSession, getSessionGeneration, invalidateSessionGeneration, getValidAccessToken, primeInMemorySession, readStoredSession, retryQueuedLogout, signOutStoredSession, watchSessionExpiry, writeStoredSession } from '../utils/authSession';
 import {
   addNetworkDiagnostic,
   describeRequestError,
@@ -79,6 +80,7 @@ type AuthContextType = {
   updateUserProfilePhoto: (photoUrl: string) => Promise<void>;
   refreshUser: () => Promise<void>;
   isLoading: boolean;
+  expiredSession: { returnTo: string | null } | null;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -99,6 +101,7 @@ const AuthContext = createContext<AuthContextType>({
   updateUserProfilePhoto: async () => { },
   refreshUser: async () => { },
   isLoading: true,
+  expiredSession: null,
 });
 
 type AuthProviderProps = {
@@ -113,10 +116,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isRefreshingProfile, setIsRefreshingProfile] = useState(false);
   const [triedPhotoRefresh, setTriedPhotoRefresh] = useState(false);
   const [registeredPush, setRegisteredPush] = useState(false);
+  const [expiredSession, setExpiredSession] = useState<AuthContextType['expiredSession']>(null);
   const pushTokenRef = useRef<string | null>(null);
   const pushRegistrationRef = useRef<Promise<void> | null>(null);
   // Session generation whose cached identity could not be verified (offline start); null once verified.
   const unverifiedGenerationRef = useRef<number | null>(null);
+
+  const clearLocalAuthState = useCallback(() => {
+    setAccess(null);
+    setRefresh(null);
+    setUser(null);
+    setRegisteredPush(false);
+    pushTokenRef.current = null;
+    setIsLoading(false);
+  }, []);
 
   // Load user from cookie session at app startup
   useEffect(() => {
@@ -249,18 +262,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(null);
       setIsLoading(false);
     };
+    const stopWatchingExpiry = watchSessionExpiry(() => {
+      setExpiredSession({ returnTo: getSessionReturnRoute() });
+      clearLocalAuthState();
+    });
+    const stopBrowserLogoutRetry = Platform.OS === 'web' ? startBrowserLogoutRetry() : undefined;
+    if (!stopBrowserLogoutRetry) void retryQueuedLogout();
     loadStoredAuth();
     const appStateSubscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void loadStoredAuth(true);
+      if (state === 'active') {
+        void retryQueuedLogout();
+        void loadStoredAuth(true);
+      }
     });
     const unsubscribeNetInfo = NetInfo.addEventListener((state) => {
-      if (state.isConnected) void loadStoredAuth(true);
+      if (state.isConnected) {
+        void retryQueuedLogout();
+        void loadStoredAuth(true);
+      }
     });
     return () => {
+      stopWatchingExpiry();
+      stopBrowserLogoutRetry?.();
       appStateSubscription.remove();
       unsubscribeNetInfo();
     };
-  }, []);
+  }, [clearLocalAuthState]);
 
   useEffect(() => {
     const generation = getSessionGeneration();
@@ -268,9 +295,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (!user || registeredPush) return;
       try {
         const token = await registerForPushNotificationsAsync();
-        if (token) pushTokenRef.current = token;
         if (generation !== getSessionGeneration()) return;
         if (token) {
+          pushTokenRef.current = token;
           const platform = Device.osName?.toLowerCase().includes('ios') ? 'ios' : 'android';
           await registerDeviceTokenWithBackend(token, platform as 'ios' | 'android');
         }
@@ -321,6 +348,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAccess(newAccess || null);
     setRefresh(newRefresh || null);
     setUser(baseUser);
+    setExpiredSession(null);
     setIsLoading(false);
     setRegisteredPush(false);
 
@@ -553,38 +581,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [access, user, isRefreshingProfile, triedPhotoRefresh]);
 
   const logout = async () => {
-    const generation = invalidateSessionGeneration();
-    const isWeb = Platform.OS === 'web';
-    const baseURL = resolveApiBaseUrl();
-    try {
-      await pushRegistrationRef.current;
-      const session = await readStoredSession();
-      if (generation !== getSessionGeneration()) return;
-      await sharedLogoutSession({
-        isBrowser: isWeb,
-        refreshToken: session?.refresh ?? session?.tokens?.refresh ?? null,
-        deviceToken: isWeb ? null : pushTokenRef.current,
-        csrfToken: isWeb ? await getBrowserCsrfToken(baseURL || '') : null,
-      });
-    } catch (error) {
-      if (isWeb) {
-        // The HttpOnly cookie cannot be removed by JavaScript. Keep the session
-        // visible until the backend confirms that it revoked the cookie.
-        if (typeof window !== 'undefined') {
-          window.alert('Could not sign out. Please check your connection and try again.');
-        }
-        throw error;
-      }
-      Alert.alert('Sign out', 'Signed out on this device, but the server session could not be revoked.');
+    // A device registration still in flight could land after the sign-out: let it settle (at most 3 s) first.
+    const token = pushTokenRef.current;
+    const registration = pushRegistrationRef.current;
+    const deviceToken = token && registration
+      ? Promise.race([registration.catch(() => undefined), new Promise(resolve => setTimeout(resolve, 3000))]).then(() => token)
+      : token;
+    const revocation = signOutStoredSession(resolveApiBaseUrl() || '', user?.id, deviceToken);
+    clearLocalAuthState();
+    if (!await revocation) {
+      if (Platform.OS === 'web') window.alert(LOGOUT_QUEUED_MESSAGE);
+      else Alert.alert('Sign out', LOGOUT_QUEUED_MESSAGE);
     }
-    if (generation !== getSessionGeneration()) return;
-    setAccess(null);
-    setRefresh(null);
-    setUser(null);
-    setRegisteredPush(false);
-    pushTokenRef.current = null;
-    setIsLoading(false);
-    await clearStoredSession();
   };
 
   const hasCapability = useCallback((capability: string, pharmacyId?: number | string | null) => {
@@ -615,6 +623,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         updateUserProfilePhoto,
         refreshUser,
         isLoading,
+        expiredSession,
       }}
     >
       <AhpraProvider key={`${user?.id}:${user?.role}`} user={user}>{children}</AhpraProvider>

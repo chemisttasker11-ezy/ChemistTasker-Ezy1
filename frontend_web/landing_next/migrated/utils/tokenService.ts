@@ -1,4 +1,5 @@
 import {refreshBrowserSession, watchSession} from '../../shared/browser-session';
+import {isSessionRejection} from '@chemisttasker/shared-core';
 // src/utils/tokenService.ts
 import { API_BASE_URL } from '../constants/api';
 import { browserWebSocketTicket } from '@chemisttasker/shared-core';
@@ -102,16 +103,12 @@ export async function refreshCookieSession(force = false): Promise<{ access: str
   refreshPromise = (async () => {
     try {
       const data = await refreshBrowserSession(API_BASE_URL);
-      if (!data.access) {
-        clearTokens();
-        return null;
-      }
+      if (!data.access) return null;
       const nextRefresh = data.refresh ?? refreshToken ?? '';
       setTokens(data.access, nextRefresh);
       return { access: data.access, refresh: nextRefresh };
     } catch (error) {
-      if ((error as {status?:number}).status !== 401) throw error;
-      clearTokens();
+      if (!isSessionRejection(error)) throw error;
       return null;
     } finally {
       refreshPromise = null;

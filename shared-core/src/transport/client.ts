@@ -12,7 +12,7 @@ export interface ApiClientConfig {
   getAuthToken?: () => MaybePromise<string | null | undefined>;
   getSessionGeneration?: () => number;
   refreshAuthToken?: () => MaybePromise<string | null | undefined>;
-  onAuthFailure?: () => MaybePromise<void>;
+  onAuthFailure?: (refreshError?: unknown) => MaybePromise<void>;
   credentials?: RequestCredentials;
   fetchImpl?: typeof fetch;
 }
@@ -122,7 +122,7 @@ export function createApiClient(configuration: ApiClientConfig): ApiClient {
       try { refreshed = await refresh(generation, assertCurrent); }
       catch (error) {
         assertCurrent();
-        if (config.onAuthFailure) await config.onAuthFailure();
+        if (config.onAuthFailure) await config.onAuthFailure(error);
         throw error;
       }
       assertCurrent();

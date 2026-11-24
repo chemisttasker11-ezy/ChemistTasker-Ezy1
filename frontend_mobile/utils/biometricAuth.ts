@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
 const BIOMETRIC_ENABLED_KEY = 'BIOMETRIC_LOGIN_ENABLED';
 const BIOMETRIC_USER_KEY = 'BIOMETRIC_LOGIN_USER';
@@ -19,6 +20,7 @@ export type BiometricAvailability = {
 type LocalAuthenticationModule = {
   hasHardwareAsync?: () => Promise<boolean>;
   isEnrolledAsync?: () => Promise<boolean>;
+  getEnrolledLevelAsync?: () => Promise<number>;
   supportedAuthenticationTypesAsync?: () => Promise<number[]>;
   authenticateAsync?: (options: {
     promptMessage: string;
@@ -51,6 +53,7 @@ function labelForTypes(types: number[]): string {
 
 export async function getBiometricAvailability(): Promise<BiometricAvailability> {
   try {
+    if (Platform.OS === 'web') return { available: false, label: 'device authentication' };
     const localAuthentication = getLocalAuthentication();
     if (
       !localAuthentication?.hasHardwareAsync ||
@@ -60,15 +63,16 @@ export async function getBiometricAvailability(): Promise<BiometricAvailability>
       return { available: false, label: 'biometrics' };
     }
 
-    const [hasHardware, isEnrolled, types] = await Promise.all([
+    const [hasHardware, isEnrolled, types, level] = await Promise.all([
       localAuthentication.hasHardwareAsync(),
       localAuthentication.isEnrolledAsync(),
       localAuthentication.supportedAuthenticationTypesAsync(),
+      localAuthentication.getEnrolledLevelAsync?.() ?? Promise.resolve(0),
     ]);
 
     return {
-      available: hasHardware && isEnrolled,
-      label: labelForTypes(types),
+      available: (hasHardware && isEnrolled) || level > 0,
+      label: hasHardware && isEnrolled ? labelForTypes(types) : 'device PIN or passcode',
     };
   } catch {
     return { available: false, label: 'biometrics' };
@@ -105,24 +109,34 @@ export async function authenticateWithDeviceLock(): Promise<boolean> {
 }
 
 export async function enableBiometricLogin(user: BiometricUser): Promise<void> {
-  await AsyncStorage.multiSet([
-    [BIOMETRIC_ENABLED_KEY, 'true'],
-    [BIOMETRIC_USER_KEY, JSON.stringify(user)],
-  ]);
+  if (Platform.OS === 'web') throw new Error('Device authentication is unavailable on the web.');
+  await SecureStore.setItemAsync(BIOMETRIC_USER_KEY, JSON.stringify(user));
+  await SecureStore.setItemAsync(BIOMETRIC_ENABLED_KEY, 'true');
+  await AsyncStorage.multiRemove([BIOMETRIC_ENABLED_KEY, BIOMETRIC_USER_KEY]);
 }
 
 export async function disableBiometricLogin(): Promise<void> {
   await AsyncStorage.multiRemove([BIOMETRIC_ENABLED_KEY, BIOMETRIC_USER_KEY]);
+  if (Platform.OS !== 'web') await Promise.all([SecureStore.deleteItemAsync(BIOMETRIC_ENABLED_KEY), SecureStore.deleteItemAsync(BIOMETRIC_USER_KEY)]);
 }
 
 export async function getSavedBiometricUser(): Promise<BiometricUser | null> {
   try {
+    if (Platform.OS === 'web') return null;
     const [enabled, rawUser] = await Promise.all([
-      AsyncStorage.getItem(BIOMETRIC_ENABLED_KEY),
-      AsyncStorage.getItem(BIOMETRIC_USER_KEY),
+      SecureStore.getItemAsync(BIOMETRIC_ENABLED_KEY),
+      SecureStore.getItemAsync(BIOMETRIC_USER_KEY),
     ]);
-    if (enabled !== 'true' || !rawUser) return null;
-    const parsed = JSON.parse(rawUser) as BiometricUser;
+    let value = rawUser;
+    if (enabled !== 'true' || !value) {
+      const [legacyEnabled, legacyUser] = await Promise.all([AsyncStorage.getItem(BIOMETRIC_ENABLED_KEY), AsyncStorage.getItem(BIOMETRIC_USER_KEY)]);
+      if (legacyEnabled !== 'true' || !legacyUser) return null;
+      const legacy = JSON.parse(legacyUser) as BiometricUser;
+      if (typeof legacy?.email !== 'string' && typeof legacy?.id !== 'number') return null;
+      await enableBiometricLogin(legacy);
+      value = legacyUser;
+    }
+    const parsed = JSON.parse(value) as BiometricUser;
     return typeof parsed?.email === 'string' || typeof parsed?.id === 'number' ? parsed : null;
   } catch {
     return null;

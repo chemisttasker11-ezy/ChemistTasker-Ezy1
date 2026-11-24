@@ -1,6 +1,6 @@
 import { configureApi, configureStorage } from '@chemisttasker/shared-core';
 import { getAccessToken, refreshCookieSession } from '../utils/tokenService';
-import { getSessionGeneration } from '../../shared/browser-session';
+import { expireBrowserSession, fetchWithBrowserSession, getSessionGeneration } from '../../shared/browser-session';
 
 let configured = false;
 
@@ -24,7 +24,10 @@ export function initSharedCoreApi() {
   configureApi({
     baseURL,
     getSessionGeneration,
+    onAuthFailure: expireBrowserSession,
+    fetchImpl: fetchWithBrowserSession,
     credentials: 'include',
+    refreshToken: async () => (await refreshCookieSession(true))?.access ?? null,
     getToken: async () => {
       const existing = getAccessToken();
       if (existing) return existing;

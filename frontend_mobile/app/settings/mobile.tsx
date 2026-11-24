@@ -243,7 +243,7 @@ function MobileSettingsContent({ user }: { user: any }) {
         <Text style={styles.muted}>Use {biometricLabel} for faster login with an existing valid session. Your password and all account verification rules remain required when the session expires.</Text>
         <View style={styles.row}><View style={styles.copy}>
           <Text variant="titleMedium">Fast sign-in</Text>
-          <Text style={styles.muted}>{deviceAvailable ? 'Device biometrics or system passcode fallback' : 'Set up biometrics in device Settings to enable'}</Text>
+          <Text style={styles.muted}>{deviceAvailable ? 'Device biometrics or system passcode fallback' : 'Set up device authentication in Settings to enable'}</Text>
         </View><Switch value={biometricEnabled} disabled={busy || loading || !deviceAvailable} onValueChange={(value) => void configureBiometric(value)} accessibilityLabel="Fast sign-in" /></View>
         <Button mode="outlined" onPress={() => void openSystemSettings()}>Manage device PIN, Face ID or fingerprint</Button>
         <Text style={styles.muted}>Attendance kiosk PINs are separate, pharmacy-specific credentials. They do not unlock your app account.</Text>

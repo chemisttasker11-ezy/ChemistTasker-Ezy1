@@ -64,6 +64,7 @@ function loadSequenceHelper() {
       }
       if (id === '@chemisttasker/shared-core') return { fetchMyConfirmedShifts: async () => [] };
       if (id === '@/context/AuthContext') return { useAuth: () => ({ user: null }) };
+      if (id === '@/utils/authSession') return { getSessionGeneration: () => 0 };
       if (id === '@/constants/tokens') return { colors: { status: { amber: { fg: '#000' } } }, radius: {}, space: {} };
       if (id === 'react') return { useCallback: (f) => f, useEffect: () => {}, useRef: () => ({ current: 0 }), useState: () => [[], () => {}] };
       if (id === '@/components/RootPageHeader') return { RootPageHeader: () => null };

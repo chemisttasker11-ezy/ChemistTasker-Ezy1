@@ -2,7 +2,7 @@ import { AHPRA_UNREADABLE_MESSAGE, API_ENDPOINTS, plainNotFoundMessage, reportAh
 // utils/apiClient.ts
 import axios from 'axios';
 import { Platform } from 'react-native';
-import { clearStoredSession, getSessionGeneration, getValidAccessToken, refreshAccessToken } from './authSession';
+import { clearStoredSession, expireAuthSession, getSessionGeneration, getValidAccessToken, refreshAccessToken } from './authSession';
 import { getBrowserCsrfToken } from './browserAuth';
 import { resolveApiBaseUrl } from './apiUrl';
 
@@ -129,10 +129,11 @@ apiClient.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const nextToken = await refreshAccessToken(API_BASE_URL);
+                const nextToken = await refreshAccessToken(API_BASE_URL, true);
                 if (generation !== getSessionGeneration()) throw new axios.CanceledError();
                 if (!nextToken) {
-                    throw new Error('Refresh failed');
+                    await expireAuthSession();
+                    throw error;
                 }
                 originalRequest.headers = originalRequest.headers || {};
                 originalRequest.headers.Authorization = `Bearer ${nextToken}`;
@@ -140,13 +141,13 @@ apiClient.interceptors.response.use(
                 return apiClient(originalRequest);
             } catch (refreshError) {
                 processQueue(refreshError, null);
-                if (generation === getSessionGeneration()) await clearStoredSession();
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;
             }
         }
 
+        if (error.response?.status === 401 && originalRequest?._retry) await expireAuthSession();
         return Promise.reject(error);
     }
 );

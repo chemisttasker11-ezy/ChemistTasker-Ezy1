@@ -1,7 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import {
+  browserLogoutQueue, browserRefreshSession, browserSessionIsSignedOut, createLogoutQueue, isSessionRejection,
+  logoutSession, markBrowserSessionSignedOut, refreshNativeSession,
+} from '@chemisttasker/shared-core';
 import { secureGet, secureRemove, secureSet } from './secureStorage';
-import { getBrowserCsrfToken } from './browserAuth';
+import { clearConfirmedShiftSnapshot } from '../features/nextShift/offlineConfirmedShifts';
 
 type StoredUserSession = {
   access?: string | null;
@@ -17,13 +22,53 @@ const ACCESS_STORAGE_KEY = 'ACCESS_KEY';
 const REFRESH_STORAGE_KEY = 'REFRESH_KEY';
 const USER_STORAGE_KEY = 'AUTH_USER';
 const LEGACY_SESSION_STORAGE_KEY = 'user';
-const TOKEN_REFRESH_PATH = '/users/token/refresh/';
+const nativeLogoutQueue = createLogoutQueue({
+  getItem: SecureStore.getItemAsync,
+  setItem: SecureStore.setItemAsync,
+  removeItem: SecureStore.deleteItemAsync,
+}, 'PENDING_LOGOUTS', (refreshToken: string) => logoutSession({ refreshToken }));
 
 let refreshPromise: Promise<string | null> | null = null;
+let nativeRotation: { generation: number; response: ReturnType<typeof refreshNativeSession> } | undefined;
 let inMemorySession: StoredUserSession | null = null;
 let legacyMigrationPromise: Promise<StoredUserSession | null> | null = null;
 let sessionGeneration = 0;
 let storageWrite: Promise<void> = Promise.resolve();
+let expiryListener: (() => void) | undefined;
+
+export function watchSessionExpiry(listener: () => void): () => void {
+  expiryListener = listener;
+  return () => { if (expiryListener === listener) expiryListener = undefined; };
+}
+
+export function expireAuthSession(refreshError?: unknown): Promise<void> | undefined {
+  if (!inMemorySession || (refreshError !== undefined && !isSessionRejection(refreshError))) return;
+  if (Platform.OS === 'web') markBrowserSessionSignedOut();
+  const clearing = clearStoredSession();
+  expiryListener?.();
+  return clearing;
+}
+
+export function retryQueuedLogout(): Promise<unknown> {
+  const retry = Platform.OS === 'web' ? browserLogoutQueue.retry() : nativeLogoutQueue.retry();
+  return retry.catch(() => undefined);
+}
+
+export async function signOutStoredSession(
+  baseUrl: string, userId?: number, deviceToken?: string | null | Promise<string | null>,
+): Promise<boolean> {
+  const refresh = normalizeRefreshToken(inMemorySession?.refresh ?? inMemorySession?.tokens?.refresh);
+  const rotation = nativeRotation?.generation === sessionGeneration ? nativeRotation.response : undefined;
+  const clearing = clearStoredSession(userId);
+  const revoked = Platform.OS === 'web'
+    ? browserLogoutQueue.signOut(baseUrl)
+    : refresh
+      ? (rotation?.catch(() => null) ?? Promise.resolve(null)).then(result =>
+        nativeLogoutQueue.enqueue(result?.refresh || refresh, true, async refreshToken => logoutSession({ refreshToken, deviceToken: await deviceToken })))
+      : Promise.resolve(true);
+  const [result] = await Promise.all([revoked.catch(() => false), clearing]);
+  return result;
+}
 
 export function getSessionGeneration(): number {
   return sessionGeneration;
@@ -242,7 +287,7 @@ export async function writeStoredSession(next: StoredUserSession, generation = s
   return generation === sessionGeneration;
 }
 
-export async function clearStoredSession(): Promise<void> {
+export async function clearStoredSession(userId = (inMemorySession?.user as { id?: number } | undefined)?.id): Promise<void> {
   invalidateSessionGeneration();
   inMemorySession = null;
   storageWrite = storageWrite.catch(() => undefined).then(async () => {
@@ -251,15 +296,15 @@ export async function clearStoredSession(): Promise<void> {
       secureRemove(REFRESH_STORAGE_KEY).catch(() => null),
       AsyncStorage.removeItem(USER_STORAGE_KEY).catch(() => null),
       removeLegacyAsyncSession(),
+      userId == null ? undefined : clearConfirmedShiftSnapshot(userId).catch(() => undefined),
     ]);
   });
   await storageWrite;
 }
 
-export async function refreshAccessToken(baseURL: string): Promise<string | null> {
-  if (refreshPromise) {
-    return refreshPromise;
-  }
+export async function refreshAccessToken(baseURL: string, reportFailure = false): Promise<string | null> {
+  if (refreshPromise) return reportFailure ? refreshPromise : refreshPromise.catch(() => null);
+  if (Platform.OS === 'web' && browserSessionIsSignedOut()) return null;
 
   const generation = sessionGeneration;
   refreshPromise = (async () => {
@@ -270,31 +315,9 @@ export async function refreshAccessToken(baseURL: string): Promise<string | null
       if (Platform.OS !== 'web' && !refresh) {
         return null;
       }
-      const isWeb = Platform.OS === 'web';
-      const csrfToken = isWeb ? await getBrowserCsrfToken(baseURL) : '';
-      if (generation !== sessionGeneration) return null;
-      const response = await fetch(`${baseURL}${TOKEN_REFRESH_PATH}`, {
-        method: 'POST',
-        credentials: isWeb ? 'include' : 'omit',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Client-Platform': isWeb ? 'web' : 'mobile',
-          ...(isWeb ? { 'X-CSRFToken': csrfToken } : {}),
-        },
-        body: JSON.stringify(isWeb ? {} : { refresh }),
-      });
-      if (generation !== sessionGeneration) return null;
-
-      if (response.status === 400 || response.status === 401) {
-        await clearStoredSession();
-        return null;
-      }
-
-      if (!response.ok) {
-        throw new Error(`Refresh failed with status ${response.status}`);
-      }
-
-      const data = await response.json().catch(() => ({}));
+      const response = refresh ? refreshNativeSession(baseURL, refresh) : browserRefreshSession({ baseUrl: baseURL });
+      if (refresh) nativeRotation = { generation, response };
+      const data = await response;
       if (generation !== sessionGeneration) return null;
       const nextAccess = normalizeToken(data.access);
       const nextRefresh = normalizeRefreshToken(data.refresh) ?? refresh;
@@ -308,17 +331,22 @@ export async function refreshAccessToken(baseURL: string): Promise<string | null
       }, generation);
 
       return saved ? nextAccess : null;
-    } catch {
+    } catch (error) {
+      if (generation !== sessionGeneration) return null;
+      if (!isSessionRejection(error)) throw error;
+      await expireAuthSession(error);
       return null;
     } finally {
+      if (nativeRotation?.generation === generation) nativeRotation = undefined;
       if (generation === sessionGeneration) refreshPromise = null;
     }
   })();
 
-  return refreshPromise;
+  return reportFailure ? refreshPromise : refreshPromise.catch(() => null);
 }
 
 export async function getValidAccessToken(baseURL: string): Promise<string | null> {
+  if (Platform.OS === 'web' && browserSessionIsSignedOut()) return null;
   const generation = sessionGeneration;
   const session = inMemorySession || (await readStoredSession());
   if (generation !== sessionGeneration) return null;

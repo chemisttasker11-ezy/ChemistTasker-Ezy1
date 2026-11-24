@@ -12,6 +12,8 @@ import { fetchApi } from '../../transport/application';
 import type { CurrentUserApi } from '../../contracts/accounts';
 import type { ExplorerPostApi } from '../../types';
 import type { Collection } from '../../contracts/common';
+import { logoutSession } from './api';
+import { browserSessionIsSignedOut, createBrowserLogoutQueue, withBrowserSessionLock } from './browserSession';
 
 export type BrowserIdentityTransport = { baseUrl: string; fetchImpl?: typeof fetch };
 type BrowserSessionResponse = { access: string; refresh?: string; user: any };
@@ -26,7 +28,7 @@ const publicRequest = { auth: false, retryAuth: false } as const;
 const browserLabel = { 'X-Client-Platform': 'web' };
 export async function browserCsrfToken(options: BrowserIdentityTransport): Promise<string> {
   const result = await client(options, 'include').get<{ csrfToken: string }>(
-    '/users/csrf/', undefined, { ...publicRequest, headers: browserLabel },
+    '/users/csrf/', undefined, { ...publicRequest, headers: browserLabel, cache: 'no-store', signal: AbortSignal.timeout?.(15000) },
   );
   if (!result?.csrfToken) throw new Error('Browser CSRF bootstrap did not return a token.');
   return result.csrfToken;
@@ -34,12 +36,36 @@ export async function browserCsrfToken(options: BrowserIdentityTransport): Promi
 export async function browserLoginSession(
   options: BrowserIdentityTransport, payload: { email: string; password: string; remember_me: boolean },
 ): Promise<BrowserSessionResponse> {
-  const csrf = await browserCsrfToken(options);
-  return client(options, 'include').post<BrowserSessionResponse>(API_ENDPOINTS.login, payload, {
-    ...publicRequest,
-    headers: { ...browserLabel, 'X-CSRFToken': csrf },
+  return browserLogoutQueue.login(
+    () => browserCsrfToken(options),
+    csrf => client(options, 'include').post<BrowserSessionResponse>(API_ENDPOINTS.login, payload, {
+      ...publicRequest, headers: { ...browserLabel, 'X-CSRFToken': csrf }, signal: AbortSignal.timeout?.(20000),
+    }),
+  );
+}
+
+export const browserLogoutQueue = createBrowserLogoutQueue(async baseUrl => {
+  const options = { baseUrl };
+  await logoutSession({ isBrowser: true, csrfToken: await browserCsrfToken(options) }, options);
+});
+
+export async function browserRefreshSession(options: BrowserIdentityTransport) {
+  return withBrowserSessionLock(async () => {
+    if (browserSessionIsSignedOut()) throw new ApiError('You have signed out.', 401, null);
+    return client(options, 'include').post<{ access: string; refresh?: string }>('/users/token/refresh/', {}, {
+      ...publicRequest, headers: { ...browserLabel, 'X-CSRFToken': await browserCsrfToken(options) },
+      cache: 'no-store', signal: AbortSignal.timeout?.(20000),
+    });
   });
 }
+
+export function startBrowserLogoutRetry(): () => void {
+  const retry = () => { void browserLogoutQueue.retry().catch(() => undefined); };
+  retry();
+  window.addEventListener('online', retry);
+  return () => window.removeEventListener('online', retry);
+}
+
 export async function browserVerifyEmailOtp(options: BrowserIdentityTransport, email: string, otp: string) {
   const csrf = await browserCsrfToken(options);
   return client(options, 'include').post(API_ENDPOINTS.verifyOtp, { email, otp }, {
@@ -85,6 +111,7 @@ export async function browserSubmitMagicMembership(
 export async function browserSessionCurrentUser(
   options: BrowserIdentityTransport, accessToken?: string | null,
 ): Promise<CurrentUserApi | null> {
+  if (browserSessionIsSignedOut()) return null;
   try {
     // A stalled identity check would leave the dashboard hidden: time it out so the Reconnect prompt shows.
     return await client(options, 'include', accessToken).get<CurrentUserApi>('/users/me/', undefined, {

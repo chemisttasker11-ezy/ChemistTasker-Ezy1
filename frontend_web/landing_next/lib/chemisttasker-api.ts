@@ -1,7 +1,7 @@
 'use client';
 
 import { createChemistTaskerApi } from '@chemisttasker/shared-core';
-import { csrfToken, getSessionGeneration, refreshBrowserSession } from '@/shared/browser-session';
+import { csrfToken, expireBrowserSession, fetchWithBrowserSession, getSessionGeneration, refreshBrowserSession } from '@/shared/browser-session';
 
 const browserFetch: typeof fetch = async (input, init = {}) => {
   const generation = getSessionGeneration();
@@ -12,7 +12,7 @@ const browserFetch: typeof fetch = async (input, init = {}) => {
     headers.set('X-CSRFToken', await csrfToken());
   }
   if (generation !== getSessionGeneration()) throw new Error('Session changed during request.');
-  return fetch(input, {
+  return fetchWithBrowserSession(input, {
     ...init,
     headers,
     credentials: 'include',
@@ -24,6 +24,7 @@ const browserFetch: typeof fetch = async (input, init = {}) => {
 export const chemistTaskerApi = createChemistTaskerApi({
   baseUrl: '/api/platform',
   refreshAuthToken: async () => (await refreshBrowserSession()).access,
+  onAuthFailure: expireBrowserSession,
   getSessionGeneration,
   fetchImpl: browserFetch,
 });

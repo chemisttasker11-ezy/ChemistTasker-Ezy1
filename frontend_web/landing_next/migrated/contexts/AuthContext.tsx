@@ -1,4 +1,4 @@
-import {claimUserBrowserStorage, logoutSession} from '../../shared/browser-session';
+import {claimUserBrowserStorage, expireBrowserSession, getSessionGeneration, logoutSession} from '../../shared/browser-session';
 // src/contexts/AuthContext.tsx
 
 import {
@@ -255,6 +255,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const bootstrap = async () => {
+      const generation = getSessionGeneration();
       try {
         await restoreTokensFromStorage();
         let parsedUser: User | null = await fetchCurrentUser();
@@ -268,7 +269,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         }
 
+        if (generation !== getSessionGeneration()) return;
         if (!parsedUser) {
+          expireBrowserSession();
           clearTokens();
           clearLocalAuthState();
           setIsLoading(false);
@@ -280,7 +283,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setRefresh(getRefreshToken());
         setUser(parsedUser);
       } catch {
-        setSessionError('Unable to connect to your account. Please retry.');
+        if (generation === getSessionGeneration()) setSessionError('Unable to connect to your account. Please retry.');
       } finally {
         setIsLoading(false);
       }
@@ -481,14 +484,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = useCallback(async () => {
-    const previousUserId=user?.id;
-    try {
-      await logoutSession(API_BASE_URL);
-      clearLocalAuthState();clearTokens();
-      if(previousUserId)localStorage.removeItem(personaStorageKey(previousUserId));
-      return true;
-    } catch {setSessionError('Could not log out. Check your connection and retry.');return false;}
-  }, [clearLocalAuthState,user?.id]);
+    setSessionError('');
+    await logoutSession(API_BASE_URL);
+    return true;
+  }, []);
 
   useEffect(()=>{const sync=()=>{setAccess(getAccessToken());setRefresh(getRefreshToken());};window.addEventListener(AUTH_TOKENS_UPDATED_EVENT,sync);return()=>window.removeEventListener(AUTH_TOKENS_UPDATED_EVENT,sync);},[]);
 
@@ -531,7 +530,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setActivePersona,
       }}
     >
-      {sessionError?<div role="alert" style={{padding:24}}><p>{sessionError}</p><button onClick={()=>window.location.reload()}>Reconnect</button><button onClick={()=>{setSessionError('');void logout();}}>Retry logout</button></div>:children}
+      {sessionError?<div role="alert" style={{padding:24}}><p>{sessionError}</p><button onClick={()=>window.location.reload()}>Reconnect</button></div>:children}
     </AuthContext.Provider>
   );
 }

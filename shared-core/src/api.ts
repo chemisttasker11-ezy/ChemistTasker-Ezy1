@@ -313,6 +313,9 @@ export {
   payShiftWithPills,
 } from './domains/rewards/api';
 export * from './domains/auth/browserOperations';
+export * from './domains/auth/logoutQueue';
+export { refreshNativeSession } from './domains/auth/api';
+export { browserSessionIsSignedOut, markBrowserSessionSignedOut } from './domains/auth/browserSession';
 export * from './domains/auth/nativeWire';
 export * from './domains/content/operations';
 export {
