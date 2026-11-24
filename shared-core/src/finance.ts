@@ -10,6 +10,7 @@ export interface FinanceConfig {
   refreshToken?: () => string | null | undefined | Promise<string | null | undefined>;
   onAuthFailure?: (refreshError?: unknown) => void | Promise<void>;
   credentials?: RequestCredentials;
+  fetchImpl?: typeof fetch;
 }
 export interface FinanceCustomer {
   id: number; name: string; legal_name: string; abn: string; contact_name: string;

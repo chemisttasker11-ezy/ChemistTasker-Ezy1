@@ -44,6 +44,7 @@ describe('source-backed wire/domain contracts after extraction',()=>{
       saveProfessionalContact: 'domains/talent/api.ts',
       deleteSavedProfessionalContact: 'domains/talent/api.ts',
       downloadChatAttachment: 'domains/chat/api.ts',
+      getPharmacyBookingImpact: 'domains/organizations/api.ts',
     } as const;
     expect(Object.keys(exportOwners)).toHaveLength(438 - retiredExports.length + checkoutRecoveryExports.length + Object.keys(newUtilityExports).length);
     for (const [name, owner] of Object.entries(newUtilityExports)) {
