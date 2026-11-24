@@ -4,6 +4,7 @@ from rest_framework import serializers
 from shifts.models import ShiftCounterOffer, ShiftCounterOfferSlot, ShiftOffer
 from decimal import Decimal
 from organizations.access import CAPABILITY_MANAGE_ROSTER, has_admin_capability
+from shifts.pharmacy_visibility import should_mask_shift_pharmacy
 from users.presentation import _get_user_short_bio
 from shifts.travel import extract_suburb_from_travel_origin, extract_travel_origin_from_message, TRAVEL_ORIGIN_PREFIX
 from .shifts import ShiftSerializer
@@ -227,6 +228,20 @@ class ShiftOfferSerializer(serializers.ModelSerializer):
     shift_detail = ShiftSerializer(source='shift', read_only=True)
     slot_detail = ShiftSlotSerializer(source='slot', read_only=True)
     engagement_terms_preview = serializers.SerializerMethodField()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        user = getattr(self.context.get('request'), 'user', None)
+        if should_mask_shift_pharmacy(instance.shift, user):
+            masked_name = data['shift_detail']['pharmacy_detail']['name']
+            for field in ('engagement_terms_preview', 'engagement_terms_snapshot'):
+                terms = data[field]
+                if isinstance(terms, dict) and 'pharmacy_name' in terms:
+                    terms = {**terms, 'pharmacy_name': masked_name}
+                    if 'pharmacy_abn' in terms:
+                        terms['pharmacy_abn'] = None
+                    data[field] = terms
+        return data
 
     def get_engagement_terms_preview(self, obj):
         request = self.context.get('request')

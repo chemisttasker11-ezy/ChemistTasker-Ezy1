@@ -50,6 +50,7 @@ def queued_emails():
             "template": kwargs.get("template_name"),
             "to": list(kwargs.get("recipient_list") or []),
             "subject": kwargs.get("subject"),
+            "context": kwargs.get("context"),
         })
 
     with override_settings(CELERY_TASK_ALWAYS_EAGER=False), mock.patch("celery.app.base.Celery.send_task", side_effect=record):
@@ -94,6 +95,163 @@ class ShiftActionFixture(TestCase):
         with queued_emails() as sent:
             response = client_for(user).post(f"{API}{path}", data or {}, format="json")
         return response, sent
+
+
+class PharmacyAnonymityTests(ShiftActionFixture):
+    def setUp(self):
+        super().setUp()
+        self.pharmacy.street_address = "15 Secret Street"
+        self.pharmacy.suburb = "Brisbane"
+        self.pharmacy.email = "secret-pharmacy@example.com"
+        self.pharmacy.save(update_fields=["street_address", "suburb", "email"])
+        self.candidate = self.worker(employment_type=None)
+        PharmacistOnboarding.objects.filter(user=self.candidate).update(
+            payment_preference="ABN", abn="53004085616", abn_verified=True, abn_entity_confirmed=True,
+        )
+        self.shift_post = self.shift(visibility="PLATFORM", post_anonymously=True, fixed_rate=Decimal("70"))
+        self.client = client_for(self.candidate)
+
+    def assert_delivery_identity(self, worker, kind, sent, name):
+        [notice] = notifications_for(worker, kind)
+        [email] = [item for item in sent if item["to"] == [worker.email]]
+        self.assertEqual(notice.payload["pharmacy_name"], name)
+        self.assertEqual(email["context"]["pharmacy_name"], name)
+        for content in (notice.title, notice.body, notice.payload, email):
+            if name != self.pharmacy.name:
+                self.assertNotIn(self.pharmacy.name, str(content))
+            self.assertNotIn(self.pharmacy.street_address, str(content))
+            self.assertNotIn(self.pharmacy.email, str(content))
+
+    def test_terms_and_snapshot_stay_masked_until_the_worker_is_booked(self):
+        from billing.utils import BILLING_STATE_PAYMENT_REQUIRED
+        from shifts.finalize import finalize_shift_offer
+
+        shift = self.shift_post
+        offer = ShiftOffer.objects.create(shift=shift, user=self.candidate, offered_rate=Decimal("70"))
+        url = f"{API}shift-offers/{offer.id}/"
+        masked = self.client.get(url)
+        self.assertEqual(masked.status_code, 200, masked.data)
+        preview = masked.data["engagement_terms_preview"]
+        self.assertEqual(preview["pharmacy_name"], "Anonymous Pharmacy")
+        self.assertIsNone(preview.get("pharmacy_abn"))
+        detail = masked.data["shift_detail"]
+        self.assertEqual(detail["pharmacy_detail"]["name"], preview["pharmacy_name"])
+        self.assertIn("Brisbane", detail["ui_address_line"])
+        for field in ("abn", "email", "street_address", "logo"):
+            self.assertNotIn(field, detail["pharmacy_detail"])
+
+        with mock.patch("billing.utils.get_billing_state_for_pharmacy", return_value=BILLING_STATE_PAYMENT_REQUIRED), \
+                queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+            accepted = self.client.post(url + "accept/", {
+                "terms_version": preview["terms_version"],
+                "engagement_terms_accepted": True,
+                "independent_contractor_status_confirmed": True,
+            }, format="json")
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.assert_delivery_identity(self.candidate, "shift_confirmed", sent, "Anonymous Pharmacy")
+        self.assertEqual(offer.engagement_terms_snapshot["pharmacy_name"], self.pharmacy.name)
+        self.assertEqual(offer.engagement_terms_snapshot["pharmacy_abn"], "51 824 753 556")
+        snapshot = self.client.get(url).data["engagement_terms_snapshot"]
+        self.assertEqual(snapshot["pharmacy_name"], "Anonymous Pharmacy")
+        self.assertIsNone(snapshot.get("pharmacy_abn"))
+        owner_view = self.owner_client.get(url).data
+        self.assertEqual(owner_view["engagement_terms_snapshot"], offer.engagement_terms_snapshot)
+        self.assertEqual(owner_view["shift_detail"]["pharmacy_detail"]["name"], self.pharmacy.name)
+
+        finalize_shift_offer(offer)
+        booked = self.client.get(url).data
+        self.assertEqual(booked["shift_detail"]["pharmacy_detail"]["name"], self.pharmacy.name)
+        self.assertIn(self.pharmacy.street_address, booked["shift_detail"]["ui_address_line"])
+        self.assertEqual(booked["engagement_terms_preview"]["pharmacy_name"], self.pharmacy.name)
+        self.assertEqual(booked["engagement_terms_preview"]["pharmacy_abn"], "51 824 753 556")
+        self.assertEqual(booked["engagement_terms_snapshot"], offer.engagement_terms_snapshot)
+
+    def test_unbooked_terms_on_named_shift_keep_the_pharmacy_identity(self):
+        shift = self.shift(visibility="PLATFORM", fixed_rate=Decimal("70"))
+        offer = ShiftOffer.objects.create(shift=shift, user=self.candidate, offered_rate=Decimal("70"))
+        preview = self.client.get(f"{API}shift-offers/{offer.id}/").data["engagement_terms_preview"]
+        self.assertEqual(preview["pharmacy_name"], self.pharmacy.name)
+        self.assertEqual(preview["pharmacy_abn"], "51 824 753 556")
+
+    def test_reveal_offer_and_reminder_mask_the_name_in_notices_and_emails(self):
+        shift = self.shift_post
+        worker = self.candidate
+        ShiftInterest.objects.create(shift=shift, user=worker)
+        with self.captureOnCommitCallbacks(execute=True):
+            response, sent = self.post(self.owner, f"shifts/{shift.id}/reveal_profile/", {"user_id": worker.id})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assert_delivery_identity(worker, "shift_profile_revealed", sent, "Anonymous Pharmacy")
+        with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+            response = self.owner_client.post(f"{API}shifts/{shift.id}/accept_user/", {"user_id": worker.id})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assert_delivery_identity(worker, "shift_offer_received", sent, "Anonymous Pharmacy")
+        response, sent = self.post(self.owner, f"shift-offers/{response.data['offer_id']}/buzz/")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assert_delivery_identity(worker, "shift_offer_buzz", sent, "Anonymous Pharmacy")
+
+    def test_edits_mask_only_unbooked_workers_on_anonymous_shifts(self):
+        for anonymous in (True, False):
+            with self.subTest(anonymous=anonymous):
+                shift = self.shift_post if anonymous else self.shift(visibility="PLATFORM")
+                unbooked = self.worker(employment_type=None)
+                booked = self.worker(employment_type=None)
+                slot = shift.slots.get()
+                ShiftSlotAssignment.objects.create(shift=shift, slot=slot, slot_date=slot.date, user=booked)
+                ShiftInterest.objects.create(shift=shift, user=unbooked)
+                ShiftInterest.objects.create(shift=shift, user=booked)
+                with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+                    response = self.owner_client.patch(f"{API}shifts/{shift.id}/", {"description": "Edited"}, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assert_delivery_identity(booked, "shift_updated", sent, self.pharmacy.name)
+                self.assert_delivery_identity(
+                    unbooked, "shift_updated", sent, "Anonymous Pharmacy" if anonymous else self.pharmacy.name,
+                )
+
+    def test_filled_notices_mask_the_loser_and_reveal_the_pharmacy_to_the_winner(self):
+        from shifts.emails import send_shift_payment_finalized_notifications
+        from shifts.finalize import finalize_shift_offer
+
+        shift = self.shift_post
+        other_shift = self.shift(visibility="PLATFORM")
+        other_slot = other_shift.slots.get()
+        ShiftSlotAssignment.objects.create(
+            shift=other_shift, slot=other_slot, slot_date=other_slot.date, user=self.candidate,
+        )
+        ShiftInterest.objects.create(shift=shift, user=self.candidate)
+        winner = self.worker(employment_type=None)
+        offer = ShiftOffer.objects.create(shift=shift, user=winner, offered_rate=Decimal("70"))
+        finalize_shift_offer(offer)
+        with queued_emails() as sent:
+            send_shift_payment_finalized_notifications(shift=shift, offers=[offer])
+        self.assert_delivery_identity(self.candidate, "shift_not_selected_after_payment", sent, "Anonymous Pharmacy")
+        self.assert_delivery_identity(winner, "shift_payment_finalized_worker", sent, self.pharmacy.name)
+
+    def test_counter_offer_responses_mask_notices_and_emails(self):
+        shift = self.shift_post
+        slot = shift.slots.get()
+        for action, kind in (("accept", "shift_counter_offer_accepted"), ("reject", "shift_counter_offer_declined")):
+            with self.subTest(action=action):
+                worker = self.worker(employment_type=None)
+                counter = ShiftCounterOffer.objects.create(shift=shift, user=worker)
+                ShiftCounterOfferSlot.objects.create(
+                    offer=counter, slot=slot, slot_date=slot.date, proposed_start_time=slot.start_time,
+                    proposed_end_time=slot.end_time, proposed_rate=Decimal("75"),
+                )
+                with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+                    response = self.owner_client.post(
+                        f"{API}shifts/{shift.id}/counter-offers/{counter.id}/{action}/", {}, format="json",
+                    )
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assert_delivery_identity(worker, kind, sent, "Anonymous Pharmacy")
+
+    def test_dedicated_offer_masks_the_notice_and_email(self):
+        from shifts.assignment import offer_dedicated_shift
+
+        with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+            offer_dedicated_shift(self.shift_post, self.candidate)
+        self.assert_delivery_identity(self.candidate, "shift_offer_received", sent, "Anonymous Pharmacy")
 
 
 class CancellationWageContracts(ShiftActionFixture):

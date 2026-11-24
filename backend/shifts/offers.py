@@ -290,17 +290,12 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             offer.last_buzzed_at = now
             offer.save(update_fields=['last_buzzed_at', 'updated_at'])
 
-        pharmacy_display = shift.pharmacy.name
-        if getattr(shift, "post_anonymously", False):
-            suburb = getattr(shift.pharmacy, "suburb", None)
-            pharmacy_display = f"Shift in {suburb}" if suburb else "Anonymous Pharmacy"
-
         worker_name = offer.user.get_full_name() or offer.user.email
         ctx = build_shift_email_context(shift, user=offer.user, role=offer.user.role.lower())
-        ctx["pharmacy_name"] = pharmacy_display
         ctx["offered_rate"] = offer.offered_rate
         ctx["expires_at"] = offer.expires_at
-        offer_details = build_offer_shift_details(shift, offer)
+        offer_details = build_offer_shift_details(shift, offer, recipient=offer.user)
+        pharmacy_display = offer_details["pharmacy_name"]
         ctx.update(offer_details)
         ctx["shift_link"] = worker_offer_url(offer.user, shift, offer)
 
@@ -461,15 +456,10 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                     payment_method="free",
                 )
 
-            pharmacy_display = shift.pharmacy.name
-            if getattr(shift, "post_anonymously", False):
-                suburb = getattr(shift.pharmacy, "suburb", None)
-                pharmacy_display = f"Shift in {suburb}" if suburb else "Anonymous Pharmacy"
-
             if offer.user and offer.user.email:
                 ctx = build_shift_email_context(shift, user=offer.user, role=offer.user.role.lower())
-                ctx["pharmacy_name"] = pharmacy_display
-                offer_details = build_offer_shift_details(shift, offer)
+                offer_details = build_offer_shift_details(shift, offer, recipient=offer.user)
+                pharmacy_display = offer_details["pharmacy_name"]
                 ctx.update(offer_details)
                 ctx["shift_link"] = worker_offer_url(offer.user, shift, offer) if requires_payment else active_shift_url_for_user(offer.user, shift)
                 ctx["payment_required"] = requires_payment
@@ -509,6 +499,10 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
 
             owner_user = self._resolve_owner_recipient(shift)
             if owner_user and owner_user.email:
+                pharmacy_display = shift.pharmacy.name
+                if shift.post_anonymously:
+                    suburb = shift.pharmacy.suburb
+                    pharmacy_display = f"Shift in {suburb}" if suburb else "Anonymous Pharmacy"
                 worker_name = offer.user.get_full_name() or offer.user.email
                 worker_role_label = user_work_role_label(offer.user, "candidate")
                 shift_date = self._first_offer_date(shift, offer)
