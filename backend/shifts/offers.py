@@ -28,14 +28,14 @@ from shifts.emails import (
     worker_offer_url,
 )
 from users.role_labels import user_work_role_label
-from shifts.notifications import notify_shift_users
+from shifts.notifications import notify_shift_users, notify_worker_credentials
 from users.task_dispatch import async_task
 from shifts.access import Http400
 from django.db import transaction
 from decimal import Decimal
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.base import SHIFT_OFFER_BUZZ_COOLDOWN
-from shifts.assignment import slot_locked_for_shift_offer
+from shifts.assignment import lock_shift_offer_credentials, slot_locked_for_shift_offer
 from shifts.access import _user_can_perform_shift_role
 from shifts.serializers import (
     ShiftInterestSerializer,
@@ -331,7 +331,6 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
     @action(detail=True, methods=['post'])
     @transaction.atomic
     def accept(self, request, pk=None):
-        from onboarding.verification.state import require_public_ahpra
         from billing.utils import (
             BILLING_STATE_PAYMENT_REQUIRED,
             get_billing_state_for_pharmacy,
@@ -341,7 +340,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         shift = Shift.objects.select_for_update().get(pk=offer.shift_id)
         list(ShiftSlot.objects.select_for_update().filter(shift=shift).order_by('pk'))
         offer = ShiftOffer.objects.select_for_update().get(pk=offer.pk)
-        require_public_ahpra(request.user, offer.shift)
+        credentials = lock_shift_offer_credentials(request.user, shift)
         if offer.user_id != request.user.id:
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
         if offer.status != ShiftOffer.Status.PENDING:
@@ -402,8 +401,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         requires_payment = billing_state == BILLING_STATE_PAYMENT_REQUIRED
 
         with transaction.atomic():
-            from onboarding.verification.state import lock_public_ahpra
-            lock_public_ahpra(request.user, shift)
+            notify_worker_credentials(shift, request.user, credentials)
             offer.payment_preference_snapshot = accepted_terms.get("payment_preference", "")
             offer.settlement_channel = accepted_terms.get("settlement_channel", "")
             offer.engagement_kind = accepted_terms.get("engagement_kind", "")

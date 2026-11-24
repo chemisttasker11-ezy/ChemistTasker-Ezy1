@@ -6,8 +6,11 @@ from django.db import transaction
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
+from shifts.access import ShiftActionRefused
+from shifts.assignment import lock_shift_offer_credentials
 from shifts.engagement import KIND_STAFF_EMPLOYMENT, staff_assignment_defaults
 from shifts.events import before_fulfillment
+from shifts.notifications import notify_worker_credentials
 from shifts.occurrences import accepted_occurrence_pairs, accepted_occurrences
 
 
@@ -39,6 +42,15 @@ def _accepted_offer_rate_for_occurrence(offer, slot_id, slot_date):
     return None
 
 
+def _check_fulfillment_credentials(offer):
+    try:
+        credentials = lock_shift_offer_credentials(offer.user, offer.shift, manager=True, schedule_recheck=False)
+    except ShiftActionRefused as exc:
+        # Paid fulfillment reconciles a refused booking through its existing validation path.
+        raise ValidationError(exc.detail) from exc
+    notify_worker_credentials(offer.shift, offer.user, credentials)
+
+
 def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
     """
     Finalize a worker-confirmed offer by creating slot assignments exactly once.
@@ -64,6 +76,7 @@ def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
         before_fulfillment.send(sender=ShiftOffer, offer=offer, checkout_id=checkout_id)
         accepted_pairs = accepted_occurrence_pairs(offer)
         matched_pairs = set()
+        credentials_checked = False
         for slot in slots_to_assign:
             for entry in accepted_occurrences(offer, expand_shift_slots(shift)):
                 if entry["slot"].id != slot.id:
@@ -75,6 +88,10 @@ def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
                     raise ValidationError({'detail': 'This shift occurrence is already assigned.'})
                 if existing:
                     continue
+
+                if not credentials_checked:
+                    _check_fulfillment_credentials(offer)
+                    credentials_checked = True
 
                 staff_defaults = {}
                 if offer.engagement_kind == KIND_STAFF_EMPLOYMENT:
@@ -137,6 +154,8 @@ def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
         if shift.slots.exists() and (not matched_pairs or (accepted_pairs and accepted_pairs != matched_pairs)):
             raise ValidationError({'detail': 'The accepted shift occurrences are no longer available.'})
         if offer.status != ShiftOffer.Status.ACCEPTED:
+            if not credentials_checked:
+                _check_fulfillment_credentials(offer)
             offer.status = ShiftOffer.Status.ACCEPTED
             offer.save(update_fields=["status", "updated_at"])
 

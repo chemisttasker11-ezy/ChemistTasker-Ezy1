@@ -13,7 +13,7 @@ from django.test import TestCase, override_settings
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from memberships.models import Membership
 from onboarding.models import PharmacistOnboarding, OtherStaffOnboarding
-from organizations.models import PharmacyAdmin
+from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
 from shifts.models import Shift, ShiftProfileAccessAudit, ShiftSlot, ShiftSlotAssignment
 
 API = "/api/v1/"
@@ -34,6 +34,43 @@ class ShiftVisibilitySafetyTests(TestCase):
         response = client_for(user).get(f'{API}{endpoint}')
         self.assertEqual(response.status_code, 200, response.data)
         return response.data.get('results', []) if isinstance(response.data, dict) else response.data
+
+    def test_widening_through_five_audiences_keeps_earlier_members(self):
+        org = Organization.objects.create(name='Five audience organization')
+        self.pharmacy.organization = org
+        self.pharmacy.save(update_fields=['organization'])
+        same_owner = Pharmacy.objects.create(name='Chain pharmacy', owner=self.pharmacy.owner)
+        _, same_org = make_owner_with_pharmacy('Organization pharmacy')
+        same_org.organization = org
+        same_org.save(update_fields=['organization'])
+        chain = Chain.objects.create(name='Owner chain', owner=self.pharmacy.owner)
+        chain.pharmacies.add(self.pharmacy, same_owner)
+
+        audience = (
+            ('FULL_PART_TIME', self.pharmacy, 'FULL_TIME'),
+            ('LOCUM_CASUAL', self.pharmacy, 'LOCUM'),
+            ('OWNER_CHAIN', same_owner, 'FULL_TIME'),
+            ('ORG_CHAIN', same_org, 'FULL_TIME'),
+            ('PLATFORM', None, None),
+        )
+        for entry_tier, pharmacy, employment in audience:
+            worker = make_user('PHARMACIST')
+            if pharmacy:
+                Membership.objects.create(user=worker, pharmacy=pharmacy, role='PHARMACIST', employment_type=employment)
+            eligible = False
+            for visibility, _, _ in audience:
+                eligible = eligible or visibility == entry_tier
+                for anonymous in (False, True):
+                    with self.subTest(entry_tier=entry_tier, visibility=visibility, anonymous=anonymous):
+                        self.shift.visibility, self.shift.post_anonymously = visibility, anonymous
+                        self.shift.save(update_fields=['visibility', 'post_anonymously'])
+                        endpoint = 'public-shifts/' if visibility == 'PLATFORM' else 'community-shifts/'
+                        self.assertEqual(any(row['id'] == self.shift.id for row in self.rows(worker, endpoint)), eligible)
+                        if visibility == 'PLATFORM' and not anonymous:
+                            community_ids = {row['id'] for row in self.rows(worker, 'community-shifts/')}
+                            self.assertEqual(self.shift.id in community_ids, entry_tier != 'PLATFORM')
+                        response = client_for(worker).get(f'{API}shifts/{self.shift.id}/')
+                        self.assertEqual(response.status_code, 200 if eligible else 404)
 
     def test_f01_n1_only_manager_and_the_worker_see_booking_identities(self):
         from shifts.models import ShiftOffer

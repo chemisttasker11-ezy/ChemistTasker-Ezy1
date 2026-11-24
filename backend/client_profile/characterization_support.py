@@ -33,6 +33,14 @@ def make_user(role="OTHER_STAFF", **extra):
     )
 
 
+def make_verified_pharmacist():
+    from onboarding.models import PharmacistOnboarding
+
+    user = make_user('PHARMACIST')
+    PharmacistOnboarding.objects.create(user=user, verified=True)
+    return user
+
+
 def make_owner_with_pharmacy(name="Characterization Pharmacy"):
     owner = make_user("OWNER")
     onboarding = OwnerOnboarding.objects.create(user=owner, phone_number="0400000000", role="MANAGER")

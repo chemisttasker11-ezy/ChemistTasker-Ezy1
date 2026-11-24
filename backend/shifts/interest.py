@@ -8,36 +8,34 @@ from datetime import datetime
 from django.conf import settings
 from rest_framework import status
 
-from memberships.models import FAVORITE_STAFF_EMPLOYMENT_TYPES, Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
 from users.task_dispatch import async_task
 from shifts.access import ShiftActionRefused, _user_can_perform_shift_role
 from shifts.emails import build_offer_shift_details, build_shift_email_context, build_shift_interest_context
+from shifts.engagement import direct_pharmacy_staff_membership
 from shifts.escalation import PUBLIC_LEVEL
 from shifts.models import ShiftInterest, ShiftRejection, ShiftSlot
 from shifts.notifications import notify_shift_managers
 
 
-def is_public_shift_member_access(user, shift):
-    """An active staff or favourite member of the pharmacy reaching its public, named shift as a member."""
+def is_shift_pharmacy_employee(user, shift):
+    """An active employee of the pharmacy posting the shift."""
     if not user or not getattr(user, "is_authenticated", False):
         return False
-    if getattr(shift, "visibility", None) != PUBLIC_LEVEL:
-        return False
-    if getattr(shift, "post_anonymously", False):
-        return False
-    if not _user_can_perform_shift_role(user, getattr(shift, "role_needed", None)):
-        return False
-    return Membership.objects.filter(
-        user=user,
-        pharmacy=shift.pharmacy,
-        employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES,
-        is_active=True,
-        status=Membership.Status.ACCEPTED,
-    ).exists()
+    return direct_pharmacy_staff_membership(user=user, pharmacy=shift.pharmacy) is not None
 
 
-def _require_public_shift_onboarding(user):
+def is_public_shift_member_access(user, shift):
+    """An employee reaching their pharmacy's named public shift as a member."""
+    return (
+        shift.visibility == PUBLIC_LEVEL
+        and not shift.post_anonymously
+        and is_shift_pharmacy_employee(user, shift)
+        and _user_can_perform_shift_role(user, shift.role_needed)
+    )
+
+
+def require_shift_booking_onboarding(user):
     if user.role == 'EXPLORER':
         if not ExplorerOnboarding.objects.filter(user=user, verified=True).exists():
             raise ShiftActionRefused('Verify your profile before applying for public shifts.', status.HTTP_403_FORBIDDEN)
@@ -76,6 +74,9 @@ def _require_public_shift_onboarding(user):
             )
 
 
+_require_public_shift_onboarding = require_shift_booking_onboarding
+
+
 def express_interest(*, shift, user, slot_ids=None, slot_id=None):
     """Record the user's interest in the shift (or the given slots) and tell the managers about new interest.
 
@@ -84,9 +85,7 @@ def express_interest(*, shift, user, slot_ids=None, slot_id=None):
     from onboarding.verification.state import require_public_ahpra
     if not _user_can_perform_shift_role(user, shift.role_needed):
         raise ShiftActionRefused('Your role does not cover this shift.')
-    # 1) Onboarding required
-    if shift.visibility == PUBLIC_LEVEL and not is_public_shift_member_access(user, shift):
-        require_public_ahpra(user, shift)
+    require_public_ahpra(user, shift)
 
     # 2) Interest logic
     if slot_ids is not None and not isinstance(slot_ids, list):

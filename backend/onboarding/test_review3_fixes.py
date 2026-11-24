@@ -86,10 +86,11 @@ class Review3FixTests(TestCase):
     def test_review_removes_public_access_keeps_member_work_and_hourly_recheck(self):
         client = client_for(self.user)
         offer = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=self.user)
-        Membership.objects.create(user=self.user, pharmacy=self.pharmacy, role='PHARMACIST', employment_type='FULL_TIME')
-        internal, _, _ = make_assignment(self.pharmacy, self.owner, self.user, timezone.localdate() + timedelta(days=3))
-        internal.role_needed = 'PHARMACIST'
-        internal.save(update_fields=['role_needed'])
+        owner, pharmacy = make_owner_with_pharmacy('Employer pharmacy')
+        Membership.objects.create(user=self.user, pharmacy=pharmacy, role='PHARMACIST', employment_type='FULL_TIME')
+        internal, _, _ = make_assignment(pharmacy, owner, self.user, timezone.localdate() + timedelta(days=3))
+        internal.role_needed, internal.visibility = 'PHARMACIST', 'FULL_PART_TIME'
+        internal.save(update_fields=['role_needed', 'visibility'])
         records = [{'name': 'Someone Else'}, {'conditions': True}, {'undertakings': True},
                    {'reprimands': True}, {'expiry_date': '2000-01-01'}, {'expiry_date': None}]
         for record in records:

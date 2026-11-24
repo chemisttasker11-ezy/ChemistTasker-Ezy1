@@ -9,7 +9,7 @@ from rest_framework.exceptions import ValidationError
 from billing import tests as fixtures
 from billing.models import FulfillmentCheckout, FulfillmentReservation, ShiftPayment
 from billing.checkout_reservations import occurrence_keys
-from client_profile.characterization_support import client_for, make_user
+from client_profile.characterization_support import client_for, make_user, make_verified_pharmacist
 from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
 
 
@@ -220,7 +220,7 @@ class CheckoutReservationTests(TestCase):
             ShiftSlotAssignment.objects.filter(source_offer=self.offer).delete()
             ShiftOffer.objects.filter(pk=self.offer.pk).update(status=ShiftOffer.Status.DECLINED)
         self.checkout.return_value = fixtures._StripeObject(id='cs_replacement', url='https://checkout.example.test/new')
-        return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+        return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_verified_pharmacist(),
                                          status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
 
     def test_cancelled_paid_booking_frees_occurrence_for_card_replacement(self):

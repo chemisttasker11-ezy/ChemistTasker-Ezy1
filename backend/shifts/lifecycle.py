@@ -7,11 +7,6 @@ from organizations.models import (
     Chain,
     Pharmacy,
 )
-from memberships.models import (
-    Membership,
-    FAVORITE_STAFF_EMPLOYMENT_TYPES,
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
-)
 from onboarding.models import OwnerOnboarding
 from shifts.models import (
     Shift,
@@ -42,6 +37,7 @@ from organizations.timezone import get_pharmacy_timezone
 from shifts.base import BaseShiftViewSet
 from shifts.selectors import (
     _matching_shift_slot_exists,
+    community_membership_q,
     shifts_managed_by,
     slot_occurrence_ended,
 )
@@ -322,65 +318,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
         )
         combined_filter |= is_owner_admin_of_pharmacy_q
 
-        # 3. Shifts visible through Membership relationship (client_profile.models.Membership)
-        eligible_membership_q = (
-            Q(
-                visibility='FULL_PART_TIME',
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            Q(
-                visibility='LOCUM_CASUAL',
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES,
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            Q(
-                visibility='LOCUM_CASUAL',
-                post_anonymously=False,
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            Q(
-                visibility='PLATFORM',
-                post_anonymously=False,
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=(
-                    PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES
-                ),
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            Q(
-                visibility='OWNER_CHAIN',
-                pharmacy__owner__in=Pharmacy.objects.filter(
-                    memberships__user=user,
-                    memberships__is_active=True,
-                    memberships__status=Membership.Status.ACCEPTED,
-                    memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                ).values_list('owner', flat=True),
-            )
-            |
-            Q(
-                visibility='ORG_CHAIN',
-                pharmacy__organization__in=Pharmacy.objects.filter(
-                    memberships__user=user,
-                    memberships__is_active=True,
-                    memberships__status=Membership.Status.ACCEPTED,
-                    memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                ).values_list('organization', flat=True),
-            )
-        )
-        combined_filter |= eligible_membership_q
+        combined_filter |= community_membership_q(user)
 
         if user.role == 'OWNER':
             try:

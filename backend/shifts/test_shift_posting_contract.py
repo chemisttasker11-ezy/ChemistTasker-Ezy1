@@ -286,8 +286,31 @@ class AvailabilityMatchTests(ShiftPostingFixture):
 
 
 class PostingDefaultsTests(ShiftPostingFixture):
-    def test_dedicated_booking_partial_edits_keep_privacy_without_visibility_input(self):
+    def dedicated_favourite(self, verified=True):
         worker = self.member('LOCUM')
+        PharmacistOnboarding.objects.create(user=worker, verified=verified)
+        return worker
+
+    def test_dedicated_offer_refuses_unverified_favourite_without_posting(self):
+        worker = self.dedicated_favourite(verified=False)
+
+        response, sent = self.post_shift(dedicated_user=worker.id)
+
+        self.assertEqual((response.status_code, response.data.get('code')), (403, 'candidate_ahpra_ineligible'))
+        self.assertFalse(Shift.objects.filter(dedicated_user=worker).exists())
+        self.assertFalse(ShiftOffer.objects.filter(user=worker).exists())
+        self.assertFalse(Notification.objects.filter(user=worker).exists())
+        self.assertEqual(sent, [])
+
+    def test_dedicated_offer_allows_own_unverified_employee(self):
+        worker = self.member('FULL_TIME')
+        PharmacistOnboarding.objects.create(user=worker, verified=False)
+        response, _ = self.post_shift(dedicated_user=worker.id)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertTrue(ShiftOffer.objects.filter(shift_id=response.data['id'], user=worker).exists())
+
+    def test_dedicated_booking_partial_edits_keep_privacy_without_visibility_input(self):
+        worker = self.dedicated_favourite()
         response, _ = self.post_shift(dedicated_user=worker.id, visibility='LOCUM_CASUAL')
         self.assertEqual(response.status_code, 201, response.data)
         shift_id = response.data['id']
@@ -307,7 +330,7 @@ class PostingDefaultsTests(ShiftPostingFixture):
         self.assertIn(unauthorized.status_code, (403,404))
 
     def test_direct_booking_ignores_widening_and_broadcast_controls(self):
-        worker = self.member('LOCUM')
+        worker = self.dedicated_favourite()
         colleague = self.member('FULL_TIME')
         response, sent = self.post_shift(
             dedicated_user=worker.id, visibility='PLATFORM', notify_pharmacy_staff=True,
@@ -325,7 +348,7 @@ class PostingDefaultsTests(ShiftPostingFixture):
         self.assertEqual(community.status_code, 404)
 
     def test_dedicated_shift_offers_each_slot_to_its_worker(self):
-        worker = self.member("LOCUM")
+        worker = self.dedicated_favourite()
         response, sent = self.post_shift(dedicated_user=worker.id)
         self.assertEqual(response.status_code, 201, response.data)
         shift = Shift.objects.get(pk=response.data["id"])
@@ -338,7 +361,7 @@ class PostingDefaultsTests(ShiftPostingFixture):
         self.assertEqual(Notification.objects.filter(user=worker, title="Shift offer received").count(), 1)
 
     def test_dedicated_offer_notification_delivery_outage_does_not_fail_post_or_email_queue(self):
-        worker = self.member("LOCUM")
+        worker = self.dedicated_favourite()
         with queued_emails() as sent, mock.patch(
             "notifications.services._deliver_notification",
             side_effect=RuntimeError("notification transport offline"),
@@ -357,7 +380,7 @@ class PostingDefaultsTests(ShiftPostingFixture):
         self.assertEqual(Notification.objects.filter(user=worker, title="Shift offer received").count(), 1)
 
     def test_dedicated_offer_email_queue_outage_does_not_fail_post_or_notification(self):
-        worker = self.member("LOCUM")
+        worker = self.dedicated_favourite()
         with mock.patch(
             "shifts.assignment.async_task",
             side_effect=RuntimeError("email queue offline"),
@@ -373,7 +396,7 @@ class PostingDefaultsTests(ShiftPostingFixture):
         self.assertTrue(ShiftOffer.objects.filter(shift_id=response.data["id"], user=worker).exists())
 
     def test_single_user_dedicated_shift_gets_one_shift_level_offer(self):
-        worker = self.member("LOCUM")
+        worker = self.dedicated_favourite()
         response, _ = self.post_shift(dedicated_user=worker.id, single_user_only=True, rate_type="FIXED",
                                       fixed_rate="80.00")
         offer = ShiftOffer.objects.get(shift_id=response.data["id"])

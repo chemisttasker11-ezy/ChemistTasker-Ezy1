@@ -5,7 +5,7 @@ from unittest import mock
 
 from django.test import TestCase
 
-from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user, make_verified_pharmacist
 from notifications.models import Notification
 from shifts.emails import send_shift_payment_finalized_notifications
 from shifts.models import Shift, ShiftOffer, ShiftInterest, ShiftSlot
@@ -20,7 +20,7 @@ class PaymentNotificationIsolationTests(TestCase):
         for i in range(2):
             slot = ShiftSlot.objects.create(shift=self.shift, date=date.today() + timedelta(days=14+i),
                                             start_time=time(9), end_time=time(17), rate="70.00")
-            self.offers.append(ShiftOffer.objects.create(shift=self.shift, slot=slot, user=make_user("PHARMACIST"),
+            self.offers.append(ShiftOffer.objects.create(shift=self.shift, slot=slot, user=make_verified_pharmacist(),
                                                         status=ShiftOffer.Status.ACCEPTED))
         self.other = make_user("PHARMACIST")
         ShiftInterest.objects.create(shift=self.shift, slot=self.offers[0].slot, user=self.other)

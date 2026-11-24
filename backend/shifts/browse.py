@@ -4,11 +4,9 @@ shared shift links.
 The manager lists and shift detail live in shifts.lifecycle, a worker's own shifts in shifts.my_shifts and
 description templates in shifts.description_templates; their historical names are re-exported here."""
 from rest_framework import generics, permissions, status
-from organizations.models import Pharmacy
 from memberships.models import (
     FAVORITE_STAFF_EMPLOYMENT_TYPES,
     Membership,
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
 )
 from onboarding.models import OtherStaffOnboarding
 from shifts.models import Shift, ShiftInterest, ShiftRejection, ShiftSlot, ShiftSlotAssignment
@@ -24,7 +22,7 @@ from django.utils import timezone
 from shifts.pricing import get_locked_rate_for_slot
 from shifts.engagement import staff_assignment_defaults
 from shifts.assignment import slot_locked_for_shift_offer
-from shifts.selectors import _future_or_current_slot_q, slot_not_ended_q
+from shifts.selectors import _future_or_current_slot_q, community_membership_q, slot_not_ended_q
 from shifts.access import staff_membership_can_claim_role
 from shifts.emails import build_roster_email_link, build_shift_email_context
 from users.task_dispatch import async_task
@@ -55,70 +53,6 @@ def _claim_refused(request, shift, reason, detail, code, status_code=status.HTTP
         context,
     )
     return Response({"detail": detail, "code": code}, status=status_code)
-
-
-def community_membership_q(user):
-    return (
-        # 1. Full/part time at this pharmacy
-        Q(
-            visibility='FULL_PART_TIME',
-            pharmacy__memberships__user=user,
-            pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-            pharmacy__memberships__is_active=True,
-            pharmacy__memberships__status=Membership.Status.ACCEPTED,
-        )
-        |
-        # 2. Any active member at this pharmacy (for locum_casual)
-        Q(
-            visibility='LOCUM_CASUAL',
-            pharmacy__memberships__user=user,
-            pharmacy__memberships__employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES,
-            pharmacy__memberships__is_active=True,
-            pharmacy__memberships__status=Membership.Status.ACCEPTED,
-        )
-        |
-        Q(
-            visibility='LOCUM_CASUAL',
-            post_anonymously=False,
-            pharmacy__memberships__user=user,
-            pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-            pharmacy__memberships__is_active=True,
-            pharmacy__memberships__status=Membership.Status.ACCEPTED,
-        )
-        |
-        Q(
-            visibility=PUBLIC_LEVEL,
-            post_anonymously=False,
-            pharmacy__memberships__user=user,
-            pharmacy__memberships__employment_type__in=(
-                PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES
-            ),
-            pharmacy__memberships__is_active=True,
-            pharmacy__memberships__status=Membership.Status.ACCEPTED,
-        )
-        |
-        # 3. Any active member at any pharmacy with the same owner as the shift’s pharmacy
-        Q(
-            visibility='OWNER_CHAIN',
-            pharmacy__owner__in=Pharmacy.objects.filter(
-                memberships__user=user,
-                memberships__is_active=True,
-                memberships__status=Membership.Status.ACCEPTED,
-                memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-            ).values_list('owner', flat=True)
-        )
-        |
-        # 4. Any active member at any pharmacy in the same organization as the shift’s pharmacy
-        Q(
-            visibility='ORG_CHAIN',
-            pharmacy__organization__in=Pharmacy.objects.filter(
-                memberships__user=user,
-                memberships__is_active=True,
-                memberships__status=Membership.Status.ACCEPTED,
-                memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-            ).values_list('organization', flat=True)
-        )
-    )
 
 
 class CommunityShiftViewSet(BaseShiftViewSet):
