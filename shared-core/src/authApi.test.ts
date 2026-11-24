@@ -4,6 +4,7 @@ import { API_ENDPOINTS } from './constants/endpoints';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import { createLogoutQueue, isSessionRejection } from './domains/auth/logoutQueue';
 
 function mobileSession(os = 'ios') {
   const stored = new Map<string, string>();
@@ -13,6 +14,13 @@ function mobileSession(os = 'ios') {
     removeItem: async (key: string) => { stored.delete(key); },
   };
   const fetch = vi.fn();
+  const logout = vi.fn(async (_options: any) => ({}));
+  const secure = new Map<string, string>();
+  const refresh = async () => {
+    const response = await fetch();
+    if (!response.ok) throw Object.assign(new Error('Refresh failed'), { status: response.status });
+    return response.json();
+  };
   const exports: any = {};
   const source = readFileSync(new URL('../../frontend_mobile/utils/authSession.ts', import.meta.url), 'utf8');
   runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
@@ -20,12 +28,15 @@ function mobileSession(os = 'ios') {
     require: (name: string) => {
       if (name === '@react-native-async-storage/async-storage') return { default: storage };
       if (name === 'react-native') return { Platform: { OS: os } };
+      if (name === 'expo-secure-store') return { getItemAsync: async (key: string) => secure.get(key) ?? null, setItemAsync: async (key: string, value: string) => { secure.set(key, value); }, deleteItemAsync: async (key: string) => { secure.delete(key); } };
+      if (name === '@chemisttasker/shared-core') return { createLogoutQueue, isSessionRejection, logoutSession: logout, refreshNativeSession: refresh, browserRefreshSession: refresh, browserSessionIsSignedOut: () => false, markBrowserSessionSignedOut: () => {}, browserLogoutQueue: { retry: async () => {}, signOut: async () => true } };
+      if (name === '../features/nextShift/offlineConfirmedShifts') return { clearConfirmedShiftSnapshot: async () => {} };
       if (name === './browserAuth') return { getBrowserCsrfToken: async () => 'csrf' };
       if (name === './secureStorage') return { secureGet: storage.getItem, secureSet: storage.setItem, secureRemove: storage.removeItem };
       throw new Error(name);
     },
   });
-  return { session: exports, stored, fetch, storage };
+  return { session: exports, stored, secure, fetch, storage, logout };
 }
 
 function mobileProvider(os = 'ios') {
@@ -49,7 +60,6 @@ function mobileProvider(os = 'ios') {
   };
   const onboarding = vi.fn(async () => ({}));
   const currentUser = vi.fn();
-  const logout = vi.fn(async () => ({}));
   const getPushToken = vi.fn(async () => 'expo-current');
   const registerPush = vi.fn(async () => undefined);
   const exports: any = {};
@@ -58,11 +68,12 @@ function mobileProvider(os = 'ios') {
     'react-native': { Platform: { OS: os }, Alert: { alert: vi.fn() }, AppState: { addEventListener: () => ({ remove() {} }) } },
     // AuthContext re-verifies an offline start on reconnect (172622e8).
     '@react-native-community/netinfo': { default: { addEventListener: () => () => {} } },
-    '@chemisttasker/shared-core': { getOnboarding: onboarding, logoutSession: logout },
+    '@chemisttasker/shared-core': { getOnboarding: onboarding, startBrowserLogoutRetry: () => () => {} },
     '../utils/authSession': env.session,
     '../utils/nativeIdentityTransport': { nativeIdentityTransport: { currentUser } },
     '../utils/apiUrl': { resolveApiBaseUrl: () => 'https://example.test' },
     '../utils/browserAuth': { getBrowserCsrfToken: async () => 'csrf' },
+    '../utils/authReturnRoute': { getSessionReturnRoute: () => null },
     '../utils/pushNotifications': { registerForPushNotificationsAsync: getPushToken, registerDeviceTokenWithBackend: registerPush },
     '../utils/biometricAuth': { getBiometricAvailability: async () => ({ available: false }), getSavedBiometricUser: async () => null },
     '../utils/networkDiagnostics': {},
@@ -71,7 +82,7 @@ function mobileProvider(os = 'ios') {
   };
   const source = readFileSync(new URL('../../frontend_mobile/context/AuthContext.tsx', import.meta.url), 'utf8');
   runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React } }).outputText, {
-    exports, console, process: { env: {} }, require: (name: string) => {
+    exports, console, setTimeout, process: { env: {} }, require: (name: string) => {
       if (!(name in mocks)) throw new Error(name);
       return mocks[name];
     },
@@ -81,7 +92,7 @@ function mobileProvider(os = 'ios') {
     effects = [];
     return exports.AuthProvider({ children: null }).props.value;
   };
-  return { ...env, render, onboarding, currentUser, logout, getPushToken, registerPush, effects: () => effects };
+  return { ...env, render, onboarding, currentUser, getPushToken, registerPush, effects: () => effects };
 }
 
 function mobileClient() {
@@ -173,6 +184,7 @@ describe('mobile session lifecycle', () => {
     env.effects()[1]();
     await vi.waitFor(() => expect(env.registerPush).toHaveBeenCalledOnce());
     const pending = env.render().logout();
+    await vi.waitFor(() => expect(JSON.parse(env.secure.get('PENDING_LOGOUTS') ?? '[]')).toEqual(['alice-refresh']));
     expect(env.logout).not.toHaveBeenCalled();
     finish();
     await pending;
