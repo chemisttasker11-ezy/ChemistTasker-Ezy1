@@ -233,6 +233,27 @@ class SignupEmailCorrectionTests(TestCase):
         self.assertEqual(result.status_code, 400)
         self.assertEqual(result.data["detail"], "Invalid or expired token.")
 
+    def test_invitation_password_link_lasts_seven_days_and_verifies_the_account(self):
+        for age, status in ((timedelta(days=6, hours=23), 200), (timedelta(days=7, seconds=5), 400)):
+            for html in (False, True):
+                with self.subTest(age=age, html=html):
+                    user = User.objects.create_user(email=f"invited-{status}-{html}@example.test", password=None)
+                    with patch.object(default_token_generator, "_now", return_value=datetime.now() - age):
+                        token = default_token_generator.make_token(user)
+                    uid = urlsafe_base64_encode(force_bytes(user.pk))
+                    passwords = {"new_password1": "NewPassword123!", "new_password2": "NewPassword123!"}
+                    if html:
+                        client = APIClient()
+                        page = client.get(f"/api/v1/users/auth/reset/{uid}/{token}/", follow=True)
+                        self.assertEqual(page.context["validlink"], status == 200)
+                        if status == 200:
+                            client.post(f"/api/v1/users/auth/reset/{uid}/set-password/", passwords)
+                    else:
+                        result = post("password-reset-confirm", {"uid": uid, "token": token, **passwords})
+                        self.assertEqual(result.status_code, status, result.data)
+                    user.refresh_from_db()
+                    self.assertEqual((user.is_otp_verified, user.has_usable_password()), (status == 200, status == 200))
+
 
 @override_settings(AXES_ENABLED=True, AXES_FAILURE_LIMIT=5)
 class LoginRecoveryTests(TestCase):

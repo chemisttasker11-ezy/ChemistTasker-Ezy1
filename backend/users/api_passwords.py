@@ -4,8 +4,8 @@ from django.contrib.auth.views import PasswordResetConfirmView
 from django.db import transaction
 from django.urls import reverse_lazy
 from rest_framework import permissions
-from django.contrib.auth.tokens import default_token_generator
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.contrib.auth.tokens import PasswordResetTokenGenerator, default_token_generator
+from django.utils.http import base36_to_int, urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -24,11 +24,29 @@ User = get_user_model()
 
 def _may_set_password(user):
     # Invited accounts have no password yet: the emailed link is their email verification.
-    return user.is_active and (user.is_otp_verified or not user.has_usable_password())
+    return user.is_active and (user.is_otp_verified or _sets_first_password(user))
+
+
+def _sets_first_password(user):
+    return not user.has_usable_password() and not user.is_otp_verified
+
+
+class PasswordLinkTokenGenerator(PasswordResetTokenGenerator):
+    """Reset links expire after PASSWORD_RESET_LINK_SECONDS. Invitation links last PASSWORD_RESET_TIMEOUT."""
+
+    def check_token(self, user, token):
+        if not super().check_token(user, token):
+            return False
+        sent = base36_to_int(token.split("-")[0])
+        return _sets_first_password(user) or self._num_seconds(self._now()) - sent <= settings.PASSWORD_RESET_LINK_SECONDS
+
+
+password_link_tokens = PasswordLinkTokenGenerator()
 
 
 class RevokingPasswordResetConfirmView(PasswordResetConfirmView):
     success_url = reverse_lazy("api_v1:password_reset_complete")
+    token_generator = password_link_tokens
 
     def get_user(self, uidb64):
         user = super().get_user(uidb64)
@@ -39,7 +57,7 @@ class RevokingPasswordResetConfirmView(PasswordResetConfirmView):
         user = User.objects.select_for_update().get(pk=self.user.pk)
         if user.password != self.user.password:
             return self.form_invalid(form)
-        first_password = not user.has_usable_password() and not user.is_otp_verified
+        first_password = _sets_first_password(user)
         if first_password:
             user.is_otp_verified = True
         self.user = form.user = user
@@ -78,7 +96,7 @@ class PasswordResetConfirmAPIView(APIView):
         if not _may_set_password(user):
             return Response({'detail':'Invalid link.'}, status=400)
 
-        if not default_token_generator.check_token(user, token):
+        if not password_link_tokens.check_token(user, token):
             return Response({'detail':'Invalid or expired token.'}, status=400)
 
         # all good—set the password
@@ -87,7 +105,7 @@ class PasswordResetConfirmAPIView(APIView):
         except DjangoValidationError as exc:
             return Response({'new_password1': list(exc.messages)}, status=400)
 
-        first_password = not user.has_usable_password() and not user.is_otp_verified
+        first_password = _sets_first_password(user)
         user.set_password(pw1)
         if first_password:
             user.is_otp_verified = True

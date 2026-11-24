@@ -597,7 +597,7 @@ class CounterOfferTests(ShiftActionFixture):
                     self.assertEqual(accepted.status_code, 200, accepted.data)
                     self.assertEqual(counter.status, ShiftCounterOffer.Status.ACCEPTED)
                     self.assertEqual(accepted.data["offer_ids"], [offered.data["offer_id"]])
-                    self.assertEqual(notices.count(), 2)
+                    self.assertEqual(notices.count(), 1)
 
                     offer = ShiftOffer.objects.get(pk=offered.data["offer_id"])
                     with mock.patch("shifts.engagement.build_shift_engagement_terms", return_value={}), \
@@ -608,7 +608,8 @@ class CounterOfferTests(ShiftActionFixture):
                     self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED)
                     assignment = ShiftSlotAssignment.objects.get(shift=shift, slot=slot)
                     self.assertEqual((assignment.user_id, assignment.source_offer_id), (worker.pk, offer.pk))
-                    self.assertEqual(notices.count(), 4)
+                    self.assertEqual(notices.count(), 1)
+                    assignment.delete()  # the next tier books the same hours
                 else:
                     self.assertEqual((accepted.status_code, accepted.data.get("code")), (403, "candidate_ahpra_ineligible"))
                     self.assertEqual(counter.status, ShiftCounterOffer.Status.PENDING)
