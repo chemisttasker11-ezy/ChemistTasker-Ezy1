@@ -107,7 +107,7 @@ def offer_shift(*, shift, candidate, slot_id):
 
     if candidate.email:
         ctx = build_shift_offer_context(shift, offer, recipient=candidate)
-        offer_details = build_offer_shift_details(shift, offer)
+        offer_details = build_offer_shift_details(shift, offer, recipient=candidate)
         ctx.update(offer_details)
         notify_shift_users(
             [candidate],
@@ -293,7 +293,7 @@ def offer_dedicated_shift(shift, dedicated_user):
             recipient=dedicated_user,
             ignore_slot_filter=True,
         )
-        offer_details = build_offer_shift_details(shift, offer_for_email)
+        offer_details = build_offer_shift_details(shift, offer_for_email, recipient=dedicated_user)
         ctx.update(offer_details)
         notify_shift_users(
             [dedicated_user],

@@ -112,13 +112,16 @@ def reveal_candidate(*, request, shift, candidate, slot_id, slot):
 
     # Notify only the first time this interest/profile is revealed.
     if not already_revealed_interest:
-        ctx = build_shift_email_context(shift, user=candidate, role=candidate.role.lower())
-        reveal_details = build_offer_shift_details(shift, interest)
+        reveal_details = build_offer_shift_details(shift, interest, recipient=candidate)
+        pharmacy_name = reveal_details["pharmacy_name"]
+        ctx = build_shift_email_context(
+            shift, user=candidate, role=candidate.role.lower(), extra={"pharmacy_name": pharmacy_name},
+        )
         notify_shift_users(
             [candidate],
             shift=shift,
-            title=f"Profile revealed: {shift.pharmacy.name}",
-            body=f"Your profile was shared with {shift.pharmacy.name} for an upcoming shift. {reveal_details['shift_summary']}",
+            title=f"Profile revealed: {pharmacy_name}",
+            body=f"Your profile was shared with {pharmacy_name} for an upcoming shift. {reveal_details['shift_summary']}",
             kind="shift_profile_revealed",
             payload={
                 "slot_id": slot_id,
@@ -129,7 +132,7 @@ def reveal_candidate(*, request, shift, candidate, slot_id, slot):
         if candidate.email:
             async_task(
                 'users.tasks.send_async_email',
-                subject=f"Your profile was revealed for a shift at {shift.pharmacy.name}",
+                subject=f"Your profile was revealed for a shift at {pharmacy_name}",
                 recipient_list=[candidate.email],
                 template_name="emails/shift_reveal.html",
                 context=ctx,

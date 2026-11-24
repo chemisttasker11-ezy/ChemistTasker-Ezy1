@@ -11,7 +11,8 @@ from shifts.selectors import slot_occurrence_ended
 from django.utils import timezone
 from organizations.access import user_can_manage_pharmacy
 from organizations.timezone import get_pharmacy_timezone
-from organizations.serializers import anonymize_pharmacy_detail, PharmacySerializer, user_can_view_full_pharmacy
+from organizations.serializers import PharmacySerializer, user_can_view_full_pharmacy
+from shifts.pharmacy_visibility import project_shift_pharmacy, should_mask_shift_pharmacy
 from shifts.posting import ensure_escalation_stamps, normalize_money_value, normalize_slots_payload, post_shift, revise_shift
 from shifts.travel import haversine_km
 from shifts.rate_visibility import project_published_rates, published_rates_visible
@@ -197,8 +198,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         request = self.context.get('request')
         user = getattr(request, 'user', None) if request else None
-        if instance.post_anonymously and not user_can_view_full_pharmacy(user, instance.pharmacy):
-            data['pharmacy_detail'] = anonymize_pharmacy_detail(data.get('pharmacy_detail'))
+        data['pharmacy_detail'] = project_shift_pharmacy(instance, user, data.get('pharmacy_detail'))
         if not user_can_view_full_pharmacy(user, instance.pharmacy):
             for field in PharmacySerializer.file_fields:
                 data.get('pharmacy_detail', {}).pop(field, None)
@@ -255,7 +255,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         pharmacy = getattr(obj, 'pharmacy', None)
         request = self.context.get('request')
         user = getattr(request, 'user', None) if request else None
-        anonymize = obj.post_anonymously and not user_can_view_full_pharmacy(user, pharmacy)
+        anonymize = should_mask_shift_pharmacy(obj, user)
         return self._get_address_parts(pharmacy, anonymize=anonymize)
 
     def _get_user_location(self, user):

@@ -203,7 +203,9 @@ def accept_counter_offer(*, shift, offer, slot_id, decided_by):
         ctx = build_shift_counter_offer_context(shift, offer, recipient=offer.user)
         ctx["payment_required"] = False
         ctx["worker_confirmation_required"] = True
-        offer_details = build_offer_shift_details(shift, created_offers[0] if created_offers else None)
+        offer_details = build_offer_shift_details(
+            shift, created_offers[0] if created_offers else None, recipient=offer.user,
+        )
         ctx.update(offer_details)
         ctx["shift_link"] = worker_offer_url(offer.user, shift, created_offers[0] if created_offers else None)
         notify_shift_users(
@@ -257,12 +259,13 @@ def reject_counter_offer(*, shift, offer, decided_by):
 
     if offer.user and offer.user.email:
         ctx = build_shift_counter_offer_context(shift, offer, recipient=offer.user)
-        offer_details = build_counter_offer_shift_details(shift, offer)
+        offer_details = build_counter_offer_shift_details(shift, offer, recipient=offer.user)
+        pharmacy_name = offer_details["pharmacy_name"]
         ctx.update(offer_details)
         notify_shift_users(
             [offer.user],
             shift=shift,
-            title=f"Counter offer declined: {shift.pharmacy.name}",
+            title=f"Counter offer declined: {pharmacy_name}",
             body=f"Your counter offer was declined. {offer_details['shift_summary']}",
             kind="shift_counter_offer_declined",
             payload={
@@ -273,7 +276,7 @@ def reject_counter_offer(*, shift, offer, decided_by):
         )
         async_task(
             'users.tasks.send_async_email',
-            subject=f"Your counter offer for {shift.pharmacy.name} was declined",
+            subject=f"Your counter offer for {pharmacy_name} was declined",
             recipient_list=[offer.user.email],
             template_name="emails/shift_counter_offer_rejected.html",
             context=ctx,
