@@ -3,9 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from shifts.models import ShiftSlotAssignment
 from workforce.roster.periods import get_roster_period_assignments, validate_roster_period
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
+from workforce.roster.slot_locking import lock_roster_workers
 
 
 def refresh_assignment_rate(assignment):
@@ -40,7 +38,7 @@ def _refresh_locked_rate(assignment):
 
 def _validate_and_price(roster_period, slot_ids=None):
     assignments = get_roster_period_assignments(roster_period)
-    list(User.objects.select_for_update().filter(pk__in=assignments.values_list("user_id", flat=True)).order_by("pk"))
+    lock_roster_workers(assignments.values_list("user_id", flat=True))
     validation = validate_roster_period(roster_period, allow_invited=True)
     if validation["errors"]:
         raise ValidationError([item["message"] for item in validation["errors"]])

@@ -211,7 +211,9 @@ def require_ahpra_application(user):
 def require_public_ahpra(user, shift, *, schedule_recheck=True):
     """Require booking credentials for workers outside the posting pharmacy's own staff, at every visibility."""
     features = verification_features()
-    if features.is_shift_pharmacy_employee(user, shift):
+    # An anonymous public post is reached as an outside worker, even by the pharmacy's own staff.
+    anonymous_public = shift.visibility == 'PLATFORM' and shift.post_anonymously
+    if not anonymous_public and features.is_shift_pharmacy_employee(user, shift):
         return
     require_ahpra_application(user)
     features.require_shift_booking_onboarding(user)

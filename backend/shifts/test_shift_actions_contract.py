@@ -1794,7 +1794,8 @@ class OfferConfirmationRaceTests(TransactionTestCase):
                     pids['roster'] = cursor.fetchone()[0]
 
                 def observe_shift_lock(execute, sql, params, many, context):
-                    if '"client_profile_shift"' in sql and 'FOR UPDATE' in sql.upper():
+                    # The booking holds the shift and the worker: the roster edit meets whichever it locks first.
+                    if any(f'FROM "{table}"' in sql for table in ('client_profile_shift', 'users_user')) and 'UPDATE NOWAIT' in sql.upper():
                         roster_attempted.set()
                     return execute(sql, params, many, context)
 
