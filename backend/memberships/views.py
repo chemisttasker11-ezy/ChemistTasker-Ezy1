@@ -8,7 +8,6 @@ from organizations.models import (
     PharmacyAdmin,
 )
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.views import APIView
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import action
@@ -39,6 +38,9 @@ from memberships.applications import (
 from memberships.invites import (
     DIRECT_APPLICATION_PREFIX, bulk_invite, create_membership_invite,
     direct_application_category, direct_invite_expired, expired_invite_from_token,
+)
+from memberships.member_management import (
+    CHANGE_DENIED, ConfirmedBookingsNeedDecision, lock_membership_for_change, remove_member,
 )
 from memberships.notifications import (  # noqa: F401  (historical import path of the notification helpers)
     _format_membership_person,
@@ -85,63 +87,28 @@ class MembershipViewSet(viewsets.ModelViewSet):
 
     def check_object_permissions(self, request, obj):
         if not user_can_change_membership(request.user, obj):
-            self.permission_denied(request, message="Not allowed to modify this membership.")
+            self.permission_denied(request, message=CHANGE_DENIED)
 
     def perform_update(self, serializer):
-        """Serialize generic reactivation against the cross-pharmacy membership cap.
-
-        DRF validates before perform_update(), so the serializer's normal cap
-        check alone can race across two pharmacies. Re-check the activation
-        transition under the same user -> membership lock order used by worker
-        self-acceptance.
-        """
-        original = serializer.instance
         with transaction.atomic():
-            User.objects.select_for_update().only("pk").get(pk=original.user_id)
-            locked = Membership.objects.select_for_update().get(pk=original.pk)
-
-            will_be_active = serializer.validated_data.get("is_active", locked.is_active)
-            if will_be_active and locked.direct_invited_at and locked.status == Membership.Status.PENDING:
-                raise DRFValidationError({"is_active": "The worker needs to join from their invitation first."})
-            if will_be_active and not locked.is_active:
-                active_count = _count_active_memberships(
-                    locked.user,
-                    exclude_membership_id=locked.pk,
-                )
-                if active_count >= MAX_ACTIVE_PHARMACY_MEMBERSHIPS:
-                    raise DRFValidationError({
-                        "is_active": f"User already belongs to {MAX_ACTIVE_PHARMACY_MEMBERSHIPS} pharmacies."
-                    })
-
-            serializer.instance = locked
+            serializer.instance = lock_membership_for_change(serializer.instance, serializer.validated_data)
             serializer.save()
 
 
     def destroy(self, request, *args, **kwargs):
         """Remove membership access while preserving historical chat messages."""
-        original = self.get_object()
-        with transaction.atomic():
-            User.objects.select_for_update().only("pk").get(pk=original.user_id)
-            membership = get_object_or_404(Membership.objects.select_for_update(), pk=original.pk)
-            self.check_object_permissions(request, membership)
-            if membership.status == Membership.Status.PENDING:
-                membership.status = Membership.Status.REJECTED
-                membership.is_active = False
-                membership.responded_at = timezone.now()
-                membership.save(update_fields=["status", "is_active", "responded_at", "updated_at"])
-                membership.revoke_admin_access()
-            else:
-                if request.query_params.get("confirmed_bookings") != "keep" and membership.pharmacy_id:
-                    bookings = employment_services().future_confirmed_bookings(
-                        membership.pharmacy, user_id=membership.user_id,
-                    )
-                    if bookings:
-                        return Response({
-                            "code": "confirmed_bookings_need_decision",
-                            "detail": "Keep the confirmed bookings, or cancel or reassign them before removing this member.",
-                            "bookings": bookings,
-                        }, status=status.HTTP_409_CONFLICT)
-                membership.remove()
+        try:
+            remove_member(
+                self.get_object(),
+                removed_by=request.user,
+                keep_confirmed_bookings=request.query_params.get("confirmed_bookings") == "keep",
+            )
+        except ConfirmedBookingsNeedDecision as undecided:
+            return Response({
+                "code": "confirmed_bookings_need_decision",
+                "detail": "Keep the confirmed bookings, or cancel or reassign them before removing this member.",
+                "bookings": undecided.bookings,
+            }, status=status.HTTP_409_CONFLICT)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _create_membership_invite(self, data, inviter):

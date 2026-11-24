@@ -126,7 +126,8 @@ Full wording, and the orchestrator's "my call: confirm or change" details, are u
 | ON-Q12 site brief | KEEP optional, plus hints in onboarding and posting | APPROVED + IMPLEMENTATION_GAP (BL-GM02-9) |
 | ON-Q13 saved payment method | KEEP | APPROVED |
 | ON-Q14 organisations join | KEEP | APPROVED |
-| GM02-Q21 offers to unverified workers | Other (A): show the check result and allow sending for group and chain shifts only. Public offers keep the send gate. Worker acceptance still requires eligible credentials under BL-01. Owner confirmed this scope on 24 Nov 2026. | APPROVED + LOCAL SEND-GATE FIX (BL-GM02-10 readiness and upgrade flow still open) |
+| GM02-Q21 offers to unverified workers | Other (A): show the check result and allow sending for group and chain shifts only. Public offers keep the send gate. ~~Worker acceptance still requires eligible credentials under BL-01.~~ Owner confirmed this scope on 24 Nov 2026. | APPROVED + LOCAL SEND-GATE FIX (BL-GM02-10 readiness and upgrade flow still open). The acceptance sentence is SUPERSEDED_BY_OWNER: see GM02-Q21-R1 |
+| GM02-Q21-R1 internal roster and group bookings | "We only notify the owner about his worker but let him do whatever with his internal roster and the inter-group booking." The reading is in the 24 Nov implementation record (my call: confirm or change) | APPROVED + IMPLEMENTATION_GAP (BL-01 scope) |
 | GM02-Q22 expiry date alone | KEEP | APPROVED |
 | GM02-Q23 intern talent posts | KEEP | APPROVED |
 | GM02-Q24 mobile check skip | KEEP: only Explorers (reconfirmed 24 Nov over GM01-Q18) | APPROVED |
@@ -315,7 +316,11 @@ Approved. Only public booking incidents count towards public shift bans.
 
 - Kiosk and PIN notices open the Vite pages. Next does not serve the kiosk interface.
 - When server sign-out cannot be completed, browser sign-in waits until revocation succeeds.
-- The offer send exception covers group and chain only. Ordinary public and pharmacy-private sends keep their checks, and acceptance rules continue to apply.
+- The offer send exception covers group and chain only. Ordinary public and pharmacy-private sends keep their checks. GM02-Q21-R1 below replaces the earlier note that acceptance rules continue to apply.
+- **GM02-Q21-R1 (owner, 24 Nov 2026, review round).** "We only notify the owner about his worker but let him do whatever with his internal roster and the inter-group booking." Replaces the acceptance part of GM02-Q21 and the earlier "acceptance keeps BL-01" note.
+  - Reading (my call: confirm or change): for the pharmacy's own staff and internal roster, and for `OWNER_CHAIN` and `ORG_CHAIN` shifts, the credential gate does not block sending, accepting or finalising. The manager gets the worker's check result as a notice, and it also shows on the offer.
+  - `LOCUM_CASUAL` and `PLATFORM` keep the full BL-01 gate at sending, accepting and finalising.
+  - Not built on this branch. The work is on `build/bl01-02-booking-gate`; close the gap when it is integrated.
 
 These dispositions apply to the local working files based on `1f00f6b4`. The full owner answers above remain the decision record.
 
