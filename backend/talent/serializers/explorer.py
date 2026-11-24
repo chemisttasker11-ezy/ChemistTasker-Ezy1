@@ -8,6 +8,7 @@ from onboarding.services.skill_identity import normalize_skills
 from drf_spectacular.utils import extend_schema_field
 from onboarding.verification.policy import under_18, verification_summary
 from onboarding.verification.schema import VerificationSummarySerializer
+from talent.post_visibility import ANONYMOUS_NAME, reader_sees_author
 
 
 class PublicAvailabilityDaysField(serializers.JSONField):
@@ -128,6 +129,17 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields  # read serializer only
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not reader_sees_author(instance, self._reader()):
+            for field in ("explorer_profile", "author_user_id", "explorer_user_id"):
+                data[field] = None
+            data["explorer_name"] = ANONYMOUS_NAME
+        return data
+
+    def _reader(self):
+        return getattr(self.context.get("request"), "user", None)
+
     def get_explorer_name(self, obj):
         user = obj.author_user or getattr(obj.explorer_profile, "user", None)
         if not user:
@@ -243,15 +255,10 @@ class ExplorerPostReadSerializer(serializers.ModelSerializer):
 
 
 class PublicExplorerPostReadSerializer(ExplorerPostReadSerializer):
-    """Public cards keep their content but not an anonymous author's identity."""
+    """Public feed cards never show an anonymous author, not even to the author."""
 
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        if instance.is_anonymous:
-            for field in ("explorer_profile", "author_user_id", "explorer_user_id"):
-                data[field] = None
-            data["explorer_name"] = "Anonymous candidate"
-        return data
+    def _reader(self):
+        return None
 
 
 class ExplorerPostWriteSerializer(serializers.ModelSerializer):

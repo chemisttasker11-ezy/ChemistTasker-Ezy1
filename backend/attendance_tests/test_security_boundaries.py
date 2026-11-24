@@ -46,15 +46,16 @@ class SecurityBoundaryTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             _count_security_attempt("security-test-limit", limit=2, window=60)
 
-    def test_public_anonymous_post_hides_identity_without_changing_authenticated_feed(self):
+    def test_anonymous_post_hides_identity_when_serialized_without_request_context(self):
         author = User(id=7, first_name="Jane", last_name="Doe")
         post = ExplorerPost(id=3, author_user=author, headline="Available", is_anonymous=True)
-        public = PublicExplorerPostReadSerializer(post).data
-        authenticated = ExplorerPostReadSerializer(post).data
-        self.assertEqual(public["explorer_name"], "Anonymous candidate")
-        self.assertIsNone(public["author_user_id"])
-        self.assertIsNone(public["explorer_user_id"])
-        self.assertEqual(authenticated["author_user_id"], 7)
+        for serializer in (ExplorerPostReadSerializer, PublicExplorerPostReadSerializer):
+            with self.subTest(serializer=serializer.__name__):
+                data = serializer(post).data
+                self.assertEqual(data["explorer_name"], "Anonymous candidate")
+                self.assertIsNone(data["explorer_profile"])
+                self.assertIsNone(data["author_user_id"])
+                self.assertIsNone(data["explorer_user_id"])
 
     def test_deleted_chat_serializer_masks_legacy_original_body(self):
         message = Message(

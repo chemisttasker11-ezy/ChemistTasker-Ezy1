@@ -17,7 +17,10 @@ from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from django.db import transaction
+from talent.post_visibility import visible_profile_posts
 from talent.serializers.explorer import (
     ExplorerPostReadSerializer,
     ExplorerPostWriteSerializer,
@@ -50,6 +53,7 @@ class TalentPostPagination(PageNumberPagination):
     max_page_size = 200
 
 
+@method_decorator(never_cache, name="dispatch")
 class ExplorerPostViewSet(viewsets.ModelViewSet):
     """
     Authenticated users can view.
@@ -264,7 +268,7 @@ class ExplorerPostViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path=r"by-profile/(?P<profile_id>[^/.]+)")
     def by_profile(self, request, profile_id=None):
-        qs = self.get_queryset().filter(explorer_profile_id=profile_id)
+        qs = visible_profile_posts(self.get_queryset().filter(explorer_profile_id=profile_id), request.user)
         page = self.paginate_queryset(qs)
         ser = ExplorerPostReadSerializer(page or qs, many=True, context={"request": request})
         if page is not None:
