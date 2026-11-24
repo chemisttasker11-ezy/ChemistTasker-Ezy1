@@ -58,18 +58,20 @@ export async function withBrowserSessionLock<T>(work: (exclusive: boolean) => Pr
   });
 }
 
-type CookieLogout = { baseUrl: string; version: string | null };
+type CookieLogout = { baseUrl: string; version: string | null; queuedAt?: number };
+// Backend SIMPLE_JWT['REFRESH_TOKEN_LIFETIME']: the longest a browser session lives after its last refresh.
+const MAX_BROWSER_SESSION_MS = 90 * 24 * 60 * 60 * 1000;
 
 export function createBrowserLogoutQueue(send: (baseUrl: string) => Promise<unknown>) {
   const entries = createLogoutQueue<CookieLogout>({
     getItem: key => localStorage.getItem(key),
     setItem: (key, value) => localStorage.setItem(key, value),
     removeItem: key => localStorage.removeItem(key),
-  }, QUEUE_KEY, async ({ baseUrl, version }) => {
+  }, QUEUE_KEY, async ({ baseUrl, version, queuedAt }) => {
+    if (Date.now() - (queuedAt ?? 0) > MAX_BROWSER_SESSION_MS) return;
     const current = localStorage.getItem(SESSION_VERSION);
-    if (current === version) await send(baseUrl);
-    // After a login with an unknown outcome the cookie may be the old or the new one: keep older entries queued.
-    else if (current?.startsWith('pending:')) throw new Error('Sign-in outcome unknown.');
+    // After a login with an unknown outcome the cookie may be the old or the new one: revoke whichever it is.
+    if (current === version || current?.startsWith('pending:')) await send(baseUrl);
   });
   const currentVersion = () => localStorage.getItem(SESSION_VERSION);
 
@@ -80,7 +82,7 @@ export function createBrowserLogoutQueue(send: (baseUrl: string) => Promise<unkn
       return withBrowserSessionLock(async exclusive => {
         // A changed version means a later login: this sign-out has nothing left to revoke.
         if (currentVersion() !== version) return true;
-        return entries.enqueue({ baseUrl, version }, exclusive);
+        return entries.enqueue({ baseUrl, version, queuedAt: Date.now() }, exclusive);
       });
     },
     retry: () => withBrowserSessionLock(async exclusive => {

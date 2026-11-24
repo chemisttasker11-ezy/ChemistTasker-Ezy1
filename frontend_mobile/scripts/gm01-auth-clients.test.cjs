@@ -179,6 +179,41 @@ test('browser password and email-code sign-in wait for queued sign-out', async (
   }
 });
 
+test('browser login without a lock clears queued sign-out after success', async () => {
+  const env = browserEnvironment({ webLocks: false });
+  let requests = 0;
+  const browser = env.createBrowserLogoutQueue(async () => { throw new Error('offline'); });
+  assert.equal(await browser.signOut('/api/v1'), false);
+  assert.ok(env.localStorage.getItem('ct:pending-logout'));
+  await browser.login(async () => {}, async () => { requests++; });
+  assert.equal(requests, 1);
+  assert.equal(env.localStorage.getItem('ct:pending-logout'), null);
+});
+
+test('browser login revokes a queued cookie when a sign-in outcome is pending', async () => {
+  const env = browserEnvironment();
+  let offline = true;
+  let sends = 0;
+  const browser = env.createBrowserLogoutQueue(async () => { sends++; if (offline) throw new Error('offline'); });
+  assert.equal(await browser.signOut('/api/v1'), false);
+  env.localStorage.setItem('ct:cookie-session-version', 'pending:unconfirmed');
+  offline = false;
+  await browser.login(async () => {}, async () => {});
+  assert.equal(sends, 2);
+  assert.equal(env.localStorage.getItem('ct:pending-logout'), null);
+});
+
+test('browser login drops an expired queued sign-out without sending it', async () => {
+  const env = browserEnvironment();
+  let sends = 0;
+  const browser = env.createBrowserLogoutQueue(async () => { sends++; throw new Error('offline'); });
+  env.localStorage.setItem('ct:pending-logout', JSON.stringify([{ baseUrl: '/api/v1', version: null,
+    queuedAt: Date.now() - 90 * 24 * 60 * 60 * 1000 - 1000 }]));
+  await browser.login(async () => {}, async () => {});
+  assert.equal(sends, 0);
+  assert.equal(env.localStorage.getItem('ct:pending-logout'), null);
+});
+
 test('a browser login waits for the old cookie to be revoked before sending a request with an unknown outcome', async () => {
   const env = browserEnvironment();
   let offline = true;
