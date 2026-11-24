@@ -63,6 +63,13 @@ def normalize_slots_payload(slots_data):
     return normalized
 
 
+def validate_posted_rates(rate_type, fixed_rate, employment_type, slots_data):
+    if rate_type == 'FIXED' and (fixed_rate is None or (employment_type == 'LOCUM' and Decimal(str(fixed_rate)) <= 0)):
+        raise serializers.ValidationError({'fixed_rate': 'A valid fixed rate is required.'})
+    if employment_type == 'LOCUM' and any(slot.get('rate') is not None and Decimal(str(slot['rate'])) <= 0 for slot in slots_data):
+        raise serializers.ValidationError({'slots': 'A slot rate must be greater than zero.'})
+
+
 def validate_posting_window(pharmacy, slots_data):
     today = timezone.now().astimezone(get_pharmacy_timezone(pharmacy)).date()
     year, month = divmod(today.year * 12 + today.month - 1 + 4, 12)
@@ -103,11 +110,13 @@ def post_shift(
     employment_type = validated_data.get('employment_type')
 
     # Default fixed_rate from pharmacy defaults when rate_type=FIXED and not provided
-    if rate_type == 'FIXED' and not validated_data.get('fixed_rate'):
+    if rate_type == 'FIXED' and validated_data.get('fixed_rate') is None:
         default_fixed = getattr(pharmacy, 'default_fixed_rate', None)
         weekday_rate = getattr(pharmacy, 'rate_weekday', None)
         slot_rate = next((slot.get('rate') for slot in slots_data if slot.get('rate') is not None), None)
-        validated_data['fixed_rate'] = default_fixed or weekday_rate or slot_rate or Decimal('0.00')
+        validated_data['fixed_rate'] = default_fixed or weekday_rate or slot_rate
+
+    validate_posted_rates(rate_type, validated_data.get('fixed_rate'), employment_type, slots_data)
 
     # Default flexible timing for FT/PT if not provided
     if employment_type in ['FULL_TIME', 'PART_TIME'] and 'flexible_timing' not in validated_data:
@@ -226,6 +235,12 @@ def revise_shift(
                     else:
                         changed_dates.append({'date': value})
             validate_posting_window(target or instance.pharmacy, changed_dates)
+        validate_posted_rates(
+            validated_data.get('rate_type', instance.rate_type),
+            validated_data.get('fixed_rate', instance.fixed_rate),
+            validated_data.get('employment_type', instance.employment_type),
+            slots_data if slots_data is not None else instance.slots.values('rate'),
+        )
         # If visibility is changing, recalc escalation_level
         if 'visibility' in validated_data:
             new_vis = validated_data['visibility']
