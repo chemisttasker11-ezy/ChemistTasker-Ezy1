@@ -11,6 +11,7 @@ import { isWorkerPersona, resolveShiftSurface } from '@/roles/shared/shifts/shif
 import { colors, radius, space } from '@/constants/tokens';
 import { calendarEditorUrl, directionsUrl, offlineShiftKey, sanitizeConfirmedShifts, upcomingShifts, type OfflineShift } from '@/features/nextShift/nextShiftModel';
 import { readConfirmedShiftSnapshot, saveConfirmedShiftSnapshot } from '@/features/nextShift/offlineConfirmedShifts';
+import { getSessionGeneration } from '@/utils/authSession';
 
 export async function loadNextShiftsSequence({
  userId,
@@ -74,12 +75,13 @@ function ScopedNextShifts({userId}:{userId?:number}) {
 
  const load=useCallback(async()=>{
   const gen=++generation.current;
+  const session=getSessionGeneration();
   if(userId==null){setRows([]);setLoading(false);return;}
   setLoading(true);setMessage('');
   try{
    await loadNextShiftsSequence({
     userId,
-    isCurrent:()=>gen===generation.current,
+    isCurrent:()=>gen===generation.current && session===getSessionGeneration(),
     onCached:(saved)=>{setRows(saved.rows);setCachedAt(saved.savedAt);setOffline(true);},
     onLive:(liveRows)=>{setRows(liveRows);setCachedAt(new Date().toISOString());setOffline(false);},
     onError:(msg)=>setMessage(msg),

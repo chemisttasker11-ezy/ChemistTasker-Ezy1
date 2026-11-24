@@ -1,8 +1,8 @@
 // src/utils/apiClient.ts
-import {csrfToken} from '../../shared/browser-session';
+import {csrfToken,expireBrowserSession,getSessionGeneration} from '../../shared/browser-session';
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
-import { clearTokens, refreshCookieSession, getAccessToken } from './tokenService';
+import { refreshCookieSession, getAccessToken } from './tokenService';
 import { API_BASE_URL } from '../constants/api';
 
 const apiClient = axios.create({
@@ -15,7 +15,10 @@ const apiClient = axios.create({
  * - Injects the JWT Bearer token from localStorage.
  */
 apiClient.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
+  async (config: InternalAxiosRequestConfig & { sessionGeneration?: number }) => {
+    const generation = getSessionGeneration();
+    if (config.sessionGeneration !== undefined && config.sessionGeneration !== generation) throw new axios.CanceledError();
+    config.sessionGeneration = generation;
     config.withCredentials = true;
     const token = getAccessToken();
     if (token) {
@@ -23,6 +26,7 @@ apiClient.interceptors.request.use(
     } else if(!['get','head','options'].includes((config.method||'get').toLowerCase())) {
       config.headers['X-CSRFToken']=await csrfToken(API_BASE_URL);
     }
+    if (generation !== getSessionGeneration()) throw new axios.CanceledError();
     return config;
   },
   (error: AxiosError) => Promise.reject(error)
@@ -53,27 +57,19 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest: any = error.config || {};
 
-    // Attempt refresh once on 401
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status !== 401 || originalRequest.sessionGeneration !== getSessionGeneration()) return Promise.reject(error);
+    if (!originalRequest._retry) {
       originalRequest._retry = true;
       try {
         const refreshed = await refreshCookieSession(true);
-        if (!refreshed?.access) {
-          throw new Error('Refresh failed');
-        }
-        return apiClient(originalRequest);
+        if (refreshed?.access) return apiClient(originalRequest);
       } catch (refreshErr) {
-        // fall through to logout behaviour
-        if((refreshErr as {status?:number}).status!==401) return Promise.reject(refreshErr);
+        if (originalRequest.sessionGeneration === getSessionGeneration()) expireBrowserSession(refreshErr);
+        return Promise.reject(refreshErr);
       }
     }
 
-    if (error.response?.status === 401) {
-      clearTokens();
-      if (window.location.pathname !== '/login') {
-        window.location.replace('/login');
-      }
-    }
+    if (originalRequest.sessionGeneration === getSessionGeneration()) expireBrowserSession();
     return Promise.reject(error);
   }
 );

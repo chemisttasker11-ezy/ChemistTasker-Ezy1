@@ -4,6 +4,13 @@ import { sanitizeConfirmedShifts, type OfflineShift } from './nextShiftModel';
 
 type Snapshot = { savedAt: string; rows: OfflineShift[] };
 const key = (userId: number | string) => 'ct.offline.confirmed-shifts.v2.' + String(userId).replace(/[^a-zA-Z0-9_-]/g, '_');
+let pendingWrite = Promise.resolve();
+
+function writeSnapshot(change: () => Promise<void>): Promise<void> {
+ const result = pendingWrite.then(change);
+ pendingWrite = result.catch(() => undefined);
+ return result;
+}
 
 /** Read-only, minimally scoped display snapshot. Never proof of a live booking. */
 export async function readConfirmedShiftSnapshot(userId: number | string): Promise<Snapshot | null> {
@@ -24,10 +31,10 @@ export async function readConfirmedShiftSnapshot(userId: number | string): Promi
 
 export async function saveConfirmedShiftSnapshot(userId: number | string, shifts: Shift[]): Promise<Snapshot> {
  const snapshot: Snapshot = {savedAt:new Date().toISOString(),rows:sanitizeConfirmedShifts(shifts,userId)};
- await AsyncStorage.setItem(key(userId),JSON.stringify(snapshot));
+ await writeSnapshot(() => AsyncStorage.setItem(key(userId),JSON.stringify(snapshot)));
  return snapshot;
 }
 
 export async function clearConfirmedShiftSnapshot(userId: number | string): Promise<void> {
- await AsyncStorage.removeItem(key(userId));
+ await writeSnapshot(() => AsyncStorage.removeItem(key(userId)));
 }

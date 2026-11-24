@@ -1,5 +1,7 @@
 import apiClient from './apiClient';
-import { NATIVE_IDENTITY_ROUTES } from '@chemisttasker/shared-core';
+import { Platform } from 'react-native';
+import { browserLoginSession, NATIVE_IDENTITY_ROUTES } from '@chemisttasker/shared-core';
+import { resolveApiBaseUrl } from './apiUrl';
 
 /**
  * Expo-only Axios compatibility boundary. The established interceptor owns
@@ -9,8 +11,11 @@ import { NATIVE_IDENTITY_ROUTES } from '@chemisttasker/shared-core';
  */
 export const nativeIdentityTransport = {
   currentUser: () => apiClient.get(NATIVE_IDENTITY_ROUTES.me),
-  login: (email: string, password: string) =>
-    apiClient.post(NATIVE_IDENTITY_ROUTES.login, { email, password }, { withCredentials: true }),
+  login: async (email: string, password: string) => {
+    const payload = { email, password };
+    if (Platform.OS === 'web') return { data: await browserLoginSession({ baseUrl: resolveApiBaseUrl() || '' }, payload) };
+    return apiClient.post(NATIVE_IDENTITY_ROUTES.login, payload, { withCredentials: true });
+  },
   register: (payload: unknown) => apiClient.post(NATIVE_IDENTITY_ROUTES.register, payload),
   verifyEmailOtp: (email: string | undefined, otp: string) =>
     apiClient.post(NATIVE_IDENTITY_ROUTES.verifyEmailOtp, { email, otp }),

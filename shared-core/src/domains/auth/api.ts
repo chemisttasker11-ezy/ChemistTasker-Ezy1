@@ -2,6 +2,7 @@ import type { CurrentUserApi } from '../../contracts/accounts';
 /** Domain-owned operations extracted from the established shared API. */
 import { API_ENDPOINTS } from '../../constants/endpoints';
 import { fetchApi } from '../../transport/application';
+import { createApiClient } from '../../transport/client';
 import { buildQuery } from '../../utils/serialization';
 import type { LoginSession } from './sessionSecurity';
 export function login(credentials: unknown) {
@@ -13,17 +14,25 @@ export type LogoutSessionOptions = {
     csrfToken?: string | null;
     deviceToken?: string | null;
 };
-export function logoutSession({ refreshToken = null, isBrowser = false, csrfToken = null, deviceToken = null }: LogoutSessionOptions = {}) {
+export function logoutSession(
+    { refreshToken = null, isBrowser = false, csrfToken = null, deviceToken = null }: LogoutSessionOptions = {},
+    transport?: { baseUrl: string; fetchImpl?: typeof fetch },
+) {
     const headers = {
         'Content-Type': 'application/json',
         'X-Client-Platform': isBrowser ? 'web' : 'mobile',
         ...(isBrowser && csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
     };
-    return fetchApi('/users/logout/', {
+    const request = {
         method: 'POST',
         body: JSON.stringify(isBrowser ? {} : { refresh: refreshToken, ...(deviceToken ? { device_token: deviceToken } : {}) }),
         headers,
-        credentials: isBrowser ? 'include' : 'omit',
+        credentials: isBrowser ? 'include' as const : 'omit' as const,
+        signal: AbortSignal.timeout?.(15000),
+    };
+    if (transport) return createApiClient(transport).request('/users/logout/', { ...request, auth: false });
+    return fetchApi('/users/logout/', {
+        ...request,
         skipAuth: true,
     });
 }
@@ -32,6 +41,13 @@ export function register(data: unknown) {
 }
 export function refreshToken(refresh: string) {
     return fetchApi('/users/token/refresh/', { method: 'POST', body: JSON.stringify({ refresh }), skipAuth: true });
+}
+export function refreshNativeSession(baseUrl: string, refresh: string) {
+    return createApiClient({ baseUrl, credentials: 'omit' }).post<{ access: string; refresh?: string }>(
+        '/users/token/refresh/', { refresh }, {
+            auth: false, headers: { 'X-Client-Platform': 'mobile' }, signal: AbortSignal.timeout?.(20000),
+        },
+    );
 }
 export function verifyOtp(data: unknown) {
     return fetchApi('/users/verify-otp/', { method: 'POST', body: JSON.stringify(data) });

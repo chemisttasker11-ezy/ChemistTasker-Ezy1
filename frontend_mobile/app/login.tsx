@@ -8,6 +8,7 @@ import { Button, TextField } from '@/components/ui';
 import { colors, font, space, type } from '@/constants/tokens';
 import { openWebPage } from '@/features/explore/webLinks';
 import { sanitizeReturnTo } from '@/utils/authReturnRoute';
+import { SESSION_ENDED_MESSAGE } from '@chemisttasker/shared-core';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
 import { hasOrganizationAccess, resolveInitialWorkspace, selectRolePersona } from '../utils/mobilePersona';
 import {
@@ -29,11 +30,13 @@ export default function LoginScreen() {
     referral_event_id?: string | string[];
     referral_shift_id?: string | string[];
     returnTo?: string | string[];
+    sessionEnded?: string;
   }>();
 
+  const { expiredSession, loginWithCredentials, loginWithStoredSession } = useAuth();
   const returnParam = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
-  // Preserve only first-party native public content routes, never arbitrary redirects.
-  const returnTo = sanitizeReturnTo(returnParam);
+  const fromExpiredSession = params.sessionEnded === '1' || Boolean(expiredSession);
+  const returnTo = sanitizeReturnTo(returnParam, fromExpiredSession ? 'session' : undefined) ?? expiredSession?.returnTo;
   const referralParams: Record<string, string> = {};
   const refCode = Array.isArray(params.referral_code) ? params.referral_code[0] : params.referral_code;
   const refEventId = Array.isArray(params.referral_event_id) ? params.referral_event_id[0] : params.referral_event_id;
@@ -41,7 +44,6 @@ export default function LoginScreen() {
   if (refCode) referralParams.referral_code = refCode;
   if (refEventId) referralParams.referral_event_id = refEventId;
   if (refShiftId) referralParams.referral_shift_id = refShiftId;
-  const { loginWithCredentials, loginWithStoredSession } = useAuth();
 
   const [email, setEmail] = useState(typeof params.email === 'string' ? params.email : '');
   const [password, setPassword] = useState('');
@@ -70,7 +72,7 @@ export default function LoginScreen() {
 
   const routeAfterLogin = async (userData: any) => {
     if (!userData.is_mobile_verified && !userData.mobile_check_skipped) {
-      router.replace('/mobile-verify' as never);
+      router.replace({ pathname: '/mobile-verify', params: returnTo && fromExpiredSession ? { returnTo } : {} });
       return;
     }
 
@@ -100,7 +102,7 @@ export default function LoginScreen() {
     const userLabel = userData.email || userData.username || 'this account';
     await new Promise<void>((resolve) => {
       Alert.alert(
-        'Use biometrics for this account?',
+        'Use device authentication for this account?',
         `Next time, you can sign in as ${userLabel} with ${availability.label} or your device screen lock.`,
         [
           { text: 'Not now', style: 'cancel', onPress: () => resolve() },
@@ -180,6 +182,7 @@ export default function LoginScreen() {
 
   const passwordRef = useRef<TextInputInstance>(null);
   const busy = loading || biometricLoading;
+  const showError = error && !(params.sessionEnded === '1' && error.toLowerCase().includes('saved session'));
 
   return (
     <AuthLayout
@@ -214,7 +217,8 @@ export default function LoginScreen() {
         </>
       }
     >
-      {error ? (
+      {params.sessionEnded === '1' && <AuthNotice tone="info" message={SESSION_ENDED_MESSAGE} />}
+      {showError ? (
         <AuthNotice tone="error" message={error} />
       ) : params.reset === '1' ? (
         <AuthNotice tone="success" message="Password updated. Sign in with your new password." />
@@ -265,6 +269,7 @@ export default function LoginScreen() {
           style={styles.forgot}
         />
       </View>
+
 
       <Button
         label="Sign in"

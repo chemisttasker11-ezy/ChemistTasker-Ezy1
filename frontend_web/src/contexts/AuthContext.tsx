@@ -1,8 +1,8 @@
 import RouteLoadingState from '../components/ui/RouteLoadingState';
 import { AhpraProvider } from './AhpraContext';
-import { Box, Button, Stack } from '@mui/material';
+import { Box } from '@mui/material';
 import DashboardContentState from '../components/dashboard/DashboardContentState';
-import {announceSession, bearerBelongsToDifferentUser, claimUserBrowserStorage, logoutSession, watchSession} from '../../landing_next/shared/browser-session';
+import {announceSession, bearerBelongsToDifferentUser, claimUserBrowserStorage, expireBrowserSession, getSessionGeneration, logoutSession, watchSession} from '../../landing_next/shared/browser-session';
 // src/contexts/AuthContext.tsx
 
 import {
@@ -169,7 +169,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const fetchSessionUser = useCallback(async (): Promise<User | null> => {
+    const generation = getSessionGeneration();
     const cookieUser = await fetchCurrentUser(true);
+    if (generation !== getSessionGeneration()) return null;
     const existingBearer = getAccessToken();
 
     if (cookieUser) {
@@ -177,6 +179,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // cookies, so discard a Bearer only when both identities are known and differ.
       if (existingBearer) {
         const bearerUser = await fetchCurrentUser();
+        if (generation !== getSessionGeneration()) return null;
         if (bearerBelongsToDifferentUser(bearerUser?.id, cookieUser.id)) {
           clearTokens();
         }
@@ -187,6 +190,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // No cookie identity was established. Fall back to the existing browser
     // token lifecycle: current Bearer/cookie request, then the established refresh.
     let currentUser = await fetchCurrentUser();
+    if (generation !== getSessionGeneration()) return null;
     if (!currentUser) {
       const refreshed = await refreshCookieSession(true);
       if (refreshed) currentUser = await fetchCurrentUser();
@@ -218,11 +222,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const bootstrap = async () => {
+      const generation = getSessionGeneration();
       try {
         await restoreTokensFromStorage();
         const parsedUser = await fetchSessionUser();
 
+        if (generation !== getSessionGeneration()) return;
         if (!parsedUser) {
+          expireBrowserSession();
           clearTokens();
           clearLocalAuthState();
           setIsLoading(false);
@@ -234,7 +241,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setRefresh(getRefreshToken());
         setUser(parsedUser);
       } catch {
-        setSessionError('Unable to connect to your account. Please retry.');
+        if (generation === getSessionGeneration()) setSessionError('Unable to connect to your account. Please retry.');
       } finally {
         setIsLoading(false);
       }
@@ -253,14 +260,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // A check already in flight may have read the cookie before another tab's login: run once more after it.
       if (inFlight) { again = true; return; }
       inFlight = true;
+      const generation = getSessionGeneration();
       // A background re-check on focus/visibility must not toggle isLoading: ProtectedRoute would replace the
       // dashboard with a spinner and unmount every page, losing open chats, forms and dialogs.
       try {
         // The cookie is shared by the Next site, Vite dashboard and playground.
         // A cached Bearer token can still belong to the previously opened user.
         const current = await fetchSessionUser();
-        if (!active) return;
+        if (!active || generation !== getSessionGeneration()) return;
         if (!current) {
+          expireBrowserSession();
           clearTokens();
           clearLocalAuthState();
         } else {
@@ -451,14 +460,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = useCallback(async () => {
-    const previousUserId=user?.id;
-    try {
-      await logoutSession(API_BASE_URL);
-      clearLocalAuthState();clearTokens();
-      if(previousUserId)localStorage.removeItem(personaStorageKey(previousUserId));
-      return true;
-    } catch {setSessionError('Could not log out. Check your connection and retry.');return false;}
-  }, [clearLocalAuthState,user?.id]);
+    setSessionError('');
+    await logoutSession(API_BASE_URL);
+    return true;
+  }, []);
 
   useEffect(()=>{const sync=()=>{setAccess(getAccessToken());setRefresh(getRefreshToken());};window.addEventListener(AUTH_TOKENS_UPDATED_EVENT,sync);return()=>window.removeEventListener(AUTH_TOKENS_UPDATED_EVENT,sync);},[]);
 
@@ -501,7 +506,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setActivePersona,
       }}
     >
-      {sessionError?<Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 640, mx: 'auto' }}><Stack spacing={2}><DashboardContentState kind="error" title={sessionError} actionLabel="Reconnect" onAction={()=>window.location.reload()} /><Button variant="outlined" sx={{ minHeight: 44 }} onClick={()=>{setSessionError('');void logout();}}>Retry logout</Button></Stack></Box>:<>{identityPending && <RouteLoadingState label="Checking your session…" />}<div style={{display:identityPending?'none':'contents'}}><AhpraProvider key={`${user?.id}:${user?.role}`} user={user}>{children}</AhpraProvider></div></>}
+      {sessionError?<Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 640, mx: 'auto' }}><DashboardContentState kind="error" title={sessionError} actionLabel="Reconnect" onAction={()=>window.location.reload()} /></Box>:<>{identityPending && <RouteLoadingState label="Checking your session…" />}<div style={{display:identityPending?'none':'contents'}}><AhpraProvider key={`${user?.id}:${user?.role}`} user={user}>{children}</AhpraProvider></div></>}
     </AuthContext.Provider>
   );
 }

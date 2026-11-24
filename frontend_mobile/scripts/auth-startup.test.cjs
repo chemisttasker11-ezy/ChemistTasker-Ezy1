@@ -44,6 +44,7 @@ async function bootstrap(currentUser, { baseURL = 'https://api.example.test', to
     },
     '@react-native-community/netinfo': { addEventListener: (listener) => { netInfoListeners.push(listener); return () => {}; } },
     '../utils/apiUrl': { resolveApiBaseUrl: () => baseURL },
+    '../utils/authReturnRoute': { getSessionReturnRoute: () => null },
     '../utils/nativeIdentityTransport': { nativeIdentityTransport: { currentUser } },
     '../utils/authSession': {
       readStoredSession: async () => {
@@ -65,6 +66,9 @@ async function bootstrap(currentUser, { baseURL = 'https://api.example.test', to
       },
       getSessionGeneration: () => generation,
       invalidateSessionGeneration: () => ++generation,
+      watchSessionExpiry: () => () => {},
+      retryQueuedLogout: async () => {},
+      signOutStoredSession: async () => { generation++; stored = null; return true; },
     },
     '../utils/biometricAuth': {
       getBiometricAvailability: async () => ({ available: false }),
@@ -76,6 +80,16 @@ async function bootstrap(currentUser, { baseURL = 'https://api.example.test', to
     const asyncStorage = new Map([['AUTH_USER', JSON.stringify(stored.user)]]);
     modules['../utils/authSession'] = loadModule('../utils/authSession.ts', {
       'react-native': modules['react-native'],
+      '@chemisttasker/shared-core': {
+        createLogoutQueue: () => ({ retry: async () => {} }),
+        isSessionRejection: error => [400, 401].includes(error?.status),
+        refreshNativeSession: async () => {
+          const response = await refreshResponse();
+          if (!response.ok) throw Object.assign(new Error('Refresh rejected'), { status: response.status });
+          return response.json();
+        },
+      },
+      '../features/nextShift/offlineConfirmedShifts': { clearConfirmedShiftSnapshot: async () => {} },
       '@react-native-async-storage/async-storage': {
         getItem: async (key) => asyncStorage.get(key) ?? null,
         setItem: async (key, value) => { asyncStorage.set(key, value); },
