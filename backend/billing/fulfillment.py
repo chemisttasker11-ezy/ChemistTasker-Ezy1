@@ -1,5 +1,6 @@
 """Selected-offer normalization and booking finalization after billing authority is established."""
-from shifts.finalize import expire_competing_offers
+from shifts.booking import lock_booking_workers
+from shifts.finalize import BookingRosterBusy, expire_competing_offers
 
 
 def _normalize_slot_ids(raw_slot_ids=None, raw_slot_id=None):
@@ -46,11 +47,12 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     failing the whole call; explicitly paid offers in other states are collected unchanged.
     """
     from rest_framework.exceptions import ValidationError
-    from shifts.models import ShiftOffer
+    from shifts.models import Shift, ShiftOffer
     from shifts.finalize import finalize_shift_offer
 
     target_offer_ids = _normalize_offer_ids(offer_ids)
-    offers = ShiftOffer.objects.filter(shift=shift).order_by("created_at")
+    Shift.objects.select_for_update().get(pk=shift.pk)
+    offers = ShiftOffer.objects.select_for_update().filter(shift=shift).order_by("created_at", "pk")
     if not (target_offer_ids and unbookable is not None):
         offers = offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
 
@@ -62,6 +64,9 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     if target_slot_ids:
         offers = offers.filter(slot_id__in=target_slot_ids)
 
+    offers = list(offers)
+    worker_ids = {offer.user_id for offer in offers if offer.status == ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT}
+    lock_booking_workers(worker_ids)
     finalized = 0
     finalized_offers = []
     for offer in offers:
@@ -74,6 +79,9 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
                 finalize_shift_offer(offer)
             else:
                 finalize_shift_offer(offer, checkout_id=checkout_id)
+        except BookingRosterBusy:
+            # Card webhooks must retry transient roster contention.
+            raise
         except ValidationError as exc:
             if unbookable is None:
                 raise

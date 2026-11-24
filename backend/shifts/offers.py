@@ -16,6 +16,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Avg
 from django.utils import timezone
 from shifts.pricing import expand_shift_slots
+from shifts.booking import ensure_worker_booking_available, lock_booking_workers
 from shifts.finalize import finalize_shift_offer
 from shifts.events import payroll_activated
 from shifts.payroll import activation_work_dates
@@ -336,7 +337,7 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
     @action(detail=True, methods=['post'])
     @transaction.atomic
     def accept(self, request, pk=None):
-        from onboarding.verification.state import require_public_ahpra
+        from onboarding.verification.state import lock_public_ahpra, require_public_ahpra
         from billing.utils import (
             BILLING_STATE_PAYMENT_REQUIRED,
             get_billing_state_for_pharmacy,
@@ -344,23 +345,26 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
 
         offer = self.get_object()
         shift = Shift.objects.select_for_update().get(pk=offer.shift_id)
-        list(ShiftSlot.objects.select_for_update().filter(shift=shift).order_by('pk'))
         offer = ShiftOffer.objects.select_for_update().get(pk=offer.pk)
         require_public_ahpra(request.user, offer.shift)
         if offer.user_id != request.user.id:
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
         if offer.status != ShiftOffer.Status.PENDING:
             return Response({'detail': 'Offer is not pending.'}, status=status.HTTP_400_BAD_REQUEST)
+        shift = offer.shift
+        lock_public_ahpra(request.user, shift)
+        lock_booking_workers([offer.user_id])
+        list(ShiftSlot.objects.select_for_update().filter(shift=shift).order_by('pk'))
+
         now = timezone.now()
         if offer.expires_at and offer.expires_at <= now:
             offer.status = ShiftOffer.Status.EXPIRED
             offer.save(update_fields=['status', 'updated_at'])
             return Response({'detail': 'Offer has expired.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        shift = offer.shift
-        slot_obj = offer.slot
         if not _user_can_perform_shift_role(offer.user, shift.role_needed):
             return Response({'detail': 'Your role does not cover this shift.'}, status=status.HTTP_400_BAD_REQUEST)
+        slot_obj = offer.slot
         if slot_obj is None:
             locked = shift.slot_assignments.exists() or shift.offers.filter(
                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -407,13 +411,12 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         requires_payment = billing_state == BILLING_STATE_PAYMENT_REQUIRED
 
         with transaction.atomic():
-            from onboarding.verification.state import lock_public_ahpra
-            lock_public_ahpra(request.user, shift)
             offer.payment_preference_snapshot = accepted_terms.get("payment_preference", "")
             offer.settlement_channel = accepted_terms.get("settlement_channel", "")
             offer.engagement_kind = accepted_terms.get("engagement_kind", "")
             offer.engagement_terms_snapshot = accepted_terms
             offer.engagement_terms_accepted_at = terms_accepted_at
+            ensure_worker_booking_available(offer)
             offer.save(update_fields=[
                 "payment_preference_snapshot",
                 "settlement_channel",
