@@ -54,9 +54,11 @@ export function createLogoutQueue<Entry>(
     beforeBrowserLogin: <T>(login: () => Promise<T>, attempt = true) => serialize(async () => {
       const queued = await read();
       const remaining = attempt && queued.length ? await flush(queued) : queued;
-      const result = await login();
-      if (remaining.length) await write([]);
-      return result;
+      if (remaining.length) {
+        const detail = 'Your previous sign-out is still pending. Reconnect and try again.';
+        throw Object.assign(new Error(detail), { status: 409, payload: { detail } });
+      }
+      return login();
     }),
   };
 }

@@ -138,20 +138,22 @@ test('parallel 401s across both browser transports announce expiry once and keep
   assert.equal(session.returnDestination(), null);
 });
 
-test('browser sign-out retries before the login request and is discarded after successful login', async () => {
+test('browser password and email-code sign-in wait for queued sign-out', async () => {
   const env = browserEnvironment();
   let offline = true;
   const sent = [];
   const browser = load(`${core}/domains/auth/browserOperations.ts`, {
     ...env,
-    API_ENDPOINTS: { login: '/login/' },
+    API_ENDPOINTS: { login: '/login/', verifyOtp: '/verify-otp/' },
     createApiClient: () => ({
       get: async () => ({ csrfToken: 'csrf' }),
-      post: async () => { sent.push('login'); return { access: 'new', user: { id: 9 } }; },
+      post: async path => { sent.push(path); return { access: 'new', user: { id: 9 } }; },
     }),
     logoutSession: async () => { sent.push('logout'); if (offline) throw new Error('offline'); },
-  }, ['browserLoginSession', 'browserLogoutQueue']);
-  const login = () => browser.browserLoginSession({ baseUrl: '/api/v1' }, { email: 'a@example.test', password: 'password', remember_me: false });
+  }, ['browserLoginSession', 'browserVerifyEmailOtp', 'browserLogoutQueue']);
+  const options = { baseUrl: '/api/v1' };
+  const login = () => browser.browserLoginSession(options, { email: 'a@example.test', password: 'password', remember_me: false });
+  const verify = () => browser.browserVerifyEmailOtp(options, 'a@example.test', '123456');
   assert.equal(await browser.browserLogoutQueue.signOut('/api/v1'), false);
   assert.equal(env.browserSessionIsSignedOut(), true);
   offline = false;
@@ -159,28 +161,41 @@ test('browser sign-out retries before the login request and is discarded after s
   assert.deepEqual(sent, ['logout', 'logout']);
   assert.equal(env.browserSessionIsSignedOut(), true);
 
-  offline = true;
-  assert.equal(await browser.browserLogoutQueue.signOut('/api/v1'), false);
-  await Promise.all([login(), browser.browserLogoutQueue.retry()]);
-  assert.equal(env.browserSessionIsSignedOut(), false);
-  assert.deepEqual(sent, ['logout', 'logout', 'logout', 'logout', 'login']);
-  offline = false;
-  await browser.browserLogoutQueue.retry();
-  assert.deepEqual(sent.slice(3), ['logout', 'login']);
-  assert.equal(env.localStorage.getItem('ct:pending-logout'), null);
+  for (const [signIn, expectedPath] of [[login, '/login/'], [verify, '/verify-otp/']]) {
+    sent.length = 0;
+    offline = true;
+    assert.equal(await browser.browserLogoutQueue.signOut(options.baseUrl), false);
+    await assert.rejects(signIn(), error =>
+      error.status === 409 && error.payload.detail.includes('previous sign-out is still pending'));
+    assert.equal(env.browserSessionIsSignedOut(), true);
+    assert.deepEqual(sent, ['logout', 'logout']);
+    assert.ok(env.localStorage.getItem('ct:pending-logout'));
+    offline = false;
+    await Promise.all([signIn(), browser.browserLogoutQueue.retry()]);
+    assert.equal(env.browserSessionIsSignedOut(), false);
+    await browser.browserLogoutQueue.retry();
+    assert.deepEqual(sent, ['logout', 'logout', 'logout', expectedPath]);
+    assert.equal(env.localStorage.getItem('ct:pending-logout'), null);
+  }
 });
 
-test('a browser login with an unknown outcome leaves the old cookie retry disarmed', async () => {
+test('a browser login waits for the old cookie to be revoked before sending a request with an unknown outcome', async () => {
   const env = browserEnvironment();
+  let offline = true;
   let sends = 0;
-  const browser = env.createBrowserLogoutQueue(async () => { sends++; throw new Error('offline'); });
+  const browser = env.createBrowserLogoutQueue(async () => { sends++; if (offline) throw new Error('offline'); });
   await browser.signOut('/api/v1');
-  await assert.rejects(browser.login(async () => {}, async () => { throw new Error('login connection lost'); }));
-  await browser.retry();
+  await assert.rejects(browser.login(async () => assert.fail('login prepared too early'), async () => {}),
+    /previous sign-out is still pending/);
   assert.equal(sends, 2);
   assert.ok(env.localStorage.getItem('ct:pending-logout'));
+  offline = false;
+  await assert.rejects(browser.login(async () => {}, async () => { throw new Error('login connection lost'); }),
+    /login connection lost/);
+  await browser.retry();
+  assert.equal(sends, 3);
   await browser.login(async () => {}, async () => ({ access: 'new' }));
-  assert.equal(sends, 2);
+  assert.equal(sends, 3);
   assert.equal(env.localStorage.getItem('ct:pending-logout'), null);
 });
 
@@ -196,37 +211,42 @@ test('sign-out after a login with an unknown outcome still revokes, but never a 
   await assert.rejects(browser.login(async () => {}, async () => { throw new Error('login connection lost'); }));
   offline = true;
   assert.equal(await browser.signOut('/api/v1'), false);
+  await assert.rejects(browser.login(async () => {}, async () => assert.fail('login sent while revocation is pending')),
+    /previous sign-out is still pending/);
+  offline = false;
   await browser.login(async () => {}, async () => ({ access: 'new' }));
-  offline = false;
   await browser.retry();
-  assert.equal(sends, 3);
+  assert.equal(sends, 4);
   assert.equal(env.localStorage.getItem('ct:pending-logout'), null);
 });
 
-test('a rejected browser login leaves the old cookie queued for the next retry', async () => {
+test('a rejected browser login leaves the browser signed out after revocation', async () => {
   const env = browserEnvironment();
   let offline = true;
   let sends = 0;
   const browser = env.createBrowserLogoutQueue(async () => { sends++; if (offline) throw new Error('offline'); });
   await browser.signOut('/api/v1');
-  await assert.rejects(browser.login(async () => {}, async () => { throw Object.assign(new Error('Invalid password'), { status: 401 }); }));
+  offline = false;
+  await assert.rejects(browser.login(async () => {}, async () => { throw Object.assign(new Error('Invalid password'), { status: 401 }); }),
+    /Invalid password/);
   assert.equal(env.browserSessionIsSignedOut(), true);
-  offline = false;
   await browser.retry();
-  assert.equal(sends, 3);
+  assert.equal(sends, 2);
   assert.equal(env.localStorage.getItem('ct:pending-logout'), null);
 });
 
-test('a failed browser login preparation leaves sign-out queued', async () => {
+test('failed login preparation after revocation leaves the browser signed out', async () => {
   const env = browserEnvironment();
   let offline = true;
   let sends = 0;
   const browser = env.createBrowserLogoutQueue(async () => { sends++; if (offline) throw new Error('offline'); });
   await browser.signOut('/api/v1');
-  await assert.rejects(browser.login(async () => { throw new Error('CSRF connection lost'); }, async () => assert.fail('login was sent')));
   offline = false;
+  await assert.rejects(browser.login(async () => { throw new Error('CSRF connection lost'); }, async () => assert.fail('login was sent')),
+    /CSRF connection lost/);
+  assert.equal(env.browserSessionIsSignedOut(), true);
   await browser.retry();
-  assert.equal(sends, 3);
+  assert.equal(sends, 2);
   assert.equal(env.localStorage.getItem('ct:pending-logout'), null);
 });
 

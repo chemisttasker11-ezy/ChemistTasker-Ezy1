@@ -67,10 +67,12 @@ export function startBrowserLogoutRetry(): () => void {
 }
 
 export async function browserVerifyEmailOtp(options: BrowserIdentityTransport, email: string, otp: string) {
-  const csrf = await browserCsrfToken(options);
-  return client(options, 'include').post(API_ENDPOINTS.verifyOtp, { email, otp }, {
-    ...publicRequest, headers: { ...browserLabel, 'X-CSRFToken': csrf },
-  });
+  return browserLogoutQueue.login(
+    () => browserCsrfToken(options),
+    csrf => client(options, 'include').post(API_ENDPOINTS.verifyOtp, { email, otp }, {
+      ...publicRequest, headers: { ...browserLabel, 'X-CSRFToken': csrf }, signal: AbortSignal.timeout?.(20000),
+    }),
+  );
 }
 export async function browserResendEmailOtp(options: BrowserIdentityTransport, email: string) {
   // Preserve the original resend request contract: browser cookie and platform
