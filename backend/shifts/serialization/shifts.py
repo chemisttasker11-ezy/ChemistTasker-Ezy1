@@ -345,15 +345,9 @@ class ShiftSerializer(serializers.ModelSerializer):
         validated_data.pop('notify_favorite_staff', None)
         validated_data.pop('notify_chain_members', None)
         apply_rates_to_pharmacy = validated_data.pop('apply_rates_to_pharmacy', False)
-        allowed_tiers = None
-        if 'visibility' in validated_data:
-            allowed_tiers = self.build_allowed_tiers(instance.pharmacy)
-            if validated_data['visibility'] != instance.visibility:
-                validate_visibility(instance.pharmacy, validated_data['visibility'], allowed_tiers)
         return revise_shift(
             instance,
             validated_data,
-            allowed_tiers=allowed_tiers,
             slots_payload=self._initial_slots_payload(),
             rate_request_data=getattr(self.context.get('request'), 'data', {}),
             apply_rates_to_pharmacy=apply_rates_to_pharmacy,
