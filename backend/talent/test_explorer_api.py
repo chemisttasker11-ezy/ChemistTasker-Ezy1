@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from client_profile.models import ExplorerOnboarding, OtherStaffOnboarding
+from organizations.models import PharmacyAdmin
 from talent.models import ExplorerPost, ExplorerPostReaction
 from client_profile.characterization_support import (
     BASE, client_for, make_owner_with_pharmacy, make_user,
@@ -37,8 +38,70 @@ class ExplorerAuthTests(TestCase):
         # privacy: an anonymous post (the default) must not reveal the author on the public feed
         self.assertTrue(rows[0]["is_anonymous"])
         self.assertEqual(rows[0]["explorer_name"], "Anonymous candidate")
+        self.assertIsNone(rows[0]["explorer_profile"])
         self.assertIsNone(rows[0]["explorer_user_id"])
         self.assertIsNone(rows[0]["author_user_id"])
+
+
+class ExplorerAnonymityTests(TestCase):
+    def setUp(self):
+        self.author = make_user("EXPLORER")
+        self.profile = ExplorerOnboarding.objects.create(user=self.author, verified=True)
+        self.anonymous = post_for(self.author, "Anonymous pitch", explorer_profile=self.profile)
+        self.named = post_for(self.author, "Named pitch", explorer_profile=self.profile, is_anonymous=False)
+        owner, pharmacy = make_owner_with_pharmacy()
+        admin = make_user("PHARMACY_MANAGER")
+        PharmacyAdmin.objects.create(user=admin, pharmacy=pharmacy)
+        self.readers = (make_user("PHARMACIST"), owner, admin)
+
+    def assert_identity(self, row, *, masked=False, legacy=False):
+        self.assertEqual(row["explorer_profile"], None if masked else self.profile.pk)
+        self.assertEqual(row.get("author_user_id"), None if masked or legacy else self.author.pk)
+        self.assertEqual(row["explorer_user_id"], None if masked else self.author.pk)
+        self.assertEqual(row["explorer_name"], "Anonymous candidate" if masked else self.author.get_full_name())
+        if masked:
+            self.assertIn("author_user_id", row)
+
+    def test_read_routes_mask_anonymous_posts_for_other_readers(self):
+        for reader in (*self.readers, self.author):
+            client = client_for(reader)
+            for path in ("", "feed/", "public-feed/"):
+                with self.subTest(reader=reader.role, path=path):
+                    response = client.get(URL + path)
+                    self.assertEqual(response.status_code, 200)
+                    rows = {row["id"]: row for row in response.json()["results"]}
+                    self.assert_identity(rows[self.anonymous.pk], masked=reader != self.author or path == "public-feed/")
+                    self.assert_identity(rows[self.named.pk])
+                    self.assertIn("no-store", response["Cache-Control"])
+            for post in (self.anonymous, self.named):
+                with self.subTest(reader=reader.role, post=post.headline):
+                    response = client.get(f"{URL}{post.pk}/")
+                    self.assertEqual(response.status_code, 200)
+                    self.assert_identity(response.json(), masked=post.is_anonymous and reader != self.author)
+
+    def test_profile_lookup_omits_other_readers_anonymous_posts_from_results_and_count(self):
+        for reader in (*self.readers, self.author):
+            with self.subTest(reader=reader.role):
+                response = client_for(reader).get(f"{URL}by-profile/{self.profile.pk}/")
+                self.assertEqual(response.status_code, 200)
+                data = response.json()
+                expected = {self.named.pk, self.anonymous.pk} if reader == self.author else {self.named.pk}
+                self.assertEqual(data["count"], len(expected))
+                self.assertEqual({row["id"] for row in data["results"]}, expected)
+                for row in data["results"]:
+                    self.assert_identity(row)
+
+    def test_legacy_anonymous_post_uses_profile_owner_as_author(self):
+        legacy = post_for(None, "Legacy pitch", explorer_profile=self.profile)
+        for reader in (self.readers[0], self.author):
+            with self.subTest(reader=reader.role):
+                client = client_for(reader)
+                response = client.get(f"{URL}{legacy.pk}/")
+                self.assertEqual(response.status_code, 200)
+                self.assert_identity(response.json(), masked=reader != self.author, legacy=True)
+                response = client.get(f"{URL}by-profile/{self.profile.pk}/")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(legacy.pk in {row["id"] for row in response.json()["results"]}, reader == self.author)
 
 
 class ExplorerVisibilityTests(TestCase):
