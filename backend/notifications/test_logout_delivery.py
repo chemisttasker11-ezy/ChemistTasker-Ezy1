@@ -43,7 +43,7 @@ class Claim5TicketSocketAfterLogout(TransactionTestCase):  # Channels closes con
 
         @database_sync_to_async
         def logout():
-            with patch("users.api_auth.notify_auth_changed") as missed:  # autocommit: on_commit runs inside
+            with patch("users.device_sessions.notify_auth_changed") as missed:  # autocommit: on_commit runs inside
                 r =client_for().post("/api/v1/users/logout/", {"refresh": str(self.refresh)}, format="json")
             assert r.status_code == 200 and missed.called, (r.status_code, missed.called)
 

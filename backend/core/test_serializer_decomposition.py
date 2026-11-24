@@ -82,6 +82,13 @@ class SerializerDecompositionContracts(SimpleTestCase):
                         "validators": [],
                         "default": "empty",
                     })
+                if qualified == "shifts.ShiftOfferSerializer":
+                    extension = actual["fields"].pop("pay_by_at", None)
+                    self.assertEqual(extension, {
+                        "required": False, "read_only": True, "write_only": False,
+                        "allow_null": True, "type": "DateTimeField", "source": "pay_by_at",
+                        "validators": [], "default": "empty",
+                    })
                 self.assertEqual(sorted(actual["fields"]), contract["fields"])
                 digest = hashlib.sha256(json.dumps(actual, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
                 self.assertEqual(digest, contract["sha256"], "Review any intentional field-contract change explicitly.")

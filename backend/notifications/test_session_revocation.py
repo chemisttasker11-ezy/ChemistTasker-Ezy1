@@ -142,7 +142,7 @@ class SessionRevocationTests(TransactionTestCase):
         self.assertEqual(rotated.status_code, 200)
         await self.event(user, bearer, cookie, ticket, survivor)
         # A rotated-away refresh token must still revoke its stable session id.
-        with patch('users.api_auth.notify_auth_changed') as missed:
+        with patch('users.device_sessions.notify_auth_changed') as missed:
             self.assertEqual((await self.post('logout', {'refresh': first['refresh']})).status_code, 200)
             missed.assert_called_once()
         await get_channel_layer().group_send(USER_GROUP_FMT.format(user_id=user.pk),

@@ -47,7 +47,7 @@ async function pinScreen() {
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, 'react-native-paper': names,
     '@/components/RootPageHeader': { RootPageHeader: (props) => ({ type: 'RootPageHeader', props }) },
     '@/components/ui/BrandActivityIndicator': { BrandActivityIndicator: 'ActivityIndicator', ActivityIndicator: 'ActivityIndicator' },
-    'expo-router': { useRouter: () => ({ push: route => routes.push(route), navigate: route => routes.push(route), back() {} }) },
+    'expo-router': { useLocalSearchParams: () => ({}), useRouter: () => ({ push: route => routes.push(route), navigate: route => routes.push(route), back() {} }) },
     '@chemisttasker/shared-core': { attendance: {
       getPinPharmacies: () => new Promise((resolve, reject) => requests.push({ resolve, reject })),
       updatePin: (pharmacyId, pin) => new Promise((resolve, reject) => saves.push({ pharmacyId, pin, resolve, reject })),

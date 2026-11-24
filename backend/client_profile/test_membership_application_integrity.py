@@ -451,6 +451,11 @@ class PayrollOptInRosterRoutingTests(TestCase):
 
 
 class ExternalShiftSettlementRoutingTests(TestCase):
+    def setUp(self):
+        patcher = patch("shifts.engagement.outside_booking_source", return_value="PUBLIC")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @staticmethod
     def _objects(*, payroll_enabled, payment_preference):
         pharmacy = SimpleNamespace(

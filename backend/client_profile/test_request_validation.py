@@ -74,6 +74,8 @@ class PublicShiftQuotaTests(TestCase):
 
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy()
+        self.pharmacy.abn_verified = True
+        self.pharmacy.save(update_fields=["abn_verified"])
         for _ in range(MAX_PUBLIC_SHIFTS_PER_DAY):
             self.shift(visibility="PLATFORM")
 
