@@ -46,3 +46,15 @@ class IndemnityTests(RoleTabFixture):
         self.assertEqual(response.status_code, 200, response.data)
         obj.refresh_from_db()
         self.assertEqual(obj.indemnity_insurer, '')
+
+    def test_replacing_cover_keeps_previous_evidence(self):
+        user, obj, url = self.onboarding('pharmacist')
+        response, _ = self.patch(user, url, {'tab': 'profile', 'indemnity_certificate': pdf()}, multipart=True)
+        self.assertEqual(response.status_code, 200, response.data)
+        obj.refresh_from_db()
+        previous = obj.indemnity_certificate.name
+        response, _ = self.patch(user, url, {'tab': 'profile', 'indemnity_certificate': pdf()}, multipart=True)
+        self.assertEqual(response.status_code, 200, response.data)
+        obj.refresh_from_db()
+        self.assertNotEqual(obj.indemnity_certificate.name, previous)
+        self.assertTrue(obj.indemnity_certificate.storage.exists(previous))
