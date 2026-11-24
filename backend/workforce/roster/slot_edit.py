@@ -63,6 +63,8 @@ def _replace_worker(shift, slot, assignment, worker):
     defaults = staff_assignment_defaults(user=worker, pharmacy=shift.pharmacy, work_date=slot.date)
     rate, reason = get_locked_rate_for_slot(slot=slot, shift=shift, user=worker, override_date=slot.date,
                                          staff_terms=defaults['engagement_terms_snapshot'])
+    if 'error' in reason:
+        raise ValidationError({'rate': 'Unable to calculate the rate for this slot.'})
     if assignment is None:
         assignment = ShiftSlotAssignment(shift=shift, slot=slot, slot_date=slot.date, user=worker, is_rostered=True)
     else:

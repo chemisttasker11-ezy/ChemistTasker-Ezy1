@@ -27,11 +27,14 @@ def _refresh_locked_rate(assignment):
     elif assignment.source_offer_id or (assignment.engagement_kind == 'INDEPENDENT_CONTRACTOR' and assignment.engagement_terms_accepted_at):
         # An accepted worker offer remains authoritative when roster dates are edited.
         return
-    assignment.unit_rate, assignment.rate_reason = get_locked_rate_for_slot(
+    rate, reason = get_locked_rate_for_slot(
         assignment.slot, assignment.shift, assignment.user,
         override_date=assignment.slot_date or assignment.slot.date,
         staff_terms=staff_terms,
     )
+    if 'error' in reason:
+        raise ValidationError({'rate': 'Unable to calculate the rate for this slot.'})
+    assignment.unit_rate, assignment.rate_reason = rate, reason
     assignment.save(update_fields=["unit_rate", "rate_reason"])
 
 

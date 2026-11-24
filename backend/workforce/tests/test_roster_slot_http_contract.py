@@ -8,6 +8,7 @@ from decimal import Decimal
 from unittest import mock
 
 from django.test import TestCase
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -16,6 +17,7 @@ from memberships.models import Membership
 from shifts.models import Shift, ShiftInterest, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
 from workforce.roster.publication import republish_roster_shift, unpublish_roster_shift
+from workforce.roster.assignment_rates import refresh_assignment_rate
 
 
 class RosterSlotHTTPContractTests(TestCase):
@@ -88,6 +90,38 @@ class RosterSlotHTTPContractTests(TestCase):
         self.assertEqual(self.assignment.engagement_terms_accepted_at, self.accepted_at)
         self.interest.refresh_from_db()
         self.assertEqual(self.interest.slot_id, self.slot.pk)
+
+    def test_refresh_rejects_pricing_error_without_overwriting_rate(self):
+        self.assignment.engagement_kind = 'INDEPENDENT_CONTRACTOR'
+        self.assignment.engagement_terms_accepted_at = None
+        self.assignment.save(update_fields=['engagement_kind', 'engagement_terms_accepted_at'])
+        with mock.patch('shifts.pricing.get_locked_rate_for_slot', return_value=(Decimal('0'), {'error': 'missing rate'})):
+            with self.assertRaises(ValidationError):
+                refresh_assignment_rate(self.assignment)
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.unit_rate, Decimal('57.00'))
+        self.assertEqual(self.assignment.rate_reason, {'source': 'existing_locked_contract'})
+
+    def test_replacing_worker_rejects_pricing_error_and_rolls_back(self):
+        worker = make_user('PHARMACIST')
+        Membership.objects.create(user=worker, pharmacy=self.pharmacy, role='PHARMACIST',
+                                  employment_type='FULL_TIME', status=Membership.Status.ACCEPTED, is_active=True)
+        slot = ShiftSlot.objects.create(shift=self.shift, date=self.week + timedelta(days=1),
+                                        start_time=time(9), end_time=time(17), roster_period=self.period)
+        payload = {'slots': [{'id': slot.pk, 'end_time': '18:00'}], 'user_id': worker.pk}
+        with mock.patch('workforce.roster.slot_edit.get_locked_rate_for_slot',
+                        return_value=(Decimal('0'), {'error': 'missing rate'})) as price, mock.patch(
+            'workforce.roster.slot_edit.staff_assignment_defaults',
+            return_value={'engagement_terms_snapshot': {'settlement_channel': 'TIMESHEET_ONLY'}},
+        ):
+            response = self.client.patch(self.url, payload, format='json')
+        self.assertEqual(response.status_code, 400, response.content)
+        price.assert_called_once()
+        self.assertIn('rate', response.data)
+        self.assert_original_assignment()
+        slot.refresh_from_db()
+        self.assertEqual(slot.end_time, time(17))
+        self.assertFalse(slot.assignments.exists())
 
     def test_patch_preserves_slot_assignment_and_unsubmitted_metadata(self):
         self.publish_fixture()
