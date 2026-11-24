@@ -14,6 +14,7 @@ export function PharmacyProfileFields({ services, weekday, weekend, onServicesCh
   onServicesChange: (value: string[]) => void; onWeekdayChange: (value: string) => void; onWeekendChange: (value: string) => void;
 }) {
   return <View style={{ gap: 12, marginTop: 16 }}>
+    <Text>Filling this in helps applicants understand what your pharmacy needs.</Text>
     <Text variant="titleMedium">Services and typical script volume</Text>
     <Text>Choose services offered at this pharmacy. Script volumes describe the whole pharmacy on a typical day.</Text>
     <View style={wrap}>{pharmacyServiceCodes(reg).map(code => <Chip key={code} style={{ maxWidth: '100%' }}

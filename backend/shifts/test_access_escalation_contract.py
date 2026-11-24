@@ -127,6 +127,8 @@ class ShiftRoleVisibilityTests(TestCase):
 class EscalationRuleTests(TestCase):
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy("Escalating")
+        self.pharmacy.abn_verified = True
+        self.pharmacy.save(update_fields=["abn_verified"])
 
     def shift(self, **values):
         shift = Shift.objects.create(

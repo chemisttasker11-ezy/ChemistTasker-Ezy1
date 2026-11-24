@@ -1,7 +1,7 @@
 import { ShiftSkillPresetControls } from '../ShiftSkillPresetControls';
 import ShiftRequirementsPicker from '../ShiftRequirementsPicker';
 import type { Dispatch, SetStateAction } from 'react';
-import { Stack } from '@mui/material';
+import { Stack, Typography } from '@mui/material';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
@@ -24,6 +24,7 @@ export default function PostShiftSkillsStep({
 }: Props) {
   return (
     <Stack spacing={2.5}>
+      <Typography variant="body2" color="text.secondary">Filling this in helps applicants understand what your pharmacy needs.</Typography>
       <ShiftSkillPresetControls userId={userId} role={roleNeeded} required={mustHave} preferred={niceToHave}
         initializedScopes={initializedScopes}
         editing={editing} defaultPreferred={defaultPreferred} onApply={preset => { setMustHave(preset.required); setNiceToHave(preset.preferred); }} />

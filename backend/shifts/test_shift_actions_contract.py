@@ -66,6 +66,8 @@ def notifications_for(user, kind=None):
 class ShiftActionFixture(TestCase):
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy("Action Pharmacy")
+        self.pharmacy.abn_verified = True
+        self.pharmacy.save(update_fields=["abn_verified"])
         self.owner_client = client_for(self.owner)
 
     def worker(self, employment_type="LOCUM", verified=True):
