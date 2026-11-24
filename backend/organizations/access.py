@@ -162,8 +162,7 @@ def user_can_edit_pharmacy_record(user, pharmacy, admin_organization_ids=None) -
 
 
 def user_can_manage_pharmacy(user, pharmacy) -> bool:
-    """Who manages a pharmacy's shifts and sees its full details: the owner, an org admin of its organization, a
-    chief/region admin assigned to it, or a pharmacy admin with the roster capability."""
+    """Owners, organization-wide admins and scoped admins with roster capability can manage shifts."""
     if not _is_active_actor(user) or pharmacy is None:
         return False
 
@@ -176,7 +175,7 @@ def user_can_manage_pharmacy(user, pharmacy) -> bool:
 def managed_pharmacies(user):
     """
     Pharmacies the user can manage because they own them, are an org admin
-    over them, or hold an active PharmacyAdmin assignment.
+    over them, or have roster capability for them through a scoped admin assignment.
     """
     if not _is_active_actor(user):
         return Pharmacy.objects.none()
