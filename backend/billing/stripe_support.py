@@ -59,8 +59,11 @@ def _get_subscription_from_customer(customer_id):
     return OwnerSubscription.objects.filter(stripe_customer_id=customer_id).first()
 
 
-def _stripe_object_value(obj, key, default=None):
+def stripe_object_value(obj, key, default=None):
     """Read StripeObject/dict safely; Stripe returns both shapes in adapters."""
     if isinstance(obj, dict):
         return obj.get(key, default)
     return getattr(obj, key, default)
+
+
+_stripe_object_value = stripe_object_value  # Existing billing adapters.

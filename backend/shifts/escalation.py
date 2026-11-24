@@ -6,6 +6,7 @@ or automatically when an escalate_to_* timestamp is due and nobody has expressed
 """
 import uuid
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -116,7 +117,14 @@ def auto_escalate_due_shifts(now, tiers_for=allowed_tiers):
                     enforce_public_shift_daily_limit(shift.pharmacy)
                 except ValidationError:
                     continue
-            apply_escalation(shift, tiers, target_index, stamp_missing=False)
+            # Expiry may have cleared this timer while the candidate was being evaluated.
+            field = ESCALATION_FIELD_MAP[target_visibility]
+            with transaction.atomic():
+                current = candidates.select_for_update(of=('self',)).filter(
+                    pk=shift.pk, visibility=shift.visibility, **{f'{field}__lte': now},
+                ).first()
+                if current is not None:
+                    apply_escalation(current, tiers, target_index, stamp_missing=False)
 
 
 def escalate_shift(shift, *, allowed_tiers, target_visibility=None):

@@ -38,7 +38,8 @@ def _normalize_offer_ids(raw_offer_ids=None, raw_offer_id=None):
     return sorted(set(offer_ids))
 
 
-def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None, return_offers=False, unbookable=None, checkout_id=None):
+def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None,
+                                      return_offers=False, unbookable=None, checkout_id=None, payment_completed_at=None):
     """
     Finalize shift offers waiting on payment.
     If candidate_id/slot_id are provided, narrow the target set.
@@ -70,7 +71,13 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
             unbookable.append(offer)
             continue
         try:
-            if checkout_id is None:
+            if payment_completed_at is not None and offer.pay_by_at and payment_completed_at >= offer.pay_by_at:
+                from .checkout_reservations import release_expired_offer
+                release_expired_offer(shift, offer)
+                raise ValidationError({'code': 'payment_deadline_passed', 'detail': 'The payment deadline has passed.'})
+            if payment_completed_at is not None:
+                finalize_shift_offer(offer, checkout_id=checkout_id, payment_completed_at=payment_completed_at)
+            elif checkout_id is None:
                 finalize_shift_offer(offer)
             else:
                 finalize_shift_offer(offer, checkout_id=checkout_id)
@@ -80,7 +87,7 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
             if isinstance(exc.detail, dict):
                 offer._fulfillment_refusal_code = str(exc.detail.get("code", ""))
             # Only a bound checkout attempt can replay after a payroll correction; unbound legacy payment cannot.
-            kept = {"checkout_reserved", "checkout_selection_changed"} | (
+            kept = {"checkout_reserved", "checkout_selection_changed", "payment_deadline_passed"} | (
                 {"locked_payroll_period"} if checkout_id is not None else set())
             if getattr(offer, "_fulfillment_refusal_code", "") not in kept:
                 offer.status = ShiftOffer.Status.EXPIRED

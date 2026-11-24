@@ -15,7 +15,8 @@ def _selection_is_fulfilled(shift, attempt):
     return bool(reserved) and actual == reserved
 
 
-def finalize_paid_selection(shift, payment, attempt, metadata, *, created, finalize=_finalize_pending_offers_for_shift, log=None):
+def finalize_paid_selection(shift, payment, attempt, metadata, *, created, payment_completed_at,
+                            finalize=_finalize_pending_offers_for_shift, log=None):
     previous_reason = payment.reconciliation_reason
     correcting = not created
     unbookable = []
@@ -28,16 +29,20 @@ def finalize_paid_selection(shift, payment, attempt, metadata, *, created, final
         count, finalized = finalize(shift,
             candidate_id=metadata.get('candidate_id'), slot_id=metadata.get('slot_id'),
             slot_ids=metadata.get('slot_ids'), offer_ids=offer_ids,
-            return_offers=True, unbookable=unbookable,
+            return_offers=True, unbookable=unbookable, payment_completed_at=payment_completed_at,
             **({'checkout_id': attempt.pk} if attempt is not None else {}))
     if correcting and _selection_is_fulfilled(shift, attempt):
         payment.reconciliation_required = False
         payment.save(update_fields=['reconciliation_required'])
     elif unbookable or not count:
         payment.reconciliation_required = True
-        payment.reconciliation_reason = ('locked_payroll_period' if attempt is not None and any(
-            getattr(offer, '_fulfillment_refusal_code', '') == 'locked_payroll_period'
-            for offer in unbookable) else 'paid_work_unavailable')
+        refusal_codes = {getattr(offer, '_fulfillment_refusal_code', '') for offer in unbookable}
+        if 'payment_deadline_passed' in refusal_codes:
+            payment.reconciliation_reason = 'payment_deadline_passed'
+        elif attempt is not None and 'locked_payroll_period' in refusal_codes:
+            payment.reconciliation_reason = 'locked_payroll_period'
+        else:
+            payment.reconciliation_reason = 'paid_work_unavailable'
         payment.save(update_fields=['reconciliation_required', 'reconciliation_reason'])
         if created or previous_reason != payment.reconciliation_reason:
             if log is not None:

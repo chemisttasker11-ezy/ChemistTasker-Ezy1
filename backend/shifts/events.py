@@ -10,5 +10,8 @@ payroll_activated = Signal()
 # Billing may refuse another payment route while a card checkout can collect.
 before_fulfillment = Signal()
 
+# Sent after a cancelled unpaid offer is committed so billing can release its checkout.
+unpaid_offer_cancelled = Signal()
+
 # Sent inside the model save transaction before settlement-linked assignment inputs change.
 assignment_changing = Signal()

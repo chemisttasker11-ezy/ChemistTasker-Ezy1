@@ -197,6 +197,7 @@ class TaskIdentityContractTests(SimpleTestCase):
         expected = {
             **LEGACY_BEAT,
             "cleanup-pitch-receipts-daily": ("talent.tasks.cleanup_expired_pitch_receipts", {}),
+            "expire-shift-payment-reservations": ("billing.tasks.expire_payment_reservations", {}),
         }
         self.assertEqual(
             {key: (entry["task"], entry.get("options", {})) for key, entry in beat.items()},
@@ -206,6 +207,8 @@ class TaskIdentityContractTests(SimpleTestCase):
             beat["cleanup-pitch-receipts-daily"]["schedule"],
             crontab(hour=2, minute=30),
         )
+        self.assertEqual(beat["expire-shift-payment-reservations"]["schedule"], 60.0)
+        self.assertIn("billing.tasks.expire_payment_reservations", celery_app().tasks)
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
     def test_string_dispatch_resolves_every_legacy_name(self):

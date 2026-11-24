@@ -1196,6 +1196,21 @@ class BookingSafetyTests(ShiftActionFixture):
                 self.captureOnCommitCallbacks(execute=True):
             return client_for(offer.user).post(f'{API}shift-offers/{offer.id}/accept/', {}, format='json')
 
+    def test_accept_starts_payment_hold_before_any_checkout(self):
+        shift = self.shift(single_user_only=False)
+        worker = self.worker(employment_type=None, verified=True)
+        slot = shift.slots.first()
+        slot.date = timezone.localdate() + timedelta(days=3)
+        slot.save(update_fields=['date'])
+        offer = self.offer(shift, worker, offered_slot_date=slot.date)
+        now = timezone.now()
+        with mock.patch('django.utils.timezone.now', return_value=now):
+            response = self.accept(offer)
+        self.assertEqual(response.status_code, 200, response.data)
+        offer.refresh_from_db()
+        self.assertEqual(offer.pay_by_at, now + timedelta(hours=24))
+        self.assertFalse(shift.fulfillment_checkouts.exists())
+
     def test_offer_terms_version_requires_reviewed_snapshot_and_preserves_pending_on_stale(self):
         """D2: missing and changed terms cannot reserve work; unchanged reviewed terms still can."""
         from shifts.engagement import shift_engagement_terms_version

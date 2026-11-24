@@ -51,7 +51,7 @@ def _check_fulfillment_credentials(offer):
     notify_worker_credentials(offer.shift, offer.user, credentials)
 
 
-def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
+def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None, payment_completed_at=None):
     """
     Finalize a worker-confirmed offer by creating slot assignments exactly once.
     Safe to call multiple times (idempotent for already assigned slots).
@@ -73,7 +73,9 @@ def finalize_shift_offer(offer: ShiftOffer, *, checkout_id=None):
             raise ValidationError({'detail': 'The selected offer changed. Refresh before fulfillment.'})
         slot_obj = offer.slot
         slots_to_assign = [slot_obj] if slot_obj else shift.slots.all()
-        before_fulfillment.send(sender=ShiftOffer, offer=offer, checkout_id=checkout_id)
+        before_fulfillment.send(
+            sender=ShiftOffer, offer=offer, checkout_id=checkout_id, payment_completed_at=payment_completed_at,
+        )
         accepted_pairs = accepted_occurrence_pairs(offer)
         matched_pairs = set()
         credentials_checked = False
