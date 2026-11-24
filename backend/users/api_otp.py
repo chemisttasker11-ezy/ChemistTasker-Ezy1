@@ -1,13 +1,13 @@
 """Verification API: e-mail OTP verify/resend and mobile OTP request/verify/resend.
 
 Logs go to the historical "users.views" channel that operators filter on."""
-import secrets
 import logging
 import requests
 from users.membership_port import membership_services
 from users.organization_port import organization_reads
 from users.tokens import RefreshToken
 from rest_framework import permissions, status
+from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from django.conf import settings
@@ -20,8 +20,15 @@ from users.utils import get_frontend_onboarding_url, get_frontend_owner_pharmaci
 from datetime import timedelta
 from django.utils import timezone
 from requests.auth import HTTPBasicAuth
-from users.otp import _capture_mobile_identity, _clean_identity_value, _get_lockout_response, _hash_otp, _otp_matches, _register_email_otp_failure, _register_mobile_otp_failure, _reset_email_otp_security_state, _reset_mobile_otp_security_state, generate_otp, normalize_au_mobile, valid_otp_format
-from users.sessions import _build_authenticated_user_payload, _is_web_client, _set_auth_cookies
+from users.otp import _capture_mobile_identity, _clean_identity_value, _get_lockout_response, hash_otp, otp_matches, _register_email_otp_failure, _register_mobile_otp_failure, _reset_email_otp_security_state, _reset_mobile_otp_security_state, generate_otp, normalize_au_mobile, valid_otp_format
+from users.otp import EMAIL_OTP_STATE_FIELDS, correct_registration_email, prepare_mobile_request, confirm_mobile_otp
+from users.sessions import (
+    _build_authenticated_user_payload,
+    _set_auth_cookies,
+    is_web_client,
+    issue_session_tokens,
+    reissue_session_tokens,
+)
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -32,6 +39,7 @@ _MOBILE_OTP_STATE_FIELDS = (
     "last_name",
     "username",
     "mobile_number",
+    "pending_mobile_number",
     "mobile_otp_code",
     "mobile_otp_created_at",
     "is_mobile_verified",
@@ -39,20 +47,12 @@ _MOBILE_OTP_STATE_FIELDS = (
     "mobile_otp_locked_until",
 )
 
-_EMAIL_OTP_STATE_FIELDS = (
-    "otp_code",
-    "otp_created_at",
-    "otp_failed_attempts",
-    "otp_locked_until",
-)
-
-
 def _snapshot_mobile_otp_state(user):
     return {field: getattr(user, field) for field in _MOBILE_OTP_STATE_FIELDS}
 
 
 def _snapshot_email_otp_state(user):
-    return {field: getattr(user, field) for field in _EMAIL_OTP_STATE_FIELDS}
+    return {field: getattr(user, field) for field in EMAIL_OTP_STATE_FIELDS}
 
 
 def _restore_failed_email_otp_attempt(user_id, *, expected_code, expected_created_at, previous_state):
@@ -148,36 +148,29 @@ class VerifyOTPView(APIView):
         enforce_browser_csrf(request)
         email = request.data.get("email", "").strip().lower()
         otp = request.data.get("otp")
-        user = User.objects.filter(email__iexact=email).first()
-        invalid_response = lambda: Response(
-            {"detail": "Invalid or expired verification code."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-        if not user or not otp:
-            return invalid_response()
-
-        if not user.is_active:
-            return invalid_response()
-
-        if user.otp_locked_until and timezone.now() < user.otp_locked_until:
-            return invalid_response()
-
-        # --- Check if OTP is expired ---
-        if not user.otp_created_at or (timezone.now() - user.otp_created_at > timedelta(minutes=self.OTP_EXPIRY_MINUTES)):
-            return invalid_response()
-
-        # --- Check if OTP matches ---
-        if not _otp_matches(otp, user.otp_code):
-            just_locked = _register_email_otp_failure(user)
-            return invalid_response()
-
-        # --- Success: verify user and clear OTP ---
-        user.is_otp_verified = True
-        user.otp_code = None
-        user.otp_created_at = None
-        _reset_email_otp_security_state(user)
-        user.save()
+        with transaction.atomic():
+            user = User.objects.select_for_update().filter(
+                email__iexact=email, is_active=True, is_otp_verified=False,
+            ).first()
+            now = timezone.now()
+            eligible = (
+                user and valid_otp_format(otp)
+                and (not user.otp_locked_until or now >= user.otp_locked_until)
+                and user.otp_created_at
+                and now - user.otp_created_at <= timedelta(minutes=self.OTP_EXPIRY_MINUTES)
+            )
+            if not eligible or not user or not otp_matches(otp, user.otp_code):
+                if eligible and user:
+                    _register_email_otp_failure(user)
+                return Response(
+                    {"detail": "Invalid or expired verification code."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            user.is_otp_verified = True
+            user.otp_code = None
+            user.otp_created_at = None
+            _reset_email_otp_security_state(user)
+            user.save(update_fields=("is_otp_verified", *EMAIL_OTP_STATE_FIELDS))
 
         # --- Send welcome email (kept exactly as you have) ---
         onboarding_link = get_frontend_onboarding_url(user)
@@ -202,11 +195,11 @@ class VerifyOTPView(APIView):
 
         # Web verifies email only, then follows the existing UI flow back to login.
         # Mobile/API clients still receive tokens so they can continue to mobile verification.
-        if _is_web_client(request):
+        if is_web_client(request):
             return Response({"detail": "Email verified successfully."}, status=status.HTTP_200_OK)
 
         # --- Also return tokens + user payload so mobile can call mobile-verify authenticated ---
-        refresh = RefreshToken.for_user(user)
+        tokens = issue_session_tokens(request, RefreshToken.for_user(user))
 
         # Build memberships payload exactly like your serializers
         from .models import OrganizationMembership
@@ -251,8 +244,7 @@ class VerifyOTPView(APIView):
         ]
 
         response = Response({
-            "refresh": str(refresh),
-            "access": str(refresh.access_token),
+            **tokens,
             "user": {
                 "id": user.id,
                 "username": user.username,
@@ -267,7 +259,7 @@ class VerifyOTPView(APIView):
                 "mobile_check_skipped": bool(getattr(user, "mobile_check_skipped", False)),
             }
         }, status=200)
-        _set_auth_cookies(response, access_token=str(refresh.access_token), refresh_token=str(refresh))
+        _set_auth_cookies(response, access_token=tokens["access"], refresh_token=tokens["refresh"])
         return response
 
 
@@ -278,17 +270,21 @@ class ResendOTPView(APIView):
 
     def post(self, request):
         email = request.data.get("email", "").strip().lower()
-        user = User.objects.filter(email__iexact=email).first()
-        if user and not user.is_otp_verified:
-            previous_state = _snapshot_email_otp_state(user)
-            otp = str(secrets.randbelow(900000) + 100000)
-            otp_hash = _hash_otp(otp)
-            generated_at = timezone.now()
-            user.otp_code = otp_hash
-            user.otp_created_at = generated_at
-            _reset_email_otp_security_state(user)
-            user.save()
+        with transaction.atomic():
+            user = User.objects.select_for_update().filter(
+                email__iexact=email, is_active=True, is_otp_verified=False,
+            ).first()
+            if user:
+                previous_state = _snapshot_email_otp_state(user)
+                otp = generate_otp()
+                otp_hash = hash_otp(otp)
+                generated_at = timezone.now()
+                user.otp_code = otp_hash
+                user.otp_created_at = generated_at
+                _reset_email_otp_security_state(user)
+                user.save(update_fields=EMAIL_OTP_STATE_FIELDS)
 
+        if user:
             context = {"otp": otp}
             queued = deliver_email_best_effort(
                 send_async_email,
@@ -314,6 +310,42 @@ class ResendOTPView(APIView):
         )
 
 
+class RegistrationEmailChangeSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=User._meta.get_field("email").max_length)
+    new_email = serializers.EmailField(max_length=User._meta.get_field("email").max_length)
+    correction_token = serializers.CharField(max_length=256)
+
+
+class RegistrationEmailChangeView(APIView):
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "otp_resend"
+
+    def post(self, request):
+        from .authentication import enforce_browser_csrf
+        enforce_browser_csrf(request)
+        serializer = RegistrationEmailChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"].lower()
+        new_email = serializer.validated_data["new_email"].lower()
+        outcome = correct_registration_email(
+            email=email,
+            new_email=new_email,
+            correction_token=serializer.validated_data["correction_token"],
+            dispatch_email=send_async_email,
+        )
+        if outcome == "unchanged":
+            raise serializers.ValidationError({"new_email": "Enter a different email address."})
+        if outcome == "duplicate":
+            raise serializers.ValidationError({"new_email": "This email address is already in use."})
+        if outcome == "invalid_registration":
+            return Response({"detail": "Invalid or expired registration."}, status=400)
+        if outcome == "delivery_failed":
+            return Response({"detail": "Unable to send a verification code. Please try again."}, status=502)
+        return Response({"email": new_email})
+
+
 class RequestMobileOTPView(APIView):
     """
     Step 1: User submits mobile number; system generates and sends OTP via SMS.
@@ -334,16 +366,16 @@ class RequestMobileOTPView(APIView):
             return Response({"error": "Invalid Australian mobile number format"}, status=status.HTTP_400_BAD_REQUEST)
 
         previous_state = _snapshot_mobile_otp_state(user)
-        changed_identity_fields, identity_error = _capture_mobile_identity(user, request.data)
-        if identity_error is not None:
-            return identity_error
+        changed_identity_fields = []
+        if not user.is_mobile_verified:
+            changed_identity_fields, identity_error = _capture_mobile_identity(user, request.data)
+            if identity_error is not None:
+                return identity_error
 
-        existing_mobile = _clean_identity_value(user.mobile_number) or None
-        if user.is_mobile_verified and existing_mobile and normalized != existing_mobile:
-            return Response(
-                {"mobile_number": "Verified mobile number is locked and cannot be changed."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        existing_mobile = user.pending_mobile_number if user.is_mobile_verified else user.mobile_number
+        error = prepare_mobile_request(user, normalized)
+        if error:
+            return Response({"mobile_number": error}, status=status.HTTP_400_BAD_REQUEST)
 
         # 60-second cooldown to prevent spamming the same pending number.
         # Allow immediate correction when the pending number has not been verified yet.
@@ -359,15 +391,14 @@ class RequestMobileOTPView(APIView):
             )
 
         otp_code = generate_otp()
-        otp_hash = _hash_otp(otp_code)
+        otp_hash = hash_otp(otp_code)
         generated_at = timezone.now()
-        user.mobile_number = normalized
         user.mobile_otp_code = otp_hash
         user.mobile_otp_created_at = generated_at
-        user.is_mobile_verified = False
         _reset_mobile_otp_security_state(user)
         update_fields = [
             "mobile_number",
+            "pending_mobile_number",
             "mobile_otp_code",
             "mobile_otp_created_at",
             "is_mobile_verified",
@@ -443,63 +474,32 @@ class VerifyMobileOTPView(APIView):
         user = request.user
         otp = request.data.get("otp")
 
-        if not user.is_active:
+        user, outcome = confirm_mobile_otp(user.pk, otp)
+        if outcome == "disabled":
             return Response({"detail": "Account is disabled."}, status=status.HTTP_403_FORBIDDEN)
-
-        if user.mobile_otp_locked_until and timezone.now() < user.mobile_otp_locked_until:
+        if outcome == "locked":
             return _get_lockout_response(user.mobile_otp_locked_until)
+        errors = {
+            "format": "Invalid OTP format",
+            "expired": "OTP has expired, please request a new one.",
+            "invalid": "Invalid OTP",
+            "taken": "This mobile number is already verified by another account.",
+        }
+        if outcome != "ok":
+            return Response({"error": errors[outcome]}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not valid_otp_format(otp):
-            return Response({"error": "Invalid OTP format"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Enforce 10-minute expiry
-        if not user.mobile_otp_created_at or (timezone.now() - user.mobile_otp_created_at) > timedelta(minutes=10):
-            return Response({"error": "OTP has expired, please request a new one."},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        if not _otp_matches(otp, user.mobile_otp_code):
-            just_locked = _register_mobile_otp_failure(user)
-            if just_locked:
-                return _get_lockout_response(user.mobile_otp_locked_until)
-            return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Success: mark verified, clear code & (optionally) timestamp
-        user.is_mobile_verified = True
-        user.mobile_otp_code = None
-        user.mobile_otp_created_at = None
-        _reset_mobile_otp_security_state(user)
-        user.save()
-
-        remember_me = request.auth.get('remember_me') if request.auth else None
-        cookie_refresh = request.COOKIES.get(getattr(settings, 'JWT_REFRESH_COOKIE', 'ct_refresh'))
-        if remember_me is None and cookie_refresh:
-            from rest_framework_simplejwt.exceptions import TokenError
-            try:
-                previous = RefreshToken(cookie_refresh)
-                if str(previous['user_id']) == str(user.pk):
-                    remember_me = previous.get('remember_me')
-            except TokenError:
-                pass
-        refresh = RefreshToken.for_user(user)
-        if request.auth and request.auth.get('sid'):
-            refresh['sid'] = request.auth['sid']
-        if remember_me is not None:
-            refresh['remember_me'] = remember_me
-        if remember_me is True:
-            refresh.set_exp(lifetime=settings.JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME)
-        access = str(refresh.access_token)
+        tokens = reissue_session_tokens(request, user)
 
         response = Response(
             {
                 "detail": "Mobile number verified successfully",
                 "user": _build_authenticated_user_payload(user),
-                "access": access,
-                "refresh": str(refresh),
+                **tokens,
             },
             status=status.HTTP_200_OK,
         )
-        _set_auth_cookies(response, access_token=access, refresh_token=str(refresh), remember_me=remember_me)
-        if _is_web_client(request):
+        _set_auth_cookies(response, access_token=tokens["access"], refresh_token=tokens["refresh"])
+        if is_web_client(request):
             response.data.pop("refresh", None)
         return response
 
@@ -530,11 +530,10 @@ class ResendMobileOTPView(APIView):
 
         previous_state = _snapshot_mobile_otp_state(user)
         otp_code = generate_otp()
-        otp_hash = _hash_otp(otp_code)
+        otp_hash = hash_otp(otp_code)
         generated_at = timezone.now()
         user.mobile_otp_code = otp_hash
         user.mobile_otp_created_at = generated_at
-        user.is_mobile_verified = False
         _reset_mobile_otp_security_state(user)
         user.save(update_fields=[
             "mobile_otp_code",
@@ -557,7 +556,7 @@ class ResendMobileOTPView(APIView):
 
         delivered = _send_mobile_otp_sms(
             user_id=user.id,
-            mobile_number=user.mobile_number,
+            mobile_number=user.pending_mobile_number or user.mobile_number,
             otp_code=otp_code,
             action="resend",
         )

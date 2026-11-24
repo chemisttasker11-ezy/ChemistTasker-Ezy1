@@ -3,8 +3,9 @@ import type { CurrentUserApi } from '../../contracts/accounts';
 import { API_ENDPOINTS } from '../../constants/endpoints';
 import { fetchApi } from '../../transport/application';
 import { buildQuery } from '../../utils/serialization';
+import type { LoginSession } from './sessionSecurity';
 export function login(credentials: unknown) {
-    return fetchApi('/users/login/', { method: 'POST', body: JSON.stringify(credentials) });
+    return fetchApi<LoginSession>('/users/login/', { method: 'POST', body: JSON.stringify(credentials), skipAuth: true });
 }
 export type LogoutSessionOptions = {
     refreshToken?: string | null;

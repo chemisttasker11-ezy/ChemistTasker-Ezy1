@@ -320,14 +320,18 @@ class MobileOtpTests(TestCase):
         self.assertEqual((user.is_mobile_verified, user.mobile_otp_code, user.mobile_otp_failed_attempts), (True, None, 0))
 
         identity = {"first_name": user.first_name, "last_name": user.last_name, "username": user.username or "ann.lee"}
-        changed, _ = post(client, "mobile/request-otp/", {"mobile_number": "0499999999", **identity})
-        self.assertEqual(changed.data["mobile_number"], "Verified mobile number is locked and cannot be changed.")
+        with self.provider():
+            changed, _ = post(client, "mobile/request-otp/", {"mobile_number": "0499999999", **identity})
+        self.assertEqual(changed.status_code, 200)
+        user.refresh_from_db()
+        self.assertEqual((user.mobile_number, user.pending_mobile_number, user.is_mobile_verified),
+                         ("61412345678", "61499999999", True))
 
 
 class SessionTests(TestCase):
     def test_reset_secret_is_email_only(self):
         from notifications.models import Notification
-        user = make_user("PHARMACIST")
+        user = make_user("PHARMACIST", is_otp_verified=True)
         with self.captureOnCommitCallbacks(execute=True):
             response, _ = post(APIClient(), "password-reset/", {"email": user.email}, eager=True)
         self.assertEqual(response.status_code, 200)
@@ -403,15 +407,20 @@ class SessionTests(TestCase):
             with self.subTest(remember=remember):
                 user = make_user("PHARMACIST", is_otp_verified=True, mobile_number="61412345678",
                                  mobile_otp_code=make_password("222333"), mobile_otp_created_at=timezone.now())
-                client = APIClient()
+                client = APIClient(HTTP_X_CLIENT_PLATFORM="web")
                 login, _ = post(client, "login/", {"email": user.email, "password": "test-pass", "remember_me": remember})
                 self.assertEqual(login.status_code, 200, login.data)
                 response, _ = post(client, "mobile/verify-otp/", {"otp": "222333"})
                 self.assertEqual(response.status_code, 200, response.data)
                 cookie = response.cookies["ct_refresh"]
-                self.assertEqual(cookie["max-age"], 604800 if remember else "")
+                if remember:
+                    self.assertIn(cookie["max-age"], range(7775998, 7776001))
+                else:
+                    self.assertEqual(cookie["max-age"], "")
                 self.assertEqual(RefreshToken(cookie.value)["remember_me"], remember)
-                self.assertEqual(RefreshToken(cookie.value)['sid'], RefreshToken(login.data['refresh'])['sid'])
+                original = RefreshToken(login.cookies["ct_refresh"].value)
+                self.assertEqual(RefreshToken(cookie.value)['sid'], original['sid'])
+                self.assertEqual(RefreshToken(cookie.value)['exp'], original['exp'])
 
     def test_password_reset_revokes_existing_refresh_tokens_and_sessions(self):
         user = make_user("PHARMACIST", is_otp_verified=True)
@@ -491,11 +500,12 @@ class SessionTests(TestCase):
         self.assertEqual(WebSocketTicket.objects.filter(user=user).count(), 2)
 
     def test_password_reset_request_does_not_reveal_accounts(self):
-        user = make_user("PHARMACIST")
+        user = make_user("PHARMACIST", is_otp_verified=True)
         expected = {"detail": "If this email exists, a reset link has been sent."}
         mail.outbox = []
         known, _ = post(APIClient(), "password-reset/", {"email": user.email.upper()}, eager=True)
         self.assertEqual([(m.subject, m.to) for m in mail.outbox], [("Reset your password", [user.email])])
+        self.assertIn("We received a request to reset your password", mail.outbox[0].body)
         mail.outbox = []
         unknown, _ = post(APIClient(), "password-reset/", {"email": "nobody@example.com"}, eager=True)
         self.assertEqual(mail.outbox, [])
