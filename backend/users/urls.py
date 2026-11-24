@@ -2,6 +2,7 @@ from django.urls import path, include
 from .views import *
 from .browser_session import csrf_token
 from .api_passwords import RevokingPasswordResetConfirmView
+from .api_otp import RegistrationEmailChangeView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.routers import DefaultRouter
 from django.contrib.auth import views as auth_views
@@ -36,6 +37,7 @@ urlpatterns = [
     path('auth/reset/done/',           auth_views.PasswordResetCompleteView.as_view(),name='password_reset_complete'),
     path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
     path('resend-otp/', ResendOTPView.as_view(), name='resend-otp'),
+    path('change-registration-email/', RegistrationEmailChangeView.as_view(), name='change-registration-email'),
 
     # Mobile verification
     path('mobile/request-otp/', RequestMobileOTPView.as_view(), name='mobile-request-otp'),

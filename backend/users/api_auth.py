@@ -21,9 +21,9 @@ from users.serializers import (
 )
 from users.models import WebSocketTicket
 from users.tokens import notify_auth_changed
-from users.login_security import _get_login_attempt_state, _login_failure_response, _login_invalid_credentials_response
+from users.login_security import finish_login_attempt, precheck_login
 from users.recaptcha import verify_recaptcha
-from users.sessions import _build_authenticated_user_payload, _clear_auth_cookies, _is_web_client, _set_auth_cookies
+from users.sessions import _build_authenticated_user_payload, _clear_auth_cookies, _set_auth_cookies, is_web_client
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -77,39 +77,35 @@ class CustomLoginView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         from .authentication import enforce_browser_csrf
         enforce_browser_csrf(request)
-        email = (request.data.get("email") or "").strip().lower()
-        remember_me = request.data.get("remember_me")
-        remember_me = remember_me if isinstance(remember_me, bool) else None
-        credentials = {"username": email}
-        attempt_state = _get_login_attempt_state(request, credentials)
-        if attempt_state and attempt_state["locked"]:
-            return _login_failure_response(attempt_state)
+        raw_email = request.data.get("email")
+        email = raw_email.strip().lower() if isinstance(raw_email, str) else ""
+        password = request.data.get("password")
+        attempt_state, refusal = precheck_login(
+            request,
+            email=email,
+            password=password,
+            captcha_token=request.data.get("captcha_token"),
+            recovery_code=request.data.get("recovery_code"),
+            verify_captcha=verify_recaptcha,
+        )
+        if refusal is not None:
+            return refusal
 
-        user = User.objects.filter(email__iexact=email).first() if email else None
-        supplied_password = request.data.get("password") or ""
-        password_matches = bool(user and user.check_password(supplied_password))
         try:
             response = super().post(request, *args, **kwargs)
         except AuthenticationFailed:
-            attempt_state = _get_login_attempt_state(request, credentials)
-            return _login_invalid_credentials_response(
-                user,
-                attempt_state,
-                password_matches=password_matches,
-            )
+            response = None
 
+        response = finish_login_attempt(
+            request, email=email, password=password, attempt_state=attempt_state, response=response,
+        )
         if response.status_code >= 400:
-            attempt_state = _get_login_attempt_state(request, credentials)
-            return _login_invalid_credentials_response(
-                user,
-                attempt_state,
-                password_matches=password_matches,
-            )
+            return response
         access = response.data.get("access")
         refresh = response.data.get("refresh")
         if access and refresh:
-            _set_auth_cookies(response, access_token=access, refresh_token=refresh, remember_me=remember_me)
-        if _is_web_client(request):
+            _set_auth_cookies(response, access_token=access, refresh_token=refresh)
+        if is_web_client(request):
             response.data.pop("refresh", None)
         return response
 
@@ -148,8 +144,8 @@ class CustomTokenRefreshView(TokenRefreshView):
         access = serializer.validated_data.get("access")
         refresh = serializer.validated_data.get("refresh")
         if access and refresh:
-            _set_auth_cookies(response, access_token=access, refresh_token=refresh, remember_me=serializer.validated_data.get('remember_me'))
-        if _is_web_client(request):
+            _set_auth_cookies(response, access_token=access, refresh_token=refresh)
+        if is_web_client(request):
             response.data.pop("refresh", None)
         return response
 

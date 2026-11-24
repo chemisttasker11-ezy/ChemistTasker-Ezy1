@@ -1,0 +1,4 @@
+Your ChemistTasker sign-in recovery code is {{ otp }}.
+
+Enter this code with your password on the sign-in screen within one hour.
+If you did not try to sign in, you can ignore this email.

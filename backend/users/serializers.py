@@ -12,11 +12,10 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from users.tokens import RefreshToken
+from users.sessions import is_web_client, issue_session_tokens, refresh_session_policy
 from rest_framework_simplejwt.exceptions import TokenError
-from django.conf import settings
 from .models import OrganizationMembership, ContactMessage, RevokedSession
-import secrets
-from datetime import datetime, timezone as dt_timezone
+from users.otp import generate_otp, registration_correction_token
 from django.utils import timezone
 from .org_roles import (
     ADMIN_LEVEL_DEFINITIONS,
@@ -85,6 +84,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True)
     accepted_terms = serializers.BooleanField(write_only=True)
+    correction_token = serializers.SerializerMethodField()
     referral_code = serializers.CharField(required=False, allow_blank=True, write_only=True)
     referral_shift_id = serializers.IntegerField(required=False, write_only=True)
     referral_event_id = serializers.IntegerField(required=False, write_only=True)
@@ -100,12 +100,16 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'confirm_password',
             'role',
             'accepted_terms',
+            'correction_token',
             'referral_code',
             'referral_shift_id',
             'referral_event_id',
             'newcomer_type',
             'date_of_birth',
         ]
+
+    def get_correction_token(self, user):
+        return registration_correction_token(user)
 
     def validate(self, attrs):
         if attrs.get('password') != attrs.pop('confirm_password'):
@@ -176,7 +180,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         user.save()
 
         # ---- OTP verification ----
-        otp = str(secrets.randbelow(900000) + 100000)
+        otp = generate_otp()
         user.otp_code = make_password(otp)
         user.otp_created_at = timezone.now()
         user.is_otp_verified = False
@@ -344,25 +348,27 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     token_class = RefreshToken
     remember_me = serializers.BooleanField(write_only=True, required=False)
 
-    def validate(self, attrs):
-        remember_me = attrs.pop('remember_me', None)
-        data = super().validate(attrs)
+    def get_fields(self):
+        fields = super().get_fields()
+        if not is_web_client(self.context.get('request')):
+            fields.pop('remember_me')
+        return fields
 
-        user = self.user
+    @classmethod
+    def get_token(cls, user):
         if not user.is_otp_verified:
             from rest_framework.exceptions import AuthenticationFailed
             raise AuthenticationFailed("Please verify your email address (check your inbox for your OTP code).")
+        return super().get_token(user)
 
-        if remember_me is False:
-            refresh = RefreshToken(data['refresh'])
-            refresh['remember_me'] = False
-            data['refresh'] = str(refresh)
-        if remember_me is True:
-            refresh = RefreshToken(data['refresh'])
-            refresh['remember_me'] = True
-            refresh.set_exp(from_time=datetime.fromtimestamp(refresh['iat'], dt_timezone.utc), lifetime=settings.JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME)
-            data['refresh'] = str(refresh)
-            data['access'] = str(refresh.access_token)
+    def validate(self, attrs):
+        remember_me = attrs.pop('remember_me', False)
+        attrs[self.username_field] = attrs[self.username_field].strip().lower()
+        data = super().validate(attrs)
+
+        data.update(issue_session_tokens(
+            self.context.get('request'), RefreshToken(data['refresh']), remember_me=remember_me,
+        ))
 
         # 1) Organization memberships
         org_memberships = OrganizationMembership.objects.filter(user=self.user)
@@ -516,6 +522,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
         original_refresh = None
         try:
             original_refresh = RefreshToken(attrs['refresh'])
+            session_policy = refresh_session_policy(self.context.get('request'), original_refresh)
             user = User.objects.get(id=original_refresh['user_id'])
         except TokenError:
             # A rotated/blacklisted refresh token must remain unusable. The
@@ -540,16 +547,12 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
         attrs = {**attrs, 'refresh': str(original_refresh)}
         data = super().validate(attrs)
-        data['remember_me'] = original_refresh.get('remember_me')
-        if original_refresh.get('remember_me') is True and data.get('refresh'):
-            refresh = RefreshToken(data['refresh'])
-            refresh['remember_me'] = True
-            refresh['exp'] = original_refresh['exp']
-            data['refresh'] = str(refresh)
-            data['access'] = str(refresh.access_token)
+        if data.get('refresh'):
+            data.update(RefreshToken(data['refresh']).session_pair(**session_policy))
 
-        self._populate_user_payload(data, user)
-        return data
+        payload = {**data, 'remember_me': session_policy['remember_me']}
+        self._populate_user_payload(payload, user)
+        return payload
 
 class InviteOrgUserSerializer(serializers.Serializer):
     email        = serializers.EmailField()

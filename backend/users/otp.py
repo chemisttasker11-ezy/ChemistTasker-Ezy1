@@ -1,6 +1,9 @@
 """One-time codes for e-mail and mobile verification: hashing and matching, failed-attempt lockout,
 code generation, Australian mobile normalisation and the identity captured with a mobile number."""
 import secrets
+from django.core import signing
+from django.db import IntegrityError, transaction
+from users.delivery import deliver_email_best_effort
 from django.contrib.auth.hashers import make_password, check_password, identify_hasher
 from rest_framework import status
 from rest_framework.response import Response
@@ -16,12 +19,27 @@ OTP_MAX_FAILED_ATTEMPTS = 5
 
 OTP_LOCKOUT_MINUTES = 15
 
+REGISTRATION_CORRECTION_SALT = "users.registration-email"
+REGISTRATION_CORRECTION_MAX_AGE = 3600
 
-def _hash_otp(raw_otp: str) -> str:
+
+EMAIL_OTP_STATE_FIELDS = (
+    "otp_code",
+    "otp_created_at",
+    "otp_failed_attempts",
+    "otp_locked_until",
+)
+
+
+def registration_correction_token(user):
+    return signing.dumps(user.pk, salt=REGISTRATION_CORRECTION_SALT)
+
+
+def hash_otp(raw_otp: str) -> str:
     return make_password(raw_otp)
 
 
-def _otp_matches(raw_otp: str, stored_value: str | None) -> bool:
+def otp_matches(raw_otp: str, stored_value: str | None) -> bool:
     if not raw_otp or not stored_value:
         return False
     try:
@@ -31,6 +49,9 @@ def _otp_matches(raw_otp: str, stored_value: str | None) -> bool:
         return stored_value == raw_otp
     return check_password(raw_otp, stored_value)
 
+
+_hash_otp = hash_otp
+_otp_matches = otp_matches
 
 def _get_lockout_response(locked_until):
     remaining = int(max((locked_until - timezone.now()).total_seconds(), 0))
@@ -95,9 +116,9 @@ def normalize_au_mobile(raw: str) -> str:
     return n
 
 
-def valid_otp_format(otp: str) -> bool:
+def valid_otp_format(otp: object) -> bool:
     """OTP must be exactly 6 digits."""
-    return bool(otp and otp.isdigit() and len(otp) == 6)
+    return isinstance(otp, str) and len(otp) == 6 and otp.isascii() and otp.isdigit()
 
 
 def _clean_identity_value(value):
@@ -175,3 +196,54 @@ def _resolve_mobile_otp_user(request):
         )
 
     return user, None
+
+
+def correct_registration_email(*, email, new_email, correction_token, dispatch_email):
+    if email == new_email:
+        return "unchanged"
+
+    try:
+        user_id = signing.loads(
+            correction_token, salt=REGISTRATION_CORRECTION_SALT,
+            max_age=REGISTRATION_CORRECTION_MAX_AGE,
+        )
+    except signing.BadSignature:
+        user_id = None
+
+    try:
+        with transaction.atomic():
+            user = User.objects.select_for_update().filter(
+                pk=user_id, email__iexact=email, is_active=True, is_otp_verified=False,
+                accepted_terms=True, role__in=User.SELF_REGISTRATION_ROLES,
+            ).first()
+            if not user:
+                return "invalid_registration"
+            if User.objects.filter(email__iexact=new_email).exists():
+                return "duplicate"
+
+            otp = generate_otp()
+            while otp_matches(otp, user.otp_code):
+                otp = generate_otp()
+            user.email = new_email
+            user.otp_code = hash_otp(otp)
+            user.otp_created_at = timezone.now()
+            _reset_email_otp_security_state(user)
+            user.save(update_fields=("email", *EMAIL_OTP_STATE_FIELDS))
+            if not deliver_email_best_effort(
+                dispatch_email,
+                subject="Your ChemistTasker Verification Code",
+                recipient_list=[new_email],
+                template_name="emails/otp_email.html",
+                context={"otp": otp},
+                text_template="emails/otp_email.txt",
+                event="registration_email_corrected",
+                user_id=user.pk,
+            ):
+                transaction.set_rollback(True)
+                return "delivery_failed"
+    except IntegrityError:
+        if User.objects.filter(email__iexact=new_email).exists():
+            return "duplicate"
+        raise
+
+    return None

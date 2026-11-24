@@ -24,9 +24,14 @@ User = get_user_model()
 class RevokingPasswordResetConfirmView(PasswordResetConfirmView):
     success_url = reverse_lazy("api_v1:password_reset_complete")
 
+    def get_user(self, uidb64):
+        user = super().get_user(uidb64)
+        return user if user and user.is_active and user.is_otp_verified else None
+
     @transaction.atomic
     def form_valid(self, form):
         response = super().form_valid(form)
+        _reset_login_lockout_state(self.user)
         _revoke_user_tokens(self.user)
         _revoke_user_sessions(self.user)
         return response
@@ -38,6 +43,7 @@ class PasswordResetConfirmAPIView(APIView):
     """
     permission_classes = [permissions.AllowAny]
 
+    @transaction.atomic
     def post(self, request):
         uid    = request.data.get('uid')
         token  = request.data.get('token')
@@ -51,7 +57,7 @@ class PasswordResetConfirmAPIView(APIView):
 
         try:
             user_pk = force_str(urlsafe_base64_decode(uid))
-            user = User.objects.get(pk=user_pk)
+            user = User.objects.select_for_update().get(pk=user_pk, is_active=True, is_otp_verified=True)
         except (TypeError, ValueError, User.DoesNotExist):
             return Response({'detail':'Invalid link.'}, status=400)
 
@@ -64,13 +70,11 @@ class PasswordResetConfirmAPIView(APIView):
         except DjangoValidationError as exc:
             return Response({'new_password1': list(exc.messages)}, status=400)
 
-        with transaction.atomic():
-            user.set_password(pw1)
-            user.is_otp_verified = True
-            user.save()
-            _reset_login_lockout_state(user)
-            _revoke_user_tokens(user)
-            _revoke_user_sessions(user)
+        user.set_password(pw1)
+        user.save(update_fields=["password"])
+        _reset_login_lockout_state(user)
+        _revoke_user_tokens(user)
+        _revoke_user_sessions(user)
         return Response({'detail':'Password has been reset.'})
 
 
@@ -81,7 +85,7 @@ class PasswordResetRequestAPIView(APIView):
 
     def post(self, request):
         email = request.data.get('email', '').strip().lower()
-        user = User.objects.filter(email__iexact=email).first()
+        user = User.objects.filter(email__iexact=email, is_active=True, is_otp_verified=True).first()
         if user:
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)

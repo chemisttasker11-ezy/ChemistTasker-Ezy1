@@ -17,9 +17,9 @@ class SessionRefreshRevocationTests(TestCase):
     def setUp(self):
         self.user = make_user('PHARMACIST')
 
-    def refresh(self, token, cookie=False):
+    def refresh(self, token, cookie=False, *, web=False):
         cache.clear()
-        client = APIClient()
+        client = APIClient(HTTP_X_CLIENT_PLATFORM="web") if web else APIClient()
         if cookie:
             client.cookies[settings.JWT_REFRESH_COOKIE] = token
         return client.post('/api/v1/users/token/refresh/', {} if cookie else {'refresh': token}, format='json')
@@ -48,13 +48,14 @@ class SessionRefreshRevocationTests(TestCase):
         RevokedSession.objects.create(session_id=revoked['sid'])
         survivor = RefreshToken.for_user(self.user)
         survivor['remember_me'] = True
-        first = self.refresh(str(survivor))
+        first = self.refresh(str(survivor), cookie=True, web=True)
         self.assertEqual(first.status_code, 200, first.data)
-        rotated = UntypedToken(first.data['refresh'])
+        refresh = first.cookies[settings.JWT_REFRESH_COOKIE].value
+        rotated = UntypedToken(refresh)
         self.assertEqual(rotated['sid'], survivor['sid'])
         self.assertEqual(rotated['exp'], survivor['exp'])
         self.assertTrue(rotated['remember_me'])
-        second = self.refresh(first.data['refresh'], cookie=True)
+        second = self.refresh(refresh, cookie=True, web=True)
         self.assertEqual(second.status_code, 200, second.data)
         self.assertIn('access', second.data)
 

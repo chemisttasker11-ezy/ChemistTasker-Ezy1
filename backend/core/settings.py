@@ -336,7 +336,11 @@ AXES_ENABLED = env.bool("AXES_ENABLED", default=True)
 AXES_FAILURE_LIMIT = env.int("AXES_FAILURE_LIMIT", default=5)
 AXES_COOLOFF_TIME = timedelta(hours=1)
 AXES_RESET_ON_SUCCESS = True
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
 AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+AXES_SENSITIVE_PARAMETERS = ["username", "ip_address", "captcha_token", "recovery_code"]
+
+PASSWORD_RESET_TIMEOUT = 60 * 60
 
 REST_FRAMEWORK = {
     # Preserve the established numeric ID wire contract through DRF 3.17's BigIntegerField mapping.
@@ -508,7 +512,7 @@ SIMPLE_JWT = {
     # Short‑lived access token
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=env.int('JWT_ACCESS_TOKEN_MINUTES', default=30)),
     # Longer‑lived refresh token
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
+    'REFRESH_TOKEN_LIFETIME': timedelta(hours=2),
     # Issue a new refresh token each time /refresh/ is called
     'ROTATE_REFRESH_TOKENS': True,
     # Blacklist old refresh tokens—prevents reuse
@@ -518,8 +522,9 @@ SIMPLE_JWT = {
 }
 
 JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME = timedelta(
-    days=env.int("JWT_REMEMBER_ME_REFRESH_TOKEN_DAYS", default=7)
+    days=min(env.int("JWT_REMEMBER_ME_REFRESH_TOKEN_DAYS", default=90), 90)
 )
+JWT_NATIVE_REFRESH_TOKEN_LIFETIME = timedelta(days=env.int("JWT_NATIVE_REFRESH_TOKEN_DAYS", default=90))
 
 # HttpOnly JWT cookie settings for web clients
 JWT_AUTH_COOKIE = env("JWT_AUTH_COOKIE", default="ct_access")
