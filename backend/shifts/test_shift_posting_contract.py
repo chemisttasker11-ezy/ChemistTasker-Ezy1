@@ -44,9 +44,10 @@ def queued_emails():
 class ShiftPostingFixture(TestCase):
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy("Posting Pharmacy")
+        self.pharmacy.abn_verified = True
         self.pharmacy.state = "NSW"
         self.pharmacy.suburb = "Parramatta"
-        self.pharmacy.save(update_fields=["state", "suburb"])
+        self.pharmacy.save(update_fields=["state", "suburb", "abn_verified"])
 
     def member(self, employment_type, *, role="PHARMACIST", user_role="PHARMACIST", pharmacy=None, is_active=True):
         user = make_user(user_role)
@@ -607,3 +608,45 @@ class ShiftEditTests(ShiftPostingFixture):
         self.assertEqual(shift.description, "Updated instructions")
         self.assertEqual(shift.slot_assignments.count(), 1)
         self.assertEqual(shift.slots.count(), 2)
+
+
+class AbnPublicPostingTests(ShiftPostingFixture):
+    def setUp(self):
+        super().setUp()
+        self.pharmacy.abn_verified = False
+        self.pharmacy.save(update_fields=["abn_verified"])
+
+    def test_public_requires_verified_abn(self):
+        response, _ = self.post_shift(visibility="PLATFORM")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "ABN_NOT_VERIFIED")
+        self.assertEqual(response.data["detail"], "Confirm your pharmacy's ABN to post public shifts.")
+        self.pharmacy.abn_verified = True
+        self.pharmacy.save(update_fields=["abn_verified"])
+        response, _ = self.post_shift(visibility="PLATFORM")
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_unverified_chain_and_organization_are_allowed(self):
+        from organizations.models import Organization
+        chain = Chain.objects.create(owner=self.pharmacy.owner, name="ABN chain")
+        chain.pharmacies.add(self.pharmacy)
+        self.pharmacy.organization = Organization.objects.create(name="ABN org", slug="abn-org")
+        self.pharmacy.save(update_fields=["organization"])
+        for tier in ("OWNER_CHAIN", "ORG_CHAIN"):
+            response, _ = self.post_shift(visibility=tier)
+            self.assertEqual(response.status_code, 201, response.data)
+
+    def test_manual_public_refusal_and_auto_stops(self):
+        from django.utils import timezone
+        from shifts.escalation import auto_escalate_due_shifts
+        response, _ = self.post_shift(visibility="LOCUM_CASUAL")
+        shift = Shift.objects.get(pk=response.data["id"])
+        response = client_for(self.owner).post(f"{API}shifts/{shift.pk}/escalate/", {"target_visibility": "PLATFORM"}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "ABN_NOT_VERIFIED")
+        shift.escalate_to_platform = timezone.now() - timedelta(minutes=1)
+        shift.save(update_fields=["escalate_to_platform"])
+        auto_escalate_due_shifts(timezone.now())
+        auto_escalate_due_shifts(timezone.now())
+        shift.refresh_from_db()
+        self.assertEqual(shift.visibility, "LOCUM_CASUAL")

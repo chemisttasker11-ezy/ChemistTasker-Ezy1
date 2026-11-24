@@ -5,7 +5,7 @@ from onboarding.services.skill_identity import normalize_skills
 from drf_spectacular.utils import extend_schema_field
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from shifts.models import Shift, ShiftDescriptionTemplate, ShiftOffer
-from shifts.escalation import allowed_tiers
+from shifts.escalation import allowed_tiers, validate_visibility
 from shifts.pricing import expand_shift_slots
 from shifts.selectors import slot_occurrence_ended
 from django.utils import timezone
@@ -324,12 +324,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         # Build the correct path
         allowed_tiers = self.build_allowed_tiers(validated_data['pharmacy'])
 
-        # Ensure the front-end’s choice is valid
-        chosen = validated_data.get('visibility')
-        if chosen not in allowed_tiers:
-            raise serializers.ValidationError({
-                'visibility': f"Invalid choice; must be one of {allowed_tiers}"
-            })
+        validate_visibility(validated_data['pharmacy'], validated_data.get('visibility'), allowed_tiers)
 
         request = self.context.get('request')
         return post_shift(
@@ -350,18 +345,9 @@ class ShiftSerializer(serializers.ModelSerializer):
         validated_data.pop('notify_favorite_staff', None)
         validated_data.pop('notify_chain_members', None)
         apply_rates_to_pharmacy = validated_data.pop('apply_rates_to_pharmacy', False)
-        allowed_tiers = None
-        if 'visibility' in validated_data:
-            allowed_tiers = self.build_allowed_tiers(instance.pharmacy)
-            new_vis = validated_data['visibility']
-            if new_vis not in allowed_tiers:
-                raise serializers.ValidationError({
-                    'visibility': f"Invalid choice; must be one of {allowed_tiers}"
-                })
         return revise_shift(
             instance,
             validated_data,
-            allowed_tiers=allowed_tiers,
             slots_payload=self._initial_slots_payload(),
             rate_request_data=getattr(self.context.get('request'), 'data', {}),
             apply_rates_to_pharmacy=apply_rates_to_pharmacy,

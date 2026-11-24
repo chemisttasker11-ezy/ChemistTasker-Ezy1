@@ -43,8 +43,16 @@ def allowed_tiers(pharmacy):
     if pharmacy.organization_id:
         tiers.append('ORG_CHAIN')
 
-    tiers.append('PLATFORM')
+    if pharmacy.abn_verified:
+        tiers.append('PLATFORM')
     return tiers
+
+
+def validate_visibility(pharmacy, visibility, tiers):
+    if visibility == PUBLIC_LEVEL and not pharmacy.abn_verified:
+        raise ShiftActionRefused({"detail": "Confirm your pharmacy's ABN to post public shifts.", "code": "ABN_NOT_VERIFIED"})
+    if visibility not in tiers:
+        raise ValidationError({'visibility': f"Invalid choice; must be one of {tiers}"})
 
 
 def resolve_current_index(shift, allowed_tiers):
@@ -133,6 +141,8 @@ def escalate_shift(shift, *, allowed_tiers, target_visibility=None):
     current_index = resolve_current_index(shift, allowed_tiers)
 
     if target_visibility:
+        if target_visibility == PUBLIC_LEVEL:
+            validate_visibility(shift.pharmacy, target_visibility, allowed_tiers)
         if target_visibility not in allowed_tiers:
             raise ShiftActionRefused(f"Invalid target_visibility. Must be one of {allowed_tiers}.")
         target_index = allowed_tiers.index(target_visibility)

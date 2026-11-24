@@ -80,7 +80,45 @@ class Claim3BookedShiftPharmacyMove(_ShiftMixin, TestCase):
         from shifts.models import ShiftOffer
         self.booked.status = ShiftOffer.Status.EXPIRED
         self.booked.save(update_fields=['status'])
+        self.shift.visibility = 'LOCUM_CASUAL'
+        self.shift.save(update_fields=['visibility'])
         r = self.patch_pharmacy(self.other)
         self.assertEqual(r.status_code, 200, r.data)
         self.shift.refresh_from_db()
         self.assertEqual(self.shift.pharmacy_id, self.other.pk)
+
+    def test_public_edit_checks_the_destination_pharmacy(self):
+        from shifts.models import ShiftOffer
+        self.booked.status = ShiftOffer.Status.EXPIRED
+        self.booked.save(update_fields=['status'])
+        self.pharmacy.abn_verified = True
+        self.pharmacy.save(update_fields=['abn_verified'])
+        self.shift.visibility = 'LOCUM_CASUAL'
+        self.shift.save(update_fields=['visibility'])
+        url = f"/api/v1/shifts/{self.shift.pk}/"
+        response = client_for(self.owner).patch(url, {'pharmacy': self.other.pk, 'visibility': 'PLATFORM'}, format='json')
+        self.assertEqual((response.status_code, response.data.get('code')), (400, 'ABN_NOT_VERIFIED'), response.data)
+        self.shift.refresh_from_db()
+        self.assertEqual((self.shift.pharmacy_id, self.shift.visibility), (self.pharmacy.pk, 'LOCUM_CASUAL'))
+        self.other.abn_verified = True
+        self.other.save(update_fields=['abn_verified'])
+        response = client_for(self.owner).patch(url, {'pharmacy': self.other.pk, 'visibility': 'PLATFORM'}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.shift.refresh_from_db()
+        self.assertEqual((self.shift.pharmacy_id, self.shift.visibility), (self.other.pk, 'PLATFORM'))
+        response = self.patch_pharmacy(self.pharmacy)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.other.abn_verified = False
+        self.other.save(update_fields=['abn_verified'])
+        response = self.patch_pharmacy(self.other)
+        self.assertEqual((response.status_code, response.data.get('code')), (400, 'ABN_NOT_VERIFIED'), response.data)
+
+    def test_legacy_public_edit_can_resubmit_the_unchanged_visibility(self):
+        self.shift.visibility = 'PLATFORM'
+        self.shift.save(update_fields=['visibility'])
+        response = client_for(self.owner).patch(f"/api/v1/shifts/{self.shift.pk}/",
+            {'visibility': 'PLATFORM', 'description': 'Reviewed'}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.shift.refresh_from_db()
+        self.assertEqual((self.shift.visibility, self.shift.description), ('PLATFORM', 'Reviewed'))
+        self.assertEqual(self.shift.pharmacy_id, self.pharmacy.pk)

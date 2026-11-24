@@ -12,6 +12,7 @@ export function PharmacyProfileFields({ services, weekday, weekend, onServicesCh
   onServicesChange: (value: string[]) => void; onWeekdayChange: (value: string) => void; onWeekendChange: (value: string) => void;
 }) {
   return <Stack spacing={2}>
+    <Typography variant="body2" color="text.secondary">Filling this in helps applicants understand what your pharmacy needs.</Typography>
     <Typography variant="h6">Services and typical script volume</Typography>
     <Typography variant="body2" color="text.secondary">Choose services offered at this pharmacy. Script volumes describe the whole pharmacy on a typical day.</Typography>
     <Stack direction="row" useFlexGap flexWrap="wrap" gap={1}>

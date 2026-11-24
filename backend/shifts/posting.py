@@ -15,7 +15,7 @@ from rest_framework import serializers
 from shifts.announcements import announce_availability_matches, announce_posted_shift
 from shifts.assignment import lock_shift_offer_credentials, offer_dedicated_shift
 from shifts.emails import send_shift_updated_notifications
-from shifts.escalation import ESCALATION_FIELD_MAP
+from shifts.escalation import ESCALATION_FIELD_MAP, allowed_tiers as pharmacy_allowed_tiers, validate_visibility
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.models import Shift, ShiftOffer, ShiftSlot
 from shifts.notifications import notify_worker_credentials
@@ -179,24 +179,21 @@ def revise_shift(
     instance,
     validated_data,
     *,
-    allowed_tiers=None,
     slots_payload=None,
     rate_request_data=None,
     apply_rates_to_pharmacy=False,
 ):
-    """Apply a validated edit: recalculate the escalation level when the visibility changes (`allowed_tiers` must
-    contain it), replace the slots when `slots_payload` is given, optionally copy the rates to the pharmacy, and
+    """Apply a validated edit: recalculate the escalation level using the resulting pharmacy when needed,
+    replace the slots when `slots_payload` is given, optionally copy the rates to the pharmacy, and
     announce the update after commit."""
     # Validate the new slots before changing anything, and apply the whole edit atomically.
     protect_direct_booking(validated_data, instance=instance)
-    if 'visibility' in validated_data and allowed_tiers is None:
-        from shifts.escalation import allowed_tiers as pharmacy_allowed_tiers
-        allowed_tiers = pharmacy_allowed_tiers(instance.pharmacy)
     slots_data = normalize_slots_payload(slots_payload) if slots_payload is not None else None
     with transaction.atomic():
         instance = Shift.objects.select_for_update().get(pk=instance.pk)
         target = validated_data.get('pharmacy')
-        if target is not None and target.pk != instance.pharmacy_id and (
+        moving = target is not None and target.pk != instance.pharmacy_id
+        if moving and (
             instance.slot_assignments.exists()
             or instance.offers.filter(status__in=[
                 ShiftOffer.Status.ACCEPTED, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -244,9 +241,11 @@ def revise_shift(
             validated_data.get('employment_type', instance.employment_type),
             slots_data if slots_data is not None else instance.slots.values('rate'),
         )
-        # If visibility is changing, recalc escalation_level
-        if 'visibility' in validated_data:
-            new_vis = validated_data['visibility']
+        new_vis = validated_data.get('visibility', instance.visibility)
+        if moving or new_vis != instance.visibility:
+            pharmacy = target if moving else instance.pharmacy
+            allowed_tiers = pharmacy_allowed_tiers(pharmacy)
+            validate_visibility(pharmacy, new_vis, allowed_tiers)
             target_index = allowed_tiers.index(new_vis)
             instance.escalation_level = target_index
             if new_vis == 'PLATFORM' and not validated_data.get('escalate_to_platform') and not instance.escalate_to_platform:

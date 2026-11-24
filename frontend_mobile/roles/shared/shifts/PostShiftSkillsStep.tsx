@@ -79,6 +79,7 @@ export default function PostShiftSkillsStep({ roleNeeded, mustHave, setMustHave,
 
   return (
     <Surface style={shared.card} elevation={1}>
+      <Text style={s.muted}>Filling this in helps applicants understand what your pharmacy needs.</Text>
       <View style={s.tray}>
         <View style={s.trayHead}>
           <Text style={s.h3}>Selected for this shift</Text>
