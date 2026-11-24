@@ -10,7 +10,7 @@ from billing import utils as billing_utils
 from marketplace import public_sitemap as marketplace_sitemap
 from public_hub import permissions as content_permissions, sitemap_sources as content_sitemap
 from rewards import registration, services as reward_services
-from shifts import access, cancellation, deletion, engagement, escalation, holidays, interest, pricing_data
+from shifts import access, cancellation, deletion, engagement, holidays, interest, pricing_data
 from shifts import public_sitemap as shift_sitemap
 from talent import account_cleanup
 from workforce import award_rates, membership_services, permissions as workforce_permissions
@@ -57,9 +57,8 @@ def configure_foundation_services():
     ))
     configure_verification_features(VerificationFeatures(
         shift_refusal_type=lambda: access.ShiftActionRefused,
-        is_public_shift=lambda shift: shift.visibility == escalation.PUBLIC_LEVEL,
-        is_public_shift_member_access=_live(interest, 'is_public_shift_member_access'),
-        require_public_shift_onboarding=_live(interest, '_require_public_shift_onboarding'),
+        is_shift_pharmacy_employee=_live(interest, 'is_shift_pharmacy_employee'),
+        require_shift_booking_onboarding=_live(interest, 'require_shift_booking_onboarding'),
         cancel_upcoming_assignments=_live(cancellation, 'cancel_upcoming_assignments'),
         announce_bookings=_live(cancellation, 'announce_bookings'),
         award_verified_referrals=_live(reward_services, 'award_verified_referrals_for_user'),

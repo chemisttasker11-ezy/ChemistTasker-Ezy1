@@ -105,9 +105,13 @@ def ensure_interest_for_counter_offer(*, shift, user, offer):
         )
 
 
+@transaction.atomic
 def accept_counter_offer(*, shift, offer, slot_id, decided_by):
     """Accept a counter offer (for one slot, or the first free one) by turning it into worker offers the candidate
     must confirm. Returns the response body."""
+    from onboarding.verification.state import lock_public_ahpra
+
+    lock_public_ahpra(offer.user, shift, manager=True)
     if not _user_can_perform_shift_role(offer.user, shift.role_needed):
         raise ShiftActionRefused('The candidate role does not cover this shift.')
     offer_slot_ids = list(offer.slots.values_list('slot_id', flat=True))

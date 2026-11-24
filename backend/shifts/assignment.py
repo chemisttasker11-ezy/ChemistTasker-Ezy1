@@ -22,9 +22,13 @@ from shifts.notifications import notify_shift_users
 OFFER_EXPIRY_HOURS = 48
 
 
+@transaction.atomic
 def offer_shift(*, shift, candidate, slot_id):
     """Offer the shift (or one slot) to a candidate, who must confirm before any assignment exists. A pending offer
     is refreshed instead of duplicated; an expired one is closed first. Returns the response body."""
+    from onboarding.verification.state import lock_public_ahpra
+
+    lock_public_ahpra(candidate, shift, manager=True)
     if not _user_can_perform_shift_role(candidate, shift.role_needed):
         raise ShiftActionRefused('The candidate role does not cover this shift.')
     # For multi-slot shifts, auto-pick when possible (prefer unassigned)

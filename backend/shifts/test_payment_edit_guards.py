@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
-from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_verified_pharmacist
 from client_profile.models import Shift
 
 RATE = patch("shifts.finalize.get_locked_rate_for_slot", return_value=(Decimal("70"), {}))
@@ -28,7 +28,7 @@ class _ShiftMixin:
 
     def offer(self, day, status=None):
         from shifts.models import ShiftOffer
-        return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user("PHARMACIST"),
+        return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_verified_pharmacist(),
                                          status=status or ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
                                          offered_slot_date=day)
 

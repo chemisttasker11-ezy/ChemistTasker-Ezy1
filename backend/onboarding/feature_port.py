@@ -12,9 +12,8 @@ from django.core.exceptions import ImproperlyConfigured
 @dataclass(frozen=True)
 class VerificationFeatures:
     shift_refusal_type: Callable
-    is_public_shift: Callable
-    is_public_shift_member_access: Callable
-    require_public_shift_onboarding: Callable
+    is_shift_pharmacy_employee: Callable
+    require_shift_booking_onboarding: Callable
     cancel_upcoming_assignments: Callable
     announce_bookings: Callable
     award_verified_referrals: Callable

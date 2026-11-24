@@ -7,11 +7,10 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 
-from memberships.models import Membership
+from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from shifts.access import staff_membership_can_claim_role
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 
-PHARMACY_STAFF_TYPES = {"FULL_TIME", "PART_TIME", "CASUAL"}
 PAYMENT_TFN = "TFN"
 PAYMENT_ABN = "ABN"
 SETTLEMENT_PAYROLL = "PAYROLL"
@@ -34,7 +33,7 @@ def direct_pharmacy_staff_membership(*, user, pharmacy):
         pharmacy=pharmacy,
         is_active=True,
         status=Membership.Status.ACCEPTED,
-        employment_type__in=PHARMACY_STAFF_TYPES,
+        employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
     ).first()
 
 

@@ -6,15 +6,42 @@ from datetime import timedelta
 
 from django.db.models import Exists, F, OuterRef, Q
 
+from memberships.models import FAVORITE_STAFF_EMPLOYMENT_TYPES, Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from organizations.access import managed_pharmacies
-from organizations.models import Pharmacy
+from organizations.models import Chain, Pharmacy
 from organizations.timezone import get_pharmacy_timezone
+from shifts.escalation import COMMUNITY_LEVELS, PUBLIC_LEVEL
 from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
 
 
 def shifts_managed_by(queryset, user):
     """The shifts the user created or whose pharmacy they manage."""
     return queryset.filter(Q(created_by=user) | Q(pharmacy__in=managed_pharmacies(user)))
+
+
+def community_membership_q(user):
+    """Member audiences accumulate as shifts widen, independently of notification settings."""
+    memberships = Membership.objects.filter(user=user, is_active=True, status=Membership.Status.ACCEPTED)
+    staff = memberships.filter(employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES)
+    favourites = memberships.filter(employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES)
+    named_public = Q(visibility=PUBLIC_LEVEL, post_anonymously=False)
+    organisation_or_public = Q(visibility='ORG_CHAIN') | named_public
+    # A shift can skip the owner-chain tier if its pharmacy has no active owner chain.
+    has_owner_chain = Q(Exists(Chain.objects.filter(
+        owner_id=OuterRef('pharmacy__owner_id'), pharmacies=OuterRef('pharmacy_id'), is_active=True,
+    )))
+    return (
+        (Q(pharmacy_id__in=staff.values('pharmacy_id')) & (
+            Q(visibility__in=COMMUNITY_LEVELS) | named_public
+        ))
+        | (Q(pharmacy_id__in=favourites.values('pharmacy_id')) & (
+            Q(visibility__in=['LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN']) | named_public
+        ))
+        | (Q(pharmacy__owner_id__in=staff.values('pharmacy__owner_id')) & (
+            Q(visibility='OWNER_CHAIN') | (organisation_or_public & has_owner_chain)
+        ))
+        | (Q(pharmacy__organization_id__in=staff.values('pharmacy__organization_id')) & organisation_or_public)
+    )
 
 
 def slot_occurrence_ended(slot_date, start_time, end_time, local_date, clock):

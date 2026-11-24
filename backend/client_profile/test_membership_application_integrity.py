@@ -782,6 +782,7 @@ class DeferredPayrollActivationTests(TestCase):
         self.onboarding = OtherStaffOnboarding.objects.create(
             user=self.worker,
             role_type="ASSISTANT",
+            verified=True,
             classification_level="LEVEL_3",
             payment_preference="TFN",
             date_of_birth=date(1990, 1, 1),

@@ -158,6 +158,8 @@ def post_shift(
 
         dedicated_user = getattr(shift, 'dedicated_user', None)
         if dedicated_user:
+            from onboarding.verification.state import lock_public_ahpra
+            lock_public_ahpra(dedicated_user, shift, manager=True)
             offer_dedicated_shift(shift, dedicated_user)
 
     return shift

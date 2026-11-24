@@ -163,22 +163,23 @@ def require_ahpra_application(user):
         raise ShiftActionRefused({'code': f"ahpra_{state['state']}", 'detail': state['note']}, 403)
     if isinstance(profile, OwnerOnboarding) and profile.role != 'PHARMACIST':
         raise ShiftActionRefused({'code': 'pharmacist_required', 'detail': 'Pharmacy managers cannot apply as pharmacists.'}, 403)
-    # Workers are held to verified onboarding by _require_public_shift_onboarding; owners have no such gate.
+    # The booking onboarding check handles workers. Owners have no separate onboarding gate.
     if isinstance(profile, OwnerOnboarding) and not profile.ahpra_verified:
         raise ShiftActionRefused({'code': 'ahpra_pending', 'detail': 'Verify your AHPRA registration before applying for public shifts.'}, 403)
 
 
-def require_public_ahpra(user, shift):
-    is_public_shift_member_access = verification_features().is_public_shift_member_access
-
-    if verification_features().is_public_shift(shift) and not is_public_shift_member_access(user, shift):
-        require_ahpra_application(user)
-        _require_public_shift_onboarding = verification_features().require_public_shift_onboarding
-        _require_public_shift_onboarding(user)
+def require_public_ahpra(user, shift, *, schedule_recheck=True):
+    """Require booking credentials for workers outside the posting pharmacy's own staff, at every visibility."""
+    features = verification_features()
+    if features.is_shift_pharmacy_employee(user, shift):
+        return
+    require_ahpra_application(user)
+    features.require_shift_booking_onboarding(user)
+    if schedule_recheck:
         transaction.on_commit(lambda: queue_public_recheck(user), robust=True)
 
 
-def lock_public_ahpra(user, shift, *, manager=False):
+def lock_public_ahpra(user, shift, *, manager=False, schedule_recheck=True):
     """Inside the booking transaction: lock the worker's AHPRA profile row (apply_state_transition holds the same
     lock) and re-check, so a booking cannot commit around a suspension that has not yet cancelled bookings."""
     ShiftActionRefused = verification_features().shift_refusal_type()
@@ -186,12 +187,15 @@ def lock_public_ahpra(user, shift, *, manager=False):
     if profile is not None:
         type(profile).objects.select_for_update().filter(pk=profile.pk).first()
     try:
-        require_public_ahpra(user, shift)
+        if schedule_recheck:
+            require_public_ahpra(user, shift)
+        else:
+            require_public_ahpra(user, shift, schedule_recheck=False)
     except ShiftActionRefused:
         if not manager:
             raise
         raise ShiftActionRefused({'code': 'candidate_ahpra_ineligible',
-                                  'detail': "This worker can't be booked for public shifts right now."}, 403)
+                                  'detail': "This worker can't be booked right now."}, 403)
 
 
 def queue_public_recheck(user):
