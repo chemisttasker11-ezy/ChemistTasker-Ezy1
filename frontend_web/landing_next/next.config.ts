@@ -8,7 +8,8 @@ const api=canonicalApiRoot(process.env.PLATFORM_API_URL);
 const backend=backendOrigin(api);
 const isDev=process.env.NODE_ENV==='development';
 
-const viteOwnedPrefixes=['onboarding','setup','kiosk','membership'];
+const viteOwnedPrefixes=['onboarding','setup','membership'];
+const viteAttendancePages=['kiosk','kiosk-link','attendance-pin'];
 const viteDashboardPrefixes=[
  'attendance',
  'workforce',
@@ -53,14 +54,18 @@ const config:NextConfig={
     destination:`${dashboardPublic}/${prefix}/:path*`,
     permanent:false,
    })),
+   ...viteAttendancePages.map(page=>({
+    source:`/${page}`,
+    destination:`${dashboardPublic}/${page}`,
+    permanent:false,
+   })),
   ];
  },
 
  async rewrites(){return {fallback:[
   // Production/staging keep the single-origin reverse-proxy behaviour.
   // In development, redirects above take precedence for Vite-owned pages.
-  ...['dashboard','onboarding','setup','kiosk','membership'].map(prefix=>({source:`/${prefix}/:path*`,destination:`${dashboard}/${prefix}/:path*`})),
-  {source:'/kiosk',destination:`${dashboard}/kiosk`},
+  ...['dashboard',...viteOwnedPrefixes].map(prefix=>({source:`/${prefix}/:path*`,destination:`${dashboard}/${prefix}/:path*`})),
   {source:'/share/qr',destination:`${dashboard}/share/qr`},
   ...['dashboard-assets','js','assets','images',...(isDev?['src','@vite','@id','@fs','node_modules','@react-refresh','landing_next/shared']:[])].map(prefix=>({source:`/${prefix}/:path*`,destination:`${dashboard}/${prefix}/:path*`})),
   {source:'/ws/:path*',destination:`${backend}/ws/:path*`},

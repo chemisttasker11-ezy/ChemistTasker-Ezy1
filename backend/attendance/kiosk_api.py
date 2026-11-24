@@ -20,6 +20,8 @@ from attendance.credentials import (
     activate_kiosk_device,
     generate_kiosk_pairing_code,
     generate_signed_pharmacy_qr,
+    get_pairing_notice_code,
+    get_pin_notice_code,
     is_authorized_kiosk_manager,
     redeem_kiosk_pairing_code,
     revoke_kiosk_device,
@@ -49,6 +51,25 @@ from attendance.api_support import (_confirm_opposite, _confirmation_session_id,
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+
+class KioskNoticeCodeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        kind = request.query_params.get("kind")
+        if kind == "pairing":
+            authorization_id = request.query_params.get("authorization_id", "")
+            if not authorization_id.isdigit():
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+            data = get_pairing_notice_code(request.user, authorization_id)
+        elif kind == "pin":
+            data = get_pin_notice_code(request.user)
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        response = Response(data if data else {"error": "Code is unavailable or expired."}, status=200 if data else 404)
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class KioskActivateView(APIView):

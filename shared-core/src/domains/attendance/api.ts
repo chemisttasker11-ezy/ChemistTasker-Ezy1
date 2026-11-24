@@ -16,6 +16,9 @@ import type {
 import { API_ENDPOINTS } from '../../constants/endpoints';
 import { operationalRequest } from '../../transport/operational';
 export const attendance = {
+    getNoticeCode: (kind: 'pairing' | 'pin', authorizationId?: string) => operationalRequest<{
+        code: string; pharmacy_id: number; device_name?: string; expires_at?: string;
+    }>(API_ENDPOINTS.attendance.kioskNoticeCode, { query: { kind, ...(authorizationId ? { authorization_id: authorizationId } : {}) } }),
     getWorkerStatus: () => operationalRequest<AttendanceWorkerStatus>(API_ENDPOINTS.attendance.workerStatus),
     clockIn: (qrToken: string, options?: boolean | AttendanceClockOptions) => {
         const opts = typeof options === 'boolean' ? { confirm_opposite: options } : (options || {});

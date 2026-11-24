@@ -219,6 +219,11 @@ export default function NotificationsScreen() {
     if (!item.readAt) {
       void markAsRead(item.id);
     }
+    const kioskRoute = String(item.actionUrl || '');
+    if (kioskRoute === '/kiosk-link?source=kiosk' || /^\/kiosk-link\?source=kiosk&authorization_id=\d+$/.test(kioskRoute) || kioskRoute === '/attendance-pin?show_setup_code=1') {
+      router.push(kioskRoute as any);
+      return;
+    }
     const roomId = resolveChatNotificationRoomId({
       actionUrl: item.actionUrl,
       payload: item.payload,
