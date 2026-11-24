@@ -54,21 +54,6 @@
     "owner": "Expo platform transport",
     "rationale": "Public unauthenticated application-version/bootstrap endpoint for app-store updates, platform-specific configuration."
   },
-  "frontend_mobile/utils/authSession.ts|unresolved-client-transport|fetch|${...}${...}#1": {
-    "classification": "approved-adapter",
-    "owner": "Expo platform transport",
-    "rationale": "Mobile refresh-token storage/rotation adapter: native secure persistence, web CSRF and token renewal are platform-specific."
-  },
-  "frontend_mobile/utils/browserAuth.ts|direct-backend-route|fetch|${...}/users/csrf/#1": {
-    "classification": "approved-adapter",
-    "owner": "Expo platform transport",
-    "rationale": "Expo web-preview CSRF bootstrap; native mobile requests use bearer token."
-  },
-  "frontend_web/landing_next/lib/chemisttasker-api.ts|unresolved-client-transport|fetch|#1": {
-    "classification": "approved-adapter",
-    "owner": "Next/Vite platform transport",
-    "rationale": "Next browser fetch adapter injects CSRF/cookie credentials into named shared-core facade."
-  },
   "frontend_web/landing_next/lib/platform-proxy.ts|unresolved-client-transport|fetch|${...}/${...}${...}#1": {
     "classification": "approved-adapter",
     "owner": "Next/Vite platform transport",
@@ -79,22 +64,7 @@
     "owner": "Next/Vite platform transport",
     "rationale": "Next migrated Axios compatibility transport for legacy pages, not domain business logic."
   },
-  "frontend_web/landing_next/shared/browser-session.ts|direct-backend-route|fetch|${...}/users/csrf/#1": {
-    "classification": "approved-adapter",
-    "owner": "Next/Vite platform transport",
-    "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
-  },
-  "frontend_web/landing_next/shared/browser-session.ts|direct-backend-route|fetch|${...}/users/token/refresh/#1": {
-    "classification": "approved-adapter",
-    "owner": "Next/Vite platform transport",
-    "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
-  },
   "frontend_web/landing_next/shared/browser-session.ts|unresolved-client-transport|fetch|#1": {
-    "classification": "approved-adapter",
-    "owner": "Next/Vite platform transport",
-    "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
-  },
-  "frontend_web/landing_next/shared/browser-session.ts|direct-backend-route|fetch|${...}/users/logout/#1": {
     "classification": "approved-adapter",
     "owner": "Next/Vite platform transport",
     "rationale": "Browser-only cookie, CSRF, refresh and logout session lifecycle, platform-owned by design."
