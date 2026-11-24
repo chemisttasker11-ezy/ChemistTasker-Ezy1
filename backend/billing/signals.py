@@ -5,8 +5,8 @@ from .checkout_reservations import expire_payment_reservation, guard_fulfillment
 
 
 @receiver(before_fulfillment)
-def protect_reserved_fulfillment(sender, offer, checkout_id=None, **kwargs):
-    guard_fulfillment(offer=offer, checkout_id=checkout_id)
+def protect_reserved_fulfillment(sender, offer, checkout_id=None, payment_completed_at=None, **kwargs):
+    guard_fulfillment(offer=offer, checkout_id=checkout_id, payment_completed_at=payment_completed_at)
 
 
 @receiver(unpaid_offer_cancelled)

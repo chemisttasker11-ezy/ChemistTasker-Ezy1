@@ -239,6 +239,20 @@ def expire_checkout(attempt, *, recover=False):
         current.reservations.filter(active=True).update(active=False)
 
 
+def release_expired_offer(shift, offer):
+    """End an expired reservation and keep its original audience under the shift lock."""
+    offer.status = ShiftOffer.Status.EXPIRED
+    offer.save(update_fields=['status', 'updated_at'])
+    tiers = allowed_tiers(shift.pharmacy)
+    wider_tiers = tiers[resolve_current_index(shift, tiers) + 1:]
+    if wider_tiers:
+        Shift.objects.filter(pk=shift.pk).update(**{ESCALATION_FIELD_MAP[tier]: None for tier in wider_tiers})
+    recipients = {user.pk: user for user in [offer.user, *shift_manager_recipients(shift)]}
+    notify_shift_users(recipients.values(), shift=shift, title="Shift payment deadline passed",
+                       body="The payment deadline passed and the reservation was released.",
+                       kind="shift_payment_expired", payload={'offer_id': offer.pk}, deliver_on_commit=True)
+
+
 def expire_payment_reservation(shift_id, offer_id, *, now=None):
     """Release a due or AHPRA-declined offer and any unpaid checkout covering it."""
     now = now or timezone.now()
@@ -265,26 +279,15 @@ def expire_payment_reservation(shift_id, offer_id, *, now=None):
                 log.warning("Could not confirm expiry for checkout %s (%s); retaining its holds", attempt.pk, type(exc).__name__)
                 return
 
-        shift_updates = {}
         if not cancelled:
-            offer.status = ShiftOffer.Status.EXPIRED
-            offer.save(update_fields=['status', 'updated_at'])
-            tiers = allowed_tiers(shift.pharmacy)
-            wider_tiers = tiers[resolve_current_index(shift, tiers) + 1:]
-            shift_updates.update({ESCALATION_FIELD_MAP[tier]: None for tier in wider_tiers})
-            recipients = {user.pk: user for user in [offer.user, *shift_manager_recipients(shift)]}
-            notify_shift_users(recipients.values(), shift=shift, title="Shift payment deadline passed",
-                               body="The payment deadline passed and the unpaid reservation was released.",
-                               kind="shift_payment_expired", payload={'offer_id': offer.pk}, deliver_on_commit=True)
+            release_expired_offer(shift, offer)
 
         if shift.payment_status == 'PENDING' and not shift.offers.filter(
             status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
         ).exists():
             paid = (shift.offers.filter(status=ShiftOffer.Status.ACCEPTED).exists()
                     or shift.payments.filter(payment_type='fulfillment', status='paid').exists())
-            shift_updates['payment_status'] = 'PAID' if paid else 'NOT_REQUIRED'
-        if shift_updates:
-            Shift.objects.filter(pk=shift.pk).update(**shift_updates)
+            Shift.objects.filter(pk=shift.pk).update(payment_status='PAID' if paid else 'NOT_REQUIRED')
 
 
 # open_checkout may still reach the provider at 23 h and a session stays payable for 24 h (no expires_at is set).
@@ -311,10 +314,10 @@ def expire_unreconciled_checkout(attempt):
         current.reservations.update(active=False)
 
 
-def guard_fulfillment(*, offer, checkout_id=None):
+def guard_fulfillment(*, offer, checkout_id=None, payment_completed_at=None):
     """Called under the booking owner's shift lock, including free/pill booking."""
     if (checkout_id is None and offer.status == ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT
-            and offer.pay_by_at and offer.pay_by_at <= timezone.now()):
+            and offer.pay_by_at and offer.pay_by_at <= (payment_completed_at or timezone.now())):
         raise ValidationError({'code': 'payment_deadline_passed', 'detail': 'The payment deadline has passed.'})
     release_cancelled_paid_work(offer.shift_id)
     keys = occurrence_keys(offer)

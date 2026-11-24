@@ -31,11 +31,12 @@ class CheckoutReservationTests(TestCase):
         return client_for(actor or self.owner).post(reverse('api_v1:billing:expire_fulfillment_checkout',
                     args=[self.shift.pk, self.attempt().pk]), {}, format='json')
 
-    def pay(self, *, metadata=None, intent='pi_reserved', session_id='cs_test', currency='aud', amount=3000):
+    def pay(self, *, metadata=None, intent='pi_reserved', session_id='cs_test', currency='aud', amount=3000, completed_at=None):
         session = fixtures._StripeObject(id=session_id, mode='payment', payment_status='paid',
             amount_total=amount, currency=currency, payment_intent=intent,
             metadata=metadata if metadata is not None else self.attempt().parameters['metadata'])
         event = fixtures._StripeObject(id=f'evt_{intent}', type='checkout.session.completed',
+                                      created=int(completed_at.timestamp()) if completed_at is not None else None,
                                       data=fixtures._StripeObject(object=session))
         with (patch('billing.stripe_support.stripe.Webhook.construct_event', return_value=event),
               patch('shifts.emails.send_shift_payment_finalized_notifications'),
@@ -43,6 +44,26 @@ class CheckoutReservationTests(TestCase):
             response = client_for().post(reverse('api_v1:billing:stripe_webhook'), b'{}', content_type='application/json')
         self.assertEqual(response.status_code, 200, response.content)
         return alert
+
+    def test_late_paid_completion_needs_refund_before_expiry_job_runs(self):
+        self.assertEqual(self.charge().status_code, 200)
+        deadline = timezone.now() - timedelta(minutes=1)
+        ShiftOffer.objects.filter(pk=self.offer.pk).update(pay_by_at=deadline)
+        self.pay(completed_at=deadline + timedelta(seconds=5))
+        payment = ShiftPayment.objects.get()
+        self.assertTrue(payment.reconciliation_required)
+        self.assertEqual(payment.reconciliation_reason, 'payment_deadline_passed')
+        self.assertFalse(ShiftSlotAssignment.objects.filter(source_offer=self.offer).exists())
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, ShiftOffer.Status.EXPIRED)
+
+    def test_delayed_webhook_still_books_when_checkout_completed_in_time(self):
+        self.assertEqual(self.charge().status_code, 200)
+        deadline = timezone.now() - timedelta(minutes=1)
+        ShiftOffer.objects.filter(pk=self.offer.pk).update(pay_by_at=deadline)
+        self.pay(completed_at=deadline - timedelta(seconds=5))
+        self.assertFalse(ShiftPayment.objects.get().reconciliation_required)
+        self.assertTrue(ShiftSlotAssignment.objects.filter(source_offer=self.offer).exists())
 
     def test_unknown_provider_outcome_persists_reservation_and_retries_identical_parameters(self):
         def lost_ack(**kwargs):
