@@ -83,6 +83,7 @@ class User(AbstractUser):
     accepted_terms_at = models.DateTimeField(null=True, blank=True)
 
     mobile_number = models.CharField(max_length=20, blank=True, null=True)
+    pending_mobile_number = models.CharField(max_length=20, blank=True, null=True)
     mobile_otp_code = models.CharField(max_length=128, blank=True, null=True)
     mobile_otp_created_at = models.DateTimeField(blank=True, null=True)
     mobile_otp_failed_attempts = models.PositiveSmallIntegerField(default=0)

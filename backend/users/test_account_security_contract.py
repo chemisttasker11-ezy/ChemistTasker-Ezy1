@@ -320,8 +320,12 @@ class MobileOtpTests(TestCase):
         self.assertEqual((user.is_mobile_verified, user.mobile_otp_code, user.mobile_otp_failed_attempts), (True, None, 0))
 
         identity = {"first_name": user.first_name, "last_name": user.last_name, "username": user.username or "ann.lee"}
-        changed, _ = post(client, "mobile/request-otp/", {"mobile_number": "0499999999", **identity})
-        self.assertEqual(changed.data["mobile_number"], "Verified mobile number is locked and cannot be changed.")
+        with self.provider():
+            changed, _ = post(client, "mobile/request-otp/", {"mobile_number": "0499999999", **identity})
+        self.assertEqual(changed.status_code, 200)
+        user.refresh_from_db()
+        self.assertEqual((user.mobile_number, user.pending_mobile_number, user.is_mobile_verified),
+                         ("61412345678", "61499999999", True))
 
 
 class SessionTests(TestCase):

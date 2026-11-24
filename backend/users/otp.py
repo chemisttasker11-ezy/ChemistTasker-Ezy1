@@ -262,3 +262,50 @@ def correct_registration_email(*, email, new_email, correction_token, dispatch_e
         raise
 
     return None
+
+
+def verified_mobile_taken(user, number):
+    return User.objects.filter(mobile_number=number, is_mobile_verified=True).exclude(pk=user.pk).exists()
+
+
+def prepare_mobile_request(user, number):
+    """Choose the destination without replacing a verified mobile."""
+    if user.is_mobile_verified:
+        if len(number) != 11 or not number.startswith("614") or not number.isascii() or not number.isdigit():
+            return "Invalid Australian mobile number format"
+        if number == user.mobile_number:
+            return "Please provide a new mobile number."
+        if verified_mobile_taken(user, number):
+            return "This mobile number is already verified by another account."
+        user.pending_mobile_number = number
+    else:
+        user.mobile_number = number
+        user.pending_mobile_number = None
+    return None
+
+
+def confirm_mobile_otp(user_id, otp):
+    """Verify and update the mobile while holding the account row lock."""
+    with transaction.atomic():
+        user = User.objects.select_for_update().get(pk=user_id)
+        if not user.is_active:
+            return user, "disabled"
+        if user.mobile_otp_locked_until and timezone.now() < user.mobile_otp_locked_until:
+            return user, "locked"
+        if not valid_otp_format(otp):
+            return user, "format"
+        if not user.mobile_otp_created_at or timezone.now() - user.mobile_otp_created_at > timedelta(minutes=10):
+            return user, "expired"
+        if not otp_matches(otp, user.mobile_otp_code):
+            return user, "locked" if _register_mobile_otp_failure(user) else "invalid"
+        if user.pending_mobile_number and verified_mobile_taken(user, user.pending_mobile_number):
+            return user, "taken"
+        if user.pending_mobile_number:
+            user.mobile_number = user.pending_mobile_number
+            user.pending_mobile_number = None
+        user.is_mobile_verified = True
+        user.mobile_otp_code = None
+        user.mobile_otp_created_at = None
+        _reset_mobile_otp_security_state(user)
+        user.save(update_fields=["mobile_number", "pending_mobile_number", "is_mobile_verified", "mobile_otp_code", "mobile_otp_created_at", "mobile_otp_failed_attempts", "mobile_otp_locked_until"])
+        return user, "ok"

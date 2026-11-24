@@ -21,7 +21,7 @@ from datetime import timedelta
 from django.utils import timezone
 from requests.auth import HTTPBasicAuth
 from users.otp import _capture_mobile_identity, _clean_identity_value, _get_lockout_response, hash_otp, otp_matches, _register_email_otp_failure, _register_mobile_otp_failure, _reset_email_otp_security_state, _reset_mobile_otp_security_state, generate_otp, normalize_au_mobile, valid_otp_format
-from users.otp import EMAIL_OTP_STATE_FIELDS, correct_registration_email
+from users.otp import EMAIL_OTP_STATE_FIELDS, correct_registration_email, prepare_mobile_request, confirm_mobile_otp
 from users.sessions import (
     _build_authenticated_user_payload,
     _set_auth_cookies,
@@ -39,6 +39,7 @@ _MOBILE_OTP_STATE_FIELDS = (
     "last_name",
     "username",
     "mobile_number",
+    "pending_mobile_number",
     "mobile_otp_code",
     "mobile_otp_created_at",
     "is_mobile_verified",
@@ -365,16 +366,16 @@ class RequestMobileOTPView(APIView):
             return Response({"error": "Invalid Australian mobile number format"}, status=status.HTTP_400_BAD_REQUEST)
 
         previous_state = _snapshot_mobile_otp_state(user)
-        changed_identity_fields, identity_error = _capture_mobile_identity(user, request.data)
-        if identity_error is not None:
-            return identity_error
+        changed_identity_fields = []
+        if not user.is_mobile_verified:
+            changed_identity_fields, identity_error = _capture_mobile_identity(user, request.data)
+            if identity_error is not None:
+                return identity_error
 
-        existing_mobile = _clean_identity_value(user.mobile_number) or None
-        if user.is_mobile_verified and existing_mobile and normalized != existing_mobile:
-            return Response(
-                {"mobile_number": "Verified mobile number is locked and cannot be changed."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        existing_mobile = user.pending_mobile_number if user.is_mobile_verified else user.mobile_number
+        error = prepare_mobile_request(user, normalized)
+        if error:
+            return Response({"mobile_number": error}, status=status.HTTP_400_BAD_REQUEST)
 
         # 60-second cooldown to prevent spamming the same pending number.
         # Allow immediate correction when the pending number has not been verified yet.
@@ -392,13 +393,12 @@ class RequestMobileOTPView(APIView):
         otp_code = generate_otp()
         otp_hash = hash_otp(otp_code)
         generated_at = timezone.now()
-        user.mobile_number = normalized
         user.mobile_otp_code = otp_hash
         user.mobile_otp_created_at = generated_at
-        user.is_mobile_verified = False
         _reset_mobile_otp_security_state(user)
         update_fields = [
             "mobile_number",
+            "pending_mobile_number",
             "mobile_otp_code",
             "mobile_otp_created_at",
             "is_mobile_verified",
@@ -474,32 +474,19 @@ class VerifyMobileOTPView(APIView):
         user = request.user
         otp = request.data.get("otp")
 
-        if not user.is_active:
+        user, outcome = confirm_mobile_otp(user.pk, otp)
+        if outcome == "disabled":
             return Response({"detail": "Account is disabled."}, status=status.HTTP_403_FORBIDDEN)
-
-        if user.mobile_otp_locked_until and timezone.now() < user.mobile_otp_locked_until:
+        if outcome == "locked":
             return _get_lockout_response(user.mobile_otp_locked_until)
-
-        if not valid_otp_format(otp):
-            return Response({"error": "Invalid OTP format"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Enforce 10-minute expiry
-        if not user.mobile_otp_created_at or (timezone.now() - user.mobile_otp_created_at) > timedelta(minutes=10):
-            return Response({"error": "OTP has expired, please request a new one."},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        if not otp_matches(otp, user.mobile_otp_code):
-            just_locked = _register_mobile_otp_failure(user)
-            if just_locked:
-                return _get_lockout_response(user.mobile_otp_locked_until)
-            return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Success: mark verified, clear code & (optionally) timestamp
-        user.is_mobile_verified = True
-        user.mobile_otp_code = None
-        user.mobile_otp_created_at = None
-        _reset_mobile_otp_security_state(user)
-        user.save()
+        errors = {
+            "format": "Invalid OTP format",
+            "expired": "OTP has expired, please request a new one.",
+            "invalid": "Invalid OTP",
+            "taken": "This mobile number is already verified by another account.",
+        }
+        if outcome != "ok":
+            return Response({"error": errors[outcome]}, status=status.HTTP_400_BAD_REQUEST)
 
         tokens = reissue_session_tokens(request, user)
 
@@ -547,7 +534,6 @@ class ResendMobileOTPView(APIView):
         generated_at = timezone.now()
         user.mobile_otp_code = otp_hash
         user.mobile_otp_created_at = generated_at
-        user.is_mobile_verified = False
         _reset_mobile_otp_security_state(user)
         user.save(update_fields=[
             "mobile_otp_code",
@@ -570,7 +556,7 @@ class ResendMobileOTPView(APIView):
 
         delivered = _send_mobile_otp_sms(
             user_id=user.id,
-            mobile_number=user.mobile_number,
+            mobile_number=user.pending_mobile_number or user.mobile_number,
             otp_code=otp_code,
             action="resend",
         )
