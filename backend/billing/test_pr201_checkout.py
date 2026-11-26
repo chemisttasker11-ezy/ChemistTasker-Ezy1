@@ -3,15 +3,15 @@ from datetime import time
 from django.utils import timezone
 from unittest.mock import patch
 from django.test import TestCase
-from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_verified_pharmacist
 from shifts.models import Shift, ShiftOffer, ShiftSlot
 
 class FulfillmentSelectionTests(TestCase):
     def setUp(self):
         self.owner, pharmacy = make_owner_with_pharmacy("P6 checkout")
         self.shift = Shift.objects.create(pharmacy=pharmacy, created_by=self.owner, role_needed="PHARMACIST", employment_type="LOCUM")
-        self.worker1 = make_user("PHARMACIST")
-        self.worker2 = make_user("PHARMACIST")
+        self.worker1 = make_verified_pharmacist()
+        self.worker2 = make_verified_pharmacist()
         self.offers = [ShiftOffer.objects.create(shift=self.shift, slot=ShiftSlot.objects.create(shift=self.shift, date=timezone.localdate(), start_time=time(hour), end_time=time(hour + 2)), user=worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT) for worker, hour in ((self.worker1, 9), (self.worker2, 14))]
 
     def checkout(self, payload):

@@ -188,7 +188,12 @@ class MembershipInviteLinkViewSet(viewsets.ModelViewSet):
         data = request.data.copy()
         pharmacy_id = data.get('pharmacy')
         category = data.get('category')
-        days = int(data.get('expires_in_days') or 14)
+        try:
+            days = int(data.get('expires_in_days') or 14)
+        except (TypeError, ValueError):
+            days = 0
+        if days < 1:
+            return Response({'detail': 'expires_in_days must be a whole number of at least 1.'}, status=400)
 
         if not pharmacy_id or not category:
             return Response({'detail': 'pharmacy and category are required.'}, status=400)

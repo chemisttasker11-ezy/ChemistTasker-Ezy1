@@ -90,7 +90,7 @@ class CheckoutReservationTests(TestCase):
 
     def test_alternate_candidate_on_same_occurrence_is_reserved(self):
         self.assertEqual(self.charge().status_code, 200)
-        competitor = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+        competitor = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_verified_pharmacist(),
                                               status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
         self.assertEqual(self.charge(competitor).status_code, 409)
         self.checkout.assert_called_once()
@@ -214,6 +214,16 @@ class CheckoutReservationTests(TestCase):
         retrieve.assert_called_once_with('cs_test')
         self.assertEqual(self.attempt().state, FulfillmentCheckout.State.EXPIRED)
         self.assertFalse(FulfillmentReservation.objects.filter(active=True).exists())
+
+    @override_settings(AHPRA_ENFORCEMENT_ENABLED=True)
+    def test_checkout_rechecks_worker_credentials_before_payment(self):
+        from onboarding.models import PharmacistOnboarding
+
+        PharmacistOnboarding.objects.filter(user=self.worker).update(verified=False)
+        response = self.charge()
+        self.assertEqual((response.status_code, response.data.get('code')), (403, 'candidate_ahpra_ineligible'))
+        self.checkout.assert_not_called()
+        self.assertFalse(FulfillmentCheckout.objects.exists())
 
     @override_settings(AHPRA_ENFORCEMENT_ENABLED=True)
     def test_ahpra_cancellation_expires_unpaid_checkout_and_releases_its_hold(self):
@@ -405,7 +415,7 @@ class CheckoutReservationTests(TestCase):
         for work_date, expected in ((kept, 409), (cancelled, 200)):
             with self.subTest(work_date=work_date):
                 replacement = ShiftOffer.objects.create(
-                    shift=self.shift, slot=self.slot, offered_slot_date=work_date, user=make_user('PHARMACIST'),
+                    shift=self.shift, slot=self.slot, offered_slot_date=work_date, user=make_verified_pharmacist(),
                     status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
                 self.assertEqual(self.charge(replacement).status_code, expected)
 
@@ -422,7 +432,7 @@ class CheckoutReservationTests(TestCase):
         ShiftOffer.objects.filter(pk=self.offer.pk).update(status=ShiftOffer.Status.DECLINED)
         release_cancelled_paid_work(self.shift.pk)
         self.assertFalse(FulfillmentReservation.objects.filter(active=True).exists())
-        replacement = ShiftOffer.objects.create(shift=self.shift, user=make_user('PHARMACIST'),
+        replacement = ShiftOffer.objects.create(shift=self.shift, user=make_verified_pharmacist(),
                                                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
         self.checkout.return_value = fixtures._StripeObject(id='cs_replacement', url='https://checkout.example.test/new')
         self.assertEqual(self.charge(replacement).status_code, 200)  # Released paid work no longer blocks.
@@ -513,7 +523,7 @@ class CheckoutReservationTests(TestCase):
 
     def test_changed_worker_after_checkout_cannot_redirect_paid_booking(self):
         self.charge()
-        self.offer.user = make_user('PHARMACIST')
+        self.offer.user = make_verified_pharmacist()
         self.offer.save(update_fields=['user'])
         self.pay()
         self.assertTrue(ShiftPayment.objects.get().reconciliation_required)
@@ -650,7 +660,7 @@ class CheckoutReconciliationAdminTests(TestCase):
         self.assertFalse(ShiftPayment.objects.get().reconciliation_required)
 
     def test_paid_unexpirable_orphan_never_books_work_a_replacement_reserved_first(self):
-        replacement = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+        replacement = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_verified_pharmacist(),
                                                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
 
         def replacement_reserves():
@@ -670,7 +680,7 @@ class CheckoutReconciliationAdminTests(TestCase):
         self.assertEqual((attempt.state, attempt.stripe_session_id, attempt.checkout_url),
                          (FulfillmentCheckout.State.UNKNOWN, 'cs_orphan', ''))
         self.assertTrue(attempt.reservations.filter(active=True).exists(), 'The possibly payable orphan owns its work again')
-        replacement = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+        replacement = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_verified_pharmacist(),
                                                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
         self.checkout.side_effect = None
         self.assertEqual(self.charge(replacement).status_code, 409)

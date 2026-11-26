@@ -10,7 +10,7 @@ from .models import ShiftPayment
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from client_profile.models import Pharmacy, Shift
-from client_profile.characterization_support import client_for, make_owner_with_pharmacy
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_verified_pharmacist
 
 
 class _StripeObject(dict):
@@ -390,7 +390,7 @@ class OrganizationBillingScopeTests(TestCase):
             payment_status='PENDING',
         )
         offer = ShiftOffer.objects.create(
-            shift=shift, user=self.unrelated, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            shift=shift, user=make_verified_pharmacist(), status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
         )
         client = APIClient()
         client.force_authenticate(self.chief)
