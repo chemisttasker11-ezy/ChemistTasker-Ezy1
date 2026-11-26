@@ -239,7 +239,19 @@ class PharmacyViewSet(viewsets.ModelViewSet):
             )
 
     def perform_update(self, serializer):
-        super().perform_update(serializer)
+        with transaction.atomic():
+            pharmacy = Pharmacy.objects.select_for_update(no_key=True).get(pk=serializer.instance.pk)
+            self.check_object_permissions(self.request, pharmacy)
+            pharmacy_features().preserve_pharmacy_bookings(pharmacy, serializer.validated_data)
+            serializer.instance = pharmacy
+            serializer.save()
+
+    @action(detail=True, methods=['get'], url_path='booking-impact')
+    def booking_impact(self, request, pk=None):
+        pharmacy = self.get_object()
+        if not user_can_edit_pharmacy_record(request.user, pharmacy):
+            self.permission_denied(request)
+        return Response({'bookings': pharmacy_features().pharmacy_booking_impact(pharmacy)})
 
     @action(detail=False, methods=['post'], url_path='lookup-abn')
     def lookup_abn(self, request):

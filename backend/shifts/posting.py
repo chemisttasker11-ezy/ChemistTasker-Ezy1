@@ -13,11 +13,13 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from shifts.announcements import announce_availability_matches, announce_posted_shift
-from shifts.assignment import offer_dedicated_shift
+from shifts.assignment import check_shift_offer_credentials, offer_dedicated_shift
+from shifts.booking import lock_booking_profiles
 from shifts.emails import send_shift_updated_notifications
-from shifts.escalation import ESCALATION_FIELD_MAP
+from shifts.escalation import ESCALATION_FIELD_MAP, allowed_tiers as pharmacy_allowed_tiers, validate_visibility
 from shifts.limits import enforce_public_shift_daily_limit
 from shifts.models import Shift, ShiftOffer, ShiftSlot
+from shifts.notifications import notify_worker_credentials
 from organizations.timezone import get_pharmacy_timezone
 
 
@@ -63,6 +65,13 @@ def normalize_slots_payload(slots_data):
     return normalized
 
 
+def validate_posted_rates(rate_type, fixed_rate, employment_type, slots_data):
+    if rate_type == 'FIXED' and (fixed_rate is None or (employment_type == 'LOCUM' and Decimal(str(fixed_rate)) <= 0)):
+        raise serializers.ValidationError({'fixed_rate': 'A valid fixed rate is required.'})
+    if employment_type == 'LOCUM' and any(slot.get('rate') is not None and Decimal(str(slot['rate'])) <= 0 for slot in slots_data):
+        raise serializers.ValidationError({'slots': 'A slot rate must be greater than zero.'})
+
+
 def validate_posting_window(pharmacy, slots_data):
     today = timezone.now().astimezone(get_pharmacy_timezone(pharmacy)).date()
     year, month = divmod(today.year * 12 + today.month - 1 + 4, 12)
@@ -103,11 +112,13 @@ def post_shift(
     employment_type = validated_data.get('employment_type')
 
     # Default fixed_rate from pharmacy defaults when rate_type=FIXED and not provided
-    if rate_type == 'FIXED' and not validated_data.get('fixed_rate'):
+    if rate_type == 'FIXED' and validated_data.get('fixed_rate') is None:
         default_fixed = getattr(pharmacy, 'default_fixed_rate', None)
         weekday_rate = getattr(pharmacy, 'rate_weekday', None)
         slot_rate = next((slot.get('rate') for slot in slots_data if slot.get('rate') is not None), None)
-        validated_data['fixed_rate'] = default_fixed or weekday_rate or slot_rate or Decimal('0.00')
+        validated_data['fixed_rate'] = default_fixed or weekday_rate or slot_rate
+
+    validate_posted_rates(rate_type, validated_data.get('fixed_rate'), employment_type, slots_data)
 
     # Default flexible timing for FT/PT if not provided
     if employment_type in ['FULL_TIME', 'PART_TIME'] and 'flexible_timing' not in validated_data:
@@ -135,6 +146,9 @@ def post_shift(
 
     with transaction.atomic():
         shift = Shift.objects.create(**validated_data)
+        dedicated_user = getattr(shift, 'dedicated_user', None)
+        if dedicated_user:
+            lock_booking_profiles([dedicated_user])
         for slot in slots_data:
             ShiftSlot.objects.create(shift=shift, **slot)
         # Announcements cannot undo a committed shift or suppress the next independent callback.
@@ -156,9 +170,10 @@ def post_shift(
                 request_data=rate_request_data,
             )
 
-        dedicated_user = getattr(shift, 'dedicated_user', None)
         if dedicated_user:
+            credentials = check_shift_offer_credentials(dedicated_user, shift, manager=True)
             offer_dedicated_shift(shift, dedicated_user)
+            notify_worker_credentials(shift, dedicated_user, credentials)
 
     return shift
 
@@ -167,24 +182,21 @@ def revise_shift(
     instance,
     validated_data,
     *,
-    allowed_tiers=None,
     slots_payload=None,
     rate_request_data=None,
     apply_rates_to_pharmacy=False,
 ):
-    """Apply a validated edit: recalculate the escalation level when the visibility changes (`allowed_tiers` must
-    contain it), replace the slots when `slots_payload` is given, optionally copy the rates to the pharmacy, and
+    """Apply a validated edit: recalculate the escalation level using the resulting pharmacy when needed,
+    replace the slots when `slots_payload` is given, optionally copy the rates to the pharmacy, and
     announce the update after commit."""
     # Validate the new slots before changing anything, and apply the whole edit atomically.
     protect_direct_booking(validated_data, instance=instance)
-    if 'visibility' in validated_data and allowed_tiers is None:
-        from shifts.escalation import allowed_tiers as pharmacy_allowed_tiers
-        allowed_tiers = pharmacy_allowed_tiers(instance.pharmacy)
     slots_data = normalize_slots_payload(slots_payload) if slots_payload is not None else None
     with transaction.atomic():
         instance = Shift.objects.select_for_update().get(pk=instance.pk)
         target = validated_data.get('pharmacy')
-        if target is not None and target.pk != instance.pharmacy_id and (
+        moving = target is not None and target.pk != instance.pharmacy_id
+        if moving and (
             instance.slot_assignments.exists()
             or instance.offers.filter(status__in=[
                 ShiftOffer.Status.ACCEPTED, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -226,9 +238,17 @@ def revise_shift(
                     else:
                         changed_dates.append({'date': value})
             validate_posting_window(target or instance.pharmacy, changed_dates)
-        # If visibility is changing, recalc escalation_level
-        if 'visibility' in validated_data:
-            new_vis = validated_data['visibility']
+        validate_posted_rates(
+            validated_data.get('rate_type', instance.rate_type),
+            validated_data.get('fixed_rate', instance.fixed_rate),
+            validated_data.get('employment_type', instance.employment_type),
+            slots_data if slots_data is not None else instance.slots.values('rate'),
+        )
+        new_vis = validated_data.get('visibility', instance.visibility)
+        if moving or new_vis != instance.visibility:
+            pharmacy = target if moving else instance.pharmacy
+            allowed_tiers = pharmacy_allowed_tiers(pharmacy)
+            validate_visibility(pharmacy, new_vis, allowed_tiers)
             target_index = allowed_tiers.index(new_vis)
             instance.escalation_level = target_index
             if new_vis == 'PLATFORM' and not validated_data.get('escalate_to_platform') and not instance.escalate_to_platform:

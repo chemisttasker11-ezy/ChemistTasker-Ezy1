@@ -29,23 +29,32 @@ def _changed_graph():
     raise ValidationError("The roster changed while acquiring locks. Refresh and retry the edit.")
 
 
-def lock_roster_shifts(shift_ids):
-    """Call inside the roster transaction, after its period and worker locks.
-
-    A booking can hold Shift while its synchronous revision signal needs our
-    period. Refuse that contention immediately so neither transaction deadlocks.
-    """
+def _lock_without_waiting(rows):
+    """A booking can hold these rows while it needs our period. Refuse that contention so neither side deadlocks."""
     try:
         with transaction.atomic():
-            return list(
-                Shift.objects.select_for_update(nowait=True, of=("self",))
-                .select_related("pharmacy").filter(pk__in=shift_ids).order_by("pk")
-            )
+            return list(rows)
     except OperationalError as exc:
         cause = exc.__cause__ or exc
         if (getattr(cause, "sqlstate", None) or getattr(cause, "pgcode", None)) != "55P03":
             raise
         raise ValidationError("A shift is being booked or edited. Refresh and retry the roster change.") from exc
+
+
+def lock_roster_workers(worker_ids):
+    """Call inside the roster transaction, after its period lock."""
+    # NO KEY UPDATE conflicts with bookings and other roster edits, not with rows that only reference the worker.
+    return _lock_without_waiting(
+        User.objects.select_for_update(nowait=True, no_key=True).filter(pk__in=worker_ids).order_by("pk")
+    )
+
+
+def lock_roster_shifts(shift_ids):
+    """Call inside the roster transaction, after its period and worker locks."""
+    return _lock_without_waiting(
+        Shift.objects.select_for_update(nowait=True, of=("self",))
+        .select_related("pharmacy").filter(pk__in=shift_ids).order_by("pk")
+    )
 
 
 @contextmanager
@@ -78,10 +87,7 @@ def locked_roster_slots(shift_id, user, *, target_dates=None, extra_worker_ids=(
             RosterPeriod.objects.select_for_update().filter(period_query).order_by("pk")
         }
         worker_ids = {row["user_id"] for row in initial_assignments} | set(extra_worker_ids)
-        workers = {
-            worker.pk: worker for worker in
-            User.objects.select_for_update().filter(pk__in=worker_ids).order_by("pk")
-        }
+        workers = {worker.pk: worker for worker in lock_roster_workers(worker_ids)}
         shifts = lock_roster_shifts([shift_id])
         shift = shifts[0] if shifts else None
         if shift is None or shift.pharmacy_id != initial_shift.pharmacy_id:

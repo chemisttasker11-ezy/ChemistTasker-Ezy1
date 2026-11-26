@@ -10,7 +10,7 @@ from .models import ShiftPayment
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from client_profile.models import Pharmacy, Shift
-from client_profile.characterization_support import client_for, make_owner_with_pharmacy
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_verified_pharmacist
 
 
 class _StripeObject(dict):
@@ -134,11 +134,11 @@ class StripeWebhookIdempotencyTests(TestCase):
 class ShiftFulfillmentCheckoutTests(TestCase):
     def setUp(self):
         from datetime import time
-        from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
+        from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_verified_pharmacist
         from shifts.models import ShiftOffer, ShiftSlot
 
         self.owner, self.pharmacy = make_owner_with_pharmacy('Checkout pharmacy')
-        self.worker = make_user('PHARMACIST')
+        self.worker = make_verified_pharmacist()
         self.client = client_for(self.owner)
         self.shift = Shift.objects.create(
             pharmacy=self.pharmacy, created_by=self.owner, role_needed='PHARMACIST',
@@ -390,7 +390,7 @@ class OrganizationBillingScopeTests(TestCase):
             payment_status='PENDING',
         )
         offer = ShiftOffer.objects.create(
-            shift=shift, user=self.unrelated, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
+            shift=shift, user=make_verified_pharmacist(), status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
         )
         client = APIClient()
         client.force_authenticate(self.chief)
@@ -598,7 +598,6 @@ class PaymentWebhookCommitContracts(TestCase):
 @override_settings(STRIPE_WEBHOOK_SECRET="whsec-lost-occurrence")
 class PaidOfferLosingOccurrenceContracts(TestCase):
     def setUp(self):
-        from client_profile.characterization_support import make_user
         from shifts.models import ShiftSlot
         self.owner, pharmacy = make_owner_with_pharmacy("Lost occurrence")
         self.day = timezone.localdate() + timedelta(days=3)
@@ -610,11 +609,11 @@ class PaidOfferLosingOccurrenceContracts(TestCase):
             shift=self.shift, date=self.day, start_time=time(9), end_time=time(17), rate=Decimal("70"),
             is_recurring=True, recurring_days=list(range(7)), recurring_end_date=self.day + timedelta(days=7),
         )
-        self.make_user = make_user
 
     def offer(self, status, day):
+        from client_profile.characterization_support import make_verified_pharmacist
         from shifts.models import ShiftOffer
-        return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=self.make_user("PHARMACIST"),
+        return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_verified_pharmacist(),
                                          status=status, offered_slot_date=day)
 
     def pay(self, offer, intent, event_id=None, real_notifications=False, before_commit=None):

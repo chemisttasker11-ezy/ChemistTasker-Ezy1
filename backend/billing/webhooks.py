@@ -29,7 +29,7 @@ def _process_stripe_event(event):
         if session.mode == 'subscription':
             handle_subscription_checkout(session, metadata, subscription_kind)
         elif session.mode == 'payment' and session.payment_status == 'paid':
-            return handle_payment_checkout(session, metadata)
+            return handle_payment_checkout(session, metadata, completed_at=event.get('created'))
     elif event.type == 'customer.subscription.updated':
         handle_subscription_updated(event)
     elif event.type == 'invoice.paid':

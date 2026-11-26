@@ -682,6 +682,7 @@ export interface ShiftSlotApi {
 
 export interface ShiftUserApi {
     id: number;
+    booking_documents_url?: string;
     first_name?: string | null;
     last_name?: string | null;
     email?: string | null;

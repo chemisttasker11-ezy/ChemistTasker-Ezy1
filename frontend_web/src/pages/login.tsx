@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { API_BASE_URL } from '../constants/api';
-import { browserLoginSession } from '@chemisttasker/shared-core';
+import { browserLoginSession, SESSION_ENDED_MESSAGE } from '@chemisttasker/shared-core';
 import { hasOrganizationAccess } from '@chemisttasker/shared-core';
 import { useAuth } from '../contexts/AuthContext';
 import AuthLayout from '../layouts/AuthLayout';
@@ -23,7 +23,7 @@ import PublicLogoTopBar from '../components/PublicLogoTopBar';
 import { resolveDashboardPath } from '../utils/dashboardPath';
 import { getOwnerSetupStatus } from '../utils/ownerSetup';
 import { setRobotsMeta } from '../utils/seo';
-import { safeNext, rememberDestination } from '../../landing_next/shared/browser-session';
+import { returnDestination, rememberDestination, finishDestination } from '../../landing_next/shared/browser-session';
 
 const PERSONA_KEY_PREFIX = 'ct-active-persona';
 
@@ -70,17 +70,18 @@ export default function Login() {
       if (userInfo?.id != null) localStorage.removeItem(`${PERSONA_KEY_PREFIX}:${userInfo.id}`);
       login(access, refresh || '', userInfo, rememberMe);
 
+      const requestedNext = returnDestination();
       if (!userInfo?.is_mobile_verified && !userInfo?.mobile_check_skipped) {
-        rememberDestination(new URLSearchParams(location.search).get('next'));
+        rememberDestination(requestedNext);
         navigate('/mobile-verify');
         return;
       }
 
       // Keep existing verification and owner-onboarding gates before
       // honoring a public QR return path supplied via ?next=.
-      const requestedNext = safeNext(new URLSearchParams(location.search).get('next'));
       if (hasOrganizationAccess(userInfo) && !['OWNER', 'PHARMACIST', 'OTHER_STAFF', 'EXPLORER'].includes(userInfo.role)) {
-        navigate(requestedNext || '/dashboard/organization/overview');
+        if (requestedNext) finishDestination(requestedNext, navigate);
+        else navigate('/dashboard/organization/overview');
         return;
       }
 
@@ -92,7 +93,8 @@ export default function Login() {
         }
       }
 
-      navigate(requestedNext || resolveDashboardPath(userInfo.role));
+      if (requestedNext) finishDestination(requestedNext, navigate);
+      else navigate(resolveDashboardPath(userInfo.role));
     } catch (err) {
       if (err && typeof err === 'object' && 'status' in err) {
         const status = Number((err as any).status);
@@ -129,6 +131,9 @@ export default function Login() {
     <>
       <PublicLogoTopBar />
       <AuthLayout title="Welcome Back">
+        {new URLSearchParams(location.search).get('sessionEnded') === '1' && (
+          <Alert severity="info" sx={{ mb: 2 }}>{SESSION_ENDED_MESSAGE}</Alert>
+        )}
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}

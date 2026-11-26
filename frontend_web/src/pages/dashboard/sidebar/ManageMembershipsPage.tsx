@@ -50,6 +50,7 @@ type Membership = {
   admin_capabilities?: string[];
   capabilities?: string[];
   status: "PENDING" | "ACCEPTED" | "REJECTED" | "LEFT";
+  expired_invite_application_token?: string | null;
   created_at: string;
   pharmacy_detail?: {
     id: number;
@@ -229,6 +230,7 @@ export default function ManageMembershipsPage() {
         <Stack spacing={1.5} aria-busy={loading}>
           {sorted.map((membership) => {
             const pharmacy = membership.pharmacy_detail;
+            const applicationToken = membership.expired_invite_application_token;
             const status = STATUS[membership.status] ?? STATUS.LEFT;
             const isPending = membership.status === "PENDING";
             const isAccepted = membership.status === "ACCEPTED";
@@ -243,7 +245,7 @@ export default function ManageMembershipsPage() {
                     <Box sx={{ minWidth: 0 }}>
                       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                         <Typography component="h2" sx={nameSx}>{pharmacy?.name || "Pharmacy"}</Typography>
-                        <Pill tone={status.tone} label={status.label} title={status.hint} />
+                        <Pill tone={status.tone} label={applicationToken ? "Expired" : status.label} title={applicationToken ? undefined : status.hint} />
                       </Stack>
                       <Typography sx={{ ...metaSx, color: "text.primary" }}>
                         {membership.is_pharmacy_admin
@@ -260,7 +262,12 @@ export default function ManageMembershipsPage() {
                   </Stack>
 
                   <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap flexShrink={0}>
-                    {isPending && !hasAdminInvitation && (
+                    {applicationToken && (
+                      <Button variant="contained" href={`/membership/apply/${encodeURIComponent(applicationToken)}`} sx={{ minHeight: 44 }}>
+                        Apply to join
+                      </Button>
+                    )}
+                    {isPending && !applicationToken && !hasAdminInvitation && (
                       <>
                         <Button variant="contained" startIcon={busyIcon(busy, <Check size={18} />)} disabled={busy} onClick={() => runAction(membership, "accept")} sx={{ minHeight: 44 }}>
                           Accept

@@ -174,7 +174,7 @@ class WorkforceTimezoneResolutionTests(TestCase):
         )
         # Simulate the pre-deployment Sydney fallback for a QLD store with no explicit zone.
         with patch("workforce.timesheet_core.get_pharmacy_timezone", return_value=old_zone), patch(
-            "workforce.roster.validation.get_pharmacy_timezone", return_value=old_zone,
+            "workforce.roster.validation.get_booking_timezone", return_value=old_zone,
         ):
             first = build_timesheet(self.timesheet.pk)
         approve_timesheet(self.timesheet, self.owner, first.revision_number)

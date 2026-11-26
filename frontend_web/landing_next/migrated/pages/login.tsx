@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { API_BASE_URL } from '../constants/api';
-import { browserLoginSession } from '@chemisttasker/shared-core';
+import { browserLoginSession, SESSION_ENDED_MESSAGE } from '@chemisttasker/shared-core';
 import { ORG_ROLES } from '../constants/roles';
 import { useAuth } from '../contexts/AuthContext';
 import AuthLayout from '../layouts/AuthLayout';
@@ -114,11 +114,6 @@ export default function Login() {
           })
         : false;
 
-      if (isOrgMember || ORG_ROLES.includes(String(userInfo?.role || '').toUpperCase() as any)) {
-        navigate('/dashboard/organization/overview');
-        return;
-      }
-
       if (userInfo?.role === 'OWNER') {
         const ownerSetup = await getOwnerSetupStatus(userInfo);
         if (ownerSetup.nextPath) {
@@ -129,6 +124,10 @@ export default function Login() {
       if (destination) {
         rememberDestination(destination);
         finishDestination(destination);
+        return;
+      }
+      if (isOrgMember || ORG_ROLES.includes(String(userInfo?.role || '').toUpperCase() as any)) {
+        navigate('/dashboard/organization/overview');
         return;
       }
 
@@ -213,6 +212,9 @@ export default function Login() {
     <>
       <PublicLogoTopBar />
       <AuthLayout title="Welcome Back">
+        {new URLSearchParams(location.search).get('sessionEnded') === '1' && (
+          <Alert severity="info" sx={{ mb: 2 }}>{SESSION_ENDED_MESSAGE}</Alert>
+        )}
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}

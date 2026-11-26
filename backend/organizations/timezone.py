@@ -26,7 +26,19 @@ _STATE_TIMEZONES: dict[str, str] = {
 
 def get_pharmacy_timezone(pharmacy) -> ZoneInfo:
     """Resolve an explicit zone, then postcode/state, then settings.TIME_ZONE without saving it."""
-    raw_tz = getattr(pharmacy, "timezone", None)
+    return _resolve_timezone(
+        getattr(pharmacy, "timezone", None), getattr(pharmacy, "postcode", None), getattr(pharmacy, "state", None),
+    )
+
+
+def get_booking_timezone(pharmacy, terms) -> ZoneInfo:
+    site = (terms or {}).get("booking_site")
+    if site:
+        return _resolve_timezone(site.get("timezone"), site.get("postcode"), site.get("state"))
+    return get_pharmacy_timezone(pharmacy)
+
+
+def _resolve_timezone(raw_tz, raw_postcode, raw_state) -> ZoneInfo:
     tz_name = str(raw_tz).strip() if raw_tz is not None else ""
     if tz_name:
         try:
@@ -34,12 +46,10 @@ def get_pharmacy_timezone(pharmacy) -> ZoneInfo:
         except (ValueError, ZoneInfoNotFoundError):
             pass
 
-    raw_postcode = getattr(pharmacy, "postcode", None)
     postcode = str(raw_postcode).strip() if raw_postcode is not None else ""
     if postcode == "2880":
         return ZoneInfo("Australia/Broken_Hill")
 
-    raw_state = getattr(pharmacy, "state", None)
     if raw_state is not None:
         normalized_state = " ".join(str(raw_state).split()).upper()
         state_tz = _STATE_TIMEZONES.get(normalized_state)

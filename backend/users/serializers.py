@@ -1,7 +1,6 @@
 from users.feature_port import user_features
 from access_control.admin_roles import validate_admin_user_for_api
 # users/serializers.py
-from users.membership_port import membership_services
 from users.organization_port import organization_reads
 from users.organization_fields import OrganizationPrimaryKeyField, PharmacyPrimaryKeyField
 
@@ -10,13 +9,10 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
-from users.tokens import RefreshToken
-from rest_framework_simplejwt.exceptions import TokenError
-from django.conf import settings
-from .models import OrganizationMembership, ContactMessage, RevokedSession
-import secrets
-from datetime import datetime, timezone as dt_timezone
+from rest_framework_simplejwt.serializers import PasswordField
+from users.sessions import is_web_client
+from .models import OrganizationMembership, ContactMessage
+from users.otp import generate_otp, registration_correction_token
 from django.utils import timezone
 from .org_roles import (
     ADMIN_LEVEL_DEFINITIONS,
@@ -85,6 +81,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True)
     accepted_terms = serializers.BooleanField(write_only=True)
+    correction_token = serializers.SerializerMethodField()
     referral_code = serializers.CharField(required=False, allow_blank=True, write_only=True)
     referral_shift_id = serializers.IntegerField(required=False, write_only=True)
     referral_event_id = serializers.IntegerField(required=False, write_only=True)
@@ -100,12 +97,16 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'confirm_password',
             'role',
             'accepted_terms',
+            'correction_token',
             'referral_code',
             'referral_shift_id',
             'referral_event_id',
             'newcomer_type',
             'date_of_birth',
         ]
+
+    def get_correction_token(self, user):
+        return registration_correction_token(user)
 
     def validate(self, attrs):
         if attrs.get('password') != attrs.pop('confirm_password'):
@@ -176,7 +177,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         user.save()
 
         # ---- OTP verification ----
-        otp = str(secrets.randbelow(900000) + 100000)
+        otp = generate_otp()
         user.otp_code = make_password(otp)
         user.otp_created_at = timezone.now()
         user.is_otp_verified = False
@@ -340,216 +341,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'role', 'memberships']
         read_only_fields = fields
 
-class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    token_class = RefreshToken
+class CustomTokenObtainPairSerializer(serializers.Serializer):
+    email = serializers.CharField(write_only=True)
+    password = PasswordField()
     remember_me = serializers.BooleanField(write_only=True, required=False)
+    device_name = serializers.CharField(required=False, allow_blank=True)
+    trusted_device_token = serializers.CharField(required=False, allow_blank=True, max_length=1024)
 
-    def validate(self, attrs):
-        remember_me = attrs.pop('remember_me', None)
-        data = super().validate(attrs)
+    def get_fields(self):
+        fields = super().get_fields()
+        if not is_web_client(self.context.get('request')):
+            fields.pop('remember_me')
+        return fields
 
-        user = self.user
-        if not user.is_otp_verified:
-            from rest_framework.exceptions import AuthenticationFailed
-            raise AuthenticationFailed("Please verify your email address (check your inbox for your OTP code).")
-
-        if remember_me is False:
-            refresh = RefreshToken(data['refresh'])
-            refresh['remember_me'] = False
-            data['refresh'] = str(refresh)
-        if remember_me is True:
-            refresh = RefreshToken(data['refresh'])
-            refresh['remember_me'] = True
-            refresh.set_exp(from_time=datetime.fromtimestamp(refresh['iat'], dt_timezone.utc), lifetime=settings.JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME)
-            data['refresh'] = str(refresh)
-            data['access'] = str(refresh.access_token)
-
-        # 1) Organization memberships
-        org_memberships = OrganizationMembership.objects.filter(user=self.user)
-        org_payload = serialize_org_memberships(org_memberships)
-
-        # 2) Pharmacy memberships
-        pharm_memberships = membership_services().accepted_for_user(self.user)
-
-        pharm_payload = [
-            {
-                'id':            pm.id,
-                'pharmacy_id':   pm.pharmacy_id,
-                'pharmacy_name': pm.pharmacy.name if pm.pharmacy else None,
-                'role':          pm.role,
-                'employment_type': pm.employment_type,
-            }
-            for pm in pharm_memberships
-        ]
-
-        owned_pharmacies = organization_reads().owned_pharmacies(self.user)
-        owned_payload = [
-            {
-                'pharmacy_id':   pharmacy.id,
-                'pharmacy_name': pharmacy.name,
-                'role':          'OWNER',
-            }
-            for pharmacy in owned_pharmacies
-        ]
-
-        pharmacy_map = {entry['pharmacy_id']: entry for entry in pharm_payload}
-        for entry in owned_payload:
-            pharmacy_map[entry['pharmacy_id']] = entry
-
-        combined_pharm_payload = list(pharmacy_map.values())
-
-        admin_assignments = organization_reads().admin_assignments_for(self.user).select_related("pharmacy")
-        admin_payload = [
-            {
-                'id': assignment.id,
-                'pharmacy_id': assignment.pharmacy_id,
-                'pharmacy_name': assignment.pharmacy.name if assignment.pharmacy else None,
-                'admin_level': assignment.admin_level,
-                'capabilities': sorted(list(assignment.capabilities)),
-                'staff_role': assignment.staff_role,
-                'job_title': assignment.job_title,
-                'is_active': assignment.is_active,
-            }
-            for assignment in admin_assignments
-        ]
-
-        # 3) Combined user payload (+ is_mobile_verified added)
-        is_billing_active = user_features().is_billing_active
-        is_in_free_trial = user_features().is_in_free_trial
-        from onboarding.services.work_profile import newcomer_type as current_newcomer_type
-        data['user'] = {
-            'id':       self.user.id,
-            'username': self.user.username,
-            'email':    self.user.email,
-            'first_name': self.user.first_name,
-            'last_name': self.user.last_name,
-            'role':     self.user.role,
-            'mobile_number': self.user.mobile_number,
-            'memberships': org_payload + combined_pharm_payload,
-            'admin_assignments': admin_payload,
-            'is_pharmacy_admin': bool(admin_payload),
-            'is_mobile_verified': bool(getattr(self.user, 'is_mobile_verified', False)),
-            'mobile_check_skipped': bool(getattr(self.user, 'mobile_check_skipped', False)),
-            'newcomer_type': current_newcomer_type(self.user),
-            'billing_active': is_billing_active(),
-            'in_free_trial': is_in_free_trial(self.user),
-        }
-        return data
-
-class CustomTokenRefreshSerializer(TokenRefreshSerializer):
-    token_class = RefreshToken
-    def _populate_user_payload(self, data, user):
-        try:
-            org_memberships = OrganizationMembership.objects.filter(user=user)
-            org_payload = serialize_org_memberships(org_memberships)
-
-            pharm_memberships = membership_services().accepted_for_user(user)
-
-            pharm_payload = [
-                {
-                    'id': pm.id,
-                    'pharmacy_id': pm.pharmacy_id,
-                    'pharmacy_name': pm.pharmacy.name if pm.pharmacy else None,
-                    'role': pm.role,
-                    'employment_type': pm.employment_type,
-                }
-                for pm in pharm_memberships
-            ]
-
-            owned_pharmacies = organization_reads().owned_pharmacies(user)
-            owned_payload = [
-                {
-                    'pharmacy_id': pharmacy.id,
-                    'pharmacy_name': pharmacy.name,
-                    'role': 'OWNER',
-                }
-                for pharmacy in owned_pharmacies
-            ]
-
-            pharmacy_map = {entry['pharmacy_id']: entry for entry in pharm_payload}
-            for entry in owned_payload:
-                pharmacy_map[entry['pharmacy_id']] = entry
-
-            combined_pharm_payload = list(pharmacy_map.values())
-
-            admin_assignments = organization_reads().admin_assignments_for(user).select_related("pharmacy")
-            admin_payload = [
-                {
-                    'id': assignment.id,
-                    'pharmacy_id': assignment.pharmacy_id,
-                    'pharmacy_name': assignment.pharmacy.name if assignment.pharmacy else None,
-                    'admin_level': assignment.admin_level,
-                    'capabilities': sorted(list(assignment.capabilities)),
-                    'staff_role': assignment.staff_role,
-                    'job_title': assignment.job_title,
-                    'is_active': assignment.is_active,
-                }
-                for assignment in admin_assignments
-            ]
-
-            is_billing_active = user_features().is_billing_active
-            is_in_free_trial = user_features().is_in_free_trial
-            from onboarding.services.work_profile import newcomer_type as current_newcomer_type
-            data['user'] = {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'role': user.role,
-                'mobile_number': user.mobile_number,
-                'memberships': org_payload + combined_pharm_payload,
-                'admin_assignments': admin_payload,
-                'is_pharmacy_admin': bool(admin_payload),
-                'is_mobile_verified': bool(getattr(user, 'is_mobile_verified', False)),
-                'mobile_check_skipped': bool(getattr(user, 'mobile_check_skipped', False)),
-                'newcomer_type': current_newcomer_type(user),
-                'billing_active': is_billing_active(),
-                'in_free_trial': is_in_free_trial(user),
-            }
-        except Exception:
-            # Keep refresh successful even if ancillary user payload construction fails.
-            pass
-
-    def validate(self, attrs):
-        user = None
-        original_refresh = None
-        try:
-            original_refresh = RefreshToken(attrs['refresh'])
-            user = User.objects.get(id=original_refresh['user_id'])
-        except TokenError:
-            # A rotated/blacklisted refresh token must remain unusable. The
-            # client coordinates concurrent refreshes and retries with the
-            # newly-issued token instead of reopening this credential.
-            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
-        except (KeyError, User.DoesNotExist):
-            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
-        except Exception:
-            # Never allow refresh endpoint to 500 on malformed/legacy tokens.
-            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
-
-        if RevokedSession.objects.filter(session_id=original_refresh.get('sid', original_refresh['jti'])).exists():
-            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
-        if not user.is_active:
-            raise serializers.ValidationError({'detail': 'Account is inactive.'})
-        from rest_framework_simplejwt.settings import api_settings
-        from rest_framework_simplejwt.utils import get_md5_hash_password
-        # Upgrade pre-fingerprint tokens in place; safe because password resets blacklist every refresh token.
-        fingerprint = get_md5_hash_password(user.password)
-        if original_refresh.payload.setdefault(api_settings.REVOKE_TOKEN_CLAIM, fingerprint) != fingerprint:
-            raise serializers.ValidationError({'detail': 'Token is invalid or expired.'})
-        attrs = {**attrs, 'refresh': str(original_refresh)}
-        data = super().validate(attrs)
-        data['remember_me'] = original_refresh.get('remember_me')
-        if original_refresh.get('remember_me') is True and data.get('refresh'):
-            refresh = RefreshToken(data['refresh'])
-            refresh['remember_me'] = True
-            refresh['exp'] = original_refresh['exp']
-            data['refresh'] = str(refresh)
-            data['access'] = str(refresh.access_token)
-
-        self._populate_user_payload(data, user)
-        return data
 
 class InviteOrgUserSerializer(serializers.Serializer):
     email        = serializers.EmailField()

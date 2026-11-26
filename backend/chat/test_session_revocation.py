@@ -83,7 +83,7 @@ class RoomSessionRevocationTests(TransactionTestCase):
                 rotated = await self.post('token/refresh', {'refresh': first['refresh']})
                 self.assertEqual(rotated.status_code, 200)
                 await self.typing(comm, survivor)
-                with patch('users.api_auth.notify_auth_changed') as missed:
+                with patch('users.device_sessions.notify_auth_changed') as missed:
                     self.assertEqual((await self.post('logout', {'refresh': first['refresh']})).status_code, 200)
                     missed.assert_called_once()
                 if direction == 'receive':

@@ -451,6 +451,11 @@ class PayrollOptInRosterRoutingTests(TestCase):
 
 
 class ExternalShiftSettlementRoutingTests(TestCase):
+    def setUp(self):
+        patcher = patch("shifts.engagement.outside_booking_source", return_value="PUBLIC")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @staticmethod
     def _objects(*, payroll_enabled, payment_preference):
         pharmacy = SimpleNamespace(
@@ -782,6 +787,7 @@ class DeferredPayrollActivationTests(TestCase):
         self.onboarding = OtherStaffOnboarding.objects.create(
             user=self.worker,
             role_type="ASSISTANT",
+            verified=True,
             classification_level="LEVEL_3",
             payment_preference="TFN",
             date_of_birth=date(1990, 1, 1),

@@ -59,13 +59,15 @@ class MembershipSerializer(serializers.ModelSerializer):
     admin_level_label = serializers.SerializerMethodField()
     admin_level_description = serializers.SerializerMethodField()
     admin_capabilities = serializers.SerializerMethodField()
+    invitation_expires_at = serializers.SerializerMethodField()
+    expired_invite_application_token = serializers.SerializerMethodField()
 
     class Meta:
         model = Membership
         fields = [
             'id', 'user', 'user_details', 'pharmacy', 'pharmacy_detail', 'invited_by', 'invited_by_details',
             'invited_name', 'role', 'employment_type', 'is_active', 'created_at', 'updated_at',
-            'status', 'responded_at',
+            'status', 'responded_at', 'invitation_expires_at', 'expired_invite_application_token',
             'job_title',
             # All classification fields are included and will be handled automatically
             'pharmacist_award_level',
@@ -93,6 +95,19 @@ class MembershipSerializer(serializers.ModelSerializer):
     # No 'create' method needed. The default ModelSerializer.create() works perfectly
     # because all the classification fields are listed in Meta.fields. It will
     # create the new Membership object and save all provided fields in one step.
+
+    def get_invitation_expires_at(self, obj):
+        from memberships.invites import direct_invite_expiry
+
+        return direct_invite_expiry(obj)
+
+    def get_expired_invite_application_token(self, obj):
+        from memberships.invites import direct_application_token, direct_invite_expired
+
+        viewer_id = getattr(getattr(self.context.get("request"), "user", None), "pk", None)
+        if viewer_id == obj.user_id and obj.pharmacy_id and direct_invite_expired(obj, timezone.now()):
+            return direct_application_token(obj)
+        return None
 
     def get_user_details(self, obj):
         payload = UserProfileSerializer(obj.user, context=self.context).data if obj.user_id else {}
@@ -445,7 +460,9 @@ class MembershipApplicationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"date_of_birth": "Enter a valid date of birth."})
 
         existing_user = User.objects.filter(email__iexact=email_value).first()
-        if existing_user and Membership.objects.filter(user=existing_user, pharmacy=invite_link.pharmacy).exists():
+        if existing_user and Membership.objects.filter(
+            user=existing_user, pharmacy=invite_link.pharmacy,
+        ).exclude(pk=self.context.get("expired_invite_id")).exists():
             raise serializers.ValidationError({
                 "email": "You already have a membership or pending invitation for this pharmacy."
             })

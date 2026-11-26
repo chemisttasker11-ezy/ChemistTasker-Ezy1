@@ -1,3 +1,4 @@
+import IndemnityCover from '../../../components/IndemnityCover';
 import AhpraStatus from '../../../components/AhpraStatus';
 import { useAhpra } from '../../../context/AhpraContext';
 // Role & qualifications (Pharmacy team). Required: the role, its classification or year, and an intern's AHPRA number.
@@ -197,6 +198,8 @@ export default function OtherStaffRegulatoryScreen() {
             {!ahpra.summary && badge('AHPRA_PROVISIONAL') && data.ahpra_number ? <EvidenceStatus code="AHPRA_PROVISIONAL" label="AHPRA provisional registration" state={badge('AHPRA_PROVISIONAL')!.state} explainer={badge('AHPRA_PROVISIONAL')!.explainer} /> : null}
           </View>
         ) : null}
+
+        {savedRole === 'INTERN' ? <IndemnityCover role="otherstaff" /> : null}
 
         {role && role !== 'INTERN' ? (
           <View style={{ gap: 10 }}>

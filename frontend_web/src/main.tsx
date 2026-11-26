@@ -62,6 +62,7 @@ const RefereeRejectPage = React.lazy(() => import('./pages/onboarding/RefereeRej
 const RosterOwnerPage = React.lazy(() => import('./pages/dashboard/sidebar/RosterOwnerPage'));
 const RosterWorkerPage = React.lazy(() => import('./pages/dashboard/sidebar/RosterWorkerPage'));
 const KioskPage = React.lazy(() => import('./pages/attendance/KioskPage'));
+const KioskNoticeCode = React.lazy(() => import('./pages/attendance/KioskNoticeCode'));
 const WorkerAttendancePage = React.lazy(() => import('./pages/attendance/WorkerAttendancePage'));
 const ManagerAttendanceReviewPage = React.lazy(() => import('./pages/attendance/ManagerAttendanceReviewPage'));
 const TimesheetsPage = React.lazy(() => import('./features/workforce/TimesheetsPage'));
@@ -174,6 +175,8 @@ const router = createBrowserRouter([
 
       // Standalone Kiosk Route (Counter Tablet PWA)
       { path: 'kiosk', element: <KioskPage /> },
+      { path: 'kiosk-link', element: <ProtectedRoute><KioskNoticeCode kind="pairing" /></ProtectedRoute> },
+      { path: 'attendance-pin', element: <ProtectedRoute><KioskNoticeCode kind="pin" /></ProtectedRoute> },
 
       // Direct Attendance Routes
       {

@@ -14,6 +14,7 @@ class MembershipServices:
     accepted_for_user: Callable
     directory_memberships: Callable
     convert_manager_account: Callable
+    activate_first_password_invites: Callable
 
 
 _services: MembershipServices | None = None

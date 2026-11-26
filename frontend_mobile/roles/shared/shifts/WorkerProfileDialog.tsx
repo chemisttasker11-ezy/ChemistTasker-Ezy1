@@ -1,7 +1,7 @@
 // The booked worker's profile in Shift Centre Confirmed and History (same as web WorkerProfileDialog). Contact details,
 // the CV and Message come only with Confirmed (owner decision 2026-10-14); the backend leaves contact out of History.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Linking, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { Button, Dialog, Portal, Text } from 'react-native-paper';
 import { BrandActivityIndicator as ActivityIndicator } from '@/components/ui/BrandActivityIndicator';
 import { FileText, Mail, MessageSquare, Phone } from 'lucide-react-native';
@@ -98,6 +98,15 @@ export function WorkerProfileDialog({
             {loading ? <ActivityIndicator style={{ marginVertical: space.xl }} accessibilityLabel="Loading profile" color={colors.primary} /> : p ? (
               <>
                 <CandidateWorkProfile name={name} bio={p.shortBio} profile={p as unknown as ShiftWorkProfile} />
+                {p.bookingDocumentsUrl ? (
+                  <Button mode="outlined" style={styles.actionBtn} onPress={() => {
+                    void Share.share({ message: p.bookingDocumentsUrl! }).catch(() => {
+                      Alert.alert('Could not share the link', 'Try sharing the pharmacy documents again.');
+                    });
+                  }}>
+                    Share pharmacy documents
+                  </Button>
+                ) : null}
                 {p.email || p.phoneNumber || p.resume ? (
                   <View style={styles.contact}>
                     <Text style={styles.title}>Contact for this booking</Text>

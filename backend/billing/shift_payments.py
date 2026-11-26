@@ -7,6 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
+from shifts.assignment import check_shift_offer_credentials
 from shifts.finalize import offer_occurrence_key
 from shifts.models import ShiftOffer, ShiftSlotAssignment
 
@@ -40,7 +41,7 @@ def charge_shift_fulfillment(user, shift, shift_id, account, billing_state, data
             offers = offers.filter(id__in=offer_ids)
         if slot_ids:
             offers = offers.filter(slot_id__in=slot_ids)
-        selected_offers = list(offers.order_by('id'))
+        selected_offers = list(offers.select_related('user').order_by('id'))
         if not selected_offers:
             return Response({'error': 'No selected offers require payment.'}, status=status.HTTP_400_BAD_REQUEST)
         if offer_ids and len(selected_offers) != len(offer_ids):
@@ -52,6 +53,9 @@ def charge_shift_fulfillment(user, shift, shift_id, account, billing_state, data
         if len(selected_occurrences) != len(set(selected_occurrences)):
             return Response({'error': 'Select only one candidate per slot.'}, status=status.HTTP_400_BAD_REQUEST)
         offer_ids = [offer.id for offer in selected_offers]
+        # Re-check each worker just before payment; finalisation checks again under its locks.
+        for offer in selected_offers:
+            check_shift_offer_credentials(offer.user, shift, manager=True, schedule_recheck=False)
         slot_ids = sorted(set(selected_slot_ids)) if len(selected_slot_ids) == len(selected_offers) else []
 
     # --- Honeymoon period / free trial: finalize for free ---

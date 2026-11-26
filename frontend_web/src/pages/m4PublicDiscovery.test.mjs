@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+import '../../scripts/load-shared-core.mjs';
+const sharedCore=await import('@chemisttasker/shared-core');
 const repo = new URL('../../../', import.meta.url);
 const jsx = (type,props,key)=>({type,props:props||{},key});
 function load(file,mocks,window={}) {
@@ -227,7 +229,7 @@ function realLogin(next, rawNext, verified=true) {
     replace:to=>navigations.push(to),assign:to=>navigations.push(to)},
     localStorage:localStore,sessionStorage:sessionStore,
     dispatchEvent:event=>announcements.push(event.type)};
-  const browser=load('landing_next/shared/browser-session.ts',{},window);
+  const browser=load('landing_next/shared/browser-session.ts',{'@chemisttasker/shared-core':sharedCore},window);
   const dashboard=load(next?'landing_next/migrated/utils/dashboardPath.ts':
     'src/utils/dashboardPath.ts',{},window);
   const user={id:44,role:'EXPLORER',is_mobile_verified:verified};
@@ -307,7 +309,7 @@ test('R #2 Vite QR next survives mobile verification and resumes after success',
   await app.submit();
   assert.deepEqual(app.navigations,['/mobile-verify']);
   app.window.location.search='';
-  const browser=load('landing_next/shared/browser-session.ts',{},app.window);
+  const browser=load('landing_next/shared/browser-session.ts',{'@chemisttasker/shared-core':sharedCore},app.window);
   const ui=hooks();
   const verify=load('src/pages/MobileOTPVerify.tsx',{
     react:ui.react,'react/jsx-runtime':{jsx,jsxs:jsx},

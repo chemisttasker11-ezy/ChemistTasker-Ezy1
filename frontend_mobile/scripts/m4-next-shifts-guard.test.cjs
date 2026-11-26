@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const ts = require('../node_modules/typescript');
+const ts = require('typescript');
 
 const jsx = (type, props) => ({ type, props: props || {} });
 const file = path.resolve(__dirname, '../app/next-shifts.tsx');
@@ -46,6 +46,7 @@ function mount(role, loading = false) {
     '@/components/RootPageHeader': { RootPageHeader: 'RootPageHeader' },
     '@chemisttasker/shared-core': { fetchMyConfirmedShifts: async () => { fetches++; return []; } },
     '@/context/AuthContext': { useAuth: () => ({ user, isLoading: loading }) },
+    '@/utils/authSession': { getSessionGeneration: () => 0 },
     '@/constants/tokens': { colors: { pageBg: '', surfaceBg: '', textPrimary: '', textSecondary: '',
       primary: '', border: '', status: { amber: { fg: '' } } }, radius: { card: 1 },
       space: { lg: 1, md: 1, sm: 1, '3xl': 1 } },

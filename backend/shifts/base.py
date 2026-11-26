@@ -126,7 +126,8 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
             return None, None
         if len(key) > 255:
             raise ValidationError({'detail': 'Idempotency key is too long.'})
-        request.user = type(request.user).objects.select_for_update(no_key=True).get(pk=request.user.pk)
+        # The unique receipt serializes retries without locking the actor before a shift or profile.
+        request.user = type(request.user).objects.get(pk=request.user.pk)
         if not request.user.is_active:
             raise PermissionDenied()
         if operation == 'shift.counter_offer.create':
@@ -159,7 +160,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
     @staticmethod
     def _check_counter_offer_membership(user, shift):
         if shift.visibility in COMMUNITY_LEVELS and shift.dedicated_user_id != user.pk:
-            from shifts.browse import community_membership_q
+            from shifts.selectors import community_membership_q
             if not Shift.objects.filter(community_membership_q(user), pk=shift.pk).exists():
                 raise NotFound()
 
@@ -343,10 +344,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         if isinstance(slot_id, str) and slot_id.isdigit():
             slot_id = int(slot_id)
 
-        from onboarding.verification.state import lock_public_ahpra
-        with transaction.atomic():
-            lock_public_ahpra(candidate, shift, manager=True)
-            body = offer_shift(shift=shift, candidate=candidate, slot_id=slot_id)
+        body = offer_shift(shift=shift, candidate=candidate, slot_id=slot_id)
         return Response(body, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='counter-offers-batch')
@@ -457,10 +455,7 @@ class BaseShiftViewSet(viewsets.ModelViewSet):
         if isinstance(slot_id, str) and slot_id.isdigit():
             slot_id = int(slot_id)
 
-        from onboarding.verification.state import lock_public_ahpra
-        with transaction.atomic():
-            lock_public_ahpra(offer.user, shift, manager=True)
-            body = accept_counter_offer(shift=shift, offer=offer, slot_id=slot_id, decided_by=request.user)
+        body = accept_counter_offer(shift=shift, offer=offer, slot_id=slot_id, decided_by=request.user)
         return Response(body, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='counter-offers/(?P<offer_id>[^/.]+)/reject')

@@ -16,6 +16,7 @@ class EmploymentServices:
     latest_engagement: Callable
     classification_options: Callable
     resolve_award_schedule: Callable
+    future_confirmed_bookings: Callable
 
 
 _services: EmploymentServices | None = None

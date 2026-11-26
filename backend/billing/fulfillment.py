@@ -1,5 +1,6 @@
 """Selected-offer normalization and booking finalization after billing authority is established."""
-from shifts.finalize import expire_competing_offers
+from shifts.booking import lock_booking_offers, lock_booking_workers
+from shifts.finalize import BookingRosterBusy, expire_competing_offers
 
 
 def _normalize_slot_ids(raw_slot_ids=None, raw_slot_id=None):
@@ -38,7 +39,8 @@ def _normalize_offer_ids(raw_offer_ids=None, raw_offer_id=None):
     return sorted(set(offer_ids))
 
 
-def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None, return_offers=False, unbookable=None, checkout_id=None):
+def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None, slot_ids=None, offer_ids=None,
+                                      return_offers=False, unbookable=None, checkout_id=None, payment_completed_at=None):
     """
     Finalize shift offers waiting on payment.
     If candidate_id/slot_id are provided, narrow the target set.
@@ -46,11 +48,13 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     failing the whole call; explicitly paid offers in other states are collected unchanged.
     """
     from rest_framework.exceptions import ValidationError
-    from shifts.models import ShiftOffer
+    from shifts.models import Shift, ShiftOffer
     from shifts.finalize import finalize_shift_offer
 
     target_offer_ids = _normalize_offer_ids(offer_ids)
-    offers = ShiftOffer.objects.filter(shift=shift).order_by("created_at")
+    shift = Shift.objects.select_for_update().get(pk=shift.pk)
+    lock_booking_offers(shift, offer_ids=target_offer_ids)
+    offers = shift.offers.order_by("created_at", "pk")
     if not (target_offer_ids and unbookable is not None):
         offers = offers.filter(status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
 
@@ -62,6 +66,9 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
     if target_slot_ids:
         offers = offers.filter(slot_id__in=target_slot_ids)
 
+    offers = list(offers)
+    worker_ids = {offer.user_id for offer in offers if offer.status == ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT}
+    lock_booking_workers(worker_ids)
     finalized = 0
     finalized_offers = []
     for offer in offers:
@@ -70,17 +77,26 @@ def _finalize_pending_offers_for_shift(shift, *, candidate_id=None, slot_id=None
             unbookable.append(offer)
             continue
         try:
-            if checkout_id is None:
+            if payment_completed_at is not None and offer.pay_by_at and payment_completed_at >= offer.pay_by_at:
+                from .checkout_reservations import release_expired_offer
+                release_expired_offer(shift, offer)
+                raise ValidationError({'code': 'payment_deadline_passed', 'detail': 'The payment deadline has passed.'})
+            if payment_completed_at is not None:
+                finalize_shift_offer(offer, checkout_id=checkout_id, payment_completed_at=payment_completed_at)
+            elif checkout_id is None:
                 finalize_shift_offer(offer)
             else:
                 finalize_shift_offer(offer, checkout_id=checkout_id)
+        except BookingRosterBusy:
+            # Card webhooks must retry transient roster contention.
+            raise
         except ValidationError as exc:
             if unbookable is None:
                 raise
             if isinstance(exc.detail, dict):
                 offer._fulfillment_refusal_code = str(exc.detail.get("code", ""))
             # Only a bound checkout attempt can replay after a payroll correction; unbound legacy payment cannot.
-            kept = {"checkout_reserved", "checkout_selection_changed"} | (
+            kept = {"checkout_reserved", "checkout_selection_changed", "payment_deadline_passed"} | (
                 {"locked_payroll_period"} if checkout_id is not None else set())
             if getattr(offer, "_fulfillment_refusal_code", "") not in kept:
                 offer.status = ShiftOffer.Status.EXPIRED

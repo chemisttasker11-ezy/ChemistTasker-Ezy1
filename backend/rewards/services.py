@@ -7,7 +7,9 @@ from django.db.models import Sum
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
-from shifts.models import Shift
+from shifts.booking import lock_booking_offers, lock_booking_workers
+from shifts.finalize import finalize_shift_offer
+from shifts.models import Shift, ShiftOffer
 from rewards.models import PillLedgerEntry, PillReferralCode, PillReferralEvent, PillRewardRule
 
 User = get_user_model()
@@ -140,7 +142,7 @@ def _create_ledger_entry(
     # Other entry points (referral credits, manual awards and separate shifts)
     # use the same central ledger helper; a view-only lock is not sufficient.
     with transaction.atomic():
-        User.objects.select_for_update().get(pk=user.pk)
+        User.objects.select_for_update(no_key=True).get(pk=user.pk)
         existing = PillLedgerEntry.objects.filter(idempotency_key=idempotency_key).first()
         if existing:
             if (existing.user_id != user.pk
@@ -376,6 +378,21 @@ def spend_pills_for_shift_post(*, user, shift: Shift, offer=None) -> PillLedgerE
         idempotency_key=f"shift:{shift.id}:offer:{offer.pk}:pill-payment" if offer else f"shift:{shift.id}:pill-payment",
         metadata={"shift_id": shift.id, **({"offer_id": offer.pk} if offer else {})},
     )
+
+
+def lock_pending_pill_offers(shift):
+    return [offer for offer in lock_booking_offers(shift)
+            if offer.status == ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT]
+
+
+def finalize_offers_with_pills(*, user, shift, offers):
+    """Debit and fulfill under the caller's shift, profile and offer locks."""
+    lock_booking_workers({user.pk, *(offer.user_id for offer in offers)})
+    entries = []
+    for offer in offers:
+        entries.append(spend_pills_for_shift_post(user=user, shift=shift, offer=offer))
+        finalize_shift_offer(offer)
+    return entries
 
 
 def user_is_referral_reward_eligible(user) -> bool:

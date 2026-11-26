@@ -64,8 +64,8 @@ class NewcomerTalentPostTests(TestCase):
         ExplorerOnboarding.objects.create(user=user, verified=verified, **profile)
         return user
 
-    def post(self, user):
-        return client_for(user).post(self.URL, {"headline": "Keen to learn", "body": "b", "role_category": "EXPLORER"}, format="json", HTTP_IDEMPOTENCY_KEY=str(uuid4()))
+    def post(self, user, **fields):
+        return client_for(user).post(self.URL, {"headline": "Keen to learn", "body": "b", "role_category": "EXPLORER", **fields}, format="json", HTTP_IDEMPOTENCY_KEY=str(uuid4()))
 
     def test_unverified_newcomers_cannot_post(self):
         self.assertEqual(self.post(self.newcomer(verified=False)).status_code, 403)
@@ -89,7 +89,7 @@ class NewcomerTalentPostTests(TestCase):
 
     def test_under_eighteen_shows_first_name_only(self):
         user = self.newcomer(date_of_birth=date.fromisoformat(years_ago(16)))
-        post_id = self.post(user).data["id"]
+        post_id = self.post(user, is_anonymous=False).data["id"]
         viewer = make_user("OWNER")
         detail = client_for(viewer).get(f"{self.URL}{post_id}/").data
         self.assertEqual(detail["explorer_name"], "Sam")

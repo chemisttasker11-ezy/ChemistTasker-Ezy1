@@ -98,7 +98,8 @@ class RosterSlotConcurrencyTests(TransactionTestCase):
         for model in (RosterPeriod, User, Shift, ShiftSlot, ShiftSlotAssignment):
             table = f'"{model._meta.db_table}"'
             indices = [index for index, query in enumerate(captured.captured_queries)
-                       if "FOR UPDATE" in query["sql"].upper() and table in query["sql"]]
+                       if any(lock in query["sql"].upper() for lock in ("FOR UPDATE", "FOR NO KEY UPDATE"))
+                       and table in query["sql"]]
             self.assertTrue(indices, f"Missing lock for {table}")
             positions.append(indices[0])
         self.assertEqual(positions, sorted(positions))

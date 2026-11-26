@@ -6,12 +6,15 @@ Driven through the real endpoints; e-mails and tasks are captured at Celery send
 so the assertions hold while the workflows move to membership services.
 """
 from contextlib import contextmanager
-from datetime import timedelta
+from datetime import time, timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
 from django.test import TestCase, override_settings
 from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from memberships.models import Membership, MembershipApplication, MembershipInviteLink
@@ -19,6 +22,7 @@ from notifications.models import Notification
 from onboarding.models import OtherStaffOnboarding
 from organizations.models import Organization, PharmacyAdmin
 from organizations.access import can_manage_roster, can_manage_staff
+from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
 from users.models import OrganizationMembership
 from workforce.models import EmploymentEngagement
 
@@ -91,15 +95,66 @@ class InviteTests(MembershipFixture):
         self.assertIn("intern", refused.data["detail"])
         self.assertEqual(OtherStaffOnboarding.objects.get(user=assistant).role_type, "ASSISTANT")  # profile role unchanged
 
-    def test_inviting_a_new_person_creates_an_active_account_and_emails_a_password_link(self):
+    def test_new_invitee_joins_only_after_setting_a_password(self):
         response, work = self.invite(email=" New.Person@Example.com ", invited_name="New Person")
         self.assertEqual(response.status_code, 201, response.data)
         user = User.objects.get(email="new.person@example.com")
         self.assertEqual((user.role, user.is_otp_verified), ("PHARMACIST", False))
         membership = Membership.objects.get(user=user, pharmacy=self.pharmacy)
         self.assertEqual((membership.status, membership.is_active, membership.invited_by_id, membership.invited_name),
-                         (Membership.Status.ACCEPTED, True, self.owner.id, "New Person"))
+                         (Membership.Status.PENDING, False, self.owner.id, "New Person"))
+        self.assertFalse(user.has_usable_password())
         self.assertEqual(work["emails"], [("emails/pharmacy_invite_new_user.html", ("new.person@example.com",))])
+        password = "An-invite-passphrase-2748"
+        reset, _ = self.call(None, "post", "users/password-reset-confirm/", {
+            "uid": urlsafe_base64_encode(force_bytes(user.pk)),
+            "token": default_token_generator.make_token(user),
+            "new_password1": password,
+            "new_password2": password,
+        })
+        self.assertEqual(reset.status_code, 200, reset.data)
+        membership.refresh_from_db()
+        self.assertEqual((membership.status, membership.is_active), (Membership.Status.ACCEPTED, True))
+
+    def test_expired_direct_invite_can_be_reissued_and_withdrawn(self):
+        worker = make_user("PHARMACIST")
+        response, _ = self.invite(email=worker.email)
+        self.assertEqual(response.status_code, 201, response.data)
+        membership_id = response.data["id"]
+        Membership.objects.filter(pk=membership_id).update(direct_invited_at=timezone.now() - timedelta(days=7))
+        expired, _ = self.call(worker, "post", f"my-memberships/{membership_id}/accept/")
+        self.assertEqual((expired.status_code, expired.data["code"]), (410, "invitation_expired"))
+        invites, _ = self.call(worker, "get", "my-memberships/")
+        rows = invites.data.get("results", []) if isinstance(invites.data, dict) else invites.data
+        token = next(row["expired_invite_application_token"] for row in rows if row["id"] == membership_id)
+        info, _ = self.call(None, "get", f"magic/memberships/{token}/")
+        self.assertEqual((info.status_code, info.data["pharmacy"]), (200, self.pharmacy.pk))
+        refused, _ = self.call(make_user("PHARMACIST"), "post", f"magic/memberships/{token}/apply/")
+        self.assertEqual(refused.status_code, 403)
+
+        reissued, _ = self.invite(email=worker.email)
+        self.assertEqual((reissued.status_code, reissued.data["id"]), (201, membership_id))
+        withdrawn, _ = self.call(self.owner, "delete", f"memberships/{membership_id}/")
+        self.assertEqual(withdrawn.status_code, 204)
+        refused, _ = self.call(worker, "post", f"my-memberships/{membership_id}/accept/")
+        self.assertEqual(refused.status_code, 400)
+
+    def test_expired_invitee_can_submit_an_application_without_joining(self):
+        worker = make_user("PHARMACIST")
+        response, _ = self.invite(email=worker.email)
+        membership_id = response.data["id"]
+        Membership.objects.filter(pk=membership_id).update(direct_invited_at=timezone.now() - timedelta(days=8))
+        invites, _ = self.call(worker, "get", "my-memberships/")
+        rows = invites.data.get("results", []) if isinstance(invites.data, dict) else invites.data
+        token = next(row["expired_invite_application_token"] for row in rows if row["id"] == membership_id)
+        application, _ = self.call(worker, "post", f"magic/memberships/{token}/apply/", {
+            "email": worker.email, "first_name": worker.first_name or "Alice", "last_name": worker.last_name or "Ng",
+            "username": worker.username or "alice-worker", "mobile_number": worker.mobile_number or "0412345678",
+            "date_of_birth": "1990-04-05", "role": "PHARMACIST",
+        })
+        self.assertEqual(application.status_code, 201, application.data)
+        self.assertEqual(application.data["status"], "PENDING")
+        self.assertFalse(Membership.objects.get(pk=membership_id).is_active)
 
     def test_inviting_an_existing_worker_is_pending_until_they_respond(self):
         worker = make_user("PHARMACIST")
@@ -184,7 +239,7 @@ class InviteTests(MembershipFixture):
         ]})
         self.assertEqual(response.status_code, 207, response.data)
         self.assertEqual([(r["email"], r["status"], r["membership_status"]) for r in response.data["results"]],
-                         [("one@example.com", "invited", Membership.Status.ACCEPTED)])
+                         [("one@example.com", "invited", Membership.Status.PENDING)])
         self.assertEqual([(e["line"], e["error"]) for e in response.data["errors"]], [
             (2, 'Field "pharmacy" is required.'),
             (3, "Not permitted to invite into this pharmacy."),
@@ -200,6 +255,20 @@ class InviteTests(MembershipFixture):
 
 
 class MembershipVisibilityTests(MembershipFixture):
+    def test_removing_a_member_requires_an_explicit_decision_to_keep_confirmed_work(self):
+        worker, membership = self.member()
+        shift = Shift.objects.create(pharmacy=self.pharmacy, created_by=self.owner, role_needed="PHARMACIST")
+        day = timezone.localdate() + timedelta(days=2)
+        slot = ShiftSlot.objects.create(shift=shift, date=day, start_time=time(9), end_time=time(17))
+        booking = ShiftSlotAssignment.objects.create(shift=shift, slot=slot, slot_date=day, user=worker)
+
+        refused, _ = self.call(self.owner, "delete", f"memberships/{membership.pk}/")
+        self.assertEqual((refused.status_code, refused.data["code"]), (409, "confirmed_bookings_need_decision"))
+        self.assertEqual(refused.data["bookings"], [{"shift_id": shift.pk, "date": day.isoformat()}])
+        accepted, _ = self.call(self.owner, "delete", f"memberships/{membership.pk}/?confirmed_bookings=keep")
+        self.assertEqual(accepted.status_code, 204)
+        self.assertTrue(ShiftSlotAssignment.objects.filter(pk=booking.pk, user=worker).exists())
+
     def test_owner_removal_revokes_admin_access_when_history_protects_membership(self):
         worker, membership = self.member(role="ASSISTANT", employment_type="CASUAL")
         assignment = PharmacyAdmin.objects.create(

@@ -1,5 +1,6 @@
 """Profile data shared by the onboarding roles: the profile photo (basic tab) and the profile tab (resume and short
 bio), with old files deleted when replaced or cleared."""
+from onboarding.services.indemnity import apply_indemnity_fields
 from infrastructure.serializer_lifecycle import _delete_file_if_unreferenced, _file_has_changed, _should_clear_flag
 
 
@@ -66,6 +67,9 @@ def apply_profile_tab(instance, vdata: dict, submit: bool):
                     pass
             instance.resume = new_file
             update_fields.append('resume')
+
+    if hasattr(instance, "indemnity_insurer"):
+        apply_indemnity_fields(instance, vdata, update_fields)
 
     if update_fields:
         instance.save(update_fields=list(set(update_fields)))

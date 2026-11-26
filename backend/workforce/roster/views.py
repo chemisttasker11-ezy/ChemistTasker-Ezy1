@@ -28,7 +28,7 @@ from django.db import transaction
 from datetime import timedelta
 from users.models import User
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
-from shifts.escalation import PUBLIC_LEVEL, apply_escalation, resolve_current_index
+from shifts.escalation import PUBLIC_LEVEL, apply_escalation, resolve_current_index, validate_visibility
 from shifts.history import _protect_assignment_history
 from shifts.deletion import protect_shift_payment_deletion
 
@@ -200,7 +200,7 @@ class RosterOwnerViewSet(viewsets.ModelViewSet):
         controlled_pharmacies_query = managed_pharmacies_for(user)
 
         qs = Membership.objects.filter(
-            is_active=True,
+            Q(is_active=True, status=Membership.Status.ACCEPTED) | Membership.roster_invite_filter(),
             pharmacy__in=controlled_pharmacies_query
         )
 
@@ -516,6 +516,8 @@ class RosterShiftManageViewSet(viewsets.ModelViewSet):
 
         target_visibility = request.data.get('target_visibility')
         if target_visibility:
+            if target_visibility == PUBLIC_LEVEL:
+                validate_visibility(shift.pharmacy, target_visibility, allowed_tiers)
             if target_visibility not in allowed_tiers:
                 return Response(
                     {'detail': f"Invalid target_visibility. Must be one of {allowed_tiers}."},

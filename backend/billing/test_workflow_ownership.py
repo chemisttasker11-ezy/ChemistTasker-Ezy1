@@ -62,8 +62,10 @@ class BillingWorkflowOwnershipContracts(SimpleTestCase):
         for kind, obj, expected in cases:
             with self.subTest(kind=kind, mode=obj.get('mode')), ExitStack() as stack:
                 handlers = {name: stack.enter_context(patch.object(webhooks, name)) for name in names}
-                event = SimpleNamespace(type=kind, data=SimpleNamespace(object=obj))
+                event = Session(type=kind, data=SimpleNamespace(object=obj), created=1720000000)
                 webhooks._process_stripe_event(event)
                 self.assertEqual([name for name, handler in handlers.items() if handler.called], [expected] if expected else [])
                 if expected:
                     handlers[expected].assert_called_once()
+                if expected == "handle_payment_checkout":
+                    handlers[expected].assert_called_once_with(obj, {}, completed_at=1720000000)

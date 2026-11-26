@@ -16,8 +16,10 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Avg
 from django.utils import timezone
 from shifts.pricing import expand_shift_slots
+from shifts.booking import ensure_worker_booking_available, lock_booking_workers, lock_offer_for_acceptance
 from shifts.finalize import finalize_shift_offer
 from shifts.events import payroll_activated
+from shifts.payment_deadlines import offer_payment_deadline
 from shifts.payroll import activation_work_dates
 from shifts.emails import (
     active_shift_url_for_user,
@@ -28,14 +30,14 @@ from shifts.emails import (
     worker_offer_url,
 )
 from users.role_labels import user_work_role_label
-from shifts.notifications import notify_shift_users
+from shifts.notifications import notify_shift_users, notify_worker_credentials
 from users.task_dispatch import async_task
 from shifts.access import Http400
 from django.db import transaction
 from decimal import Decimal
 from organizations.access import managed_pharmacies as managed_pharmacies_for, user_can_manage_pharmacy
 from shifts.base import SHIFT_OFFER_BUZZ_COOLDOWN
-from shifts.assignment import slot_locked_for_shift_offer
+from shifts.assignment import check_shift_offer_credentials, slot_locked_for_shift_offer
 from shifts.access import _user_can_perform_shift_role
 from shifts.serializers import (
     ShiftInterestSerializer,
@@ -290,17 +292,12 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
             offer.last_buzzed_at = now
             offer.save(update_fields=['last_buzzed_at', 'updated_at'])
 
-        pharmacy_display = shift.pharmacy.name
-        if getattr(shift, "post_anonymously", False):
-            suburb = getattr(shift.pharmacy, "suburb", None)
-            pharmacy_display = f"Shift in {suburb}" if suburb else "Anonymous Pharmacy"
-
         worker_name = offer.user.get_full_name() or offer.user.email
         ctx = build_shift_email_context(shift, user=offer.user, role=offer.user.role.lower())
-        ctx["pharmacy_name"] = pharmacy_display
         ctx["offered_rate"] = offer.offered_rate
         ctx["expires_at"] = offer.expires_at
-        offer_details = build_offer_shift_details(shift, offer)
+        offer_details = build_offer_shift_details(shift, offer, recipient=offer.user)
+        pharmacy_display = offer_details["pharmacy_name"]
         ctx.update(offer_details)
         ctx["shift_link"] = worker_offer_url(offer.user, shift, offer)
 
@@ -336,31 +333,30 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
     @action(detail=True, methods=['post'])
     @transaction.atomic
     def accept(self, request, pk=None):
-        from onboarding.verification.state import require_public_ahpra
         from billing.utils import (
             BILLING_STATE_PAYMENT_REQUIRED,
             get_billing_state_for_pharmacy,
         )
 
-        offer = self.get_object()
-        shift = Shift.objects.select_for_update().get(pk=offer.shift_id)
-        list(ShiftSlot.objects.select_for_update().filter(shift=shift).order_by('pk'))
-        offer = ShiftOffer.objects.select_for_update().get(pk=offer.pk)
-        require_public_ahpra(request.user, offer.shift)
+        shift, offer = lock_offer_for_acceptance(self.get_object(), request.user)
         if offer.user_id != request.user.id:
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
         if offer.status != ShiftOffer.Status.PENDING:
             return Response({'detail': 'Offer is not pending.'}, status=status.HTTP_400_BAD_REQUEST)
+        shift = offer.shift
+        lock_booking_workers([offer.user_id])
+        credentials = check_shift_offer_credentials(request.user, shift)
+        list(ShiftSlot.objects.select_for_update().filter(shift=shift).order_by('pk'))
+
         now = timezone.now()
         if offer.expires_at and offer.expires_at <= now:
             offer.status = ShiftOffer.Status.EXPIRED
             offer.save(update_fields=['status', 'updated_at'])
             return Response({'detail': 'Offer has expired.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        shift = offer.shift
-        slot_obj = offer.slot
         if not _user_can_perform_shift_role(offer.user, shift.role_needed):
             return Response({'detail': 'Your role does not cover this shift.'}, status=status.HTTP_400_BAD_REQUEST)
+        slot_obj = offer.slot
         if slot_obj is None:
             locked = shift.slot_assignments.exists() or shift.offers.filter(
                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -407,13 +403,13 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         requires_payment = billing_state == BILLING_STATE_PAYMENT_REQUIRED
 
         with transaction.atomic():
-            from onboarding.verification.state import lock_public_ahpra
-            lock_public_ahpra(request.user, shift)
+            notify_worker_credentials(shift, request.user, credentials)
             offer.payment_preference_snapshot = accepted_terms.get("payment_preference", "")
             offer.settlement_channel = accepted_terms.get("settlement_channel", "")
             offer.engagement_kind = accepted_terms.get("engagement_kind", "")
             offer.engagement_terms_snapshot = accepted_terms
             offer.engagement_terms_accepted_at = terms_accepted_at
+            ensure_worker_booking_available(offer)
             offer.save(update_fields=[
                 "payment_preference_snapshot",
                 "settlement_channel",
@@ -425,7 +421,8 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
 
             if requires_payment:
                 offer.status = ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT
-                offer.save(update_fields=['status', 'updated_at'])
+                offer.pay_by_at = offer_payment_deadline(offer, timezone.now())
+                offer.save(update_fields=['status', 'pay_by_at', 'updated_at'])
                 if shift.payment_status != 'PENDING':
                     shift.payment_status = 'PENDING'
                     shift.save(update_fields=['payment_status'])
@@ -461,15 +458,10 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
                     payment_method="free",
                 )
 
-            pharmacy_display = shift.pharmacy.name
-            if getattr(shift, "post_anonymously", False):
-                suburb = getattr(shift.pharmacy, "suburb", None)
-                pharmacy_display = f"Shift in {suburb}" if suburb else "Anonymous Pharmacy"
-
             if offer.user and offer.user.email:
                 ctx = build_shift_email_context(shift, user=offer.user, role=offer.user.role.lower())
-                ctx["pharmacy_name"] = pharmacy_display
-                offer_details = build_offer_shift_details(shift, offer)
+                offer_details = build_offer_shift_details(shift, offer, recipient=offer.user)
+                pharmacy_display = offer_details["pharmacy_name"]
                 ctx.update(offer_details)
                 ctx["shift_link"] = worker_offer_url(offer.user, shift, offer) if requires_payment else active_shift_url_for_user(offer.user, shift)
                 ctx["payment_required"] = requires_payment
@@ -509,6 +501,10 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
 
             owner_user = self._resolve_owner_recipient(shift)
             if owner_user and owner_user.email:
+                pharmacy_display = shift.pharmacy.name
+                if shift.post_anonymously:
+                    suburb = shift.pharmacy.suburb
+                    pharmacy_display = f"Shift in {suburb}" if suburb else "Anonymous Pharmacy"
                 worker_name = offer.user.get_full_name() or offer.user.email
                 worker_role_label = user_work_role_label(offer.user, "candidate")
                 shift_date = self._first_offer_date(shift, offer)

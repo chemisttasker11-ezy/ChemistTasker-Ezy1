@@ -95,6 +95,64 @@ class LegacyRosterAdminCapabilityTests(TestCase):
         self.assertEqual(response.status_code, 403, response.data)
         self.assertEqual(Shift.objects.count(), 1)
 
+    def test_region_assignment_alone_cannot_mutate_roster_or_shifts(self):
+        client = self.region_admin("COMMUNICATION_MANAGER")
+        for endpoint in ("roster-shifts", "shifts"):
+            with self.subTest(endpoint=endpoint):
+                payload = {"pharmacy": self.pharmacy.pk, "role_needed": "PHARMACIST",
+                           "employment_type": "LOCUM", "visibility": "FULL_PART_TIME", "slots": []}
+                response = client.post(f"{BASE}{endpoint}/", payload, format="json")
+                self.assertIn(response.status_code, (403, 404), response.data)
+                response = client.patch(f"{BASE}{endpoint}/{self.shift.pk}/", {"description": "forbidden"}, format="json")
+                self.assertIn(response.status_code, (403, 404), response.data)
+                response = client.delete(f"{BASE}{endpoint}/{self.shift.pk}/")
+                self.assertIn(response.status_code, (403, 404), response.data)
+                self.shift.refresh_from_db()
+                self.assertEqual(self.shift.description, "original")
+        response = client.patch(f"{BASE}roster-owner/{self.assignment.pk}/", {"unit_rate": "95.00"}, format="json")
+        self.assertIn(response.status_code, (403, 404), response.data)
+        response = client.delete(f"{BASE}roster-owner/{self.assignment.pk}/")
+        self.assertIn(response.status_code, (403, 404), response.data)
+        self.assertTrue(ShiftSlotAssignment.objects.filter(pk=self.assignment.pk).exists())
+        self.assertEqual(Shift.objects.count(), 1)
+
+    def test_region_roster_capability_authorizes_mutations(self):
+        client = self.region_admin("ROSTER_MANAGER")
+        for endpoint in ("roster-shifts", "shifts"):
+            with self.subTest(endpoint=endpoint):
+                payload = {"pharmacy": self.pharmacy.pk, "role_needed": "PHARMACIST",
+                           "employment_type": "LOCUM", "visibility": "FULL_PART_TIME", "slots": []}
+                response = client.post(f"{BASE}{endpoint}/", payload, format="json")
+                self.assertEqual(response.status_code, 201, response.data)
+                shift_id = response.data["id"]
+                response = client.patch(f"{BASE}{endpoint}/{shift_id}/", {"description": "allowed"}, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+                response = client.delete(f"{BASE}{endpoint}/{shift_id}/")
+                self.assertEqual(response.status_code, 204, getattr(response, "data", None))
+        response = client.patch(f"{BASE}roster-owner/{self.assignment.pk}/", {"unit_rate": "95.00"}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        response = client.delete(f"{BASE}roster-owner/{self.assignment.pk}/")
+        self.assertEqual(response.status_code, 204, getattr(response, "data", None))
+
+    def test_calculate_rates_requires_rights_at_requested_pharmacy(self):
+        self.pharmacy.rate_weekday = "87.00"
+        self.pharmacy.state = "QLD"
+        self.pharmacy.save(update_fields=["rate_weekday", "state"])
+        client = self.region_admin("COMMUNICATION_MANAGER")
+        payload = {"pharmacyId": self.pharmacy.pk, "role": "PHARMACIST",
+                   "slots": [{"date": "2026-09-21", "startTime": "09:00", "endTime": "17:00"}]}
+        response = client.post(f"{BASE}shifts/calculate-rates/", payload, format="json")
+        self.assertEqual(response.status_code, 403, response.data)
+        response = client_for(make_user("PHARMACIST")).post(f"{BASE}shifts/calculate-rates/", payload, format="json")
+        self.assertEqual(response.status_code, 403, response.data)
+        membership = OrganizationMembership.objects.get(organization=self.pharmacy.organization, role="REGION_ADMIN")
+        membership.admin_level = "ROSTER_MANAGER"
+        membership.save(update_fields=["admin_level"])
+        response = client.post(f"{BASE}shifts/calculate-rates/", payload, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data[0]["rate"], "87.00")
+        self.assertIn("segments", response.data[0]["meta"])
+
     def test_roster_manager_can_create_and_retrieve_shift(self):
         client = client_for(self.roster_admin)
         response = client.post(f"{BASE}roster-shifts/", {

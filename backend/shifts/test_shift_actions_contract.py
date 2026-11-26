@@ -18,10 +18,13 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from django.utils import timezone
 
-from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_staff_member, make_user
+from client_profile.characterization_support import (
+    client_for, make_owner_with_pharmacy, make_staff_member, make_user, make_verified_pharmacist,
+)
 from memberships.models import Membership
 from notifications.models import Notification
 from onboarding.models import PharmacistOnboarding
+from organizations.models import Chain, Organization, Pharmacy
 from workforce.models import RosterPeriod
 from shifts.models import (
     Shift,
@@ -50,6 +53,7 @@ def queued_emails():
             "template": kwargs.get("template_name"),
             "to": list(kwargs.get("recipient_list") or []),
             "subject": kwargs.get("subject"),
+            "context": kwargs.get("context"),
         })
 
     with override_settings(CELERY_TASK_ALWAYS_EAGER=False), mock.patch("celery.app.base.Celery.send_task", side_effect=record):
@@ -66,6 +70,8 @@ def notifications_for(user, kind=None):
 class ShiftActionFixture(TestCase):
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy("Action Pharmacy")
+        self.pharmacy.abn_verified = True
+        self.pharmacy.save(update_fields=["abn_verified"])
         self.owner_client = client_for(self.owner)
 
     def worker(self, employment_type="LOCUM", verified=True):
@@ -94,6 +100,163 @@ class ShiftActionFixture(TestCase):
         with queued_emails() as sent:
             response = client_for(user).post(f"{API}{path}", data or {}, format="json")
         return response, sent
+
+
+class PharmacyAnonymityTests(ShiftActionFixture):
+    def setUp(self):
+        super().setUp()
+        self.pharmacy.street_address = "15 Secret Street"
+        self.pharmacy.suburb = "Brisbane"
+        self.pharmacy.email = "secret-pharmacy@example.com"
+        self.pharmacy.save(update_fields=["street_address", "suburb", "email"])
+        self.candidate = self.worker(employment_type=None)
+        PharmacistOnboarding.objects.filter(user=self.candidate).update(
+            payment_preference="ABN", abn="53004085616", abn_verified=True, abn_entity_confirmed=True,
+        )
+        self.shift_post = self.shift(visibility="PLATFORM", post_anonymously=True, fixed_rate=Decimal("70"))
+        self.client = client_for(self.candidate)
+
+    def assert_delivery_identity(self, worker, kind, sent, name):
+        [notice] = notifications_for(worker, kind)
+        [email] = [item for item in sent if item["to"] == [worker.email]]
+        self.assertEqual(notice.payload["pharmacy_name"], name)
+        self.assertEqual(email["context"]["pharmacy_name"], name)
+        for content in (notice.title, notice.body, notice.payload, email):
+            if name != self.pharmacy.name:
+                self.assertNotIn(self.pharmacy.name, str(content))
+            self.assertNotIn(self.pharmacy.street_address, str(content))
+            self.assertNotIn(self.pharmacy.email, str(content))
+
+    def test_terms_and_snapshot_stay_masked_until_the_worker_is_booked(self):
+        from billing.utils import BILLING_STATE_PAYMENT_REQUIRED
+        from shifts.finalize import finalize_shift_offer
+
+        shift = self.shift_post
+        offer = ShiftOffer.objects.create(shift=shift, user=self.candidate, offered_rate=Decimal("70"))
+        url = f"{API}shift-offers/{offer.id}/"
+        masked = self.client.get(url)
+        self.assertEqual(masked.status_code, 200, masked.data)
+        preview = masked.data["engagement_terms_preview"]
+        self.assertEqual(preview["pharmacy_name"], "Anonymous Pharmacy")
+        self.assertIsNone(preview.get("pharmacy_abn"))
+        detail = masked.data["shift_detail"]
+        self.assertEqual(detail["pharmacy_detail"]["name"], preview["pharmacy_name"])
+        self.assertIn("Brisbane", detail["ui_address_line"])
+        for field in ("abn", "email", "street_address", "logo"):
+            self.assertNotIn(field, detail["pharmacy_detail"])
+
+        with mock.patch("billing.utils.get_billing_state_for_pharmacy", return_value=BILLING_STATE_PAYMENT_REQUIRED), \
+                queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+            accepted = self.client.post(url + "accept/", {
+                "terms_version": preview["terms_version"],
+                "engagement_terms_accepted": True,
+                "independent_contractor_status_confirmed": True,
+            }, format="json")
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.assert_delivery_identity(self.candidate, "shift_confirmed", sent, "Anonymous Pharmacy")
+        self.assertEqual(offer.engagement_terms_snapshot["pharmacy_name"], self.pharmacy.name)
+        self.assertEqual(offer.engagement_terms_snapshot["pharmacy_abn"], "51 824 753 556")
+        snapshot = self.client.get(url).data["engagement_terms_snapshot"]
+        self.assertEqual(snapshot["pharmacy_name"], "Anonymous Pharmacy")
+        self.assertIsNone(snapshot.get("pharmacy_abn"))
+        owner_view = self.owner_client.get(url).data
+        self.assertEqual(owner_view["engagement_terms_snapshot"], offer.engagement_terms_snapshot)
+        self.assertEqual(owner_view["shift_detail"]["pharmacy_detail"]["name"], self.pharmacy.name)
+
+        finalize_shift_offer(offer)
+        booked = self.client.get(url).data
+        self.assertEqual(booked["shift_detail"]["pharmacy_detail"]["name"], self.pharmacy.name)
+        self.assertIn(self.pharmacy.street_address, booked["shift_detail"]["ui_address_line"])
+        self.assertEqual(booked["engagement_terms_preview"]["pharmacy_name"], self.pharmacy.name)
+        self.assertEqual(booked["engagement_terms_preview"]["pharmacy_abn"], "51 824 753 556")
+        self.assertEqual(booked["engagement_terms_snapshot"], offer.engagement_terms_snapshot)
+
+    def test_unbooked_terms_on_named_shift_keep_the_pharmacy_identity(self):
+        shift = self.shift(visibility="PLATFORM", fixed_rate=Decimal("70"))
+        offer = ShiftOffer.objects.create(shift=shift, user=self.candidate, offered_rate=Decimal("70"))
+        preview = self.client.get(f"{API}shift-offers/{offer.id}/").data["engagement_terms_preview"]
+        self.assertEqual(preview["pharmacy_name"], self.pharmacy.name)
+        self.assertEqual(preview["pharmacy_abn"], "51 824 753 556")
+
+    def test_reveal_offer_and_reminder_mask_the_name_in_notices_and_emails(self):
+        shift = self.shift_post
+        worker = self.candidate
+        ShiftInterest.objects.create(shift=shift, user=worker)
+        with self.captureOnCommitCallbacks(execute=True):
+            response, sent = self.post(self.owner, f"shifts/{shift.id}/reveal_profile/", {"user_id": worker.id})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assert_delivery_identity(worker, "shift_profile_revealed", sent, "Anonymous Pharmacy")
+        with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+            response = self.owner_client.post(f"{API}shifts/{shift.id}/accept_user/", {"user_id": worker.id})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assert_delivery_identity(worker, "shift_offer_received", sent, "Anonymous Pharmacy")
+        response, sent = self.post(self.owner, f"shift-offers/{response.data['offer_id']}/buzz/")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assert_delivery_identity(worker, "shift_offer_buzz", sent, "Anonymous Pharmacy")
+
+    def test_edits_mask_only_unbooked_workers_on_anonymous_shifts(self):
+        for anonymous in (True, False):
+            with self.subTest(anonymous=anonymous):
+                shift = self.shift_post if anonymous else self.shift(visibility="PLATFORM")
+                unbooked = self.worker(employment_type=None)
+                booked = self.worker(employment_type=None)
+                slot = shift.slots.get()
+                ShiftSlotAssignment.objects.create(shift=shift, slot=slot, slot_date=slot.date, user=booked)
+                ShiftInterest.objects.create(shift=shift, user=unbooked)
+                ShiftInterest.objects.create(shift=shift, user=booked)
+                with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+                    response = self.owner_client.patch(f"{API}shifts/{shift.id}/", {"description": "Edited"}, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assert_delivery_identity(booked, "shift_updated", sent, self.pharmacy.name)
+                self.assert_delivery_identity(
+                    unbooked, "shift_updated", sent, "Anonymous Pharmacy" if anonymous else self.pharmacy.name,
+                )
+
+    def test_filled_notices_mask_the_loser_and_reveal_the_pharmacy_to_the_winner(self):
+        from shifts.emails import send_shift_payment_finalized_notifications
+        from shifts.finalize import finalize_shift_offer
+
+        shift = self.shift_post
+        other_shift = self.shift(visibility="PLATFORM")
+        other_slot = other_shift.slots.get()
+        ShiftSlotAssignment.objects.create(
+            shift=other_shift, slot=other_slot, slot_date=other_slot.date, user=self.candidate,
+        )
+        ShiftInterest.objects.create(shift=shift, user=self.candidate)
+        winner = self.worker(employment_type=None)
+        offer = ShiftOffer.objects.create(shift=shift, user=winner, offered_rate=Decimal("70"))
+        finalize_shift_offer(offer)
+        with queued_emails() as sent:
+            send_shift_payment_finalized_notifications(shift=shift, offers=[offer])
+        self.assert_delivery_identity(self.candidate, "shift_not_selected_after_payment", sent, "Anonymous Pharmacy")
+        self.assert_delivery_identity(winner, "shift_payment_finalized_worker", sent, self.pharmacy.name)
+
+    def test_counter_offer_responses_mask_notices_and_emails(self):
+        shift = self.shift_post
+        slot = shift.slots.get()
+        for action, kind in (("accept", "shift_counter_offer_accepted"), ("reject", "shift_counter_offer_declined")):
+            with self.subTest(action=action):
+                worker = self.worker(employment_type=None)
+                counter = ShiftCounterOffer.objects.create(shift=shift, user=worker)
+                ShiftCounterOfferSlot.objects.create(
+                    offer=counter, slot=slot, slot_date=slot.date, proposed_start_time=slot.start_time,
+                    proposed_end_time=slot.end_time, proposed_rate=Decimal("75"),
+                )
+                with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+                    response = self.owner_client.post(
+                        f"{API}shifts/{shift.id}/counter-offers/{counter.id}/{action}/", {}, format="json",
+                    )
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assert_delivery_identity(worker, kind, sent, "Anonymous Pharmacy")
+
+    def test_dedicated_offer_masks_the_notice_and_email(self):
+        from shifts.assignment import offer_dedicated_shift
+
+        with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
+            offer_dedicated_shift(self.shift_post, self.candidate)
+        self.assert_delivery_identity(self.candidate, "shift_offer_received", sent, "Anonymous Pharmacy")
 
 
 class CancellationWageContracts(ShiftActionFixture):
@@ -187,6 +350,16 @@ class ExpressInterestTests(ShiftActionFixture):
         self.assertEqual(notice.title, "New public shift interest")
         self.assertTrue(notice.body.startswith("A candidate expressed interest"))
         self.assertEqual([e["template"] for e in sent], ["emails/shift_interest.html"])
+
+    def test_unverified_favourite_is_refused_but_own_employee_can_apply(self):
+        for employment, expected in (("LOCUM", 403), ("FULL_TIME", 201)):
+            worker = self.worker(employment_type=employment, verified=False)
+            for anonymous in (False, True):
+                with self.subTest(employment=employment, anonymous=anonymous):
+                    shift = self.shift(visibility="PLATFORM", post_anonymously=anonymous)
+                    response, _ = self.post(worker, f"public-shifts/{shift.id}/express_interest/")
+                    self.assertEqual(response.status_code, expected, response.data)
+                    self.assertEqual(ShiftInterest.objects.filter(shift=shift, user=worker).exists(), expected == 201)
 
     def test_unknown_shift_is_not_found(self):
         response, _ = self.post(self.worker(), "shifts/999999/express_interest/")
@@ -376,6 +549,100 @@ class CounterOfferTests(ShiftActionFixture):
         with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
             response = client_for(worker).post(f"{API}shifts/{shift.id}/counter-offers/", payload, format="json")
         return response, sent
+
+    def test_unverified_workers_can_receive_only_chain_and_organization_offers(self):
+        org = Organization.objects.create(name="Booking organization")
+        self.pharmacy.organization = org
+        self.pharmacy.save(update_fields=["organization"])
+        sibling = Pharmacy.objects.create(name="Sibling", owner=self.pharmacy.owner, organization=org)
+        chain = Chain.objects.create(name="Booking chain", owner=self.pharmacy.owner)
+        chain.pharmacies.add(self.pharmacy, sibling)
+        worker = self.worker(employment_type="LOCUM", verified=False)
+        Membership.objects.create(user=worker, pharmacy=sibling, role="PHARMACIST", employment_type="FULL_TIME")
+
+        for visibility in ("LOCUM_CASUAL", "OWNER_CHAIN", "ORG_CHAIN", "PLATFORM"):
+            with self.subTest(visibility=visibility):
+                shift = self.shift(single_user_only=False, visibility=visibility, rate_type="FLEXIBLE")
+                slot = shift.slots.get()
+                interest, _ = self.post(worker, f"shifts/{shift.id}/express_interest/", {"slot_id": slot.id})
+                self.assertEqual(interest.status_code, 403, interest.data)
+                submitted, _ = self.submit(worker, shift, slot)
+                self.assertEqual(submitted.status_code, 403, submitted.data)
+                self.assertFalse(ShiftInterest.objects.filter(shift=shift).exists())
+                self.assertFalse(ShiftCounterOffer.objects.filter(shift=shift).exists())
+
+                with mock.patch("onboarding.verification.state.queue_public_recheck") as recheck, \
+                        queued_emails(), self.captureOnCommitCallbacks(execute=True):
+                    offered = self.owner_client.post(f"{API}shifts/{shift.id}/accept_user/",
+                                                     {"user_id": worker.id, "slot_id": slot.id}, format="json")
+                chain_offer = visibility in ("OWNER_CHAIN", "ORG_CHAIN")
+                notices = Notification.objects.filter(
+                    user=self.owner, payload__shift_id=shift.id,
+                    payload__notification_kind="shift_worker_credentials_notice",
+                )
+                if chain_offer:
+                    self.assertEqual(offered.status_code, 200, offered.data)
+                    credentials = {"ok": False, "code": "booking_onboarding_required"}
+                    self.assertEqual(offered.data["worker_credentials"], credentials)
+                    recheck.assert_called_once_with(worker)
+                    payload = notices.get().payload
+                    self.assertEqual(payload["worker_id"], worker.pk)
+                    self.assertEqual(payload["worker_credentials"], credentials)
+                else:
+                    self.assertEqual((offered.status_code, offered.data.get("code")), (403, "candidate_ahpra_ineligible"))
+                counter = ShiftCounterOffer.objects.create(shift=shift, user=worker)
+                ShiftCounterOfferSlot.objects.create(offer=counter, slot=slot, slot_date=slot.date, proposed_start_time=time(9),
+                                                     proposed_end_time=time(17), proposed_rate=Decimal("75"))
+                accepted, _ = self.post(self.owner, f"shifts/{shift.id}/counter-offers/{counter.id}/accept/")
+                counter.refresh_from_db()
+                if chain_offer:
+                    self.assertEqual(accepted.status_code, 200, accepted.data)
+                    self.assertEqual(counter.status, ShiftCounterOffer.Status.ACCEPTED)
+                    self.assertEqual(accepted.data["offer_ids"], [offered.data["offer_id"]])
+                    self.assertEqual(notices.count(), 1)
+
+                    offer = ShiftOffer.objects.get(pk=offered.data["offer_id"])
+                    with mock.patch("shifts.engagement.build_shift_engagement_terms", return_value={}), \
+                            mock.patch("billing.utils.get_billing_state_for_pharmacy", return_value="FREE"):
+                        confirmed, _ = self.post(worker, f"shift-offers/{offer.pk}/accept/")
+                    self.assertEqual(confirmed.status_code, 200, confirmed.data)
+                    offer.refresh_from_db()
+                    self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED)
+                    assignment = ShiftSlotAssignment.objects.get(shift=shift, slot=slot)
+                    self.assertEqual((assignment.user_id, assignment.source_offer_id), (worker.pk, offer.pk))
+                    self.assertEqual(notices.count(), 1)
+                    assignment.delete()  # the next tier books the same hours
+                else:
+                    self.assertEqual((accepted.status_code, accepted.data.get("code")), (403, "candidate_ahpra_ineligible"))
+                    self.assertEqual(counter.status, ShiftCounterOffer.Status.PENDING)
+                    self.assertFalse(ShiftOffer.objects.filter(shift=shift).exists())
+                    self.assertFalse(notices.exists())
+
+    def test_group_exception_requires_current_membership_at_send_and_accept(self):
+        org = Organization.objects.create(name="Booking organization")
+        self.pharmacy.organization = org
+        self.pharmacy.save(update_fields=["organization"])
+        sibling = Pharmacy.objects.create(name="Sibling", owner=self.pharmacy.owner, organization=org)
+        same_owner = Pharmacy.objects.create(name="Outside chain", owner=self.pharmacy.owner)
+        chain = Chain.objects.create(name="Booking chain", owner=self.pharmacy.owner)
+        chain.pharmacies.add(self.pharmacy, sibling)
+        worker = self.worker(employment_type=None, verified=False)
+        Membership.objects.create(user=worker, pharmacy=same_owner, role="PHARMACIST", employment_type="FULL_TIME")
+        for visibility in ("OWNER_CHAIN", "ORG_CHAIN"):
+            with self.subTest(visibility=visibility):
+                shift = self.shift(visibility=visibility)
+                send = f"shifts/{shift.pk}/accept_user/"
+                refused, _ = self.post(self.owner, send, {"user_id": worker.pk})
+                self.assertEqual((refused.status_code, refused.data["code"]), (403, "candidate_ahpra_ineligible"))
+                membership = Membership.objects.create(
+                    user=worker, pharmacy=sibling, role="PHARMACIST", employment_type="FULL_TIME",
+                )
+                offered, _ = self.post(self.owner, send, {"user_id": worker.pk})
+                self.assertEqual(offered.status_code, 200, offered.data)
+                membership.delete()
+                response, _ = self.post(worker, f'shift-offers/{offered.data["offer_id"]}/accept/')
+                self.assertEqual(response.status_code, 403, response.data)
+                self.assertFalse(shift.slot_assignments.exists())
 
     def test_public_counteroffer_preserves_onboarding_outcomes_with_enforcement_on_or_off(self):
         for enforcement in (True, False):
@@ -960,6 +1227,149 @@ class BookingSafetyTests(ShiftActionFixture):
                 self.captureOnCommitCallbacks(execute=True):
             return client_for(offer.user).post(f'{API}shift-offers/{offer.id}/accept/', {}, format='json')
 
+    def test_accept_starts_payment_hold_before_any_checkout(self):
+        shift = self.shift(single_user_only=False)
+        worker = self.worker(employment_type=None, verified=True)
+        slot = shift.slots.first()
+        slot.date = timezone.localdate() + timedelta(days=3)
+        slot.save(update_fields=['date'])
+        offer = self.offer(shift, worker, offered_slot_date=slot.date)
+        now = timezone.now()
+        with mock.patch('django.utils.timezone.now', return_value=now):
+            response = self.accept(offer)
+        self.assertEqual(response.status_code, 200, response.data)
+        offer.refresh_from_db()
+        self.assertEqual(offer.pay_by_at, now + timedelta(hours=24))
+        self.assertFalse(shift.fulfillment_checkouts.exists())
+
+    def test_bl12_accept_rejects_a_confirmed_booking_on_another_shift(self):
+        worker = self.worker()
+        first = self.offer(self.shift(), worker)
+        self.assertEqual(self.accept(first, payment=False).status_code, 200)
+        offer = self.offer(self.shift(), worker)
+
+        response = self.accept(offer)
+
+        self.assertIn(response.status_code, (400, 409), response.data)
+        self.assertEqual(response.data['code'], 'worker_booking_overlap')
+        self.assertIn(f'{DAY} 09:00', str(response.data['detail']))
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+
+    def test_bl12_finalization_rechecks_for_a_roster_assignment_after_acceptance(self):
+        from rest_framework.exceptions import ValidationError
+        from shifts.finalize import finalize_shift_offer
+
+        worker = self.worker()
+        offer = self.offer(self.shift(), worker)
+        self.assertEqual(self.accept(offer).status_code, 200)
+        other = self.shift()
+        slot = other.slots.get()
+        ShiftSlotAssignment.objects.create(
+            shift=other, slot=slot, slot_date=slot.date, user=worker, is_rostered=True,
+        )
+
+        with self.assertRaisesMessage(ValidationError, f'{DAY} 09:00'):
+            finalize_shift_offer(offer)
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.assertFalse(offer.shift.slot_assignments.exists())
+
+    def test_bl12_accept_rejects_overlap_with_another_unpaid_hold(self):
+        worker = self.worker()
+        held = self.offer(self.shift(), worker)
+        self.assertEqual(self.accept(held).status_code, 200)
+        ShiftOffer.objects.filter(pk=held.pk).update(expires_at=timezone.now() - timedelta(seconds=1))
+        second = self.offer(self.shift(), worker)
+
+        response = self.accept(second, payment=False)
+
+        self.assertIn(response.status_code, (400, 409), response.data)
+        self.assertIn(f'{DAY} 09:00', str(response.data['detail']))
+        held.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(held.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.assertEqual(second.status, ShiftOffer.Status.PENDING)
+
+    def test_finalization_rejects_a_pricing_error_without_assigning(self):
+        from rest_framework.exceptions import ValidationError
+        from shifts.finalize import finalize_shift_offer
+
+        offer = self.offer(self.shift(), self.worker(), status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        with mock.patch('shifts.finalize.get_locked_rate_for_slot', return_value=(Decimal('0'), {'error': 'missing wage'})):
+            with self.assertRaises(ValidationError) as refusal:
+                finalize_shift_offer(offer)
+        self.assertEqual(refusal.exception.detail['code'], 'booking_rate_unavailable')
+        self.assertFalse(offer.slot_assignments.exists())
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+
+    def test_finalization_accepts_intentional_timesheet_only_zero(self):
+        from shifts.finalize import finalize_shift_offer
+
+        offer = self.offer(self.shift(), self.worker(), status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        reason = {'source': 'StaffEmployment', 'settlement_channel': 'TIMESHEET_ONLY'}
+        with mock.patch('shifts.finalize.get_locked_rate_for_slot', return_value=(Decimal('0'), reason)):
+            finalize_shift_offer(offer)
+        assignment = offer.slot_assignments.get()
+        self.assertEqual((assignment.unit_rate, assignment.rate_reason), (Decimal('0'), reason))
+
+    def test_bl12_touching_edges_are_allowed(self):
+        worker = self.worker()
+        first = self.offer(self.shift(), worker)
+        self.assertEqual(self.accept(first, payment=False).status_code, 200)
+        second = self.offer(self.shift(), worker)
+        second.shift.slots.update(start_time=time(17), end_time=time(19))
+
+        response = self.accept(second, payment=False)
+
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_bl12_cancelled_assignment_and_inactive_offers_are_ignored(self):
+        worker = self.worker()
+        booked = self.offer(self.shift(), worker)
+        self.assertEqual(self.accept(booked, payment=False).status_code, 200)
+        booked.slot_assignments.get().delete()
+        for state in (ShiftOffer.Status.EXPIRED, ShiftOffer.Status.DECLINED):
+            self.offer(self.shift(), worker, status=state)
+        response = self.accept(self.offer(self.shift(), worker), payment=False)
+
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_bl12_accept_compares_overnight_work_in_absolute_time(self):
+        worker = self.worker()
+        self.pharmacy.timezone = 'Australia/Perth'
+        self.pharmacy.save(update_fields=['timezone'])
+        overnight = self.shift(single_user_only=False)
+        overnight.slots.update(start_time=time(22), end_time=time(6))
+        # The negotiated Perth end of 07:00 is 09:00 in Brisbane.
+        held = self.offer(overnight, worker, offered_end_time=time(7), offered_slot_date=DAY)
+        self.assertEqual(self.accept(held).status_code, 200)
+        _, other_pharmacy = make_owner_with_pharmacy('Brisbane overlap')
+        other_pharmacy.timezone = 'Australia/Brisbane'
+        other_pharmacy.save(update_fields=['timezone'])
+        second = self.shift()
+        Shift.objects.filter(pk=second.pk).update(pharmacy=other_pharmacy)
+        second.slots.update(date=DAY + timedelta(days=1), start_time=time(8, 30), end_time=time(10))
+
+        response = self.accept(self.offer(second, worker))
+
+        self.assertIn(response.status_code, (400, 409), response.data)
+        self.assertIn(f'{DAY + timedelta(days=1)} 07:00', str(response.data['detail']))
+
+    def test_bl12_accept_and_finalization_lock_the_worker_row(self):
+        from shifts.finalize import finalize_shift_offer
+
+        worker = self.worker()
+        offer = self.offer(self.shift(), worker)
+        users = type(worker).objects
+        with mock.patch.object(users, 'select_for_update', wraps=users.select_for_update) as lock:
+            self.assertEqual(self.accept(offer).status_code, 200)
+            lock.assert_called_once_with(no_key=True)
+            lock.reset_mock()
+            self.assertEqual(len(finalize_shift_offer(offer)[0]), 1)
+            lock.assert_called_once_with(no_key=True)
+
     def test_offer_terms_version_requires_reviewed_snapshot_and_preserves_pending_on_stale(self):
         """D2: missing and changed terms cannot reserve work; unchanged reviewed terms still can."""
         from shifts.engagement import shift_engagement_terms_version
@@ -1038,6 +1448,55 @@ class BookingSafetyTests(ShiftActionFixture):
                         else:
                             self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
                         self.assertFalse(ShiftSlotAssignment.objects.filter(shift=shift).exists())
+
+    def test_non_public_offer_acceptance_refuses_unverified_favourite(self):
+        shift = self.shift(visibility="LOCUM_CASUAL")
+        offer = self.offer(shift, self.worker(verified=False))
+        response = self.accept(offer)
+        self.assertEqual(response.status_code, 403, response.data)
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.PENDING)
+        self.assertFalse(ShiftSlotAssignment.objects.filter(shift=shift).exists())
+
+    def test_delayed_fulfillment_rechecks_worker_verification(self):
+        from rest_framework.exceptions import ValidationError
+        from shifts.finalize import finalize_shift_offer
+
+        shift = self.shift(visibility="LOCUM_CASUAL")
+        worker = self.worker()
+        offer = self.offer(shift, worker)
+        self.assertEqual(self.accept(offer).status_code, 200)
+        PharmacistOnboarding.objects.filter(user=worker).update(verified=False)
+
+        with self.assertRaises(ValidationError) as refused:
+            finalize_shift_offer(offer)
+
+        self.assertEqual(refused.exception.detail['code'], 'candidate_ahpra_ineligible')
+        self.assertEqual(refused.exception.detail['detail'], "This worker can't be booked right now.")
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+        self.assertFalse(ShiftSlotAssignment.objects.filter(shift=shift).exists())
+
+    def test_group_fulfillment_assigns_unverified_worker_and_notifies_manager(self):
+        from shifts.finalize import finalize_shift_offer
+
+        shift = self.shift(visibility="OWNER_CHAIN")
+        worker = self.worker(verified=False)
+        sibling = Pharmacy.objects.create(name="Sibling", owner=self.pharmacy.owner)
+        chain = Chain.objects.create(name="Booking chain", owner=self.pharmacy.owner)
+        chain.pharmacies.add(self.pharmacy, sibling)
+        Membership.objects.create(user=worker, pharmacy=sibling, role="PHARMACIST", employment_type="FULL_TIME")
+        offer = self.offer(shift, worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+
+        assignment_ids, _ = finalize_shift_offer(offer)
+
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, ShiftOffer.Status.ACCEPTED)
+        assignment = ShiftSlotAssignment.objects.get(shift=shift, user=worker, source_offer=offer)
+        self.assertEqual(assignment_ids, [assignment.pk])
+        [notice] = notifications_for(self.owner, "shift_worker_credentials_notice")
+        self.assertEqual(notice.payload["worker_id"], worker.pk)
+        self.assertEqual(notice.payload["worker_credentials"], {"ok": False, "code": "booking_onboarding_required"})
 
     def test_b54_second_confirmation_cannot_reserve_the_same_occurrence(self):
         for payment in (True, False):
@@ -1190,7 +1649,9 @@ class BookingSafetyTests(ShiftActionFixture):
                                         {'slot_id': slot.id, 'slot_date': str(slot.date)}]})]:
                 response, _ = self.post(self.owner, f'shifts/{shift.id}/{action}/', payload)
                 self.assertEqual(response.status_code, expected, response.data)
-            offer = self.offer(self.shift(single_user_only=False), worker)
+            offer_shift = self.shift(single_user_only=False)
+            offer_shift.slots.update(date=slot.date + timedelta(days=1))
+            offer = self.offer(offer_shift, worker)
             self.assertEqual(self.accept(offer).status_code, expected)
 
     def test_f05_n1_explorer_requires_verification_to_apply(self):
@@ -1303,7 +1764,7 @@ class OfferConfirmationRaceTests(TransactionTestCase):
         from workforce.models import RosterRevisionState
 
         owner, pharmacy = make_owner_with_pharmacy('Booking and roster lock order')
-        staff_worker, offered_worker = make_user('PHARMACIST'), make_user('PHARMACIST')
+        staff_worker, offered_worker = make_user('PHARMACIST'), make_verified_pharmacist()
         Membership.objects.create(
             user=staff_worker, pharmacy=pharmacy, role='PHARMACIST', employment_type='FULL_TIME',
             status=Membership.Status.ACCEPTED, is_active=True,
@@ -1365,7 +1826,8 @@ class OfferConfirmationRaceTests(TransactionTestCase):
                     pids['roster'] = cursor.fetchone()[0]
 
                 def observe_shift_lock(execute, sql, params, many, context):
-                    if '"client_profile_shift"' in sql and 'FOR UPDATE' in sql.upper():
+                    # The booking holds the shift and the worker: the roster edit meets whichever it locks first.
+                    if any(f'FROM "{table}"' in sql for table in ('client_profile_shift', 'users_user')) and 'UPDATE NOWAIT' in sql.upper():
                         roster_attempted.set()
                     return execute(sql, params, many, context)
 
@@ -1432,7 +1894,7 @@ class OfferConfirmationRaceTests(TransactionTestCase):
             )
             slot.roster_period = period
             slot.save(update_fields=['roster_period'])
-        staff_worker, offered_worker = make_user('PHARMACIST'), make_user('PHARMACIST')
+        staff_worker, offered_worker = make_user('PHARMACIST'), make_verified_pharmacist()
         Membership.objects.create(
             user=staff_worker, pharmacy=pharmacy, role='PHARMACIST', employment_type='FULL_TIME',
             status=Membership.Status.ACCEPTED, is_active=True,
@@ -1529,7 +1991,7 @@ class OfferConfirmationRaceTests(TransactionTestCase):
             end_time=time(17),
             rate=Decimal('70'),
         )
-        offered_worker = make_user('PHARMACIST')
+        offered_worker = make_verified_pharmacist()
         offer = ShiftOffer.objects.create(
             shift=shift,
             slot=slot,
@@ -1616,7 +2078,7 @@ class OfferConfirmationRaceTests(TransactionTestCase):
             shift = Shift.objects.create(pharmacy=pharmacy, created_by=owner, role_needed='PHARMACIST',
                                          employment_type='LOCUM', visibility='LOCUM_CASUAL', single_user_only=False)
             slot = ShiftSlot.objects.create(shift=shift, date=DAY, start_time=time(9), end_time=time(17), rate=Decimal('70'))
-            workers = [make_user('PHARMACIST') for _ in range(2)]
+            workers = [make_verified_pharmacist() for _ in range(2)]
             offers = [ShiftOffer.objects.create(shift=shift, slot=slot, user=worker, offered_slot_date=DAY) for worker in workers]
             barrier = Barrier(2)
             original_get = ShiftOfferViewSet.get_object

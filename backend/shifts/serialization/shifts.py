@@ -5,13 +5,14 @@ from onboarding.services.skill_identity import normalize_skills
 from drf_spectacular.utils import extend_schema_field
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
 from shifts.models import Shift, ShiftDescriptionTemplate, ShiftOffer
-from shifts.escalation import allowed_tiers
+from shifts.escalation import allowed_tiers, validate_visibility
 from shifts.pricing import expand_shift_slots
 from shifts.selectors import slot_occurrence_ended
 from django.utils import timezone
 from organizations.access import user_can_manage_pharmacy
 from organizations.timezone import get_pharmacy_timezone
-from organizations.serializers import anonymize_pharmacy_detail, PharmacySerializer, user_can_view_full_pharmacy
+from organizations.serializers import PharmacySerializer, user_can_view_full_pharmacy
+from shifts.pharmacy_visibility import project_shift_pharmacy, should_mask_shift_pharmacy
 from shifts.posting import ensure_escalation_stamps, normalize_money_value, normalize_slots_payload, post_shift, revise_shift
 from shifts.travel import haversine_km
 from shifts.rate_visibility import project_published_rates, published_rates_visible
@@ -197,8 +198,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         request = self.context.get('request')
         user = getattr(request, 'user', None) if request else None
-        if instance.post_anonymously and not user_can_view_full_pharmacy(user, instance.pharmacy):
-            data['pharmacy_detail'] = anonymize_pharmacy_detail(data.get('pharmacy_detail'))
+        data['pharmacy_detail'] = project_shift_pharmacy(instance, user, data.get('pharmacy_detail'))
         if not user_can_view_full_pharmacy(user, instance.pharmacy):
             for field in PharmacySerializer.file_fields:
                 data.get('pharmacy_detail', {}).pop(field, None)
@@ -255,7 +255,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         pharmacy = getattr(obj, 'pharmacy', None)
         request = self.context.get('request')
         user = getattr(request, 'user', None) if request else None
-        anonymize = obj.post_anonymously and not user_can_view_full_pharmacy(user, pharmacy)
+        anonymize = should_mask_shift_pharmacy(obj, user)
         return self._get_address_parts(pharmacy, anonymize=anonymize)
 
     def _get_user_location(self, user):
@@ -324,12 +324,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         # Build the correct path
         allowed_tiers = self.build_allowed_tiers(validated_data['pharmacy'])
 
-        # Ensure the front-end’s choice is valid
-        chosen = validated_data.get('visibility')
-        if chosen not in allowed_tiers:
-            raise serializers.ValidationError({
-                'visibility': f"Invalid choice; must be one of {allowed_tiers}"
-            })
+        validate_visibility(validated_data['pharmacy'], validated_data.get('visibility'), allowed_tiers)
 
         request = self.context.get('request')
         return post_shift(
@@ -350,18 +345,9 @@ class ShiftSerializer(serializers.ModelSerializer):
         validated_data.pop('notify_favorite_staff', None)
         validated_data.pop('notify_chain_members', None)
         apply_rates_to_pharmacy = validated_data.pop('apply_rates_to_pharmacy', False)
-        allowed_tiers = None
-        if 'visibility' in validated_data:
-            allowed_tiers = self.build_allowed_tiers(instance.pharmacy)
-            new_vis = validated_data['visibility']
-            if new_vis not in allowed_tiers:
-                raise serializers.ValidationError({
-                    'visibility': f"Invalid choice; must be one of {allowed_tiers}"
-                })
         return revise_shift(
             instance,
             validated_data,
-            allowed_tiers=allowed_tiers,
             slots_payload=self._initial_slots_payload(),
             rate_request_data=getattr(self.context.get('request'), 'data', {}),
             apply_rates_to_pharmacy=apply_rates_to_pharmacy,

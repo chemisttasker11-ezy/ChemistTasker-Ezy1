@@ -4,11 +4,11 @@ configuration, the admin user list and WebSocket tickets.
 Logs go to the historical "users.views" channel that operators filter on."""
 import secrets
 import logging
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework import serializers
+from rest_framework_simplejwt.views import TokenViewBase
 from rest_framework import viewsets, permissions, filters, generics, status
 from rest_framework.response import Response
 from django.conf import settings
-from django.db import transaction
 from rest_framework.views import APIView
 from users.tasks import send_async_email
 from users.delivery import deliver_email_best_effort
@@ -17,13 +17,17 @@ from users.serializers import (
     UserRegistrationSerializer,
     CustomTokenObtainPairSerializer,
     UserProfileSerializer,
-    CustomTokenRefreshSerializer,
 )
 from users.models import WebSocketTicket
-from users.tokens import notify_auth_changed
-from users.login_security import _get_login_attempt_state, _login_failure_response, _login_invalid_credentials_response
 from users.recaptcha import verify_recaptcha
-from users.sessions import _build_authenticated_user_payload, _clear_auth_cookies, _is_web_client, _set_auth_cookies
+from users.authentication import enforce_browser_csrf
+from users.device_sessions import logout_device_session, refresh_device_session
+from users.sessions import (
+    TRUSTED_DEVICE_COOKIE, build_authenticated_user_payload, clear_auth_cookies, is_web_client,
+    set_auth_cookies, set_trusted_device_cookie,
+)
+from users.sign_in import complete_two_factor_login, send_two_factor_login_code, sign_in
+from users.two_factor import METHODS, TRUSTED_DEVICE_TTL
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -71,85 +75,100 @@ class RegisterView(generics.CreateAPIView):
         )
 
 
-class CustomLoginView(TokenObtainPairView):
+def _login_response(response, web):
+    if response.status_code < 400:
+        set_auth_cookies(response, access_token=response.data["access"], refresh_token=response.data["refresh"])
+        if web:
+            response.data.pop("refresh")
+            if token := response.data.pop("trusted_device_token", None):
+                set_trusted_device_cookie(response, token, TRUSTED_DEVICE_TTL)
+    return response
+
+
+class CustomLoginView(TokenViewBase):
     serializer_class = CustomTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
-        from .authentication import enforce_browser_csrf
         enforce_browser_csrf(request)
-        email = (request.data.get("email") or "").strip().lower()
-        remember_me = request.data.get("remember_me")
-        remember_me = remember_me if isinstance(remember_me, bool) else None
-        credentials = {"username": email}
-        attempt_state = _get_login_attempt_state(request, credentials)
-        if attempt_state and attempt_state["locked"]:
-            return _login_failure_response(attempt_state)
-
-        user = User.objects.filter(email__iexact=email).first() if email else None
-        supplied_password = request.data.get("password") or ""
-        password_matches = bool(user and user.check_password(supplied_password))
-        try:
-            response = super().post(request, *args, **kwargs)
-        except AuthenticationFailed:
-            attempt_state = _get_login_attempt_state(request, credentials)
-            return _login_invalid_credentials_response(
-                user,
-                attempt_state,
-                password_matches=password_matches,
-            )
-
-        if response.status_code >= 400:
-            attempt_state = _get_login_attempt_state(request, credentials)
-            return _login_invalid_credentials_response(
-                user,
-                attempt_state,
-                password_matches=password_matches,
-            )
-        access = response.data.get("access")
-        refresh = response.data.get("refresh")
-        if access and refresh:
-            _set_auth_cookies(response, access_token=access, refresh_token=refresh, remember_me=remember_me)
-        if _is_web_client(request):
-            response.data.pop("refresh", None)
-        return response
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        fields = dict(serializer.validated_data)
+        web = is_web_client(request)
+        native_token = fields.pop("trusted_device_token", None)
+        response = sign_in(
+            request, client_kind="web" if web else "native",
+            trusted_token=request.COOKIES.get(TRUSTED_DEVICE_COOKIE) if web else native_token,
+            captcha_token=request.data.get("captcha_token"), recovery_code=request.data.get("recovery_code"),
+            verify_captcha=verify_recaptcha, **fields,
+        )
+        return _login_response(response, web)
 
 
-class CustomTokenRefreshView(TokenRefreshView):
-    serializer_class = CustomTokenRefreshSerializer
+class LoginChallengeSerializer(serializers.Serializer):
+    challenge_token = serializers.CharField(max_length=2048)
+
+
+class CompleteTwoFactorLoginSerializer(LoginChallengeSerializer):
+    method = serializers.ChoiceField(choices=METHODS)
+    code = serializers.CharField(max_length=64)
+    remember_device = serializers.BooleanField(required=False)
+
+
+class CompleteTwoFactorLoginView(TokenViewBase):
+    serializer_class = CompleteTwoFactorLoginSerializer
 
     def post(self, request, *args, **kwargs):
-        from .authentication import enforce_browser_csrf
         enforce_browser_csrf(request)
-        mutable_data = request.data.copy()
-        if not mutable_data.get("refresh"):
-            cookie_refresh = request.COOKIES.get(getattr(settings, "JWT_REFRESH_COOKIE", "ct_refresh"))
-            if cookie_refresh:
-                mutable_data["refresh"] = cookie_refresh
-        if not mutable_data.get("refresh"):
-            response = Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
-            _clear_auth_cookies(response)
-            return response
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        web = is_web_client(request)
+        response = complete_two_factor_login(
+            request, client_kind="web" if web else "native", **serializer.validated_data,
+        )
+        return _login_response(response, web)
 
-        serializer = self.get_serializer(data=mutable_data)
+
+class SendTwoFactorLoginCodeView(TokenViewBase):
+    serializer_class = LoginChallengeSerializer
+
+    def post(self, request, *args, **kwargs):
+        enforce_browser_csrf(request)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return send_two_factor_login_code(
+            request, client_kind="web" if is_web_client(request) else "native", **serializer.validated_data,
+        )
+
+
+class RefreshInputSerializer(serializers.Serializer):
+    refresh = serializers.CharField()
+
+
+class CustomTokenRefreshView(TokenViewBase):
+    serializer_class = RefreshInputSerializer
+
+    def post(self, request, *args, **kwargs):
+        enforce_browser_csrf(request)
+        raw_refresh = request.data.get("refresh") or request.COOKIES.get(settings.JWT_REFRESH_COOKIE)
+        serializer = self.get_serializer(data={"refresh": raw_refresh})
         try:
             serializer.is_valid(raise_exception=True)
-        except ValidationError:
-            response = Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
-            _clear_auth_cookies(response)
-            return response
+            payload = refresh_device_session(request, serializer.validated_data["refresh"])
+        except (ValidationError, AuthenticationFailed):
+            payload = None
         except Exception:
             logging.getLogger("users.views").exception("Unexpected refresh failure")
+            payload = None
+
+        if payload is None:
             response = Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
-            _clear_auth_cookies(response)
+            clear_auth_cookies(response)
             return response
 
-        response = Response(serializer.validated_data, status=status.HTTP_200_OK)
-
-        access = serializer.validated_data.get("access")
-        refresh = serializer.validated_data.get("refresh")
-        if access and refresh:
-            _set_auth_cookies(response, access_token=access, refresh_token=refresh, remember_me=serializer.validated_data.get('remember_me'))
-        if _is_web_client(request):
+        response = Response(payload)
+        if refresh := payload.get("refresh"):
+            set_auth_cookies(response, access_token=payload["access"], refresh_token=refresh)
+        if is_web_client(request):
             response.data.pop("refresh", None)
         return response
 
@@ -159,31 +178,11 @@ class LogoutView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
-        from .authentication import enforce_browser_csrf
         enforce_browser_csrf(request)
-        from rest_framework_simplejwt.tokens import RefreshToken, UntypedToken
-        from rest_framework_simplejwt.exceptions import TokenError
-        token = request.COOKIES.get(getattr(settings, 'JWT_REFRESH_COOKIE', 'ct_refresh')) or request.data.get('refresh')
-        if token:
-            try:
-                refresh = UntypedToken(token)
-                if refresh.get('token_type') == 'refresh':
-                    # Close only this session's sockets; rotation keeps `sid`, so the rotated-away token works too.
-                    sid = refresh.get('sid', refresh['jti'])
-                    from users.models import RevokedSession
-                    RevokedSession.objects.get_or_create(session_id=sid)
-                    WebSocketTicket.objects.filter(session_id=sid).delete()
-                    transaction.on_commit(lambda: notify_auth_changed(refresh['user_id'], sid))
-                    device_token = request.data.get('device_token')
-                    if isinstance(device_token, str) and device_token:
-                        from users.models import DeviceToken
-                        # Rotation must not prevent unregistering this user's device during logout.
-                        DeviceToken.objects.filter(user_id=refresh['user_id'], token=device_token).delete()
-                    RefreshToken(token).blacklist()
-            except TokenError:
-                pass
-        response = Response({"detail": "Logged out successfully."}, status=200)
-        _clear_auth_cookies(response)
+        token = request.COOKIES.get(settings.JWT_REFRESH_COOKIE) or request.data.get("refresh")
+        logout_device_session(token, request.data.get("device_token"))
+        response = Response({"detail": "Logged out successfully."})
+        clear_auth_cookies(response)
         return response
 
 
@@ -191,7 +190,7 @@ class CurrentUserView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        return Response(_build_authenticated_user_payload(request.user), status=200)
+        return Response(build_authenticated_user_payload(request.user, current_user=True), status=200)
 
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):

@@ -3,18 +3,46 @@
 The list views compose these instead of repeating the filters.
 """
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 from django.db.models import Exists, F, OuterRef, Q
 
+from memberships.models import FAVORITE_STAFF_EMPLOYMENT_TYPES, Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
 from organizations.access import managed_pharmacies
-from organizations.models import Pharmacy
+from organizations.models import Chain, Pharmacy
 from organizations.timezone import get_pharmacy_timezone
+from shifts.escalation import COMMUNITY_LEVELS, PUBLIC_LEVEL
 from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
 
 
 def shifts_managed_by(queryset, user):
     """The shifts the user created or whose pharmacy they manage."""
     return queryset.filter(Q(created_by=user) | Q(pharmacy__in=managed_pharmacies(user)))
+
+
+def community_membership_q(user):
+    """Member audiences accumulate as shifts widen, independently of notification settings."""
+    memberships = Membership.objects.filter(user=user, is_active=True, status=Membership.Status.ACCEPTED)
+    staff = memberships.filter(employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES)
+    favourites = memberships.filter(employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES)
+    named_public = Q(visibility=PUBLIC_LEVEL, post_anonymously=False)
+    organisation_or_public = Q(visibility='ORG_CHAIN') | named_public
+    # A shift can skip the owner-chain tier if its pharmacy has no active owner chain.
+    has_owner_chain = Q(Exists(Chain.objects.filter(
+        owner_id=OuterRef('pharmacy__owner_id'), pharmacies=OuterRef('pharmacy_id'), is_active=True,
+    )))
+    return (
+        (Q(pharmacy_id__in=staff.values('pharmacy_id')) & (
+            Q(visibility__in=COMMUNITY_LEVELS) | named_public
+        ))
+        | (Q(pharmacy_id__in=favourites.values('pharmacy_id')) & (
+            Q(visibility__in=['LOCUM_CASUAL', 'OWNER_CHAIN', 'ORG_CHAIN']) | named_public
+        ))
+        | (Q(pharmacy__owner_id__in=staff.values('pharmacy__owner_id')) & (
+            Q(visibility='OWNER_CHAIN') | (organisation_or_public & has_owner_chain)
+        ))
+        | (Q(pharmacy__organization_id__in=staff.values('pharmacy__organization_id')) & organisation_or_public)
+    )
 
 
 def slot_occurrence_ended(slot_date, start_time, end_time, local_date, clock):
@@ -31,6 +59,27 @@ def slot_not_ended_q(local_date, clock, *, date='date', start='start_time', end=
         | (Q(**{date: local_date}) & (Q(**{f'{end}__gte': clock}) | overnight))
         | (Q(**{date: local_date - timedelta(days=1), f'{end}__gte': clock}) & overnight)
     )
+
+
+BOOKED_TIMEZONE = 'engagement_terms_snapshot__booking_site__timezone'
+
+
+def assignment_not_ended_q(now, zone):
+    local = now.astimezone(zone)
+    times = {'start': 'slot__start_time', 'end': 'slot__end_time'}
+    return slot_not_ended_q(local.date(), local.time(), date='slot_date', **times) | (
+        Q(slot_date__isnull=True) & slot_not_ended_q(local.date(), local.time(), date='slot__date', **times)
+    )
+
+
+def snapshot_assignment_filters(now, assignments):
+    """Return the saved-zone rows and the subset still upcoming in their booked zone."""
+    saved = Q(**{f'{BOOKED_TIMEZONE}__isnull': False})
+    upcoming = Q(pk__in=[])
+    zones = assignments.filter(saved).order_by().values_list(BOOKED_TIMEZONE, flat=True).distinct()
+    for zone in zones:
+        upcoming |= Q(**{BOOKED_TIMEZONE: zone}) & assignment_not_ended_q(now, ZoneInfo(zone))
+    return saved, upcoming
 
 
 def _future_or_current_slot_q(now, today, prefix=''):
@@ -81,9 +130,16 @@ def _matching_shift_slot_exists(*, now, today, assigned_user_id=None, state='act
             Q(has_assignment=False) | Q(has_pending_payment=True)
         )
     elif state == 'confirmed':
-        slots = slots.filter(_future_or_current_slot_q(now, today)).filter(
-            has_assignment=True,
-            has_pending_payment=False,
+        scope = ShiftSlotAssignment.objects.filter(
+            Q(slot_date__gte=now.date() - timedelta(days=2))
+            | Q(slot_date__isnull=True, slot__date__gte=now.date() - timedelta(days=2))
+        )
+        if assigned_user_id is not None:
+            scope = scope.filter(user_id=assigned_user_id)
+        saved_zone, upcoming = snapshot_assignment_filters(now, scope)
+        slots = slots.filter(has_pending_payment=False).filter(
+            Exists(slot_assignments.filter(upcoming))
+            | (_future_or_current_slot_q(now, today) & Exists(slot_assignments.filter(~saved_zone)))
         )
     # elif state == 'history':
     #     slots = slots.filter(_past_slot_q(now, today)).filter(

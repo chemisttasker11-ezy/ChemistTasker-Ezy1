@@ -3,6 +3,7 @@ from django.urls import path
 from attendance.cover_terms import WorkerAcceptCoverTermsView, WorkerCoverTermsView
 from attendance.kiosk_review import ManagerPendingKioskReviewView, ManagerDecideKioskReviewView
 from attendance.views import (
+    KioskNoticeCodeView,
     KioskActivateView,
     KioskActiveStaffView,
     KioskConfigView,
@@ -32,6 +33,7 @@ from attendance.views import (
 
 
 urlpatterns = [
+    path('attendance/kiosk/notice-code/', KioskNoticeCodeView.as_view(), name='attendance-kiosk-notice-code'),
     path('attendance/kiosk/activate/', KioskActivateView.as_view(), name='attendance-kiosk-activate'),
     path('attendance/kiosk/pairing/request/', KioskRequestPairingCodeView.as_view(), name='attendance-kiosk-pairing-request'),
     path('attendance/kiosk/pairing/pair/', KioskPairWithCodeView.as_view(), name='attendance-kiosk-pairing-pair'),

@@ -102,7 +102,7 @@ class FulfillmentReleaseContracts(TestCase):
     def test_direct_prepare_and_resume_cannot_bypass_collection_control(self):
         with self.assertRaises(LiveCollectionRestricted):
             prepare_checkout(shift_id=self.shift.pk, actor=self.owner, offer_ids=[self.offer.pk], parameters={})
-        attempt = Mock()
+        attempt = Mock(state=FulfillmentCheckout.State.OPEN, offer_ids=[self.offer.pk])
         with self.assertRaises(LiveCollectionRestricted):
             open_checkout(attempt)
         attempt.refresh_from_db.assert_called_once()

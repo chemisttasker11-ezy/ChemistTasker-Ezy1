@@ -1,9 +1,9 @@
 """Shift pricing: award rates, public holidays, day types, slot expansion and locked rates."""
 from datetime import datetime, timedelta, date, time
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from django.core.exceptions import ValidationError
 from onboarding.models import PharmacistOnboarding
-from shifts.pricing_data import award_rates
+from shifts.pricing_data import PricingDataError, award_rates
 from shifts.holidays import (
     day_type as classify_day, holiday_boundaries, normalize_state, resolve_public_holiday,
 )
@@ -453,7 +453,7 @@ def get_locked_rate_for_slot(slot, shift, user, override_date=None, *, staff_ter
             shift,
             rate_preference=rate_preference,
         )
-    except (KeyError, ValidationError) as exc:
+    except (KeyError, ValidationError, PricingDataError, InvalidOperation, ValueError) as exc:
         return DECIMAL_ZERO, {'error': str(exc)}
 
 
@@ -473,7 +473,7 @@ def calculate_shift_rates(shift, slot_date, start_time, end_time):
             shift,
             rate_preference=rate_preference,
         )
-    except (KeyError, ValidationError) as exc:
+    except (KeyError, ValidationError, PricingDataError, InvalidOperation, ValueError) as exc:
         return DECIMAL_ZERO, {'error': str(exc)}
 
 

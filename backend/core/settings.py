@@ -269,6 +269,10 @@ CELERY_TASK_ROUTES = {
     "onboarding.tasks.verify_skill_certificate_task": {"queue": "ocr"},
 }
 CELERY_BEAT_SCHEDULE = {
+    'expire-shift-payment-reservations': {
+        'task': 'billing.tasks.expire_payment_reservations',
+        'schedule': 60.0,
+    },
     'cleanup-pitch-receipts-daily': {
         'task': 'talent.tasks.cleanup_expired_pitch_receipts',
         'schedule': crontab(hour=2, minute=30),
@@ -336,7 +340,16 @@ AXES_ENABLED = env.bool("AXES_ENABLED", default=True)
 AXES_FAILURE_LIMIT = env.int("AXES_FAILURE_LIMIT", default=5)
 AXES_COOLOFF_TIME = timedelta(hours=1)
 AXES_RESET_ON_SUCCESS = True
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
 AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+AXES_SENSITIVE_PARAMETERS = [
+    "username", "ip_address", "captcha_token", "recovery_code", "code", "challenge_token", "trusted_device_token",
+]
+
+# Invitation links (first password) last as long as the invitation; reset links are limited to one hour.
+PASSWORD_RESET_TIMEOUT = 7 * 24 * 60 * 60
+PASSWORD_RESET_LINK_SECONDS = 60 * 60
+APP_TWO_FACTOR_ENROLLMENT_ENABLED = env.bool('APP_TWO_FACTOR_ENROLLMENT_ENABLED', default=False)
 
 REST_FRAMEWORK = {
     # Preserve the established numeric ID wire contract through DRF 3.17's BigIntegerField mapping.
@@ -508,7 +521,7 @@ SIMPLE_JWT = {
     # Short‑lived access token
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=env.int('JWT_ACCESS_TOKEN_MINUTES', default=30)),
     # Longer‑lived refresh token
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
+    'REFRESH_TOKEN_LIFETIME': timedelta(hours=2),
     # Issue a new refresh token each time /refresh/ is called
     'ROTATE_REFRESH_TOKENS': True,
     # Blacklist old refresh tokens—prevents reuse
@@ -518,8 +531,9 @@ SIMPLE_JWT = {
 }
 
 JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME = timedelta(
-    days=env.int("JWT_REMEMBER_ME_REFRESH_TOKEN_DAYS", default=7)
+    days=min(env.int("JWT_REMEMBER_ME_REFRESH_TOKEN_DAYS", default=90), 90)
 )
+JWT_NATIVE_REFRESH_TOKEN_LIFETIME = timedelta(days=env.int("JWT_NATIVE_REFRESH_TOKEN_DAYS", default=90))
 
 # HttpOnly JWT cookie settings for web clients
 JWT_AUTH_COOKIE = env("JWT_AUTH_COOKIE", default="ct_access")

@@ -1,10 +1,10 @@
 import { useAhpra } from '../context/AhpraContext';
 import AhpraStatus from '../components/AhpraStatus';
 import { BrandLoader } from '../components/ui/BrandLoader';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform, Pressable, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, useLocalSearchParams, usePathname, useRouter, useSegments } from 'expo-router';
+import { Stack, useGlobalSearchParams, useLocalSearchParams, usePathname, useRouter, useSegments } from 'expo-router';
 import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
 import * as Updates from 'expo-updates';
 import * as Notifications from 'expo-notifications';
@@ -18,7 +18,7 @@ import OfflineBanner from '../components/OfflineBanner';
 import '../config/api'; // Configure shared-core on app load
 import { en, registerTranslation } from 'react-native-paper-dates';
 import { getOwnerSetupStatus, ownerSetupPaths } from '../utils/ownerSetup';
-import { sanitizeReturnTo } from '@/utils/authReturnRoute';
+import { sanitizeReturnTo, updateSessionReturnRoute } from '@/utils/authReturnRoute';
 import { initializeMobileSslPinning } from '../utils/sslPinning';
 import { evaluateRouteDecision, isPublicShiftRoute } from '../roles/shared/shifts/publicShiftRoute';
 import { UnsavedChangesDialogProvider } from '../roles/shared/forms/UnsavedChangesDialogProvider';
@@ -288,10 +288,15 @@ function AuthGate() {
   const router = useRouter();
   const pathname = usePathname();
   const localParams = useLocalSearchParams();
+  const globalParams = useGlobalSearchParams();
   const segments = useSegments();
   // Typed Expo routes can infer a narrow tuple; deep-link matching needs a read-only path array.
   const routeSegments: readonly string[] = segments;
-  const { user, isLoading, hasCapability } = useAuth();
+  const { user, isLoading, hasCapability, expiredSession } = useAuth();
+  const routedExpiry = useRef<typeof expiredSession>(null);
+  useLayoutEffect(() => {
+    updateSessionReturnRoute(pathname, globalParams, routeSegments);
+  }, [pathname, globalParams, routeSegments]);
   const { selectedPharmacyId } = useWorkspace();
   const { summary: ahpraSummary, loading: ahpraLoading, refusal: ahpraRefusal, clearRefusal } = useAhpra();
   const ahpraPath = user?.role === 'PHARMACIST' ? '/pharmacist/profile-basic-info' : '/otherstaff/profile-regulatory';
@@ -301,6 +306,15 @@ function AuthGate() {
     || (routeSegments[0] === 'membership' && routeSegments[1] === 'apply' && Boolean(routeSegments[2]));
 
   useEffect(() => {
+    if (!user && expiredSession && routedExpiry.current !== expiredSession) {
+      routedExpiry.current = expiredSession;
+      if (pathname !== '/login' || localParams.sessionEnded !== '1') {
+        router.replace({ pathname: '/login', params: {
+          sessionEnded: '1', ...(expiredSession.returnTo ? { returnTo: expiredSession.returnTo } : {}),
+        } });
+      }
+      return;
+    }
     if (isLoading || ahpraLoading) return;
     if (user && user.role !== 'OWNER' && ahpraSummary?.state !== 'review' && (ahpraSummary?.frozen || ahpraRefusal)) {
       if (!onAhpraStep && !onInvitePage) router.replace(ahpraPath as any);
@@ -528,7 +542,7 @@ function AuthGate() {
     return () => {
       active = false;
     };
-  }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user, ahpraLoading, ahpraSummary?.frozen, ahpraSummary?.state, ahpraRefusal, clearRefusal, ahpraPath, onAhpraStep, onInvitePage, pathname, localParams]);
+  }, [hasCapability, isLoading, router, segments, selectedPharmacyId, user, ahpraLoading, ahpraSummary?.frozen, ahpraSummary?.state, ahpraRefusal, clearRefusal, ahpraPath, onAhpraStep, onInvitePage, pathname, localParams, expiredSession]);
 
   if (user && (ahpraLoading || (user.role !== 'OWNER' && ahpraSummary?.state !== 'review' && (ahpraSummary?.frozen || ahpraRefusal) && !onAhpraStep && !onInvitePage))) {
     return <View style={{ position: 'absolute', inset: 0, zIndex: 10000, backgroundColor: '#FFFFFF', padding: 24, justifyContent: 'center' }}>
@@ -546,7 +560,7 @@ function KioskLinkNotificationGate() {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data: any = response?.notification?.request?.content?.data || {};
       const route = String(data.kiosk_link_route || '');
-      if (route.startsWith('/kiosk-link?source=kiosk&')) {
+      if (/^\/kiosk-link\?source=kiosk&authorization_id=\d+$/.test(route) || route === '/attendance-pin?show_setup_code=1') {
         guardedNavigation(() => router.push(route as any));
       }
     });

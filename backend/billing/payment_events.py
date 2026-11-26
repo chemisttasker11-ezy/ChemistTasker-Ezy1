@@ -1,4 +1,5 @@
 """Payment and refund handlers invoked within the webhook delivery transaction."""
+from datetime import datetime, timezone as datetime_timezone
 from decimal import Decimal
 import logging
 
@@ -15,7 +16,7 @@ from .checkout_reservations import bind_paid_checkout
 logger = logging.getLogger(__name__)
 
 
-def handle_payment_checkout(session, metadata):
+def handle_payment_checkout(session, metadata, *, completed_at=None):
     shift_id = metadata.get('shift_id')
     payment_type = metadata.get('type')
     if shift_id and payment_type in ('fulfillment', 'cancellation'):
@@ -91,8 +92,14 @@ def handle_payment_checkout(session, metadata):
 
         # Mark shift paid, then finalize pending offers waiting on payment.
         try:
+            # Use the signed completion event time so late delivery does not invalidate a timely checkout.
+            payment_completed_at = (
+                datetime.fromtimestamp(completed_at, tz=datetime_timezone.utc)
+                if completed_at is not None else timezone.now()
+            )
             finalized_count, finalized_offers, correction_pending = finalize_paid_selection(
                 shift_obj, payment, attempt, metadata, created=created, finalize=_finalize_pending_offers_for_shift, log=logger,
+                payment_completed_at=payment_completed_at,
             )
             from shifts.emails import (
                 send_shift_payment_finalized_notifications,

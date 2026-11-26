@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 from django.test import TestCase
 from billing.models import OwnerSubscription
-from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_verified_pharmacist
 from shifts.models import Shift, ShiftOffer
 
 class B01CheckoutPricing(TestCase):
@@ -15,7 +15,7 @@ class B01CheckoutPricing(TestCase):
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy("PR201 B01")
         self.other_owner, _other_pharmacy = make_owner_with_pharmacy("PR201 other account")
-        self.worker = make_user("PHARMACIST")
+        self.worker = make_verified_pharmacist()
 
     def checkout(self, category):
         extra = {"min_hourly_rate": 60, "max_hourly_rate": 80} if category == "FULL_TIME" else {}

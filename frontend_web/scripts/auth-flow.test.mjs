@@ -3,11 +3,15 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import vm from 'node:vm';
-import { bearerBelongsToDifferentUser, safeNext, loginHref, refreshBrowserSession, logoutSession } from '../landing_next/shared/browser-session.ts';
+import './load-shared-core.mjs';
 import { canAccessRoute } from '../src/components/routeAccess.ts';
 import { safeHubAttachmentUrl } from '../landing_next/lib/safe-hub-attachment.ts';
 import { resolveDashboardPath } from '../src/utils/dashboardPath.ts';
-import * as browserSession from '../landing_next/shared/browser-session.ts';
+
+const browserSession = await import('../landing_next/shared/browser-session.ts');
+const { browserLogoutQueue } = await import('@chemisttasker/shared-core');
+const apiRoot = 'https://example.test/api/v1';
+const { bearerBelongsToDifferentUser, safeNext, loginHref, refreshBrowserSession, logoutSession } = browserSession;
 
 test('Next API fences a session change during CSRF lookup', async () => {
   const ts = createRequire(import.meta.url)('typescript');
@@ -66,6 +70,7 @@ function sessionProviderHarness() {
   vm.runInNewContext(compiled, { module, exports: module.exports, window: {
     addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name),
   }, require: id => {
+    if (id === '@chemisttasker/shared-core') return { browserSessionIsSignedOut: () => false, startBrowserLogoutRetry: () => () => {} };
     if (id === 'react') return react;
     if (id === 'react/jsx-runtime') return { jsx: (type, props, key) => ({ type, props, key }), jsxs: (type, props, key) => ({ type, props, key }) };
     if (id.includes('browser-session')) return { claimUserBrowserStorage: () => {}, watchSession: fn => { sessionListener = fn; return () => {}; } };
@@ -147,7 +152,11 @@ test('account connection errors reuse the styled recovery state and keep legitim
   const auth = fs.readFileSync(new URL('../src/contexts/AuthContext.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(auth, /<button/);
   assert.match(auth, /<DashboardContentState[\s\S]*?kind="error"[\s\S]*?actionLabel="Reconnect"/);
-  assert.match(auth, /<Button[\s\S]*?minHeight: ?44[\s\S]*?>Retry logout<\/Button>/);
+  assert.match(auth, /await logoutSession\(API_BASE_URL\)/);
+  const session = fs.readFileSync(new URL('../landing_next/shared/browser-session.ts', import.meta.url), 'utf8');
+  assert.match(session, /window\.alert\(LOGOUT_QUEUED_MESSAGE\)/);
+  const operations = fs.readFileSync(new URL('../../shared-core/src/domains/auth/browserOperations.ts', import.meta.url), 'utf8');
+  assert.match(operations, /addEventListener\('online', retry\)/);
   assert.match(auth, /<AhpraProvider[^>]*>[{]children[}]<\/AhpraProvider>/);
 });
 
@@ -185,6 +194,15 @@ test('return links preserve permitted destinations and reject external or login 
  for(const path of ['https://example.com','//example.com','/\\example.com','/login?next=/login','javascript:alert(1)','/hubs/../../login','/dashboard/owner/logout?workspace=internal&pharmacy_id=2','/dashboard/admin/1/logout/','/dashboard/pharmacist/%6cogout',null])assert.equal(safeNext(path),null);
 });
 
+test('sign-in preserves Vite kiosk notice destinations',()=>{
+ for(const path of ['/kiosk-link?source=kiosk&authorization_id=42','/attendance-pin?show_setup_code=1']){
+  assert.equal(safeNext(path),path);
+  assert.equal(new URL(loginHref(path),'https://example.test').searchParams.get('next'),path);
+ }
+ assert.equal(safeNext('/kiosk-link/other'),null);
+ assert.equal(safeNext('/attendance-pin/other'),null);
+});
+
 test('logout route cannot force generic dashboard return after a different user logs in',()=>{
  assert.equal(loginHref('/dashboard/owner/logout'),'/login');
  assert.equal(loginHref('/dashboard/admin/101/logout/?foo=bar'),'/login');
@@ -200,31 +218,36 @@ test('cookie authority only reconciles a known cross-user bearer identity',()=>{
 test('concurrent consumers share one cookie refresh and failures release the pending request',async()=>{
  const original=globalThis.fetch;let rotations=0;
  globalThis.fetch=async url=>{await new Promise(resolve=>setTimeout(resolve,5));if(String(url).endsWith('/csrf/'))return Response.json({csrfToken:'test-csrf'});rotations++;return Response.json({access:'test-access',refresh:'test-refresh'});};
- try{const [a,b]=await Promise.all([refreshBrowserSession(),refreshBrowserSession()]);assert.equal(rotations,1);assert.equal(a.access,b.access);
- globalThis.fetch=async()=>{throw new TypeError('Network unavailable');};await assert.rejects(refreshBrowserSession(),/Network unavailable/);
+ try{const [a,b]=await Promise.all([refreshBrowserSession(apiRoot),refreshBrowserSession(apiRoot)]);assert.equal(rotations,1);assert.equal(a.access,b.access);
+ globalThis.fetch=async()=>{throw new TypeError('Network unavailable');};await assert.rejects(refreshBrowserSession(apiRoot),/Network unavailable/);
  globalThis.fetch=async url=>Response.json(String(url).endsWith('/csrf/')?{csrfToken:'new-csrf'}:{access:'new-access',refresh:'new-refresh'});
- assert.equal((await refreshBrowserSession()).access,'new-access');
+ assert.equal((await refreshBrowserSession(apiRoot)).access,'new-access');
  }finally{globalThis.fetch=original;}
 });
 
-test('logout waits for refresh, sends once, and only then announces logout',async()=>{
+test('logout announces locally, waits for refresh and sends once',async()=>{
  const originalFetch=globalThis.fetch,originalWindow=globalThis.window,originalStorage=globalThis.localStorage;
  const store=new Map();globalThis.localStorage={getItem:key=>store.get(key)??null,setItem:(key,value)=>store.set(key,value),removeItem:key=>store.delete(key)};
  globalThis.window=new EventTarget();const order=[];window.addEventListener('ct:session-changed',()=>order.push('announced'));
  globalThis.fetch=async url=>{if(String(url).endsWith('/csrf/'))return Response.json({csrfToken:'csrf'});if(String(url).includes('/refresh/')){await new Promise(r=>setTimeout(r,10));order.push('refresh');return Response.json({access:'access',refresh:'refresh'});}order.push('logout');return new Response(null,{status:204});};
- try{const refreshing=refreshBrowserSession();const first=logoutSession(),second=logoutSession();assert.equal(first,second);await assert.rejects(refreshBrowserSession(),e=>e.status===401);await refreshing;await first;assert.deepEqual(order,['refresh','logout','announced']);}
+ try{const refreshing=refreshBrowserSession(apiRoot);const first=logoutSession(apiRoot),second=logoutSession(apiRoot);assert.equal(first,second);assert.equal(refreshBrowserSession(apiRoot),refreshing);await assert.rejects(refreshing,/Session changed/);await first;assert.deepEqual(order,['announced','refresh','logout']);}
  finally{globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.localStorage=originalStorage;}
 });
 
-test('failed logout does not announce success and can be retried',async()=>{
+test('failed logout queues revocation and retries without restoring the session',async()=>{
  const originalFetch=globalThis.fetch,originalWindow=globalThis.window,originalStorage=globalThis.localStorage;
- globalThis.window=new EventTarget();globalThis.localStorage=undefined;let announcements=0;window.addEventListener('ct:session-changed',()=>announcements++);
- globalThis.fetch=async url=>String(url).endsWith('/csrf/')?Response.json({csrfToken:'csrf'}):Response.json({detail:'Try again'},{status:503});
- try{const leaving=logoutSession();const concurrent=assert.rejects(refreshBrowserSession(),error=>error.status===503);await assert.rejects(leaving,/Try again/);await concurrent;assert.equal(announcements,0);globalThis.localStorage={setItem(){}};globalThis.fetch=async url=>String(url).endsWith('/csrf/')?Response.json({csrfToken:'csrf'}):new Response(null,{status:204});
- // Web Locks is absent in Node; provide the minimal lease storage used by this browser fallback.
  const store=new Map();globalThis.localStorage={getItem:key=>store.get(key)??null,setItem:(key,value)=>store.set(key,value),removeItem:key=>store.delete(key)};
- await logoutSession();assert.equal(announcements,1);}
- finally{globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.localStorage=originalStorage;}
+ globalThis.window=new EventTarget();let announcements=0,alerts=0;window.alert=()=>alerts++;window.addEventListener('ct:session-changed',()=>announcements++);
+ globalThis.fetch=async url=>String(url).endsWith('/csrf/')?Response.json({csrfToken:'csrf'}):Response.json({detail:'Try again'},{status:503});
+ try{
+  await logoutSession(apiRoot);
+  assert.equal(announcements,1);assert.equal(alerts,1);assert.equal(store.get('ct:signed-out'),'1');
+  assert.equal(JSON.parse(store.get('ct:pending-logout')).length,1);
+  await assert.rejects(refreshBrowserSession(apiRoot),error=>error.status===401);
+  let revocations=0;globalThis.fetch=async url=>{if(String(url).endsWith('/csrf/'))return Response.json({csrfToken:'csrf'});revocations++;return new Response(null,{status:204});};
+  await browserLogoutQueue.retry();
+  assert.equal(revocations,1);assert.equal(store.has('ct:pending-logout'),false);assert.equal(store.get('ct:signed-out'),'1');assert.equal(announcements,1);
+ }finally{globalThis.fetch=originalFetch;globalThis.window=originalWindow;globalThis.localStorage=originalStorage;}
 });
 
 test('refresh cannot signal signed-out state before the pending logout response is consumed',async()=>{
@@ -234,13 +257,13 @@ test('refresh cannot signal signed-out state before the pending logout response 
  let release,started;const response=new Promise(resolve=>{release=resolve;});const requested=new Promise(resolve=>{started=resolve;});
  let refreshRequests=0;
  globalThis.fetch=async url=>{if(String(url).endsWith('/csrf/'))return Response.json({csrfToken:'csrf'});if(String(url).includes('/token/refresh/'))refreshRequests++;started();return response;};
- const leaving=logoutSession();
+ const leaving=logoutSession(apiRoot);
  try{
   await requested;
-  let settled=false;const blocked=refreshBrowserSession().catch(error=>{settled=true;return error;});
+  let settled=false;const blocked=refreshBrowserSession(apiRoot).catch(error=>{settled=true;return error;});
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(settled,false,'401 handlers must not redirect while logout is still pending');
-  assert.equal(announcements,0);
+  assert.equal(announcements,1);
   release(new Response(null,{status:204}));await leaving;
   assert.equal((await blocked).status,401);
   assert.equal(announcements,1);assert.equal(refreshRequests,0);

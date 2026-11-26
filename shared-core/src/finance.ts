@@ -8,8 +8,9 @@ export interface FinanceConfig {
   getToken: () => string | null | undefined | Promise<string | null | undefined>;
   getSessionGeneration?: () => number;
   refreshToken?: () => string | null | undefined | Promise<string | null | undefined>;
-  onAuthFailure?: () => void | Promise<void>;
+  onAuthFailure?: (refreshError?: unknown) => void | Promise<void>;
   credentials?: RequestCredentials;
+  fetchImpl?: typeof fetch;
 }
 export interface FinanceCustomer {
   id: number; name: string; legal_name: string; abn: string; contact_name: string;

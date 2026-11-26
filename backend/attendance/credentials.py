@@ -32,6 +32,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.utils.crypto import salted_hmac
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -316,11 +317,12 @@ def generate_kiosk_pairing_code(
     }
 
     expires_at = timezone.now() + timedelta(seconds=ttl_seconds)
+    authorization = None
     # The database uniqueness constraint is the authoritative collision boundary.
     for _ in range(20):
         code = f"{secrets.randbelow(900000) + 100000}"
         try:
-            KioskPairingAuthorization.objects.create(
+            authorization = KioskPairingAuthorization.objects.create(
                 pharmacy=pharmacy,
                 authorized_by=user,
                 code_digest=_pairing_code_digest(code),
@@ -331,7 +333,7 @@ def generate_kiosk_pairing_code(
             break
         except IntegrityError:
             continue
-    else:
+    if authorization is None:
         raise ValidationError("Unable to reserve a pairing code. Please try again.")
     # Retain the cache entry only as a compatibility hint for older nodes/tests.
     try:
@@ -341,23 +343,26 @@ def generate_kiosk_pairing_code(
         # only for a controlled mixed-version transition.
         pass
 
+    try:
+        security_cache.set(f"kiosk_pair_display:{authorization.pk}", code, timeout=ttl_seconds)
+    except Exception:
+        pass
+
     # Dispatch notification to the user (triggers Expo push + WebSocket + DB in-app notification)
     try:
         from notifications.services import Notification, notify_users
         notify_users(
             user_ids=[user.id],
             title="Kiosk Terminal Pairing Code",
-            body=f"Your single-use pairing code for {pharmacy.name} is {code}. Valid for 15 minutes.",
+            body="A kiosk pairing code is ready.",
             notification_type=Notification.Type.SECURITY if hasattr(Notification.Type, "SECURITY") else Notification.Type.TASK,
-            action_url="/kiosk",
+            action_url=f"/kiosk-link?source=kiosk&authorization_id={authorization.pk}",
             payload={
-                "pairing_code": code,
                 "pharmacy_id": pharmacy.id,
                 "pharmacy_name": pharmacy.name,
                 "expires_in_seconds": ttl_seconds,
                 "kiosk_link_route": (
-                    f"/kiosk-link?source=kiosk&pharmacy_id={pharmacy.id}"
-                    f"&pairing_code={code}"
+                    f"/kiosk-link?source=kiosk&authorization_id={authorization.pk}"
                 ),
             },
         )
@@ -366,6 +371,21 @@ def generate_kiosk_pairing_code(
         pass
 
     return code
+
+
+def get_pairing_notice_code(user, authorization_id):
+    """Return a valid pairing code only to its still-authorized issuer."""
+    authorization = KioskPairingAuthorization.objects.select_related("pharmacy").filter(
+        pk=authorization_id, authorized_by=user,
+        consumed_at__isnull=True, expires_at__gt=timezone.now(),
+    ).first()
+    if not authorization or not is_authorized_kiosk_manager(user, authorization.pharmacy):
+        return None
+    code = security_cache.get(f"kiosk_pair_display:{authorization.pk}")
+    if not code or _pairing_code_digest(code) != authorization.code_digest:
+        return None
+    return {"code": code, "pharmacy_id": authorization.pharmacy_id,
+            "device_name": authorization.device_name, "expires_at": authorization.expires_at}
 
 
 def redeem_kiosk_pairing_code(
@@ -883,9 +903,10 @@ def send_worker_pin_setup_code(
         notify_users(
             user_ids=[worker.id],
             title="Kiosk PIN Setup Code",
-            body=f"Your verification code to set your counter PIN is {otp_code}.",
+            body="Your PIN code is ready.",
             notification_type=Notification.Type.SECURITY if hasattr(Notification.Type, "SECURITY") else Notification.Type.TASK,
-            payload={"otp": otp_code, "pharmacy_id": kiosk_device.pharmacy_id},
+            action_url="/attendance-pin?show_setup_code=1",
+            payload={"kiosk_link_route": "/attendance-pin?show_setup_code=1"},
         )
     except Exception:
         pass
@@ -898,6 +919,29 @@ def send_worker_pin_setup_code(
         "delivery_channel": "EMAIL",
         "email_delivery": "SENT",
     }
+
+
+def get_pin_notice_code(user):
+    """Return the recipient's unspent, unexpired PIN setup code."""
+    key = f"{WORKER_PIN_OTP_CACHE_PREFIX}{user.pk}"
+    cached = security_cache.get(key)
+    if not isinstance(cached, dict) or cached.get("worker_id") != user.pk or not cached.get("otp"):
+        return None
+    claim = security_cache.get(f"{key}:claim")
+    if claim is not None:
+        if not isinstance(claim, dict) or not {"pin_id", "pin_hash"} <= claim.keys():
+            return None
+        if WorkerPIN.objects.filter(pk=claim["pin_id"], pin_hash=claim["pin_hash"]).exists():
+            return None
+    if security_cache.get(f"{key}:locked") or not pin_eligible_memberships().filter(
+        pk=cached.get("membership_id"), user=user,
+    ).exists():
+        return None
+    created_at = parse_datetime(cached.get("created_at", ""))
+    expires_at = created_at + timedelta(seconds=WORKER_PIN_OTP_TTL) if created_at else None
+    if not expires_at or expires_at <= timezone.now():
+        return None
+    return {"code": cached["otp"], "pharmacy_id": cached.get("pharmacy_id"), "expires_at": expires_at}
 
 
 def consume_worker_pin_otp(worker_id) -> None:
@@ -936,6 +980,8 @@ def setup_worker_kiosk_pin(
     # A claim whose PIN hash is committed means an earlier setup committed before its on_commit consumption ran;
     # an uncommitted (rolled-back) claim is stale, since the User lock means that setup has finished.
     claim = security_cache.get(f"{cache_key}:claim")
+    if claim is not None and (not isinstance(claim, dict) or not {"pin_id", "pin_hash"} <= claim.keys()):
+        raise ValidationError("Verification code is unavailable. Please request a new code.")
     if claim and WorkerPIN.objects.filter(pk=claim["pin_id"], pin_hash=claim["pin_hash"]).exists():
         consume_worker_pin_otp(worker.id)
         raise ValidationError("Verification code expired or not requested. Please request a new code.")

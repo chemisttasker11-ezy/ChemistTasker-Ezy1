@@ -7,11 +7,6 @@ from organizations.models import (
     Chain,
     Pharmacy,
 )
-from memberships.models import (
-    Membership,
-    FAVORITE_STAFF_EMPLOYMENT_TYPES,
-    PHARMACY_STAFF_EMPLOYMENT_TYPES,
-)
 from onboarding.models import OwnerOnboarding
 from shifts.models import (
     Shift,
@@ -22,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from django.conf import settings
 from django.db.models import (
     Count,
     Q,
@@ -42,6 +38,7 @@ from organizations.timezone import get_pharmacy_timezone
 from shifts.base import BaseShiftViewSet
 from shifts.selectors import (
     _matching_shift_slot_exists,
+    community_membership_q,
     shifts_managed_by,
     slot_occurrence_ended,
 )
@@ -141,8 +138,16 @@ class AssignedProfileActions:
         candidate = get_object_or_404(User, pk=user_id)
         slot_id = request.data.get('slot_id')
         slot = get_object_or_404(ShiftSlot, pk=slot_id, shift=shift) if slot_id is not None else None
-        return Response(assigned_profile(request=request, shift=shift, candidate=candidate, slot_id=slot_id, slot=slot,
-                                         contact=self.assigned_profile_contact))
+        profile = assigned_profile(
+            request=request, shift=shift, candidate=candidate, slot_id=slot_id, slot=slot,
+            contact=self.assigned_profile_contact,
+        )
+        if self.assigned_profile_contact and candidate.role in {"PHARMACIST", "OTHER_STAFF"}:
+            persona = candidate.role.replace("_", "").lower()
+            profile["booking_documents_url"] = (
+                f"{settings.FRONTEND_BASE_URL.rstrip('/')}/dashboard/{persona}/shifts/confirmed?documents={shift.pk}"
+            )
+        return Response(profile)
 
 
 class ConfirmedShiftViewSet(AssignedProfileActions, BaseShiftViewSet):
@@ -322,65 +327,7 @@ class ShiftDetailViewSet(BaseShiftViewSet):
         )
         combined_filter |= is_owner_admin_of_pharmacy_q
 
-        # 3. Shifts visible through Membership relationship (client_profile.models.Membership)
-        eligible_membership_q = (
-            Q(
-                visibility='FULL_PART_TIME',
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            Q(
-                visibility='LOCUM_CASUAL',
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=FAVORITE_STAFF_EMPLOYMENT_TYPES,
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            Q(
-                visibility='LOCUM_CASUAL',
-                post_anonymously=False,
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            Q(
-                visibility='PLATFORM',
-                post_anonymously=False,
-                pharmacy__memberships__user=user,
-                pharmacy__memberships__employment_type__in=(
-                    PHARMACY_STAFF_EMPLOYMENT_TYPES + FAVORITE_STAFF_EMPLOYMENT_TYPES
-                ),
-                pharmacy__memberships__is_active=True,
-                pharmacy__memberships__status=Membership.Status.ACCEPTED,
-            )
-            |
-            Q(
-                visibility='OWNER_CHAIN',
-                pharmacy__owner__in=Pharmacy.objects.filter(
-                    memberships__user=user,
-                    memberships__is_active=True,
-                    memberships__status=Membership.Status.ACCEPTED,
-                    memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                ).values_list('owner', flat=True),
-            )
-            |
-            Q(
-                visibility='ORG_CHAIN',
-                pharmacy__organization__in=Pharmacy.objects.filter(
-                    memberships__user=user,
-                    memberships__is_active=True,
-                    memberships__status=Membership.Status.ACCEPTED,
-                    memberships__employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
-                ).values_list('organization', flat=True),
-            )
-        )
-        combined_filter |= eligible_membership_q
+        combined_filter |= community_membership_q(user)
 
         if user.role == 'OWNER':
             try:

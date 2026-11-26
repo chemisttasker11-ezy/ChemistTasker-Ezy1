@@ -16,6 +16,9 @@
 </p>
 <a class="btn" href="{{ membership_url|default:frontend_dashboard_link }}" style="display:inline-block; background:#433894; color:#ffffff !important; padding:13px 26px; border-radius:8px; text-decoration:none; font-weight:700; font-size:15px; line-height:1.2; margin:16px 0;">Review invitation</a>
 <p>You will not get member access to this pharmacy until you accept the invitation.</p>
+{% if expired_application_url %}
+<p>This invitation is open for seven days. After it expires, you can <a href="{{ expired_application_url }}">apply to join</a> using your ChemistTasker account.</p>
+{% endif %}
 <p>If you have any questions or need assistance, our team is always happy to help.</p>
 <p class="emoji">The ChemistTasker Team</p>
 {% endblock %}

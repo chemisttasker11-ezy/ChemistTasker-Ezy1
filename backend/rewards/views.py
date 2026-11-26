@@ -10,18 +10,19 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
-from shifts.finalize import expire_competing_offers, finalize_shift_offer, offer_occurrence_key
+from shifts.finalize import expire_competing_offers, offer_occurrence_key
 from shifts.emails import send_shift_payment_finalized_notifications
 from rewards.services import (
     claim_referral_code,
     create_friend_referral,
     create_shift_referral,
+    finalize_offers_with_pills,
+    lock_pending_pill_offers,
     get_or_create_referral_code,
     get_pill_balance,
     get_shift_post_pill_cost,
     RewardError,
     seed_default_reward_rules,
-    spend_pills_for_shift_post,
     user_is_referral_reward_eligible,
 )
 from django.db import transaction
@@ -180,8 +181,6 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
             or request.data.get("offer_id") or request.data.get("offerId"),
             "offer_ids",
         )
-        ledger_entries = []
-        finalized = []
         try:
             with transaction.atomic():
                 shift = get_object_or_404(
@@ -198,11 +197,7 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
                     })
                 if shift.payment_status != "PENDING":
                     raise DRFValidationError({"detail": "This shift does not require payment."})
-                pending = list(
-                    ShiftOffer.objects.select_for_update().filter(
-                        shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
-                    ).order_by("pk")
-                )
+                pending = lock_pending_pill_offers(shift)
                 if offer_ids:
                     selected = [offer for offer in pending if offer.id in offer_ids]
                     if len(selected) != len(offer_ids):
@@ -224,11 +219,7 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
                 selected_occurrences = [offer_occurrence_key(offer) for offer in selected if offer.slot_id]
                 if len(selected_occurrences) != len(set(selected_occurrences)):
                     raise DRFValidationError({"detail": "Select only one candidate per slot."})
-                # _create_ledger_entry locks the payer row before reading the balance.
-                for offer in selected:
-                    ledger_entries.append(spend_pills_for_shift_post(user=request.user, shift=shift, offer=offer))
-                    finalize_shift_offer(offer)
-                    finalized.append(offer)
+                ledger_entries = finalize_offers_with_pills(user=request.user, shift=shift, offers=selected)
                 expire_competing_offers(shift, selected)
                 outstanding = ShiftOffer.objects.filter(
                     shift=shift, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
@@ -243,13 +234,13 @@ class PillRewardsViewSet(viewsets.GenericViewSet):
                 "required": get_shift_post_pill_cost() * max(1, len(offer_ids) or len(slot_ids)),
             })
         send_shift_payment_finalized_notifications(
-            shift=shift, offers=finalized, paid_by=request.user, payment_method="pills",
+            shift=shift, offers=selected, paid_by=request.user, payment_method="pills",
         )
         return Response({
             "detail": "Shift paid with pills.",
             "balance": get_pill_balance(request.user),
             "payment_status": shift.payment_status,
-            "finalized_offers": len(finalized),
+            "finalized_offers": len(selected),
             "ledger_entries": PillLedgerEntrySerializer(ledger_entries, many=True).data,
             "ledger_entry": PillLedgerEntrySerializer(ledger_entries[-1]).data if ledger_entries else None,
         })

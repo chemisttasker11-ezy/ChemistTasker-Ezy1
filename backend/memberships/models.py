@@ -1,4 +1,6 @@
 """Membership models. Django app labels remain client_profile during the code-ownership phase."""
+from datetime import timedelta
+from django.contrib.auth.hashers import UNUSABLE_PASSWORD_PREFIX
 from django.db import models, transaction
 from django.db.models.deletion import ProtectedError
 from django.conf import settings
@@ -43,6 +45,7 @@ PHARMACY_STAFF_EMPLOYMENT_TYPES = ("FULL_TIME", "PART_TIME", "CASUAL")
 
 
 FAVORITE_STAFF_EMPLOYMENT_TYPES = ("LOCUM", "SHIFT_HERO")
+DIRECT_INVITE_DURATION = timedelta(days=7)
 
 
 class Membership(models.Model):
@@ -118,6 +121,7 @@ class Membership(models.Model):
         db_index=True,
     )
     responded_at = models.DateTimeField(null=True, blank=True)
+    direct_invited_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -188,6 +192,15 @@ class Membership(models.Model):
     @property
     def is_favorite_staff_member(self) -> bool:
         return self.employment_type in FAVORITE_STAFF_EMPLOYMENT_TYPES
+
+    @classmethod
+    def roster_invite_filter(cls):
+        return models.Q(
+            status=cls.Status.PENDING, is_active=False, invited_by__isnull=False,
+            direct_invited_at__gt=timezone.now() - DIRECT_INVITE_DURATION,
+            user__is_active=True, user__is_otp_verified=False, user__password__startswith=UNUSABLE_PASSWORD_PREFIX,
+            employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
+        )
 
 
     def revoke_admin_access(self):

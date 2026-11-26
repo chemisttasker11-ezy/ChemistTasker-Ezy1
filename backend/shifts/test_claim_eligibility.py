@@ -1,11 +1,8 @@
 """The effective eligibility rule of the community claim-shift endpoint.
 
-The community queryset owns who can see (and therefore claim) a shift: a FULL_PART_TIME shift is visible to active
-full-time / part-time / casual members of its pharmacy; a LOCUM_CASUAL shift to active locum / shift-hero members and,
-unless it is posted anonymously, to active staff members. Membership is unique per (user, pharmacy). The claim locks the current direct membership row, re-runs the canonical
-queryset under that lock, and keeps the lock through assignment, so visibility and tier handling use one stable
-membership snapshot. Locum and shift-hero members are then refused with 400 because they must express interest and
-accept an offer. These tests drive the real endpoint through every tier/visibility/anonymity combination.
+The community queryset makes FULL_PART_TIME shifts visible to active staff and adds favourites at LOCUM_CASUAL.
+The claim locks the direct membership and rechecks the queryset through assignment. Verified locum and shift-hero
+members must still express interest and accept an offer. These tests drive the actual claim endpoint.
 """
 from datetime import date, time, timedelta
 from unittest import mock
@@ -14,6 +11,7 @@ from django.test import TestCase
 
 from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
 from memberships.models import FAVORITE_STAFF_EMPLOYMENT_TYPES, PHARMACY_STAFF_EMPLOYMENT_TYPES, Membership
+from onboarding.models import PharmacistOnboarding
 from shifts.models import Shift, ShiftSlot, ShiftSlotAssignment
 
 API = "/api/v1/"
@@ -79,6 +77,7 @@ class ClaimEligibilityTests(TestCase):
 
     def claim(self, employment_type, visibility, anonymous):
         worker = make_user("PHARMACIST")
+        PharmacistOnboarding.objects.create(user=worker, verified=True)
         Membership.objects.create(
             user=worker, pharmacy=self.pharmacy, role="PHARMACIST", employment_type=employment_type,
             status=Membership.Status.ACCEPTED, is_active=True,
@@ -122,13 +121,14 @@ class ClaimEligibilityTests(TestCase):
         from shifts.browse import CommunityShiftViewSet
 
         worker = make_user("PHARMACIST")
+        PharmacistOnboarding.objects.create(user=worker, verified=True)
         membership = Membership.objects.create(
-            user=worker, pharmacy=self.pharmacy, role="PHARMACIST", employment_type="LOCUM",
+            user=worker, pharmacy=self.pharmacy, role="PHARMACIST", employment_type="FULL_TIME",
             status=Membership.Status.ACCEPTED, is_active=True,
         )
         shift = Shift.objects.create(
             pharmacy=self.pharmacy, created_by=self.owner, role_needed="PHARMACIST", employment_type="LOCUM",
-            visibility="LOCUM_CASUAL", post_anonymously=True,
+            visibility="FULL_PART_TIME", post_anonymously=True,
         )
         ShiftSlot.objects.create(
             shift=shift, date=date.today() + timedelta(days=7), start_time=time(9, 0), end_time=time(17, 0)
@@ -140,7 +140,7 @@ class ClaimEligibilityTests(TestCase):
         def get_object_then_change(view):
             nonlocal changed
             obj = original_get_object(view)
-            Membership._base_manager.filter(pk=membership.pk).update(employment_type="PART_TIME")
+            Membership._base_manager.filter(pk=membership.pk).update(employment_type="LOCUM")
             changed = True
             return obj
 
@@ -176,8 +176,6 @@ class ClaimEligibilityTests(TestCase):
                             )
                         elif employment in favorites:
                             expected = (400, None, False)
-                        elif anonymous:
-                            expected = (403, "shift_not_accessible", False)
                         else:
                             expected = (201, None, True)
 

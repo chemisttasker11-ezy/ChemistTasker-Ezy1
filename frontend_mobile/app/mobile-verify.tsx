@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, type TextInputInstance, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { sanitizeReturnTo } from '@/utils/authReturnRoute';
 import { Globe } from 'lucide-react-native';
 import {
     mobileRequestOtp,
@@ -18,7 +19,7 @@ type PendingAction = 'send' | 'verify' | 'resend' | 'skip';
 
 export default function MobileVerifyScreen() {
     const router = useRouter();
-    const { source } = useLocalSearchParams<{ source?: string }>();
+    const { source, returnTo } = useLocalSearchParams<{ source?: string; returnTo?: string }>();
     const fromProfile = source === 'profile';
     const { logout, markMobileVerified, markMobileCheckSkipped, user } = useAuth();
     const canSkipOverseas = canSkipOverseasMobileCheck(user);
@@ -114,7 +115,7 @@ export default function MobileVerifyScreen() {
                 ? (user?.role === 'OTHER_STAFF' ? '/otherstaff/profile-basic-info'
                     : user?.role === 'PHARMACIST' ? '/pharmacist/profile-basic-info'
                     : getRoleHome(user?.role))
-                : getRoleHome(user?.role);
+                : sanitizeReturnTo(returnTo, 'session') || getRoleHome(user?.role);
             setTimeout(() => router.replace(destination as any), 800);
         } catch (err: any) {
             setError(err?.message || 'Verification failed.');

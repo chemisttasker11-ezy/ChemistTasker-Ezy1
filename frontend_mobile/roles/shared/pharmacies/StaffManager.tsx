@@ -526,7 +526,7 @@ export default function StaffManager({
         if (!id) return;
         setDeleteLoadingId(id);
         try {
-            await deleteMembershipService(String(id));
+            await deleteMembershipService(String(id), 'keep');
             setToast({ message: 'Staff removed', severity: 'success' });
             onMembershipsChanged();
         } catch (error: any) {
@@ -871,7 +871,7 @@ export default function StaffManager({
                     <Text style={styles.modalTitle}>Remove Member</Text>
                     <Text>
                         {confirmRemove
-                            ? `Remove ${confirmRemove.name} from this pharmacy? This action can't be undone.`
+                            ? `Remove ${confirmRemove.name} from this pharmacy? Confirmed bookings stay in place. To cancel or reassign any, review the roster first.`
                             : "This action can't be undone."}
                     </Text>
                     <View style={styles.modalActions}>

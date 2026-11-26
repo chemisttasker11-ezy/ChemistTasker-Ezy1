@@ -14,8 +14,8 @@ from memberships.models import Membership
 from onboarding.models import ExplorerOnboarding, OtherStaffOnboarding, PharmacistOnboarding
 from organizations.models import Chain
 from organizations.chains import active_owner_chains_for_pharmacy
-from organizations.serializers import user_can_view_full_pharmacy
 from shifts.emails import build_shift_email_context
+from shifts.pharmacy_visibility import project_shift_pharmacy, shift_pharmacy_name
 from shifts.pricing import expand_shift_slots
 from shifts.access import _user_can_perform_shift_role
 from shifts.travel import haversine_km
@@ -97,32 +97,15 @@ def _format_money(value):
     return f"${formatted}"
 
 def _get_pharmacy_display_name(shift, user):
-    pharmacy = getattr(shift, "pharmacy", None)
-    if not pharmacy:
-        return "Pharmacy"
-    if shift.post_anonymously and not user_can_view_full_pharmacy(user, pharmacy):
-        suburb = getattr(pharmacy, "suburb", None)
-        return f"Shift in {suburb}" if suburb else "Anonymous Pharmacy"
-    return pharmacy.name
+    return shift_pharmacy_name(shift, user) if getattr(shift, "pharmacy", None) else "Pharmacy"
 
 def _get_location_line_for_email(shift, user):
     pharmacy = getattr(shift, "pharmacy", None)
     if not pharmacy:
         return None
-    anonymize = shift.post_anonymously and not user_can_view_full_pharmacy(user, pharmacy)
-    if anonymize:
-        parts = [
-            getattr(pharmacy, "suburb", None),
-            getattr(pharmacy, "state", None),
-            getattr(pharmacy, "postcode", None),
-        ]
-    else:
-        parts = [
-            getattr(pharmacy, "street_address", None),
-            getattr(pharmacy, "suburb", None),
-            getattr(pharmacy, "state", None),
-            getattr(pharmacy, "postcode", None),
-        ]
+    fields = ("street_address", "suburb", "state", "postcode")
+    detail = project_shift_pharmacy(shift, user, {field: getattr(pharmacy, field) for field in fields})
+    parts = [detail.get(field) for field in fields]
     return ", ".join(part for part in parts if part) or None
 
 def _build_shift_email_slot_meta(shift, slot_entries, *, user=None):

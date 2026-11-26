@@ -7,6 +7,7 @@ from datetime import date, time, timedelta
 from decimal import Decimal
 from unittest import mock
 
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -15,7 +16,9 @@ from client_profile.characterization_support import make_owner_with_pharmacy, ma
 from memberships.models import Membership
 from shifts.models import Shift, ShiftInterest, ShiftSlot, ShiftSlotAssignment
 from workforce.models import RosterPeriod
-from workforce.roster.publication import republish_roster_shift, unpublish_roster_shift
+from workforce.roster.assignment_rates import refresh_assignment_rate
+from workforce.roster.bulk_edit import bulk_edit_roster_period
+from workforce.roster.publication import publish_roster_period, republish_roster_shift, unpublish_roster_shift
 
 
 class RosterSlotHTTPContractTests(TestCase):
@@ -64,6 +67,34 @@ class RosterSlotHTTPContractTests(TestCase):
         # Build every slot while DRAFT, then exercise production unpublish/PATCH.
         RosterPeriod.objects.filter(pk=self.period.pk).update(status=RosterPeriod.Status.PUBLISHED)
 
+    def test_draft_can_plan_an_invited_worker_but_publication_waits_for_joining(self):
+        invited = make_user("PHARMACIST")
+        invited.set_unusable_password()
+        invited.is_otp_verified = False
+        invited.save(update_fields=["password", "is_otp_verified"])
+        membership = Membership.objects.create(
+            user=invited, pharmacy=self.pharmacy, invited_by=self.owner, role="PHARMACIST",
+            employment_type="FULL_TIME", is_active=False, status=Membership.Status.PENDING,
+            direct_invited_at=timezone.now(),
+        )
+        day = self.week + timedelta(days=1)
+        bulk_edit_roster_period(self.period, [{
+            "action": "create_shift", "date": str(day), "start_time": "09:00", "end_time": "17:00",
+            "role": "PHARMACIST", "user_id": invited.pk,
+        }], self.owner)
+        assignment = ShiftSlotAssignment.objects.get(user=invited, slot_date=day)
+        self.assertEqual(assignment.engagement_terms_snapshot["draft_invite_membership_id"], membership.pk)
+        with self.assertRaisesMessage(ValidationError, "active accepted membership"):
+            publish_roster_period(self.period, self.owner)
+
+        membership.status = Membership.Status.ACCEPTED
+        membership.is_active = True
+        membership.save(update_fields=["status", "is_active"])
+        publish_roster_period(self.period, self.owner)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.engagement_terms_snapshot["membership_id"], membership.pk)
+        self.assertNotIn("draft_invite_membership_id", assignment.engagement_terms_snapshot)
+
     def payload(self, **slot_overrides):
         return {
             "role_needed": "PHARMACIST",
@@ -88,6 +119,38 @@ class RosterSlotHTTPContractTests(TestCase):
         self.assertEqual(self.assignment.engagement_terms_accepted_at, self.accepted_at)
         self.interest.refresh_from_db()
         self.assertEqual(self.interest.slot_id, self.slot.pk)
+
+    def test_refresh_rejects_pricing_error_without_overwriting_rate(self):
+        self.assignment.engagement_kind = 'INDEPENDENT_CONTRACTOR'
+        self.assignment.engagement_terms_accepted_at = None
+        self.assignment.save(update_fields=['engagement_kind', 'engagement_terms_accepted_at'])
+        with mock.patch('shifts.pricing.get_locked_rate_for_slot', return_value=(Decimal('0'), {'error': 'missing rate'})):
+            with self.assertRaises(ValidationError):
+                refresh_assignment_rate(self.assignment)
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.unit_rate, Decimal('57.00'))
+        self.assertEqual(self.assignment.rate_reason, {'source': 'existing_locked_contract'})
+
+    def test_replacing_worker_rejects_pricing_error_and_rolls_back(self):
+        worker = make_user('PHARMACIST')
+        Membership.objects.create(user=worker, pharmacy=self.pharmacy, role='PHARMACIST',
+                                  employment_type='FULL_TIME', status=Membership.Status.ACCEPTED, is_active=True)
+        slot = ShiftSlot.objects.create(shift=self.shift, date=self.week + timedelta(days=1),
+                                        start_time=time(9), end_time=time(17), roster_period=self.period)
+        payload = {'slots': [{'id': slot.pk, 'end_time': '18:00'}], 'user_id': worker.pk}
+        with mock.patch('workforce.roster.slot_edit.get_locked_rate_for_slot',
+                        return_value=(Decimal('0'), {'error': 'missing rate'})) as price, mock.patch(
+            'workforce.roster.slot_edit.staff_assignment_defaults',
+            return_value={'engagement_terms_snapshot': {'settlement_channel': 'TIMESHEET_ONLY'}},
+        ):
+            response = self.client.patch(self.url, payload, format='json')
+        self.assertEqual(response.status_code, 400, response.content)
+        price.assert_called_once()
+        self.assertIn('rate', response.data)
+        self.assert_original_assignment()
+        slot.refresh_from_db()
+        self.assertEqual(slot.end_time, time(17))
+        self.assertFalse(slot.assignments.exists())
 
     def test_patch_preserves_slot_assignment_and_unsubmitted_metadata(self):
         self.publish_fixture()

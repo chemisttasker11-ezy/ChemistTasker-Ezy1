@@ -16,6 +16,8 @@ from workforce.models import RosterPeriod
 class RosterShiftEscalationTests(TestCase):
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy()
+        self.pharmacy.abn_verified = True
+        self.pharmacy.save(update_fields=['abn_verified'])
         today = timezone.localdate()
         self.monday = today - timedelta(days=today.weekday()) + timedelta(days=28)
         self.period = RosterPeriod.objects.create(pharmacy=self.pharmacy, week_start=self.monday, created_by=self.owner)

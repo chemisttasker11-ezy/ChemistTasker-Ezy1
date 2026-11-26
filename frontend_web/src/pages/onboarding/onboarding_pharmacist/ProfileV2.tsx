@@ -1,5 +1,6 @@
 // src/pages/onboardingV2/ProfileV2.tsx
 import * as React from 'react';
+import IndemnityCover from '../IndemnityCover';
 import {
   Box,
   Typography,
@@ -191,6 +192,7 @@ export default function ProfileV2() {
           </Stack>
         </Box>
 
+        <IndemnityCover role="pharmacist" />
         <Box>
           <Button variant="contained" onClick={save} disabled={saving}>
             {saving ? (

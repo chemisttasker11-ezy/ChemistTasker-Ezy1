@@ -5,6 +5,7 @@ from unittest import mock
 from django.test import TestCase
 from django.utils import timezone
 
+from onboarding.models import OtherStaffOnboarding
 from rewards.models import PillLedgerEntry, PillReferralCode, PillReferralEvent, PillRewardRule
 from rewards.services import get_pill_balance, get_shift_post_pill_cost
 from shifts.models import Shift, ShiftOffer, ShiftSlot
@@ -147,8 +148,10 @@ class PillRewardsOfferPaymentTests(TestCase):
                 shift=self.shift, date=timezone.localdate() + timedelta(days=offset + 1),
                 start_time=time(9), end_time=time(17), rate=30,
             )
+            worker = make_user()
+            OtherStaffOnboarding.objects.create(user=worker, role_type="ASSISTANT", verified=True)
             self.offers.append(ShiftOffer.objects.create(
-                shift=self.shift, slot=slot, user=make_user(), offered_rate=30,
+                shift=self.shift, slot=slot, user=worker, offered_rate=30,
                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT,
             ))
         self.cost = get_shift_post_pill_cost()

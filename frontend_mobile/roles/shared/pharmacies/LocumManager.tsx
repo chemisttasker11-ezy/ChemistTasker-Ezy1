@@ -440,7 +440,7 @@ export default function LocumManager({
         if (!id) return;
         setDeleteLoadingId(id);
         try {
-            await deleteMembershipService(String(id));
+            await deleteMembershipService(String(id), 'keep');
             setToast({ message: 'Locum removed', severity: 'success' });
             onMembershipsChanged();
         } catch (error: any) {
@@ -785,7 +785,7 @@ export default function LocumManager({
                     <Text style={styles.modalTitle}>Remove Locum</Text>
                     <Text>
                         {confirmRemove
-                            ? `Remove ${confirmRemove.name} from this pharmacy? This action can't be undone.`
+                            ? `Remove ${confirmRemove.name} from this pharmacy? Confirmed bookings stay in place. To cancel or reassign any, review confirmed shifts first.`
                             : "This action can't be undone."}
                     </Text>
                     <View style={styles.modalActions}>

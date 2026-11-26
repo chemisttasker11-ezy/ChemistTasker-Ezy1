@@ -6,6 +6,7 @@ or automatically when an escalate_to_* timestamp is due and nobody has expressed
 """
 import uuid
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -42,8 +43,16 @@ def allowed_tiers(pharmacy):
     if pharmacy.organization_id:
         tiers.append('ORG_CHAIN')
 
-    tiers.append('PLATFORM')
+    if pharmacy.abn_verified:
+        tiers.append('PLATFORM')
     return tiers
+
+
+def validate_visibility(pharmacy, visibility, tiers):
+    if visibility == PUBLIC_LEVEL and not pharmacy.abn_verified:
+        raise ShiftActionRefused({"detail": "Confirm your pharmacy's ABN to post public shifts.", "code": "ABN_NOT_VERIFIED"})
+    if visibility not in tiers:
+        raise ValidationError({'visibility': f"Invalid choice; must be one of {tiers}"})
 
 
 def resolve_current_index(shift, allowed_tiers):
@@ -116,7 +125,14 @@ def auto_escalate_due_shifts(now, tiers_for=allowed_tiers):
                     enforce_public_shift_daily_limit(shift.pharmacy)
                 except ValidationError:
                     continue
-            apply_escalation(shift, tiers, target_index, stamp_missing=False)
+            # Expiry may have cleared this timer while the candidate was being evaluated.
+            field = ESCALATION_FIELD_MAP[target_visibility]
+            with transaction.atomic():
+                current = candidates.select_for_update(of=('self',)).filter(
+                    pk=shift.pk, visibility=shift.visibility, **{f'{field}__lte': now},
+                ).first()
+                if current is not None:
+                    apply_escalation(current, tiers, target_index, stamp_missing=False)
 
 
 def escalate_shift(shift, *, allowed_tiers, target_visibility=None):
@@ -125,6 +141,8 @@ def escalate_shift(shift, *, allowed_tiers, target_visibility=None):
     current_index = resolve_current_index(shift, allowed_tiers)
 
     if target_visibility:
+        if target_visibility == PUBLIC_LEVEL:
+            validate_visibility(shift.pharmacy, target_visibility, allowed_tiers)
         if target_visibility not in allowed_tiers:
             raise ShiftActionRefused(f"Invalid target_visibility. Must be one of {allowed_tiers}.")
         target_index = allowed_tiers.index(target_visibility)

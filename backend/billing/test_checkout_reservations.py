@@ -1,5 +1,5 @@
 """Durable checkout ownership through HTTP and signed-payment dispatch boundaries."""
-from datetime import time, timedelta
+from datetime import datetime, time, timedelta, timezone as utc_timezone
 from decimal import Decimal
 from unittest.mock import patch
 from django.test import TestCase, override_settings
@@ -9,7 +9,7 @@ from rest_framework.exceptions import ValidationError
 from billing import tests as fixtures
 from billing.models import FulfillmentCheckout, FulfillmentReservation, ShiftPayment
 from billing.checkout_reservations import occurrence_keys
-from client_profile.characterization_support import client_for, make_user
+from client_profile.characterization_support import client_for, make_user, make_verified_pharmacist
 from shifts.models import ShiftOffer, ShiftSlot, ShiftSlotAssignment
 
 
@@ -31,11 +31,12 @@ class CheckoutReservationTests(TestCase):
         return client_for(actor or self.owner).post(reverse('api_v1:billing:expire_fulfillment_checkout',
                     args=[self.shift.pk, self.attempt().pk]), {}, format='json')
 
-    def pay(self, *, metadata=None, intent='pi_reserved', session_id='cs_test', currency='aud', amount=3000):
+    def pay(self, *, metadata=None, intent='pi_reserved', session_id='cs_test', currency='aud', amount=3000, completed_at=None):
         session = fixtures._StripeObject(id=session_id, mode='payment', payment_status='paid',
             amount_total=amount, currency=currency, payment_intent=intent,
             metadata=metadata if metadata is not None else self.attempt().parameters['metadata'])
         event = fixtures._StripeObject(id=f'evt_{intent}', type='checkout.session.completed',
+                                      created=int(completed_at.timestamp()) if completed_at is not None else None,
                                       data=fixtures._StripeObject(object=session))
         with (patch('billing.stripe_support.stripe.Webhook.construct_event', return_value=event),
               patch('shifts.emails.send_shift_payment_finalized_notifications'),
@@ -43,6 +44,26 @@ class CheckoutReservationTests(TestCase):
             response = client_for().post(reverse('api_v1:billing:stripe_webhook'), b'{}', content_type='application/json')
         self.assertEqual(response.status_code, 200, response.content)
         return alert
+
+    def test_late_paid_completion_needs_refund_before_expiry_job_runs(self):
+        self.assertEqual(self.charge().status_code, 200)
+        deadline = timezone.now() - timedelta(minutes=1)
+        ShiftOffer.objects.filter(pk=self.offer.pk).update(pay_by_at=deadline)
+        self.pay(completed_at=deadline + timedelta(seconds=5))
+        payment = ShiftPayment.objects.get()
+        self.assertTrue(payment.reconciliation_required)
+        self.assertEqual(payment.reconciliation_reason, 'payment_deadline_passed')
+        self.assertFalse(ShiftSlotAssignment.objects.filter(source_offer=self.offer).exists())
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, ShiftOffer.Status.EXPIRED)
+
+    def test_delayed_webhook_still_books_when_checkout_completed_in_time(self):
+        self.assertEqual(self.charge().status_code, 200)
+        deadline = timezone.now() - timedelta(minutes=1)
+        ShiftOffer.objects.filter(pk=self.offer.pk).update(pay_by_at=deadline)
+        self.pay(completed_at=deadline - timedelta(seconds=5))
+        self.assertFalse(ShiftPayment.objects.get().reconciliation_required)
+        self.assertTrue(ShiftSlotAssignment.objects.filter(source_offer=self.offer).exists())
 
     def test_unknown_provider_outcome_persists_reservation_and_retries_identical_parameters(self):
         def lost_ack(**kwargs):
@@ -69,7 +90,7 @@ class CheckoutReservationTests(TestCase):
 
     def test_alternate_candidate_on_same_occurrence_is_reserved(self):
         self.assertEqual(self.charge().status_code, 200)
-        competitor = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+        competitor = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_verified_pharmacist(),
                                               status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
         self.assertEqual(self.charge(competitor).status_code, 409)
         self.checkout.assert_called_once()
@@ -106,6 +127,142 @@ class CheckoutReservationTests(TestCase):
         with patch('billing.stripe_support.stripe.checkout.Session.retrieve') as retrieve:
             self.assertEqual(self.expire(self.worker).status_code, 403)
         retrieve.assert_not_called()
+
+    def test_payment_deadline_bands_and_start_cap(self):
+        from shifts.payment_deadlines import payment_deadline
+
+        reserved = datetime(2026, 12, 1, tzinfo=utc_timezone.utc)
+        for start, deadline in ((49, 24), (48, 6), (12, 6), (11, 2), (2, 0.5), (1, 0.5), (0.25, 0.25)):
+            with self.subTest(hours_until_start=start):
+                self.assertEqual(payment_deadline(reserved, reserved + timedelta(hours=start)),
+                                 reserved + timedelta(hours=deadline))
+
+    def test_deadline_expiry_reopens_only_to_existing_audience_and_notifies_once(self):
+        from billing.tasks import expire_payment_reservations
+        from notifications.models import Notification
+        from shifts.assignment import slot_locked_for_shift_offer
+        from shifts.escalation import auto_escalate_due_shifts
+
+        self.shift.visibility = 'LOCUM_CASUAL'
+        self.shift.escalation_level = 1
+        self.shift.escalate_to_platform = timezone.now() - timedelta(minutes=1)
+        self.shift.save()
+        self.slot.date = timezone.localdate() + timedelta(days=3)
+        self.slot.save(update_fields=['date'])
+        self.assertEqual(self.charge().status_code, 200)
+        now = timezone.now()
+        ShiftOffer.objects.filter(pk=self.offer.pk).update(pay_by_at=now + timedelta(minutes=1))
+        self.assertTrue(slot_locked_for_shift_offer(shift=self.shift, slot=self.slot))
+        expired = fixtures._StripeObject(id='cs_test', status='expired', payment_status='unpaid')
+        with patch('billing.stripe_support.stripe.checkout.Session.retrieve', return_value=expired) as retrieve:
+            expire_payment_reservations.run()
+            retrieve.assert_not_called()
+            ShiftOffer.objects.filter(pk=self.offer.pk).update(pay_by_at=now - timedelta(minutes=1))
+            expire_payment_reservations.run()
+            expire_payment_reservations.run()
+        retrieve.assert_called_once_with('cs_test')
+        auto_escalate_due_shifts(timezone.now())
+        self.shift.refresh_from_db()
+        self.offer.refresh_from_db()
+        self.assertEqual(self.attempt().state, FulfillmentCheckout.State.EXPIRED)
+        self.assertFalse(FulfillmentReservation.objects.filter(active=True).exists())
+        self.assertFalse(slot_locked_for_shift_offer(shift=self.shift, slot=self.slot))
+        self.assertEqual(self.offer.status, ShiftOffer.Status.EXPIRED)
+        self.assertEqual(self.shift.payment_status, 'NOT_REQUIRED')
+        self.assertEqual((self.shift.visibility, self.shift.escalation_level), ('LOCUM_CASUAL', 1))
+        self.assertCountEqual(Notification.objects.filter(payload__notification_kind='shift_payment_expired')
+                              .values_list('user_id', flat=True), [self.owner.pk, self.worker.pk])
+        self.assertFalse(ShiftPayment.objects.exists())
+
+    def test_due_offer_expires_without_ever_starting_checkout(self):
+        from billing.tasks import expire_payment_reservations
+
+        ShiftOffer.objects.filter(pk=self.offer.pk).update(pay_by_at=timezone.now() - timedelta(minutes=1))
+        self.assertEqual(self.charge().status_code, 409)
+        expire_payment_reservations.run()
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, ShiftOffer.Status.EXPIRED)
+        self.checkout.assert_not_called()
+
+    def test_deadline_expiry_keeps_provider_paid_hold_before_webhook(self):
+        from billing.tasks import expire_payment_reservations
+
+        self.assertEqual(self.charge().status_code, 200)
+        ShiftOffer.objects.filter(pk=self.offer.pk).update(pay_by_at=timezone.now() - timedelta(minutes=1))
+        session = fixtures._StripeObject(id='cs_test', status='complete', payment_status='paid')
+        with (patch('billing.stripe_support.stripe.checkout.Session.retrieve', return_value=session),
+              patch('billing.stripe_support.stripe.checkout.Session.expire') as expire):
+            expire_payment_reservations.run()
+            self.assertEqual(self.expire().status_code, 409)
+        expire.assert_not_called()
+        self.assertTrue(FulfillmentReservation.objects.filter(active=True).exists())
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
+
+    def test_deadline_expiry_recovers_a_checkout_after_lost_acknowledgment(self):
+        from billing.tasks import expire_payment_reservations
+
+        self.checkout.side_effect = TimeoutError
+        self.assertEqual(self.charge().status_code, 503)
+        original_request = self.checkout.call_args.kwargs
+        self.checkout.side_effect = None
+        ShiftOffer.objects.filter(pk=self.offer.pk).update(pay_by_at=timezone.now() - timedelta(minutes=1))
+        expired = fixtures._StripeObject(id='cs_test', status='expired', payment_status='unpaid')
+        with patch('billing.stripe_support.stripe.checkout.Session.retrieve', return_value=expired) as retrieve:
+            expire_payment_reservations.run()
+        self.assertEqual(self.checkout.call_args.kwargs, original_request)
+        retrieve.assert_called_once_with('cs_test')
+        self.assertEqual(self.attempt().state, FulfillmentCheckout.State.EXPIRED)
+        self.assertFalse(FulfillmentReservation.objects.filter(active=True).exists())
+
+    @override_settings(AHPRA_ENFORCEMENT_ENABLED=True)
+    def test_checkout_rechecks_worker_credentials_before_payment(self):
+        from onboarding.models import PharmacistOnboarding
+
+        PharmacistOnboarding.objects.filter(user=self.worker).update(verified=False)
+        response = self.charge()
+        self.assertEqual((response.status_code, response.data.get('code')), (403, 'candidate_ahpra_ineligible'))
+        self.checkout.assert_not_called()
+        self.assertFalse(FulfillmentCheckout.objects.exists())
+
+    @override_settings(AHPRA_ENFORCEMENT_ENABLED=True)
+    def test_ahpra_cancellation_expires_unpaid_checkout_and_releases_its_hold(self):
+        from shifts.cancellation import cancel_upcoming_assignments
+
+        self.slot.date = timezone.localdate() + timedelta(days=3)
+        self.slot.save(update_fields=['date'])
+        self.assertEqual(self.charge().status_code, 200)
+        session = fixtures._StripeObject(id='cs_test', status='open', payment_status='unpaid')
+        expired = fixtures._StripeObject(id='cs_test', status='expired', payment_status='unpaid')
+        with (patch('billing.stripe_support.stripe.checkout.Session.retrieve', return_value=session),
+              patch('billing.stripe_support.stripe.checkout.Session.expire', return_value=expired) as expire,
+              patch('shifts.cancellation._announce_cancellation'),
+              self.captureOnCommitCallbacks(execute=True)):
+            cancel_upcoming_assignments(self.worker)
+        expire.assert_called_once_with('cs_test')
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, ShiftOffer.Status.DECLINED)
+        self.assertEqual(self.attempt().state, FulfillmentCheckout.State.EXPIRED)
+        self.assertFalse(FulfillmentReservation.objects.filter(active=True).exists())
+
+    @override_settings(AHPRA_ENFORCEMENT_ENABLED=True)
+    def test_ahpra_checkout_expiry_retries_after_provider_timeout(self):
+        from billing.tasks import expire_payment_reservations
+        from shifts.cancellation import cancel_upcoming_assignments
+
+        self.slot.date = timezone.localdate() + timedelta(days=3)
+        self.slot.save(update_fields=['date'])
+        self.assertEqual(self.charge().status_code, 200)
+        with (patch('billing.stripe_support.stripe.checkout.Session.retrieve', side_effect=TimeoutError),
+              patch('shifts.cancellation._announce_cancellation'),
+              self.captureOnCommitCallbacks(execute=True)):
+            cancel_upcoming_assignments(self.worker)
+        self.assertTrue(FulfillmentReservation.objects.filter(active=True).exists())
+        expired = fixtures._StripeObject(id='cs_test', status='expired', payment_status='unpaid')
+        with patch('billing.stripe_support.stripe.checkout.Session.retrieve', return_value=expired):
+            expire_payment_reservations.run()
+        self.assertEqual(self.attempt().state, FulfillmentCheckout.State.EXPIRED)
+        self.assertFalse(FulfillmentReservation.objects.filter(active=True).exists())
 
     def test_expiry_releases_only_after_confirmed_unpaid_expiry(self):
         first = self.charge()
@@ -220,7 +377,7 @@ class CheckoutReservationTests(TestCase):
             ShiftSlotAssignment.objects.filter(source_offer=self.offer).delete()
             ShiftOffer.objects.filter(pk=self.offer.pk).update(status=ShiftOffer.Status.DECLINED)
         self.checkout.return_value = fixtures._StripeObject(id='cs_replacement', url='https://checkout.example.test/new')
-        return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+        return ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_verified_pharmacist(),
                                          status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
 
     def test_cancelled_paid_booking_frees_occurrence_for_card_replacement(self):
@@ -258,7 +415,7 @@ class CheckoutReservationTests(TestCase):
         for work_date, expected in ((kept, 409), (cancelled, 200)):
             with self.subTest(work_date=work_date):
                 replacement = ShiftOffer.objects.create(
-                    shift=self.shift, slot=self.slot, offered_slot_date=work_date, user=make_user('PHARMACIST'),
+                    shift=self.shift, slot=self.slot, offered_slot_date=work_date, user=make_verified_pharmacist(),
                     status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
                 self.assertEqual(self.charge(replacement).status_code, expected)
 
@@ -275,7 +432,7 @@ class CheckoutReservationTests(TestCase):
         ShiftOffer.objects.filter(pk=self.offer.pk).update(status=ShiftOffer.Status.DECLINED)
         release_cancelled_paid_work(self.shift.pk)
         self.assertFalse(FulfillmentReservation.objects.filter(active=True).exists())
-        replacement = ShiftOffer.objects.create(shift=self.shift, user=make_user('PHARMACIST'),
+        replacement = ShiftOffer.objects.create(shift=self.shift, user=make_verified_pharmacist(),
                                                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
         self.checkout.return_value = fixtures._StripeObject(id='cs_replacement', url='https://checkout.example.test/new')
         self.assertEqual(self.charge(replacement).status_code, 200)  # Released paid work no longer blocks.
@@ -366,7 +523,7 @@ class CheckoutReservationTests(TestCase):
 
     def test_changed_worker_after_checkout_cannot_redirect_paid_booking(self):
         self.charge()
-        self.offer.user = make_user('PHARMACIST')
+        self.offer.user = make_verified_pharmacist()
         self.offer.save(update_fields=['user'])
         self.pay()
         self.assertTrue(ShiftPayment.objects.get().reconciliation_required)
@@ -503,7 +660,7 @@ class CheckoutReconciliationAdminTests(TestCase):
         self.assertFalse(ShiftPayment.objects.get().reconciliation_required)
 
     def test_paid_unexpirable_orphan_never_books_work_a_replacement_reserved_first(self):
-        replacement = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+        replacement = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_verified_pharmacist(),
                                                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
 
         def replacement_reserves():
@@ -523,7 +680,7 @@ class CheckoutReconciliationAdminTests(TestCase):
         self.assertEqual((attempt.state, attempt.stripe_session_id, attempt.checkout_url),
                          (FulfillmentCheckout.State.UNKNOWN, 'cs_orphan', ''))
         self.assertTrue(attempt.reservations.filter(active=True).exists(), 'The possibly payable orphan owns its work again')
-        replacement = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+        replacement = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_verified_pharmacist(),
                                                 status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
         self.checkout.side_effect = None
         self.assertEqual(self.charge(replacement).status_code, 409)

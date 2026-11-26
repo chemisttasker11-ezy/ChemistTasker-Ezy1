@@ -9,7 +9,7 @@ from shifts.models import ShiftSlotAssignment
 from workforce.models import RosterPeriod, RosterPublicationAudit
 from workforce.roster.permissions import is_authorized_attendance_manager
 from workforce.roster.periods import get_roster_period_assignments, validate_roster_period
-from workforce.roster.slot_locking import locked_roster_slots, week_start
+from workforce.roster.slot_locking import lock_roster_workers, locked_roster_slots, week_start
 from workforce.roster.publication_contract import reviewed_validation
 from django.contrib.auth import get_user_model
 
@@ -55,7 +55,7 @@ def publish_roster_period(roster_period, published_by, force_warnings=False, *, 
             return period, validate_roster_period(period)
 
         worker_ids = get_roster_period_assignments(period).values_list("user_id", flat=True)
-        list(User.objects.select_for_update().filter(pk__in=worker_ids).order_by("pk"))
+        lock_roster_workers(worker_ids)
         validation = validate_roster_period(period)
         if acknowledged_warning_keys is not None:
             validation = reviewed_validation(validation, acknowledged_warning_keys)
@@ -69,6 +69,20 @@ def publish_roster_period(roster_period, published_by, force_warnings=False, *, 
 
         if period.status == RosterPeriod.Status.PUBLISHED:
             return period, validation
+
+        from shifts.engagement import staff_assignment_defaults
+        from workforce.roster.assignment_rates import refresh_assignment_rate
+        for assignment in get_roster_period_assignments(period).filter(
+            engagement_terms_snapshot__draft_invite_membership_id__isnull=False,
+        ).select_related("user", "slot"):
+            final_terms = staff_assignment_defaults(
+                user=assignment.user, pharmacy=period.pharmacy,
+                work_date=assignment.slot_date or assignment.slot.date,
+            )
+            for field, value in final_terms.items():
+                setattr(assignment, field, value)
+            assignment.save(update_fields=list(final_terms))
+            refresh_assignment_rate(assignment)
 
         # Update period
         period.status = RosterPeriod.Status.PUBLISHED

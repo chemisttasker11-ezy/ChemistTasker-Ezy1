@@ -2,7 +2,13 @@ from django.urls import path, include
 from .views import *
 from .browser_session import csrf_token
 from .api_passwords import RevokingPasswordResetConfirmView
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from .api_otp import RegistrationEmailChangeView
+from .api_auth import CompleteTwoFactorLoginView, SendTwoFactorLoginCodeView
+from .api_session_security import (
+    ConfirmAuthenticatorView, ConfirmEmailTwoFactorView, DeviceSessionsView, DisableTwoFactorView,
+    RegenerateBackupCodesView, RevokeAllDeviceSessionsView, RevokeDeviceSessionView,
+    StartAuthenticatorView, StartEmailTwoFactorView, TwoFactorStatusView,
+)
 from rest_framework.routers import DefaultRouter
 from django.contrib.auth import views as auth_views
 
@@ -23,6 +29,18 @@ urlpatterns = [
     path('csrf/', csrf_token, name='browser-csrf'),
     path('register/', RegisterView.as_view()),
     path('login/', CustomLoginView.as_view(), name='custom_token_obtain_pair'),
+    path('login/2fa/', CompleteTwoFactorLoginView.as_view(), name='login-two-factor'),
+    path('login/2fa/email/', SendTwoFactorLoginCodeView.as_view(), name='login-two-factor-email'),
+    path('2fa/', TwoFactorStatusView.as_view(), name='two-factor-status'),
+    path('2fa/email/start/', StartEmailTwoFactorView.as_view(), name='two-factor-email-start'),
+    path('2fa/email/confirm/', ConfirmEmailTwoFactorView.as_view(), name='two-factor-email-confirm'),
+    path('2fa/authenticator/start/', StartAuthenticatorView.as_view(), name='two-factor-authenticator-start'),
+    path('2fa/authenticator/confirm/', ConfirmAuthenticatorView.as_view(), name='two-factor-authenticator-confirm'),
+    path('2fa/backup-codes/regenerate/', RegenerateBackupCodesView.as_view(), name='two-factor-backup-regenerate'),
+    path('2fa/disable/', DisableTwoFactorView.as_view(), name='two-factor-disable'),
+    path('sessions/', DeviceSessionsView.as_view(), name='device-sessions'),
+    path('sessions/revoke-all/', RevokeAllDeviceSessionsView.as_view(), name='device-sessions-revoke-all'),
+    path('sessions/<str:sid>/revoke/', RevokeDeviceSessionView.as_view(), name='device-session-revoke'),
     path('token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('mobile/app-config/', MobileAppConfigView.as_view(), name='mobile-app-config'),
@@ -36,6 +54,7 @@ urlpatterns = [
     path('auth/reset/done/',           auth_views.PasswordResetCompleteView.as_view(),name='password_reset_complete'),
     path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
     path('resend-otp/', ResendOTPView.as_view(), name='resend-otp'),
+    path('change-registration-email/', RegistrationEmailChangeView.as_view(), name='change-registration-email'),
 
     # Mobile verification
     path('mobile/request-otp/', RequestMobileOTPView.as_view(), name='mobile-request-otp'),

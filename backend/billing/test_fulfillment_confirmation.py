@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from billing.models import ShiftPayment
-from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_user
+from client_profile.characterization_support import client_for, make_owner_with_pharmacy, make_verified_pharmacist
 from client_profile.models import Shift
 
 
@@ -41,7 +41,7 @@ class _ShiftBase(TestCase):
 
     def offer(self, status, day, slot=None):
         from shifts.models import ShiftOffer
-        return ShiftOffer.objects.create(shift=self.shift, slot=slot or self.slot, user=make_user("PHARMACIST"),
+        return ShiftOffer.objects.create(shift=self.shift, slot=slot or self.slot, user=make_verified_pharmacist(),
                                          status=status, offered_slot_date=day)
 
 

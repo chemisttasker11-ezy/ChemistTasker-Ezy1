@@ -44,9 +44,10 @@ def queued_emails():
 class ShiftPostingFixture(TestCase):
     def setUp(self):
         self.owner, self.pharmacy = make_owner_with_pharmacy("Posting Pharmacy")
+        self.pharmacy.abn_verified = True
         self.pharmacy.state = "NSW"
         self.pharmacy.suburb = "Parramatta"
-        self.pharmacy.save(update_fields=["state", "suburb"])
+        self.pharmacy.save(update_fields=["state", "suburb", "abn_verified"])
 
     def member(self, employment_type, *, role="PHARMACIST", user_role="PHARMACIST", pharmacy=None, is_active=True):
         user = make_user(user_role)
@@ -286,8 +287,31 @@ class AvailabilityMatchTests(ShiftPostingFixture):
 
 
 class PostingDefaultsTests(ShiftPostingFixture):
-    def test_dedicated_booking_partial_edits_keep_privacy_without_visibility_input(self):
+    def dedicated_favourite(self, verified=True):
         worker = self.member('LOCUM')
+        PharmacistOnboarding.objects.create(user=worker, verified=verified)
+        return worker
+
+    def test_dedicated_offer_refuses_unverified_favourite_without_posting(self):
+        worker = self.dedicated_favourite(verified=False)
+
+        response, sent = self.post_shift(dedicated_user=worker.id)
+
+        self.assertEqual((response.status_code, response.data.get('code')), (403, 'candidate_ahpra_ineligible'))
+        self.assertFalse(Shift.objects.filter(dedicated_user=worker).exists())
+        self.assertFalse(ShiftOffer.objects.filter(user=worker).exists())
+        self.assertFalse(Notification.objects.filter(user=worker).exists())
+        self.assertEqual(sent, [])
+
+    def test_dedicated_offer_allows_own_unverified_employee(self):
+        worker = self.member('FULL_TIME')
+        PharmacistOnboarding.objects.create(user=worker, verified=False)
+        response, _ = self.post_shift(dedicated_user=worker.id)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertTrue(ShiftOffer.objects.filter(shift_id=response.data['id'], user=worker).exists())
+
+    def test_dedicated_booking_partial_edits_keep_privacy_without_visibility_input(self):
+        worker = self.dedicated_favourite()
         response, _ = self.post_shift(dedicated_user=worker.id, visibility='LOCUM_CASUAL')
         self.assertEqual(response.status_code, 201, response.data)
         shift_id = response.data['id']
@@ -307,7 +331,7 @@ class PostingDefaultsTests(ShiftPostingFixture):
         self.assertIn(unauthorized.status_code, (403,404))
 
     def test_direct_booking_ignores_widening_and_broadcast_controls(self):
-        worker = self.member('LOCUM')
+        worker = self.dedicated_favourite()
         colleague = self.member('FULL_TIME')
         response, sent = self.post_shift(
             dedicated_user=worker.id, visibility='PLATFORM', notify_pharmacy_staff=True,
@@ -325,7 +349,7 @@ class PostingDefaultsTests(ShiftPostingFixture):
         self.assertEqual(community.status_code, 404)
 
     def test_dedicated_shift_offers_each_slot_to_its_worker(self):
-        worker = self.member("LOCUM")
+        worker = self.dedicated_favourite()
         response, sent = self.post_shift(dedicated_user=worker.id)
         self.assertEqual(response.status_code, 201, response.data)
         shift = Shift.objects.get(pk=response.data["id"])
@@ -338,7 +362,7 @@ class PostingDefaultsTests(ShiftPostingFixture):
         self.assertEqual(Notification.objects.filter(user=worker, title="Shift offer received").count(), 1)
 
     def test_dedicated_offer_notification_delivery_outage_does_not_fail_post_or_email_queue(self):
-        worker = self.member("LOCUM")
+        worker = self.dedicated_favourite()
         with queued_emails() as sent, mock.patch(
             "notifications.services._deliver_notification",
             side_effect=RuntimeError("notification transport offline"),
@@ -357,7 +381,7 @@ class PostingDefaultsTests(ShiftPostingFixture):
         self.assertEqual(Notification.objects.filter(user=worker, title="Shift offer received").count(), 1)
 
     def test_dedicated_offer_email_queue_outage_does_not_fail_post_or_notification(self):
-        worker = self.member("LOCUM")
+        worker = self.dedicated_favourite()
         with mock.patch(
             "shifts.assignment.async_task",
             side_effect=RuntimeError("email queue offline"),
@@ -373,7 +397,7 @@ class PostingDefaultsTests(ShiftPostingFixture):
         self.assertTrue(ShiftOffer.objects.filter(shift_id=response.data["id"], user=worker).exists())
 
     def test_single_user_dedicated_shift_gets_one_shift_level_offer(self):
-        worker = self.member("LOCUM")
+        worker = self.dedicated_favourite()
         response, _ = self.post_shift(dedicated_user=worker.id, single_user_only=True, rate_type="FIXED",
                                       fixed_rate="80.00")
         offer = ShiftOffer.objects.get(shift_id=response.data["id"])
@@ -508,6 +532,8 @@ class ShiftEditTests(ShiftPostingFixture):
         shift = Shift.objects.get(pk=response.data["id"])
         interested = self.member("LOCUM")
         ShiftInterest.objects.create(shift=shift, slot=None, user=interested)
+        follower = self.member("LOCUM")
+        shift.saved_by.create(user=follower)
 
         with queued_emails() as sent, self.captureOnCommitCallbacks(execute=True):
             edited = client_for(self.owner).patch(f"{API}shifts/{shift.id}/", {
@@ -524,6 +550,7 @@ class ShiftEditTests(ShiftPostingFixture):
         # the update is announced to workers with interest, counter offers or live offers (not as a new posting)
         self.assertEqual([(e["template"], e["to"]) for e in sent], [("emails/shift_updated.html", (interested.email,))])
         self.assertEqual(Notification.objects.filter(user=interested, title="Shift updated: Posting Pharmacy").count(), 1)
+        self.assertEqual(Notification.objects.filter(user=follower, title="Shift updated").count(), 1)
 
     def test_an_invalid_slot_in_an_edit_changes_nothing(self):
         # Regression: the edit used to save the shift's fields before validating the new slots, so a 400 for a bad
@@ -584,3 +611,45 @@ class ShiftEditTests(ShiftPostingFixture):
         self.assertEqual(shift.description, "Updated instructions")
         self.assertEqual(shift.slot_assignments.count(), 1)
         self.assertEqual(shift.slots.count(), 2)
+
+
+class AbnPublicPostingTests(ShiftPostingFixture):
+    def setUp(self):
+        super().setUp()
+        self.pharmacy.abn_verified = False
+        self.pharmacy.save(update_fields=["abn_verified"])
+
+    def test_public_requires_verified_abn(self):
+        response, _ = self.post_shift(visibility="PLATFORM")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "ABN_NOT_VERIFIED")
+        self.assertEqual(response.data["detail"], "Confirm your pharmacy's ABN to post public shifts.")
+        self.pharmacy.abn_verified = True
+        self.pharmacy.save(update_fields=["abn_verified"])
+        response, _ = self.post_shift(visibility="PLATFORM")
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_unverified_chain_and_organization_are_allowed(self):
+        from organizations.models import Organization
+        chain = Chain.objects.create(owner=self.pharmacy.owner, name="ABN chain")
+        chain.pharmacies.add(self.pharmacy)
+        self.pharmacy.organization = Organization.objects.create(name="ABN org", slug="abn-org")
+        self.pharmacy.save(update_fields=["organization"])
+        for tier in ("OWNER_CHAIN", "ORG_CHAIN"):
+            response, _ = self.post_shift(visibility=tier)
+            self.assertEqual(response.status_code, 201, response.data)
+
+    def test_manual_public_refusal_and_auto_stops(self):
+        from django.utils import timezone
+        from shifts.escalation import auto_escalate_due_shifts
+        response, _ = self.post_shift(visibility="LOCUM_CASUAL")
+        shift = Shift.objects.get(pk=response.data["id"])
+        response = client_for(self.owner).post(f"{API}shifts/{shift.pk}/escalate/", {"target_visibility": "PLATFORM"}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["code"], "ABN_NOT_VERIFIED")
+        shift.escalate_to_platform = timezone.now() - timedelta(minutes=1)
+        shift.save(update_fields=["escalate_to_platform"])
+        auto_escalate_due_shifts(timezone.now())
+        auto_escalate_due_shifts(timezone.now())
+        shift.refresh_from_db()
+        self.assertEqual(shift.visibility, "LOCUM_CASUAL")

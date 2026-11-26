@@ -9,7 +9,7 @@ import { attendance } from '@chemisttasker/shared-core';
 
 type Pharmacy = { id: number; name: string; timezone: string };
 export default function KioskLinkPrompt() {
-  const params = useLocalSearchParams<{ source?: string; pharmacy_id?: string; device_name?: string }>();
+  const params = useLocalSearchParams<{ source?: string; pharmacy_id?: string; device_name?: string; authorization_id?: string }>();
   const prompted = params.source === 'kiosk';
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [selected, setSelected] = useState('');
@@ -33,12 +33,22 @@ export default function KioskLinkPrompt() {
       if (params.pharmacy_id && !requested) {
         setError('You do not have terminal-management access to the pharmacy in this link.');
         setSelected('');
-      } else setSelected(requested ? String(requested.id) : rows.length === 1 ? String(rows[0].id) : '');
+      } else if (!params.authorization_id) setSelected(requested ? String(requested.id) : rows.length === 1 ? String(rows[0].id) : '');
     }).catch(() => { if (active) setError('Unable to load your pharmacies. Try again.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [prompted, params.pharmacy_id, refresh]);
+  }, [prompted, params.pharmacy_id, params.authorization_id, refresh]);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
+  useEffect(() => {
+    if (!params.authorization_id) return;
+    let active = true;
+    attendance.getNoticeCode('pairing', params.authorization_id).then(data => {
+      if (!active) return;
+      setSelected(String(data.pharmacy_id)); setDeviceName(data.device_name || 'Front counter');
+      setCode(data.code); setExpiresAt(Date.parse(data.expires_at || ''));
+    }).catch(() => { if (active) setError('This pairing code is unavailable or expired. Create a new code.'); });
+    return () => { active = false; };
+  }, [params.authorization_id]);
   const pharmacy = pharmacies.find(p => String(p.id) === selected);
   const expired = !!code && now >= expiresAt;
   const createCode = async () => {

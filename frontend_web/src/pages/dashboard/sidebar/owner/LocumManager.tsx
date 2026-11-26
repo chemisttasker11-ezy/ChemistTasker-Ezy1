@@ -418,7 +418,7 @@ export default function LocumManager({
     if (!id) return;
     setDeleteLoadingId(id);
     try {
-      await deleteMembershipService(id);
+      await deleteMembershipService(id, "keep");
       setToast({ message: "Removed from favourites.", severity: "success" });
       onMembershipsChanged();
     } catch (error: any) {
@@ -570,8 +570,8 @@ export default function LocumManager({
       <ConfirmDialog
         open={Boolean(confirmRemove)}
         title={confirmRemove ? `Remove ${confirmRemove.name} from favourites?` : "Remove favourite?"}
-        body="They'll stop seeing your shifts first. Shifts they've already accepted stay booked, and you can add them again later."
-        confirmLabel="Remove"
+        body="They'll stop seeing your shifts first. Confirmed bookings stay in place. To cancel or reassign any, close this dialog and review the confirmed shifts first."
+        confirmLabel="Remove and keep bookings"
         busyLabel="Removing…"
         busy={Boolean(deleteLoadingId)}
         onConfirm={() => confirmRemove && handleRemoveMembership(confirmRemove.id)}

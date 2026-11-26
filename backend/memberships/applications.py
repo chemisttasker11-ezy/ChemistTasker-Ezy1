@@ -9,9 +9,11 @@ from django.utils import timezone
 
 from users.task_dispatch import async_task
 from memberships.access import user_can_decide_applications
-from memberships.invites import create_membership_invite
-from memberships.models import MembershipApplication
+from memberships.invites import create_membership_invite, direct_application_category, expired_invite_from_token
+from memberships.models import MembershipApplication, MembershipInviteLink
+from memberships.serializers import MAX_ACTIVE_PHARMACY_MEMBERSHIPS, MembershipApplicationSerializer, _count_active_memberships
 from onboarding.models import OtherStaffOnboarding, PharmacistOnboarding
+from organizations.models import Pharmacy
 from users.models import User
 from users.normalization import sanitize_email_text as clean_email
 
@@ -23,6 +25,47 @@ class ApplicationRefused(Exception):
         super().__init__(body)
         self.body = body
         self.status = status
+
+
+def submit_application(request, link, *, expired_invite_id=None):
+    payload = request.data.copy()
+    payload['invite_link'] = link.pk
+    if payload.get('email'):
+        payload['email'] = clean_email(payload['email'].strip().lower())
+    serializer = MembershipApplicationSerializer(
+        data=payload, context={'request': request, 'expired_invite_id': expired_invite_id},
+    )
+    serializer.is_valid(raise_exception=True)
+    app = serializer.save(
+        pharmacy=link.pharmacy, category=link.category, invite_link=link,
+        submitted_by=request.user if request.user.is_authenticated else None,
+    )
+    transaction.on_commit(
+        lambda app_id=app.pk: async_task('client_profile.tasks.email_membership_application_submitted', app_id),
+        robust=True,
+    )
+    return app
+
+
+@transaction.atomic
+def apply_to_expired_invite(request, token):
+    membership = expired_invite_from_token(token)
+    if not membership:
+        raise ApplicationRefused({'detail': 'This application link is unavailable.'}, 410)
+    if request.user.pk != membership.user_id:
+        raise ApplicationRefused({'detail': 'Sign in with the account that received this invitation.'}, 403)
+    Pharmacy.objects.select_for_update().get(pk=membership.pharmacy_id)
+    User.objects.select_for_update().only("pk").get(pk=request.user.pk)
+    membership = expired_invite_from_token(token, for_update=True)
+    if not membership:
+        raise ApplicationRefused({'detail': 'This application link is unavailable.'}, 410)
+    if _count_active_memberships(request.user) >= MAX_ACTIVE_PHARMACY_MEMBERSHIPS:
+        raise ApplicationRefused({'detail': f'You already belong to {MAX_ACTIVE_PHARMACY_MEMBERSHIPS} pharmacies.'}, 400)
+    link = MembershipInviteLink.objects.create(
+        pharmacy=membership.pharmacy, created_by=membership.invited_by,
+        category=direct_application_category(membership), expires_at=timezone.now(), is_active=False,
+    )
+    return submit_application(request, link, expired_invite_id=membership.pk)
 
 
 def approve_application(app, *, decided_by, data):
@@ -120,12 +163,12 @@ def approve_application(app, *, decided_by, data):
                 'intern_half': app.intern_half,
                 'student_year': app.student_year,
                 'activate_immediately': True,
-                'source_application_id': app.id,
             }
 
             membership, error = create_membership_invite(
                 invite_data,
                 inviter=decided_by,
+                source_application_id=app.pk,
             )
             if error:
                 raise DjangoValidationError({'detail': [error]})

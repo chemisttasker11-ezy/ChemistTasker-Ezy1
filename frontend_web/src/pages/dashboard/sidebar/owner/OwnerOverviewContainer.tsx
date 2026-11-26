@@ -1,6 +1,6 @@
 // src/pages/dashboard/sidebar/owner/OwnerOverviewContainer.tsx
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Box } from "@mui/material";
+import { Alert, Box, Button } from "@mui/material";
 import TopBar from "./TopBar";
 import { useAuth } from '../../../../contexts/AuthContext';
 import { useWorkspace } from '../../../../contexts/WorkspaceContext';
@@ -27,6 +27,7 @@ const membershipIsVisibleCategoryMember = (membership: MembershipDTO) => {
 export default function OwnerOverviewContainer() {
   const navigate = useNavigate();
   const [pharmacies, setPharmacies] = useState<PharmacyDTO[]>([]);
+  const [pharmaciesLoaded, setPharmaciesLoaded] = useState(false);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
@@ -95,6 +96,7 @@ export default function OwnerOverviewContainer() {
             ? normalizedPharmacies.filter((pharmacy) => Number(pharmacy.id) === scopedPharmacyId)
             : normalizedPharmacies;
         setPharmacies(scopedPharmacies);
+        setPharmaciesLoaded(true);
 
         // Load memberships for each pharmacy
         const memberMap: Record<string, MembershipDTO[]> = {};
@@ -262,6 +264,12 @@ export default function OwnerOverviewContainer() {
       {view === "overview" && (
         <>
           <TopBar breadcrumb={["Overview"]} />
+          {activePersona !== "admin" && pharmaciesLoaded && pharmacies.length === 0 && (
+            <Alert severity="info" sx={{ m: 2 }}
+              action={<Button color="inherit" onClick={goToManagePharmacies}>Add a pharmacy</Button>}>
+              Add your pharmacy when you're ready to post shifts.
+            </Alert>
+          )}
           <OwnerOverviewHome
             totalPharmacies={pharmacies.length}
             pharmacies={pharmacies}

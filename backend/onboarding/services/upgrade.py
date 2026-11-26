@@ -6,6 +6,7 @@ checked AHPRA registration, and the overseas mobile skip no longer applies. The 
 the person posts again in the new role.
 """
 from onboarding.feature_port import verification_features
+from onboarding.services.gov_id import RESULT_FIELDS, has_gov_id_result
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
@@ -21,7 +22,7 @@ CARRIED_FIELDS = (
 )
 # The photo ID moves as one unit (documents, type, details and the check result), so the carried check always
 # describes the carried documents. Shared files are safe: storage deletion skips files another profile references.
-IDENTITY_BUNDLE = ('government_id', 'government_id_type', 'identity_secondary_file', 'identity_meta', 'gov_id_verified', 'gov_id_verification_note')
+IDENTITY_BUNDLE = ('government_id', 'government_id_type', 'identity_secondary_file', 'identity_meta', *RESULT_FIELDS)
 
 
 def upgrade_newcomer(user_id, role, staff_role=None):
@@ -51,7 +52,9 @@ def upgrade_newcomer(user_id, role, staff_role=None):
                 if name in target_fields and value not in (None, '', [], {}) and getattr(target, name) in (None, '', [], {}, False):
                     setattr(target, name, value)
                     changed.append(name)
-            if newcomer.government_id and not target.government_id:
+            if (newcomer.government_id or has_gov_id_result(newcomer)) and not (
+                target.government_id or has_gov_id_result(target)
+            ):
                 for name in IDENTITY_BUNDLE:
                     setattr(target, name, getattr(newcomer, name))
                     changed.append(name)
