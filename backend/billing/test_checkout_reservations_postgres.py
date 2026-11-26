@@ -87,8 +87,7 @@ class CheckoutReservationConcurrencyTests(TransactionTestCase):
         self.assertEqual(FulfillmentReservation.objects.filter(active=True).count(), 1)
 
     def test_different_candidate_overlap_cannot_prepare_second_provider_request(self):
-        from client_profile.characterization_support import make_user
-        competitor = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_user('PHARMACIST'),
+        competitor = ShiftOffer.objects.create(shift=self.shift, slot=self.slot, user=make_verified_pharmacist(),
                                               status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
         accepted, finish = Event(), Event()
         def provider(**kwargs):
