@@ -28,7 +28,7 @@ from typing import Optional
 from django.db.models import Q
 from django.utils import timezone
 
-from organizations.timezone import get_pharmacy_timezone
+from organizations.timezone import get_booking_timezone
 from organizations.models import (
     Chain,
     Pharmacy,
@@ -142,11 +142,9 @@ def _find_matching_assignment(
     if shift_id is not None:
         base_qs = base_qs.filter(shift_id=shift_id)
 
-    tz = get_pharmacy_timezone(pharmacy)
-    eval_local = target_time.astimezone(tz) if timezone.is_aware(target_time) and tz else target_time
-
-    target_date = eval_local.date()
-    candidate_dates = [target_date, target_date - timedelta(days=1)]
+    aware = timezone.is_aware(target_time)
+    target_date = target_time.date()
+    candidate_dates = [target_date + timedelta(days=offset) for offset in ((-2, -1, 0, 1) if aware else (-1, 0))]
 
     candidates = base_qs.filter(
         Q(slot_date__in=candidate_dates)
@@ -166,7 +164,10 @@ def _find_matching_assignment(
         start_time = slot.start_time or time(0, 0)
         end_time = slot.end_time or time(23, 59, 59)
 
-        if tz and timezone.is_aware(target_time):
+        eval_local = target_time
+        if aware:
+            tz = get_booking_timezone(pharmacy, assignment.engagement_terms_snapshot)
+            eval_local = target_time.astimezone(tz)
             start_dt = datetime.combine(slot_date, start_time, tzinfo=tz)
             if end_time <= start_time:
                 end_dt = datetime.combine(slot_date + timedelta(days=1), end_time, tzinfo=tz)

@@ -2,6 +2,8 @@
 from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from organizations.feature_port import pharmacy_features
 from organizations.models import Chain, Organization, Pharmacy, PharmacyAdmin
 from organizations.pharmacy_profile import record_marketplace_review, validate_marketplace_review
 
@@ -120,7 +122,11 @@ class PharmacyModelAdmin(admin.ModelAdmin):
         }),
     )
 
+    @transaction.atomic
     def save_model(self, request, obj, form, change):
+        if change:
+            pharmacy = Pharmacy.objects.select_for_update(no_key=True).get(pk=obj.pk)
+            pharmacy_features().preserve_pharmacy_bookings(pharmacy, form.cleaned_data)
         if "marketplace_review_status" in form.changed_data:
             record_marketplace_review(obj, request.user)
         super().save_model(request, obj, form, change)

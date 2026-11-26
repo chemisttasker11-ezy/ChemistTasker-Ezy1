@@ -3,10 +3,10 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from organizations.timezone import get_pharmacy_timezone
+from organizations.timezone import get_booking_timezone, get_pharmacy_timezone
 from shifts.models import ShiftSlotAssignment
 from shifts.notifications import notify_shift_users
-from shifts.selectors import slot_not_ended_q
+from shifts.selectors import assignment_not_ended_q, snapshot_assignment_filters
 
 
 ADDRESS_FIELDS = ("street_address", "suburb", "state", "postcode", "google_place_id", "latitude", "longitude")
@@ -19,6 +19,7 @@ OPENING_FIELDS = tuple(
 
 def booking_site(pharmacy):
     values = {field: getattr(pharmacy, field) for field in ADDRESS_FIELDS}
+    values["timezone"] = get_pharmacy_timezone(pharmacy).key
     for field in ("latitude", "longitude"):
         if values[field] is not None:
             values[field] = str(values[field])
@@ -26,17 +27,16 @@ def booking_site(pharmacy):
 
 
 def upcoming_pharmacy_assignments(pharmacy, *, user_id=None):
-    now = timezone.now().astimezone(get_pharmacy_timezone(pharmacy))
-    upcoming = slot_not_ended_q(now.date(), now.time(), date="slot_date", start="slot__start_time", end="slot__end_time")
-    legacy = Q(slot_date__isnull=True) & slot_not_ended_q(
-        now.date(), now.time(), date="slot__date", start="slot__start_time", end="slot__end_time",
-    )
-    rows = ShiftSlotAssignment.objects.filter(upcoming | legacy, shift__pharmacy=pharmacy)
-    rows = rows.filter(
+    now = timezone.now()
+    rows = ShiftSlotAssignment.objects.filter(
         Q(is_rostered=False) | Q(slot__roster_period__isnull=True) | Q(slot__roster_period__status="PUBLISHED"),
         slot__unpublished_at__isnull=True,
+        shift__pharmacy=pharmacy,
     )
-    return rows.filter(user_id=user_id) if user_id is not None else rows
+    if user_id is not None:
+        rows = rows.filter(user_id=user_id)
+    saved_zone, upcoming = snapshot_assignment_filters(now, rows)
+    return rows.filter(upcoming | (~saved_zone & assignment_not_ended_q(now, get_pharmacy_timezone(pharmacy))))
 
 
 def pharmacy_booking_impact(pharmacy, *, user_id=None):
@@ -50,7 +50,9 @@ def pharmacy_booking_impact(pharmacy, *, user_id=None):
 
 
 def preserve_pharmacy_bookings(pharmacy, changes):
-    changes_site = any(field in changes and changes[field] != getattr(pharmacy, field) for field in ADDRESS_FIELDS)
+    changes_site = any(
+        field in changes and changes[field] != getattr(pharmacy, field) for field in (*ADDRESS_FIELDS, "timezone")
+    )
     changes_hours = any(
         field in changes and changes[field] != getattr(pharmacy, field, None)
         for field in OPENING_FIELDS
@@ -64,8 +66,14 @@ def preserve_pharmacy_bookings(pharmacy, changes):
         historic = []
         for booking in bookings:
             terms = booking.engagement_terms_snapshot or {}
-            if "booking_site" not in terms:
-                booking.engagement_terms_snapshot = {**terms, "booking_site": site}
+            old_site = terms.get("booking_site")
+            if not old_site or not old_site.get("timezone"):
+                if old_site:
+                    saved_zone = get_booking_timezone(pharmacy, terms).key
+                    if (old_site.get("state"), old_site.get("postcode")) == (site["state"], site["postcode"]):
+                        saved_zone = site["timezone"]
+                    old_site = {**old_site, "timezone": saved_zone}
+                booking.engagement_terms_snapshot = {**terms, "booking_site": old_site or site}
                 historic.append(booking)
         ShiftSlotAssignment.objects.bulk_update(historic, ["engagement_terms_snapshot"])
 

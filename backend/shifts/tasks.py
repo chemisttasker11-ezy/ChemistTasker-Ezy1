@@ -11,7 +11,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from users.task_dispatch import async_task
-from organizations.timezone import get_pharmacy_timezone
+from organizations.timezone import get_booking_timezone
 from shifts.emails import build_shift_email_context
 from shifts.models import ShiftSlotAssignment
 
@@ -29,19 +29,16 @@ def send_shift_reminders():
         .filter(Q(slot_date__in=date_window) | Q(slot_date__isnull=True))
     )
 
-    pharmacy_assignment_map = {}
+    assignments_by_zone = {}
     for assignment in assignments:
         pharmacy = assignment.shift.pharmacy
         if pharmacy is None:
             continue
-        pharmacy_assignment_map.setdefault(pharmacy.id, {"pharmacy": pharmacy, "assignments": []})[
-            "assignments"
-        ].append(assignment)
+        booking_zone = get_booking_timezone(pharmacy, assignment.engagement_terms_snapshot)
+        assignments_by_zone.setdefault(booking_zone, []).append(assignment)
 
     total_sent = 0
-    for entry in pharmacy_assignment_map.values():
-        pharmacy = entry["pharmacy"]
-        tz = get_pharmacy_timezone(pharmacy)
+    for tz, grouped_assignments in assignments_by_zone.items():
         local_now = now_utc.astimezone(tz)
         window_start = local_now + timedelta(hours=12)
         window_end = local_now + timedelta(hours=13)
@@ -55,7 +52,7 @@ def send_shift_reminders():
                 return start_time < window_end.time()
             return False
 
-        for assignment in entry["assignments"]:
+        for assignment in grouped_assignments:
             slot_date = assignment.slot_date or getattr(assignment.slot, "date", None)
             start_time = getattr(assignment.slot, "start_time", None)
             if not slot_date or not start_time:

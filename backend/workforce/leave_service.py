@@ -10,7 +10,7 @@ from django.utils.dateparse import parse_datetime
 from memberships.models import Membership
 from organizations.models import PharmacyAdmin
 from shifts.models import ShiftSlotAssignment
-from organizations.timezone import get_pharmacy_timezone
+from organizations.timezone import get_booking_timezone
 from shifts.emails import build_roster_email_link
 from users.task_dispatch import async_task
 from users.models import OrganizationMembership, User
@@ -47,7 +47,7 @@ def _membership_for_assignment(user, pharmacy):
 
 def assignment_interval(assignment):
     work_date = assignment.slot_date or assignment.slot.date
-    tz = get_pharmacy_timezone(assignment.shift.pharmacy)
+    tz = get_booking_timezone(assignment.shift.pharmacy, assignment.engagement_terms_snapshot)
     start = datetime.combine(work_date, assignment.slot.start_time, tzinfo=tz)
     end_date = work_date + timedelta(days=1) if assignment.slot.end_time <= assignment.slot.start_time else work_date
     end = datetime.combine(end_date, assignment.slot.end_time, tzinfo=tz)

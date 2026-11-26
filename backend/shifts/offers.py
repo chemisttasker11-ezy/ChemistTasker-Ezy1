@@ -339,13 +339,13 @@ class ShiftOfferViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins
         )
 
         shift, offer = lock_offer_for_acceptance(self.get_object(), request.user)
-        credentials = check_shift_offer_credentials(request.user, shift)
         if offer.user_id != request.user.id:
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
         if offer.status != ShiftOffer.Status.PENDING:
             return Response({'detail': 'Offer is not pending.'}, status=status.HTTP_400_BAD_REQUEST)
         shift = offer.shift
         lock_booking_workers([offer.user_id])
+        credentials = check_shift_offer_credentials(request.user, shift)
         list(ShiftSlot.objects.select_for_update().filter(shift=shift).order_by('pk'))
 
         now = timezone.now()

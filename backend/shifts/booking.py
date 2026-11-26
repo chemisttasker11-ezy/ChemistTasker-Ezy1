@@ -9,7 +9,7 @@ from rest_framework.exceptions import ValidationError
 from shifts.models import Shift, ShiftOffer, ShiftSlotAssignment
 from shifts.occurrences import accepted_occurrences
 from shifts.pricing import expand_shift_slots
-from organizations.timezone import get_pharmacy_timezone
+from organizations.timezone import get_booking_timezone
 
 
 def lock_booking_profiles(workers):
@@ -52,16 +52,15 @@ def lock_booking_workers(worker_ids):
     ).order_by('pk').values_list('pk', flat=True))
 
 
-def _work_interval(pharmacy, work_date, start_time, end_time):
-    tz = get_pharmacy_timezone(pharmacy)
+def _work_interval(tz, work_date, start_time, end_time):
     start = datetime.combine(work_date, start_time, tzinfo=tz)
     end = datetime.combine(work_date, end_time, tzinfo=tz)
     return start, end + timedelta(days=1) if end <= start else end
 
 
-def _booking_interval(pharmacy, slot, day, offer):
+def _booking_interval(pharmacy, slot, day, offer, terms=None):
     return _work_interval(
-        pharmacy,
+        get_booking_timezone(pharmacy, terms),
         day,
         (offer and offer.offered_start_time) or slot.start_time,
         (offer and offer.offered_end_time) or slot.end_time,
@@ -103,7 +102,7 @@ def ensure_worker_booking_available(offer, occurrences=None):
     for assignment in assignments:
         check(_booking_interval(
             assignment.shift.pharmacy, assignment.slot, assignment.slot_date or assignment.slot.date,
-            assignment.source_offer,
+            assignment.source_offer, assignment.engagement_terms_snapshot,
         ), 'an assigned shift')
 
     # Payment expiry transitions the offer only after confirming the provider no longer owns the hold.

@@ -26,7 +26,7 @@ ROOT = "/api/v1/users/"
 PASSWORD = "CorrectPassword123!"
 
 
-@override_settings(AXES_ENABLED=False)
+@override_settings(AXES_ENABLED=False, APP_TWO_FACTOR_ENROLLMENT_ENABLED=True)
 class SessionSecurityTests(TestCase):
     def setUp(self):
         cache.clear()
@@ -92,6 +92,31 @@ class SessionSecurityTests(TestCase):
         self.assertEqual(self.get("me/", second.data["access"]).status_code, 401)
         self.challenge()
         self.assertEqual(UserSession.objects.filter(user=self.user).count(), 2)
+
+    def test_enrollment_gate_blocks_setup_and_confirmation(self):
+        access = self.login().data["access"]
+        code = self.send_email("2fa/email/start/", access=access)
+        with self.settings(APP_TWO_FACTOR_ENROLLMENT_ENABLED=False):
+            self.assertEqual(self.get("2fa/", access).data, {"eligible": False, "enabled": False, "methods": []})
+            for path, data in (
+                ("2fa/email/start/", {}),
+                ("2fa/email/confirm/", {"code": code}),
+                ("2fa/authenticator/start/", {}),
+                ("2fa/authenticator/confirm/", {"code": "123456"}),
+            ):
+                with self.subTest(path=path):
+                    response = self.post(path, data, access=access)
+                    self.assertEqual(response.status_code, 403, response.data)
+            self.assertEqual(self.login().status_code, 200)
+
+    def test_enrollment_gate_keeps_existing_factor_login_working(self):
+        access = self.login().data["access"]
+        self.enable_email(access)
+        with self.settings(APP_TWO_FACTOR_ENROLLMENT_ENABLED=False):
+            self.assertEqual(self.get("2fa/", access).data, {"eligible": False, "enabled": True, "methods": ["email"]})
+            challenge = self.challenge()
+            confirmed = self.complete(challenge, self.email_challenge_code(challenge))
+            self.assertEqual(confirmed.status_code, 200, confirmed.data)
 
     def test_email_send_is_throttled_and_one_live_code_has_five_guesses(self):
         access = self.login().data["access"]

@@ -1,5 +1,7 @@
 import json
-from datetime import time, timedelta
+from datetime import datetime, time, timedelta
+from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 from django.http import QueryDict
 from django.test import SimpleTestCase, TestCase
@@ -38,11 +40,12 @@ class PharmacyProfileContractTests(SimpleTestCase):
 
 
 class PharmacyBookingChangeContractTests(TestCase):
-    def test_pharmacy_edit_preserves_booked_address_and_tells_worker(self):
+    def test_pharmacy_edit_preserves_booked_address_and_timezone_and_tells_worker(self):
         owner, pharmacy = make_owner_with_pharmacy("Confirm Pharmacy")
         worker = make_user("PHARMACIST")
         pharmacy.street_address = "1 Original Road"
-        pharmacy.save(update_fields=["street_address"])
+        pharmacy.state, pharmacy.postcode, pharmacy.timezone = "WA", "6000", ""
+        pharmacy.save(update_fields=["street_address", "state", "postcode", "timezone"])
         shift = Shift.objects.create(pharmacy=pharmacy, created_by=owner, role_needed="PHARMACIST")
         day = timezone.localdate() + timedelta(days=2)
         slot = ShiftSlot.objects.create(shift=shift, date=day, start_time=time(9), end_time=time(17))
@@ -52,13 +55,22 @@ class PharmacyBookingChangeContractTests(TestCase):
         impact = client_for(owner).get(url + "booking-impact/")
         self.assertEqual(impact.data, {"bookings": [{"shift_id": shift.pk, "date": day.isoformat()}]})
         with self.captureOnCommitCallbacks(execute=True):
-            changed = client_for(owner).patch(url, {"street_address": "2 New Road"}, format="json")
+            changed = client_for(owner).patch(url, {
+                "street_address": "2 New Road", "state": "QLD", "postcode": "4000",
+            }, format="json")
         self.assertEqual(changed.status_code, 200, changed.data)
         assignment.refresh_from_db()
         self.assertEqual(assignment.engagement_terms_snapshot["booking_site"]["street_address"], "1 Original Road")
-        confirmation = client_for(worker).get(f"/api/v1/my-confirmed-shifts/{shift.pk}/")
+        # In Brisbane it's already 18:30, but the Perth booking still has half an hour.
+        still_working = datetime.combine(day, time(16, 30), tzinfo=ZoneInfo("Australia/Perth"))
+        with patch("django.utils.timezone.now", return_value=still_working):
+            confirmation = client_for(worker).get(f"/api/v1/my-confirmed-shifts/{shift.pk}/")
+            impact = client_for(owner).get(url + "booking-impact/")
         self.assertEqual(confirmation.status_code, 200, confirmation.data)
+        self.assertEqual(impact.data, {"bookings": [{"shift_id": shift.pk, "date": day.isoformat()}]})
         self.assertEqual(confirmation.data["pharmacy_detail"]["street_address"], "1 Original Road")
+        self.assertEqual(confirmation.data["pharmacy_detail"]["timezone"], "Australia/Perth")
+        self.assertEqual(confirmation.data["assigned_occurrences"][0]["timezone"], "Australia/Perth")
         self.assertTrue(Notification.objects.filter(user=worker, title="Pharmacy details updated").exists())
 
     def test_marketplace_review_attributes_and_notifies_an_explicit_decision(self):

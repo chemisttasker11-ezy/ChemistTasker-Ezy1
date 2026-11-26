@@ -3,7 +3,7 @@ from rest_framework import serializers
 from shifts.access import _user_can_perform_shift_role
 from shifts.models import Shift
 from organizations.serializers import PharmacySerializer
-from organizations.timezone import get_pharmacy_timezone
+from organizations.timezone import get_booking_timezone
 from .shifts import ShiftSerializer
 from .slots import ShiftSlotSerializer
 from shifts.rate_visibility import project_published_rates
@@ -62,6 +62,7 @@ class MyShiftSerializer(serializers.ModelSerializer):
         ).values_list('engagement_terms_snapshot', flat=True).first()
         if terms and terms.get('booking_site'):
             data['pharmacy_detail'].update(terms['booking_site'])
+            data['pharmacy_detail']['timezone'] = get_booking_timezone(instance.pharmacy, terms).key
         return project_published_rates(data, user=user, pharmacy=instance.pharmacy)
 
     @staticmethod
@@ -82,7 +83,6 @@ class MyShiftSerializer(serializers.ModelSerializer):
         user = getattr(self.context.get('request'), 'user', None)
         if not user or not user.is_authenticated:
             return []
-        time_zone = get_pharmacy_timezone(obj.pharmacy).key
         assignments = obj.slot_assignments.filter(
             user_id=user.pk, slot__unpublished_at__isnull=True,
         ).select_related('slot', 'source_offer').order_by('slot_date', 'pk')
@@ -109,7 +109,8 @@ class MyShiftSerializer(serializers.ModelSerializer):
                 break
             result.append({
                 'slot_id': slot.id, 'date': str(work_date),
-                'start_time': str(start), 'end_time': str(end), 'timezone': time_zone,
+                'start_time': str(start), 'end_time': str(end),
+                'timezone': get_booking_timezone(obj.pharmacy, snapshot).key,
             })
         return result
 

@@ -2,6 +2,7 @@
 import secrets
 from datetime import timedelta
 
+from django.conf import settings
 from django.core import signing
 from django.db import transaction
 from django.utils import timezone
@@ -53,17 +54,22 @@ def _configured_methods(user, state):
 def two_factor_status(user):
     state = UserTwoFactor.objects.filter(user=user).first()
     methods = _configured_methods(user, state)
-    return {"eligible": _can_set_up(user), "enabled": bool(methods), "methods": methods}
+    return {
+        "eligible": settings.APP_TWO_FACTOR_ENROLLMENT_ENABLED and _can_set_up(user),
+        "enabled": bool(methods), "methods": methods,
+    }
 
 
-def _lock_settings_user(user, sid, *, setup=False):
+def _lock_settings_user(user, sid, *, setup=False, enroll=False):
     locked = User.objects.select_for_update().get(pk=user.pk)
     if (
         not locked.is_active or locked.deleted_at or locked.password != user.password
         or (sid and RevokedSession.objects.filter(session_id=sid).exists())
     ):
         raise AuthenticationFailed("Session is no longer valid.")
-    if setup and not _can_set_up(locked):
+    if enroll and not settings.APP_TWO_FACTOR_ENROLLMENT_ENABLED:
+        raise PermissionDenied("Two-factor setup is not available yet.")
+    if (setup or enroll) and not _can_set_up(locked):
         raise PermissionDenied("Two-factor setup is available to owners and organisation admins.")
     return locked
 
@@ -106,16 +112,14 @@ def _verify_email_code(state, code):
 
 @transaction.atomic
 def start_email_two_factor(user, sid):
-    user = _lock_settings_user(user, sid)
+    user = _lock_settings_user(user, sid, enroll=True)
     state, _ = UserTwoFactor.objects.get_or_create(user=user)
-    if not state.email_confirmed and not _can_set_up(user):
-        raise PermissionDenied("Two-factor setup is available to owners and organisation admins.")
     return _send_email_code(user, state)
 
 
 @transaction.atomic
 def confirm_email_two_factor(user, sid, code):
-    user = _lock_settings_user(user, sid, setup=True)
+    user = _lock_settings_user(user, sid, enroll=True)
     state = UserTwoFactor.objects.filter(user=user, email_confirmed=False).first()
     if not state or not _verify_email_code(state, code):
         return None
@@ -127,7 +131,7 @@ def confirm_email_two_factor(user, sid, code):
 
 @transaction.atomic
 def start_authenticator_two_factor(user, sid):
-    user = _lock_settings_user(user, sid, setup=True)
+    user = _lock_settings_user(user, sid, enroll=True)
     state, _ = UserTwoFactor.objects.get_or_create(user=user)
     if state.authenticator_confirmed:
         raise ValidationError("Authenticator is already configured.")
@@ -138,7 +142,7 @@ def start_authenticator_two_factor(user, sid):
 
 @transaction.atomic
 def confirm_authenticator_two_factor(user, sid, code):
-    user = _lock_settings_user(user, sid, setup=True)
+    user = _lock_settings_user(user, sid, enroll=True)
     state = UserTwoFactor.objects.filter(user=user, authenticator_confirmed=False).first()
     device = _totp_devices(user).first()
     if not state or not device or not _verify_totp(device, code):

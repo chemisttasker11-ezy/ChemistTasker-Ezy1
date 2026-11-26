@@ -7,12 +7,12 @@ from django.db.models import Q
 from memberships.models import Membership
 from shifts.models import ShiftSlotAssignment
 from talent.models import UserAvailability
-from organizations.timezone import get_pharmacy_timezone
+from organizations.timezone import get_booking_timezone
 from users.presentation import user_display_name
 
 
-def work_interval(pharmacy, work_date, start_time, end_time):
-    tz = get_pharmacy_timezone(pharmacy)
+def work_interval(pharmacy, work_date, start_time, end_time, *, terms=None):
+    tz = get_booking_timezone(pharmacy, terms)
     start = datetime.combine(work_date, start_time, tzinfo=tz)
     end = datetime.combine(work_date, end_time, tzinfo=tz)
     if end <= start:
@@ -53,7 +53,8 @@ def worker_issues(pharmacy, worker, work_date, start_time, end_time, role, exclu
     ).exclude(pk=exclude_assignment_id).select_related("slot", "shift__pharmacy")
     for other in nearby:
         other_start, other_end = work_interval(other.shift.pharmacy, other.slot_date or other.slot.date,
-                                               other.slot.start_time, other.slot.end_time)
+                                               other.slot.start_time, other.slot.end_time,
+                                               terms=other.engagement_terms_snapshot)
         if start < other_end and other_start < end:
             error("SHIFT_OVERLAP", f"Worker {name} has an overlapping shift at {other.shift.pharmacy.name}.",
                   conflicting_assignment_id=other.pk)

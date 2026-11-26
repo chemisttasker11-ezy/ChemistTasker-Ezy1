@@ -315,12 +315,19 @@ Approved. Only public booking incidents count towards public shift bans.
 #### Owner follow-ups from the review
 
 - Kiosk and PIN notices open the Vite pages. Next does not serve the kiosk interface.
-- When server sign-out cannot be completed, browser sign-in waits until revocation succeeds.
+- Browser sign-in normally waits for pending server revocation. On 26 Nov 2026 the owner confirmed that sign-in may proceed when both Web Locks and IndexedDB coordination are unavailable.
 - The offer send exception covers group and chain only. Ordinary public and pharmacy-private sends keep their checks. GM02-Q21-R1 below replaces the earlier note that acceptance rules continue to apply.
 - **GM02-Q21-R1 (owner, 24 Nov 2026, review round).** "We only notify the owner about his worker but let him do whatever with his internal roster and the inter-group booking." Replaces the acceptance part of GM02-Q21 and the earlier "acceptance keeps BL-01" note.
   - Reading (my call: confirm or change): for the pharmacy's own staff and internal roster, and for `OWNER_CHAIN` and `ORG_CHAIN` shifts, the credential gate does not block sending, accepting or finalising. The manager gets the worker's check result as a notice, and it also shows on the offer.
   - `LOCUM_CASUAL` and `PLATFORM` keep the full BL-01 gate at sending, accepting and finalising.
   - Not built on this branch. The work is on `build/bl01-02-booking-gate`; close the gap when it is integrated.
+
+#### Owner follow-ups on the integration (26 Nov 2026)
+
+- Launch starts with fresh data, so the legacy zero-rate workaround is deferred.
+- App two-factor enrolment remains off until the supported sign-in screens can complete a challenge.
+- The group booking warning requires current, active staff membership in the relevant chain or organisation. The exception is checked again at acceptance and finalisation.
+- Confirmed bookings preserve their booked time zone alongside the site address when the pharmacy changes location or time zone.
 
 These dispositions apply to the local working files based on `1f00f6b4`. The full owner answers above remain the decision record.
 

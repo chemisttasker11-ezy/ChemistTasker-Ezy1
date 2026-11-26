@@ -24,7 +24,7 @@ from client_profile.characterization_support import (
 from memberships.models import Membership
 from notifications.models import Notification
 from onboarding.models import PharmacistOnboarding
-from organizations.models import Organization, Pharmacy
+from organizations.models import Chain, Organization, Pharmacy
 from workforce.models import RosterPeriod
 from shifts.models import (
     Shift,
@@ -555,6 +555,8 @@ class CounterOfferTests(ShiftActionFixture):
         self.pharmacy.organization = org
         self.pharmacy.save(update_fields=["organization"])
         sibling = Pharmacy.objects.create(name="Sibling", owner=self.pharmacy.owner, organization=org)
+        chain = Chain.objects.create(name="Booking chain", owner=self.pharmacy.owner)
+        chain.pharmacies.add(self.pharmacy, sibling)
         worker = self.worker(employment_type="LOCUM", verified=False)
         Membership.objects.create(user=worker, pharmacy=sibling, role="PHARMACIST", employment_type="FULL_TIME")
 
@@ -615,6 +617,32 @@ class CounterOfferTests(ShiftActionFixture):
                     self.assertEqual(counter.status, ShiftCounterOffer.Status.PENDING)
                     self.assertFalse(ShiftOffer.objects.filter(shift=shift).exists())
                     self.assertFalse(notices.exists())
+
+    def test_group_exception_requires_current_membership_at_send_and_accept(self):
+        org = Organization.objects.create(name="Booking organization")
+        self.pharmacy.organization = org
+        self.pharmacy.save(update_fields=["organization"])
+        sibling = Pharmacy.objects.create(name="Sibling", owner=self.pharmacy.owner, organization=org)
+        same_owner = Pharmacy.objects.create(name="Outside chain", owner=self.pharmacy.owner)
+        chain = Chain.objects.create(name="Booking chain", owner=self.pharmacy.owner)
+        chain.pharmacies.add(self.pharmacy, sibling)
+        worker = self.worker(employment_type=None, verified=False)
+        Membership.objects.create(user=worker, pharmacy=same_owner, role="PHARMACIST", employment_type="FULL_TIME")
+        for visibility in ("OWNER_CHAIN", "ORG_CHAIN"):
+            with self.subTest(visibility=visibility):
+                shift = self.shift(visibility=visibility)
+                send = f"shifts/{shift.pk}/accept_user/"
+                refused, _ = self.post(self.owner, send, {"user_id": worker.pk})
+                self.assertEqual((refused.status_code, refused.data["code"]), (403, "candidate_ahpra_ineligible"))
+                membership = Membership.objects.create(
+                    user=worker, pharmacy=sibling, role="PHARMACIST", employment_type="FULL_TIME",
+                )
+                offered, _ = self.post(self.owner, send, {"user_id": worker.pk})
+                self.assertEqual(offered.status_code, 200, offered.data)
+                membership.delete()
+                response, _ = self.post(worker, f'shift-offers/{offered.data["offer_id"]}/accept/')
+                self.assertEqual(response.status_code, 403, response.data)
+                self.assertFalse(shift.slot_assignments.exists())
 
     def test_public_counteroffer_preserves_onboarding_outcomes_with_enforcement_on_or_off(self):
         for enforcement in (True, False):
@@ -1454,6 +1482,10 @@ class BookingSafetyTests(ShiftActionFixture):
 
         shift = self.shift(visibility="OWNER_CHAIN")
         worker = self.worker(verified=False)
+        sibling = Pharmacy.objects.create(name="Sibling", owner=self.pharmacy.owner)
+        chain = Chain.objects.create(name="Booking chain", owner=self.pharmacy.owner)
+        chain.pharmacies.add(self.pharmacy, sibling)
+        Membership.objects.create(user=worker, pharmacy=sibling, role="PHARMACIST", employment_type="FULL_TIME")
         offer = self.offer(shift, worker, status=ShiftOffer.Status.ACCEPTED_AWAITING_PAYMENT)
 
         assignment_ids, _ = finalize_shift_offer(offer)

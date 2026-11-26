@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from users.task_dispatch import async_task
 from memberships.models import Membership, PHARMACY_STAFF_EMPLOYMENT_TYPES
+from organizations.chains import active_owner_chains_for_pharmacy
 from shifts.access import ShiftActionRefused, _user_can_perform_shift_role, staff_membership_can_claim_role
 from shifts.emails import build_offer_shift_details, build_shift_offer_context
 from shifts.engagement import keep_accepted_terms, staff_assignment_defaults
@@ -22,19 +23,34 @@ from shifts.notifications import notify_shift_users, notify_worker_credentials
 OFFER_EXPIRY_HOURS = 48
 
 
-def lock_shift_offer_credentials(worker, shift, *, manager=False, schedule_recheck=True):
-    from onboarding.verification.state import lock_public_ahpra
-
-    return lock_public_ahpra(
-        worker, shift, manager=manager, schedule_recheck=schedule_recheck, allow_group_booking=True,
+def _worker_in_shift_group(worker, shift):
+    if shift.visibility not in ('OWNER_CHAIN', 'ORG_CHAIN'):
+        return False
+    pharmacy = shift.pharmacy
+    staff = Membership.objects.filter(
+        user=worker, is_active=True, status=Membership.Status.ACCEPTED,
+        employment_type__in=PHARMACY_STAFF_EMPLOYMENT_TYPES,
     )
+    if shift.visibility == 'OWNER_CHAIN':
+        return staff.filter(pharmacy__chains__in=active_owner_chains_for_pharmacy(pharmacy)).exists()
+    return pharmacy.organization_id is not None and staff.filter(
+        pharmacy__organization_id=pharmacy.organization_id,
+    ).exists()
+
+
+def lock_shift_offer_credentials(worker, shift, *, manager=False, schedule_recheck=True):
+    from onboarding.verification.state import lock_ahpra_profiles
+
+    lock_ahpra_profiles([worker])
+    return check_shift_offer_credentials(worker, shift, manager=manager, schedule_recheck=schedule_recheck)
 
 
 def check_shift_offer_credentials(worker, shift, *, manager=False, schedule_recheck=True):
     from onboarding.verification.state import check_public_ahpra
 
     return check_public_ahpra(
-        worker, shift, manager=manager, schedule_recheck=schedule_recheck, allow_group_booking=True,
+        worker, shift, manager=manager, schedule_recheck=schedule_recheck,
+        allow_group_booking=_worker_in_shift_group(worker, shift),
     )
 
 

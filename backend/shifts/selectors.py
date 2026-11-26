@@ -3,6 +3,7 @@
 The list views compose these instead of repeating the filters.
 """
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 from django.db.models import Exists, F, OuterRef, Q
 
@@ -60,6 +61,27 @@ def slot_not_ended_q(local_date, clock, *, date='date', start='start_time', end=
     )
 
 
+BOOKED_TIMEZONE = 'engagement_terms_snapshot__booking_site__timezone'
+
+
+def assignment_not_ended_q(now, zone):
+    local = now.astimezone(zone)
+    times = {'start': 'slot__start_time', 'end': 'slot__end_time'}
+    return slot_not_ended_q(local.date(), local.time(), date='slot_date', **times) | (
+        Q(slot_date__isnull=True) & slot_not_ended_q(local.date(), local.time(), date='slot__date', **times)
+    )
+
+
+def snapshot_assignment_filters(now, assignments):
+    """Return the saved-zone rows and the subset still upcoming in their booked zone."""
+    saved = Q(**{f'{BOOKED_TIMEZONE}__isnull': False})
+    upcoming = Q(pk__in=[])
+    zones = assignments.filter(saved).order_by().values_list(BOOKED_TIMEZONE, flat=True).distinct()
+    for zone in zones:
+        upcoming |= Q(**{BOOKED_TIMEZONE: zone}) & assignment_not_ended_q(now, ZoneInfo(zone))
+    return saved, upcoming
+
+
 def _future_or_current_slot_q(now, today, prefix=''):
     result = Q(pk__in=[])
     pharmacy_ids_by_zone = {}
@@ -108,9 +130,16 @@ def _matching_shift_slot_exists(*, now, today, assigned_user_id=None, state='act
             Q(has_assignment=False) | Q(has_pending_payment=True)
         )
     elif state == 'confirmed':
-        slots = slots.filter(_future_or_current_slot_q(now, today)).filter(
-            has_assignment=True,
-            has_pending_payment=False,
+        scope = ShiftSlotAssignment.objects.filter(
+            Q(slot_date__gte=now.date() - timedelta(days=2))
+            | Q(slot_date__isnull=True, slot__date__gte=now.date() - timedelta(days=2))
+        )
+        if assigned_user_id is not None:
+            scope = scope.filter(user_id=assigned_user_id)
+        saved_zone, upcoming = snapshot_assignment_filters(now, scope)
+        slots = slots.filter(has_pending_payment=False).filter(
+            Exists(slot_assignments.filter(upcoming))
+            | (_future_or_current_slot_q(now, today) & Exists(slot_assignments.filter(~saved_zone)))
         )
     # elif state == 'history':
     #     slots = slots.filter(_past_slot_q(now, today)).filter(

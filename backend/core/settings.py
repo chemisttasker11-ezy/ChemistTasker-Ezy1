@@ -349,6 +349,7 @@ AXES_SENSITIVE_PARAMETERS = [
 # Invitation links (first password) last as long as the invitation; reset links are limited to one hour.
 PASSWORD_RESET_TIMEOUT = 7 * 24 * 60 * 60
 PASSWORD_RESET_LINK_SECONDS = 60 * 60
+APP_TWO_FACTOR_ENROLLMENT_ENABLED = env.bool('APP_TWO_FACTOR_ENROLLMENT_ENABLED', default=False)
 
 REST_FRAMEWORK = {
     # Preserve the established numeric ID wire contract through DRF 3.17's BigIntegerField mapping.
